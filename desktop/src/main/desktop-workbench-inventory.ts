@@ -53,9 +53,17 @@ export namespace DesktopWorkbenchInventory {
     if (!snapshot) return failure("editor_surface_endpoint_unavailable");
     return {
       content: [],
-      structuredContent: { interactive: true, ...snapshot },
+      structuredContent: { interactive: true, ...tabs(snapshot) },
       isError: false,
     };
+  }
+
+  export function tabs({
+    active,
+    open,
+    truncated,
+  }: NativeEditorSurfaceSnapshot) {
+    return { active, open, truncated };
   }
 
   function failure(text: string) {

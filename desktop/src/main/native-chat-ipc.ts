@@ -7,8 +7,8 @@ import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import {
+  NativeEditorSelection,
   NativeEditorSurfaces,
-  NativeEditorSvgSelection,
   NativeEditorSvgText,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
@@ -433,7 +433,7 @@ export class NativeChatIpc {
     "native_chat_svg_text_unverified"
   );
   private readonly svgSelectionReplies = new NativeEditorSvgReplies(
-    NativeEditorSvgSelection.result,
+    NativeEditorSelection.result,
     "native_chat_svg_selection_unverified"
   );
   /** Per window, the sessions it showed for each chat host. */
@@ -2636,6 +2636,12 @@ export class NativeChatIpc {
     )
       throw new Error("native_chat_editor_surfaces_invalid");
     if (
+      snapshot.selection?.kind === "document" &&
+      snapshot.selection.placement?.boardPath === "/" &&
+      !deck
+    )
+      throw new Error("native_chat_editor_surfaces_invalid");
+    if (
       file &&
       (revision !== undefined ||
         snapshot.truncated ||
@@ -2644,7 +2650,7 @@ export class NativeChatIpc {
           : snapshot.open.length !== 1 ||
             (document
               ? snapshot.active !== DOCUMENT_SURFACE
-              : !snapshot.active.toLowerCase().endsWith(".svg"))))
+              : !NativeEditorSurfaces.isSvgPath(snapshot.active))))
     )
       throw new Error("native_chat_editor_surfaces_invalid");
     if (deck) attachment.deckEditorSurface = snapshot;
@@ -2695,7 +2701,17 @@ export class NativeChatIpc {
             ),
         async (request, signal) => {
           const slide = attachment.deckEditorSurface;
-          if (deck && !slide?.active) return { kind: "stale" };
+          if (
+            deck &&
+            (!slide ||
+              (slide.selection
+                ? !NativeEditorSelection.sameSubject(
+                    slide.selection,
+                    request.subject
+                  )
+                : !slide.active || request.path !== slide.active))
+          )
+            return { kind: "stale" };
           try {
             if (file) await file.recheck();
             this.revalidate(owner, attachment);
@@ -2714,12 +2730,12 @@ export class NativeChatIpc {
               }),
             signal
           );
-          this.revalidate(owner, attachment);
           if (file) await file.recheck();
+          this.revalidate(owner, attachment);
           if (
             deck &&
             (attachment.deckEditorSurface !== slide ||
-              ("path" in result && result.path !== slide?.active))
+              ("path" in result && result.path !== request.path))
           )
             throw new Error("native_chat_svg_selection_unverified");
           return result;
@@ -2750,7 +2766,7 @@ export class NativeChatIpc {
     value: unknown
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const result = NativeEditorSvgSelection.result(value);
+    const result = NativeEditorSelection.result(value);
     if (
       result &&
       "path" in result &&
@@ -2822,11 +2838,13 @@ export class NativeChatIpc {
     inputId: string,
     text: string,
     mode: NativeChatOperatingRegime | undefined,
-    targetId: unknown
-  ): { targetId: string; inputId: string } | undefined {
-    if (targetId === undefined) return;
+    value: unknown
+  ) {
+    if (value === undefined) return;
+    const capture = NativeEditorSelection.capture(value);
+    const targetId = capture?.targetId ?? value;
     if (
-      !NativeEditorSvgText.isId(targetId) ||
+      !NativeEditorSelection.isId(targetId) ||
       mode !== "act" ||
       typeof inputId !== "string" ||
       !/^[A-Za-z0-9_.:@/-]{1,256}$/.test(inputId) ||
@@ -2835,7 +2853,11 @@ export class NativeChatIpc {
     )
       throw new Error("native_chat_editor_tool_context_invalid");
     if (owner.active.chat.acceptsEditorToolContext)
-      return { targetId, inputId };
+      return {
+        targetId,
+        inputId,
+        ...(capture && { subject: capture.subject }),
+      };
   }
 
   async submit(

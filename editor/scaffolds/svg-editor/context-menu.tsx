@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useCommands,
   useSelection,
@@ -17,7 +17,7 @@ import {
 } from "@app/ui/components/dropdown-menu";
 
 /**
- * Shared right-click context menu for the SVG editor demo, used by both the
+ * Shared right-click context menu for the SVG editor, used by both the
  * canvas surface ({@link SvgCanvasContextMenu}) and the layers tree
  * ({@link SvgTreeRowContextMenu}). The menu body ({@link SvgContextMenuItems})
  * and its action bindings ({@link useSvgContextMenuActions}) are factored out
@@ -206,7 +206,8 @@ function useContextMenuAt() {
     before?.();
     setPos({ x: e.clientX, y: e.clientY });
   };
-  return { pos, open, close: () => setPos(null) };
+  const close = useCallback(() => setPos(null), []);
+  return { pos, open, close };
 }
 
 function ContextMenuAt({
@@ -247,27 +248,36 @@ function ContextMenuAt({
  */
 export function SvgCanvasContextMenu({
   children,
+  enabled = true,
 }: {
   children: React.ReactNode;
+  enabled?: boolean;
 }) {
   const editor = useSvgEditor();
   const cmd = useCommands();
   const selection = useSelection();
-  const menu = useContextMenuAt();
+  const { pos, open, close } = useContextMenuAt();
+  useEffect(() => {
+    if (!enabled) close();
+  }, [enabled, close]);
 
   return (
     <div
       className="absolute inset-0"
       data-testid="svg-canvas-context-menu"
-      onContextMenu={(e) =>
-        menu.open(e, () => {
-          const hovered = editor.surface_hover();
-          if (hovered && !selection.includes(hovered)) cmd.select(hovered);
-        })
+      onContextMenu={
+        enabled
+          ? (e) =>
+              open(e, () => {
+                const hovered = editor.surface_hover();
+                if (hovered && !selection.includes(hovered))
+                  cmd.select(hovered);
+              })
+          : undefined
       }
     >
       {children}
-      <ContextMenuAt pos={menu.pos} onClose={menu.close}>
+      <ContextMenuAt pos={enabled ? pos : null} onClose={close}>
         <SvgContextMenuItems />
       </ContextMenuAt>
     </div>

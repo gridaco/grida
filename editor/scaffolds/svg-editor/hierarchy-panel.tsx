@@ -7,7 +7,7 @@ import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 import type { Row } from "@grida/tree-view";
 import { useSvgTreeController, type SvgNodeMeta } from "./use-svg-tree";
 import { useSurfaceHover } from "./use-surface-hover";
-import { tagInfo } from "./node-type-map";
+import { tagIcon } from "./node-type-map";
 import { SvgTreeRowContextMenu } from "./context-menu";
 import { cn } from "@app/ui/lib/utils";
 
@@ -118,7 +118,7 @@ function HierarchyRow({
   const controller = useTree<SvgNodeMeta>();
   const node = controller.source.getNode(row.id);
   const label = controller.source.getLabel?.(row.id) ?? row.id;
-  const { Icon } = tagInfo(node.meta?.tag ?? "");
+  const Icon = tagIcon(node.meta?.tag ?? "");
   const isFolder = row.isContainer;
   const isExpanded = row.isExpanded;
 

@@ -8,14 +8,21 @@
  *
  * It renders ONLY the editor canvas — the shared {@link ./file-shell} owns the
  * title bar (fed via `onMeta`) and the AI sidebar (bound to this editor via
- * `onActiveEditor`). One-doc-per-window, so there is no mtime conflict path
+ * `bindEditor`). One-doc-per-window, so there is no mtime conflict path
  * here (that lives in the workspace workbench's svg tab); a single document
  * window has no concurrent editor.
  */
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AlertTriangleIcon } from "lucide-react";
 import {
   SvgEditorCanvas,
@@ -52,13 +59,13 @@ type LoadState =
 
 export function SingleFileSvgSurface({
   docId,
-  onActiveEditor,
+  bindEditor,
   onMeta,
 }: {
   docId?: string;
   /** Report the live editor up so the shell publishes it as the window's
    *  document surface. */
-  onActiveEditor: (editor: SvgEditor | null) => void;
+  bindEditor: (editor: SvgEditor) => (() => void) | undefined;
   /** Report title-bar metadata (filename, path, dirty) up to the shell. */
   onMeta: (meta: FileMeta) => void;
 }) {
@@ -114,7 +121,7 @@ export function SingleFileSvgSurface({
         docId={docId!}
         filename={loadState.filename}
         displayPath={loadState.displayPath}
-        onActiveEditor={onActiveEditor}
+        bindEditor={bindEditor}
         onMeta={onMeta}
       />
     </SvgEditorProvider>
@@ -138,13 +145,13 @@ function Surface({
   docId,
   filename,
   displayPath,
-  onActiveEditor,
+  bindEditor,
   onMeta,
 }: {
   docId: string;
   filename: string;
   displayPath: string;
-  onActiveEditor: (editor: SvgEditor | null) => void;
+  bindEditor: (editor: SvgEditor) => (() => void) | undefined;
   onMeta: (meta: FileMeta) => void;
 }) {
   const editor = useSvgEditor();
@@ -158,10 +165,7 @@ function Surface({
   const isDirty = contentVersion !== savedVersion;
 
   // Publish this editor as the window's document surface while it's mounted.
-  useEffect(() => {
-    onActiveEditor(editor);
-    return () => onActiveEditor(null);
-  }, [editor, onActiveEditor]);
+  useLayoutEffect(() => bindEditor(editor), [bindEditor, editor]);
 
   // Title-bar metadata. Filename basename + home-shortened path tooltip +
   // dirty dot, surfaced through the shell's title bar.

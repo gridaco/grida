@@ -6,6 +6,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { ShieldAlertIcon } from "lucide-react";
+import { AgentPromptCard } from "@/kits/agent-chat/prompt-card";
 
 const APPROVAL_ACTION = {
   read_file: "Read file",
@@ -40,10 +41,10 @@ export function AgentApprovalPrompt({
         ? "The agent is asking to change its settings file."
         : "The agent is asking for additional read access.";
   return (
-    <div
+    <AgentPromptCard
       role="group"
       aria-label="Permission approval"
-      className="grid shrink-0 gap-2 bg-muted/30 px-3 py-2.5 text-sm leading-5"
+      className="shrink-0"
     >
       <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
         <ShieldAlertIcon aria-hidden="true" className="size-4" />
@@ -175,7 +176,7 @@ export function AgentApprovalPrompt({
           Allow once
         </Button>
       </div>
-    </div>
+    </AgentPromptCard>
   );
 }
 

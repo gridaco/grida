@@ -516,6 +516,33 @@ it("expires one-use mount claims with a bounded mount failure and permits an exp
   f.host.closeAll();
 });
 
+it("retires the workspace browser when the shell navigates in page to Welcome", async () => {
+  const f = await fixture();
+  const page = f.descriptor();
+  const { guest } = f.mount(page);
+  const { webContents: shell } = f.window;
+  const workspace = shell.url;
+  const welcome = "https://grida.co/desktop/welcome";
+  shell.emit("did-start-navigation", {
+    isMainFrame: true,
+    isSameDocument: true,
+    url: welcome,
+  });
+  shell.url = welcome;
+  shell.mainFrame.url = welcome;
+  shell.emit("did-navigate-in-page", {}, welcome, true);
+
+  expect(guest.close).toHaveBeenCalledWith({ waitForBeforeUnload: false });
+  // Returning to the same URL cannot revive the previous page attachment.
+  shell.url = workspace;
+  shell.mainFrame.url = workspace;
+  shell.emit("did-navigate-in-page", {}, workspace, true);
+  expect(() => f.host.snapshot(f.event, f.attached.attachmentId)).toThrow(
+    "browser_attachment_expired"
+  );
+  f.host.closeAll();
+});
+
 it("ends claimed guests before registration when their document attachment is revoked", async () => {
   const f = await fixture();
   const page = f.descriptor();

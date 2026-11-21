@@ -3,7 +3,8 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { SvgEditorProvider, useSvgEditor } from "@grida/svg-editor/react";
 import { expect, it, vi } from "vitest";
-import { SlideSurface } from "./slide-surface";
+import { DocumentSurfaceHost } from "../file/document-surface-host";
+import { SlideSurface, type BindSlideEditor } from "./slide-surface";
 
 const writeFile = vi.hoisted(() =>
   vi.fn<() => Promise<{ mtime: number }>>(async () => ({ mtime: 11 }))
@@ -52,7 +53,7 @@ function createDom() {
   }
 }
 
-it("reports a dirty slide and clears the report on save or unmount", async () => {
+it("expires the selection on a same-file slide switch and saves the live buffer", async () => {
   const dom = createDom();
   vi.stubGlobal("window", dom.window);
   vi.stubGlobal("document", dom.window.document);
@@ -63,32 +64,71 @@ it("reports a dirty slide and clears the report on save or unmount", async () =>
   document.body.append(host);
   const root = createRoot(host);
   const report = vi.fn<(dirty: boolean) => void>();
-  let editor: ReturnType<typeof useSvgEditor>;
-  function TestSlide() {
+  const surface = new DocumentSurfaceHost();
+  const bindEditor: BindSlideEditor = (editor, slide) =>
+    surface.bindEditor(editor, `/${slide.src}`);
+  let editor!: ReturnType<typeof useSvgEditor>;
+  function TestSlide({ id, active }: { id: string; active: boolean }) {
     editor = useSvgEditor();
     return (
       <SlideSurface
         workspaceId="workspace"
         relPath={relPath}
         initialMtime={10}
+        active={active}
         onDirtyChange={report}
+        binding={{ slide: { id, src: "slide.svg" }, bindEditor }}
       />
     );
   }
 
   try {
-    await act(async () => {
+    const render = (id: string, active = true) => {
       root.render(
         <SvgEditorProvider initialSvg={original}>
-          <TestSlide />
+          <TestSlide id={id} active={active} />
         </SvgEditorProvider>
       );
-    });
+    };
+    await act(async () => render("first"));
     expect(report).toHaveBeenLastCalledWith(false);
+
+    await act(async () => {
+      const tree = editor.tree();
+      editor.commands.select(tree.nodes.get(tree.root)!.children);
+    });
+    const targetId = surface.editorSelection.capture()!;
+    const request = {
+      targetId,
+      path: "/slide.svg",
+      expiresAtMs: Date.now() + 1000,
+      operation: { kind: "inspect" } as const,
+    };
+    expect(surface.editorSelection.invoke(request)).toMatchObject({
+      kind: "inspection",
+    });
+    const previousEditor = editor;
+    await act(async () => render("second"));
+    expect(editor).toBe(previousEditor);
+    expect(surface.readEditorSurfaces().selection).toEqual({
+      kind: "svg",
+      path: "/slide.svg",
+    });
+    expect(surface.editorSelection.invoke(request)).toEqual({ kind: "stale" });
+    expect(surface.editorSelection.capture()).toBeDefined();
 
     await act(async () => editor.load(edited));
     expect(report).toHaveBeenLastCalledWith(true);
 
+    await act(async () => render("second", false));
+    expect(surface.readEditorSurfaces().selection).toBeUndefined();
+    expect(editor.serialize()).toBe(edited);
+    window.dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key: "s", metaKey: true })
+    );
+    expect(writeFile).not.toHaveBeenCalled();
+
+    await act(async () => render("second"));
     await act(async () => {
       window.dispatchEvent(
         new dom.window.KeyboardEvent("keydown", { key: "s", metaKey: true })

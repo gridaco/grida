@@ -12,7 +12,10 @@ import {
 } from "@grida/svg-editor/react";
 import type { Tool } from "@grida/svg-editor";
 
-import { ToolGroupItem } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import {
+  ToolGroupItem,
+  ToolbarPosition,
+} from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 
@@ -82,7 +85,7 @@ export function PathToolbar({ className }: { className?: string }) {
     <div
       aria-label="Path toolbar"
       className={cn(
-        "pointer-events-auto flex items-center gap-2 rounded-full border bg-popover px-3 py-1 shadow-md",
+        "pointer-events-auto flex select-none items-center gap-2 rounded-full border bg-background px-3 py-1 shadow",
         className
       )}
     >
@@ -140,11 +143,7 @@ export function PathToolbar({ className }: { className?: string }) {
 export function PathToolbarPosition({ children }: React.PropsWithChildren) {
   const kind = useContentEditKind();
   if (kind !== "path") return null;
-  return (
-    <div className="absolute bottom-16 left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
-      {children}
-    </div>
-  );
+  return <ToolbarPosition className="bottom-24">{children}</ToolbarPosition>;
 }
 
 /**

@@ -4,6 +4,8 @@ import type {
   NativeChatProfileCatalog,
 } from "@grida/desktop-bridge";
 import type { ComposerCatalog } from "@/kits/composer";
+import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
+import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 
 /** Deterministic local examples; no native bridge, account or inference required. */
 export namespace DesktopComposerFixtures {
@@ -101,4 +103,26 @@ export namespace DesktopComposerFixtures {
     if (!response.ok) throw new Error("Fixture image unavailable");
     return response.blob();
   }
+
+  const libraryImage = {
+    id: "gallery-cover",
+    title: "Gallery cover study",
+    mime: "image/jpeg",
+    url: imageUrl,
+  };
+  const loadLibraryPage: LibraryExplorerPageLoader = async (_, [start]) => ({
+    items: start === 0 ? [libraryImage] : [],
+    exactCount: 1,
+  });
+  export const libraryRequestSource = {
+    loadPage: loadLibraryPage,
+    async readPng(id: string, maxBytes: number) {
+      if (id !== libraryImage.id) throw new Error("Unknown Library reference");
+      const file = await readImage(image.previewId!);
+      return encodeLibraryPng(
+        { mime: libraryImage.mime, bytes: await file.arrayBuffer() },
+        maxBytes
+      );
+    },
+  };
 }

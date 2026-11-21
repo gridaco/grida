@@ -20,10 +20,14 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CopyIcon,
   RotateCcwIcon,
   EllipsisVerticalIcon,
+  EyeOffIcon,
+  FolderIcon,
+  GitForkIcon,
+  HashIcon,
   ListIcon,
-  MailIcon,
   PencilIcon,
   PlusIcon,
   SparklesIcon,
@@ -43,6 +47,10 @@ import { ChatActivityIndicators } from "./chat-activity-indicators";
 import { cn } from "@app/ui/lib/utils";
 import { NativeEffortSlider } from "./native-effort-slider";
 import { ComposerControlSkeleton } from "../shared/composer-control-skeleton";
+import {
+  ComposerToolbarTooltip,
+  composerToolbarButtonClassName,
+} from "@/kits/composer";
 import {
   Popover,
   PopoverContent,
@@ -66,8 +74,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
 import {
@@ -75,15 +87,18 @@ import {
   type NativeChatController,
   type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
+import layout from "./native-chat-layout.module.css";
 
 export function NativeChatHeader({
   controller,
   state,
+  workingDirectory,
   disabled = false,
   onChatSelected,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
+  workingDirectory?: string;
   disabled?: boolean;
   onChatSelected?: () => void;
 }) {
@@ -96,6 +111,7 @@ export function NativeChatHeader({
   const title = state.selected
     ? controller.chatTitle(state.selected)
     : NEW_CHAT_TITLE;
+  const entry = state.catalogEntry;
   useEffect(() => {
     if (disabled) return;
     const visible = () => pickerOpen.current && !document.hidden;
@@ -148,7 +164,7 @@ export function NativeChatHeader({
   return (
     <header
       data-testid="native-chat-header"
-      className="flex h-10 shrink-0 items-center gap-2 px-[max(0.75rem,calc((100%_-_48rem)/2))] text-xs font-medium"
+      className={`flex h-10 shrink-0 items-center gap-2 text-xs font-medium ${layout.contentInset}`}
     >
       <Popover
         open={open}
@@ -256,8 +272,8 @@ export function NativeChatHeader({
                           <ContextMenuItem
                             onSelect={() => void controller.markChatUnread(id)}
                           >
-                            <MailIcon aria-hidden />
-                            Mark unread
+                            <EyeOffIcon aria-hidden />
+                            Mark as unread
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
@@ -341,7 +357,7 @@ export function NativeChatHeader({
       >
         <PlusIcon className="size-4" />
       </Button>
-      {(state.catalogEntry || state.catalogEntryError) && (
+      {(entry || state.catalogEntryError) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -368,7 +384,7 @@ export function NativeChatHeader({
               renaming.current = false;
             }}
           >
-            {state.catalogEntry && (
+            {entry && (
               <>
                 <DropdownMenuItem
                   disabled={state.catalogChanging}
@@ -386,11 +402,62 @@ export function NativeChatHeader({
                       void controller.markChatUnread(state.selected!)
                     }
                   >
-                    <MailIcon aria-hidden />
-                    Mark unread
+                    <EyeOffIcon aria-hidden />
+                    Mark as unread
                   </DropdownMenuItem>
                 )}
-                {!state.catalogEntry.archived && (
+                <DropdownMenuSeparator />
+                {controller.commandChoices.includes("fork") && (
+                  <>
+                    <DropdownMenuItem
+                      disabled={state.acting || !!state.commandRunning}
+                      onSelect={() =>
+                        void controller
+                          .runComposerCommand("fork")
+                          .catch(() => {})
+                      }
+                    >
+                      <GitForkIcon aria-hidden />
+                      Fork chat
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <CopyIcon aria-hidden />
+                    Copy
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="w-48">
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void copyChatValue(entry.sessionId, "Chat ID copied")
+                        }
+                      >
+                        <HashIcon aria-hidden />
+                        Copy chat ID
+                      </DropdownMenuItem>
+                      {workingDirectory && (
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void copyChatValue(
+                              workingDirectory,
+                              "Working directory copied"
+                            )
+                          }
+                        >
+                          <FolderIcon aria-hidden />
+                          Copy working directory
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+                {(!entry.archived || entry.deletionAvailable) && (
+                  <DropdownMenuSeparator />
+                )}
+                {!entry.archived && (
                   <DropdownMenuItem
                     disabled={state.catalogChanging}
                     onSelect={() => void archiveChat()}
@@ -399,7 +466,7 @@ export function NativeChatHeader({
                     Archive
                   </DropdownMenuItem>
                 )}
-                {state.catalogEntry.deletionAvailable && (
+                {entry.deletionAvailable && (
                   <DropdownMenuItem
                     disabled={!controller.canDeleteSavedChat}
                     onSelect={() => void deleteChat()}
@@ -410,9 +477,7 @@ export function NativeChatHeader({
                 )}
               </>
             )}
-            {state.catalogEntry && state.catalogEntryError && (
-              <DropdownMenuSeparator />
-            )}
+            {entry && state.catalogEntryError && <DropdownMenuSeparator />}
             {state.catalogEntryError && (
               <DropdownMenuItem
                 onSelect={() => void controller.readChatDetails()}
@@ -425,6 +490,15 @@ export function NativeChatHeader({
       )}
     </header>
   );
+}
+
+async function copyChatValue(value: string, confirmation: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(confirmation);
+  } catch {
+    toast.error("Couldn't copy to the clipboard.");
+  }
 }
 
 function chatsByDate(ids: readonly string[], controller: NativeChatController) {
@@ -664,19 +738,23 @@ export function NativeModelPicker({
     !!speed?.capabilities && speed.value !== "standard" && !speedAvailable;
   if (initialError)
     return (
-      <Button
-        type="button"
-        size="xs"
-        variant="ghost"
-        aria-label="Retry loading models"
-        title={initialError}
-        className="w-32 min-w-16 shrink rounded-xl text-muted-foreground"
-        disabled={busy}
-        onClick={onRefresh}
-      >
-        <RotateCcwIcon className="size-3.5" />
-        Retry
-      </Button>
+      <ComposerToolbarTooltip label={initialError}>
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          aria-label="Retry loading models"
+          className={cn(
+            composerToolbarButtonClassName,
+            "w-32 min-w-16 shrink text-muted-foreground"
+          )}
+          disabled={busy}
+          onClick={onRefresh}
+        >
+          <RotateCcwIcon className="size-3.5" />
+          Retry
+        </Button>
+      </ComposerToolbarTooltip>
     );
   if (loading) return <ComposerControlSkeleton kind="model" />;
   return (
@@ -695,53 +773,54 @@ export function NativeModelPicker({
         }
       }}
     >
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          role="combobox"
-          aria-label={editingEffort ? "Select effort" : "Model connection"}
-          aria-description={speedDescription}
-          aria-expanded={open}
-          disabled={busy}
-          title={
-            editingEffort
-              ? "Select effort"
-              : selected
-                ? `${selected.connection} · ${selected.model}`
-                : label
-          }
-          className={cn(
-            "min-w-16 max-w-52 shrink gap-1.5 rounded-xl px-1.5 font-normal",
-            open && "bg-muted px-3",
-            editingEffort && "text-muted-foreground"
-          )}
-        >
-          {activeSpeed ? (
-            <ResponseSpeedIcon
-              speed={activeSpeed.value}
-              className="size-3.5 shrink-0"
-            />
-          ) : (
-            <ConnectionIcon connection={selected?.connection} />
-          )}
-          <span className="truncate">
-            {editingEffort ? "Select effort" : label}
-          </span>
-          {onEffort && !editingEffort && (
-            <span className="shrink-0 text-muted-foreground">
-              {EFFORT_LABEL[stop]}
+      <ComposerToolbarTooltip
+        label={
+          speedDescription
+            ? `Select efforts & models · ${speedDescription}`
+            : "Select efforts & models"
+        }
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            role="combobox"
+            aria-label={editingEffort ? "Select effort" : "Model connection"}
+            aria-description={speedDescription}
+            aria-expanded={open}
+            disabled={busy}
+            className={cn(
+              composerToolbarButtonClassName,
+              "min-w-16 max-w-52 shrink gap-1.5 px-1.5 font-normal",
+              editingEffort && "text-muted-foreground"
+            )}
+          >
+            {activeSpeed ? (
+              <ResponseSpeedIcon
+                speed={activeSpeed.value}
+                className="size-3.5 shrink-0"
+              />
+            ) : (
+              <ConnectionIcon connection={selected?.connection} />
+            )}
+            <span className="truncate">
+              {editingEffort ? "Select effort" : label}
             </span>
-          )}
-          {open && !editingEffort && (
-            <ChevronDownIcon
-              aria-hidden="true"
-              className="size-3 shrink-0 text-muted-foreground"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+            {onEffort && !editingEffort && (
+              <span className="shrink-0 text-muted-foreground">
+                {EFFORT_LABEL[stop]}
+              </span>
+            )}
+            {open && !editingEffort && (
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="size-3 shrink-0 text-muted-foreground"
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+      </ComposerToolbarTooltip>
       <PopoverContent
         align="end"
         side="top"
@@ -991,7 +1070,7 @@ export function NativeModelPicker({
                               setAllModels(true);
                             } else {
                               setOpen(false);
-                              void app.openSettings().catch(() => {
+                              void app.openSettings("models").catch(() => {
                                 setSettingsError(
                                   "Couldn't open Settings. Restart Desktop and try again."
                                 );

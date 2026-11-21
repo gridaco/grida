@@ -6,6 +6,11 @@
   --composer-content-padding-inline: 0.625rem;
   --composer-editor-min-height: 2rem;
   --composer-editor-font-size: 0.875rem;
+  --composer-placeholder-color: color-mix(
+    in oklab,
+    var(--muted-foreground) 50%,
+    transparent
+  );
   --composer-paragraph-margin-block: 0.125rem;
   --composer-code-padding: 0.5rem;
   --composer-chip-margin-inline: 0.125rem;
@@ -22,9 +27,20 @@
   font-weight: 400;
 }
 
-.composer-content [data-composer-editor] {
+.composer-content :is([data-composer-editor], .composer-suggestion) {
   min-height: var(--composer-editor-min-height);
   outline: none;
+}
+
+.composer-formatting-bubble {
+  --composer-bubble-padding: 0.125rem;
+  --composer-bubble-border: 1px;
+  padding: var(--composer-bubble-padding);
+  border-width: var(--composer-bubble-border);
+  border-radius: calc(
+    theme(--radius-md) + var(--composer-bubble-padding) +
+      var(--composer-bubble-border)
+  );
 }
 
 /* Placeholder is taken out of flow (absolute) and pinned to a single
@@ -32,11 +48,13 @@
  * placeholder wrap to a second line, which — inside the editor's
  * `overflow-y-auto` min-height box — surfaced a scrollbar on an empty
  * composer. Absolute + nowrap can't grow either scroll axis. */
-.composer-content [data-composer-editor] .is-editor-empty:first-child {
+.composer-content [data-composer-editor] > p.is-editor-empty:first-child {
   position: relative;
 }
 
-.composer-content [data-composer-editor] .is-editor-empty:first-child::before {
+.composer-content
+  [data-composer-editor]
+  > p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   position: absolute;
   inset-inline: 0;
@@ -45,33 +63,58 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
+  color: var(--composer-placeholder-color);
 }
 
-/* Reserve room for the acceptance key even when the suggestion is ellipsized. */
 .composer-content[data-composer-suggestion] {
-  position: relative;
+  /* Let wrapped suggestions size the same space as the editable draft. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.composer-content[data-composer-suggestion] > .composer-editor,
+.composer-suggestion {
+  grid-area: 1 / 1;
 }
 .composer-content[data-composer-suggestion]
   [data-composer-editor]
-  .is-editor-empty:first-child::before {
-  inset-inline-end: 2.5rem;
+  > p.is-editor-empty:first-child::before {
+  content: none;
 }
-.composer-suggestion-key {
-  position: absolute;
-  inset-inline-end: var(--composer-content-padding-inline);
-  top: var(--composer-content-padding-block);
+.composer-suggestion {
+  display: none;
   pointer-events: none;
-  color: var(--muted-foreground);
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  padding: 0 0.25rem;
-  font: inherit;
-  font-size: 0.7rem;
+  overflow-wrap: break-word;
+  white-space: break-spaces;
+  color: var(--composer-placeholder-color);
+}
+.composer-content:has([data-composer-editor] > p.is-editor-empty:first-child)
+  > .composer-suggestion {
+  display: block;
 }
 
-.composer-content [data-composer-editor] .composer-text-node {
+.composer-content .composer-text-node {
   margin-block: var(--composer-paragraph-margin-block);
+}
+
+.composer-suggestion-lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.composer-suggestion-lines::before,
+.composer-suggestion-inline {
+  grid-area: 1 / 1;
+}
+
+/* Size the preview from the draft text alone so the shortcut cannot add a line. */
+.composer-suggestion-lines::before {
+  content: attr(data-suggestion-text);
+  visibility: hidden;
+}
+
+.composer-suggestion-inline {
+  contain: size;
+  overflow: clip;
 }
 
 .composer-content [data-composer-editor] .composer-code-block {
@@ -87,6 +130,19 @@
   border-radius: 0.25rem;
   background: var(--muted);
   padding-inline: 0.25rem;
+}
+
+.composer-content
+  [data-composer-editor]
+  .composer-link:not([data-chat-web-link]) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.composer-content [data-composer-editor] .composer-blockquote {
+  margin-block: 0.375rem;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 0.75rem;
 }
 
 .composer-content [data-composer-editor] .composer-list-node {

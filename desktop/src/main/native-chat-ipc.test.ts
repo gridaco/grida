@@ -3413,37 +3413,50 @@ describe("native chat IPC", () => {
     });
   });
 
-  it("delivers only scoped updates and detaches on top-level navigation without a chat control", async () => {
-    const { ipc, first, second, listeners, emit, chat } = setup();
-    const pause = vi.spyOn(chat, "pause");
-    const one = await ipc.create(first.event);
-    const two = await ipc.create(second.event);
-    const subscriptionId = randomUUID();
-    ipc.subscribe(first.event, one.attachmentId, subscriptionId);
-    ipc.subscribe(second.event, two.attachmentId, randomUUID());
-    emit(one.sessionId, UPDATE);
-    expect(first.frame.send).toHaveBeenCalledWith(
-      IPC_CHANNELS.NATIVE_CHAT_UPDATE,
-      {
-        subscriptionId,
-        attachmentId: one.attachmentId,
-        update: UPDATE,
-      }
-    );
-    expect(second.frame.send).not.toHaveBeenCalled();
-    first.contents.emit("did-start-navigation", { isMainFrame: false });
-    emit(one.sessionId, { kind: "resync" });
-    expect(first.frame.send).toHaveBeenCalledTimes(2);
-    first.contents.emit("did-start-navigation", { isMainFrame: true });
-    expect(listeners.get(one.sessionId)?.size).toBe(0);
-    emit(one.sessionId, UPDATE);
-    expect(first.frame.send).toHaveBeenCalledTimes(2);
-    await expect(ipc.observe(first.event, one.attachmentId)).rejects.toThrow(
-      "native_chat_attachment_unavailable"
-    );
-    expect(pause).not.toHaveBeenCalled();
-    expect(listeners.get(two.sessionId)?.size).toBe(1);
-  });
+  it.each(["new document", "same document"] as const)(
+    "releases only the leaving chat surface on %s navigation to Welcome",
+    async (navigation) => {
+      const { ipc, first, second, listeners, emit, chat } = setup();
+      const pause = vi.spyOn(chat, "pause");
+      const one = await ipc.create(first.event);
+      const two = await ipc.create(second.event);
+      const subscriptionId = randomUUID();
+      ipc.subscribe(first.event, one.attachmentId, subscriptionId);
+      ipc.subscribe(second.event, two.attachmentId, randomUUID());
+      emit(one.sessionId, UPDATE);
+      expect(first.frame.send).toHaveBeenCalledWith(
+        IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+        {
+          subscriptionId,
+          attachmentId: one.attachmentId,
+          update: UPDATE,
+        }
+      );
+      expect(second.frame.send).not.toHaveBeenCalled();
+      first.contents.emit("did-start-navigation", { isMainFrame: false });
+      emit(one.sessionId, { kind: "resync" });
+      expect(first.frame.send).toHaveBeenCalledTimes(2);
+      const isSameDocument = navigation === "same document";
+      const welcome = `${ORIGIN}/desktop/welcome`;
+      first.contents.emit("did-start-navigation", {
+        isMainFrame: true,
+        isSameDocument,
+        url: welcome,
+      });
+      first.frame.url = welcome;
+      if (isSameDocument)
+        first.contents.emit("did-navigate-in-page", {}, welcome, true);
+      else first.contents.emit("did-navigate", {}, welcome);
+      expect(listeners.get(one.sessionId)?.size).toBe(0);
+      emit(one.sessionId, UPDATE);
+      expect(first.frame.send).toHaveBeenCalledTimes(2);
+      await expect(ipc.observe(first.event, one.attachmentId)).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
+      expect(pause).not.toHaveBeenCalled();
+      expect(listeners.get(two.sessionId)?.size).toBe(1);
+    }
+  );
 
   it("rejects a late observation after navigation and closes a stream at its delivery bound", async () => {
     const { ipc, first, chat, emit, listeners } = setup();

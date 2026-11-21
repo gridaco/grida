@@ -19,6 +19,7 @@ import type {
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeEditorSelection,
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
@@ -1373,10 +1374,14 @@ it("fences presentation by the current attachment, tab revision, and delivery li
   expect(open.mock.calls[1][1]()).toBe(false);
 });
 
-it("keeps the captured SVG target when the same submission reply is lost", async () => {
+it("keeps the captured SVG target on retry with the earlier SVG publication", async () => {
   const { bridge } = fixture();
-  bridge.publishEditorSurfaces = async () => {};
-  bridge.onEditorSvgText = () => () => {};
+  Object.assign(bridge, { svgSelectionContext: true });
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  bridge.onEditorSvgSelection = () => () => {};
   const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
     async (_action, sessionId, inputId) => ({
       sessionId,
@@ -1397,10 +1402,13 @@ it("keeps the captured SVG target when the same submission reply is lost", async
       active: "/poster.svg",
       open: ["/poster.svg"],
       truncated: false,
+      selection: { kind: "svg", path: "/poster.svg" },
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: {
-      hasSelection: () => true,
+    editorSelection: {
+      clear: () => {},
+      readSubject: () => ({ kind: "svg", path: "/poster.svg" }),
+      readLabel: () => "Rectangle",
       subscribe: () => () => {},
       capture,
       invoke: () => ({ kind: "unavailable" }),
@@ -1408,15 +1416,21 @@ it("keeps the captured SVG target when the same submission reply is lost", async
   });
   try {
     await controller.select("workbench");
-    expect(controller.readComposerSvgText()).toBe(true);
+    expect(publish).toHaveBeenCalledExactlyOnceWith("workbench", {
+      active: "/poster.svg",
+      open: ["/poster.svg"],
+      truncated: false,
+      activeSvg: "/poster.svg",
+    });
+    expect(controller.readComposerEditorSelection()).toBe("Rectangle");
     expect(capture).not.toHaveBeenCalled();
     controller.selectOperatingRegime("plan");
-    expect(controller.readComposerSvgText()).toBe(false);
+    expect(controller.readComposerEditorSelection()).toBeUndefined();
     controller.selectOperatingRegime("act");
     await expect(controller.submit("Read this SVG selection.")).rejects.toThrow(
       "fixture lost reply"
     );
-    expect(controller.readComposerSvgText()).toBe(false);
+    expect(controller.readComposerEditorSelection()).toBeUndefined();
     await controller.submit("Read this SVG selection.");
     expect(send.mock.calls[0]?.at(-1)).toBe(target);
     expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
@@ -1429,11 +1443,10 @@ it("keeps the captured SVG target when the same submission reply is lost", async
 it.each([
   "Inspect these SVG objects.",
   "/stop is a note. Inspect these objects.",
-])("freezes both SVG grants before the queued send of %s", async (prompt) => {
+])("freezes one SVG selection before the queued send of %s", async (prompt) => {
   const { bridge, running } = fixture();
   running.add("workbench");
   bridge.publishEditorSurfaces = async () => {};
-  bridge.onEditorSvgText = () => () => {};
   bridge.onEditorSvgSelection = () => () => {};
   bridge.enqueue = async () => {
     throw new Error("fixture uses submitInRegime");
@@ -1449,11 +1462,8 @@ it.each([
   );
   send.mockRejectedValueOnce(new Error("fixture lost reply"));
   bridge.submitInRegime = send;
-  const originalText = crypto.randomUUID();
   const originalSelection = crypto.randomUUID();
-  let textTarget = originalText;
   let selectionTarget = originalSelection;
-  const captureText = vi.fn<() => string>(() => textTarget);
   const captureSelection = vi.fn<() => string>(() => selectionTarget);
   const controller = new NativeChatController(bridge, undefined, undefined, {
     readEditorSurfaces: () => ({
@@ -1462,14 +1472,10 @@ it.each([
       truncated: false,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: {
-      hasSelection: () => true,
-      subscribe: () => () => {},
-      capture: captureText,
-      invoke: () => ({ kind: "unavailable" }),
-    },
-    svgSelection: {
-      hasSelection: () => true,
+    editorSelection: {
+      clear: () => {},
+      readSubject: () => ({ kind: "svg", path: "/poster.svg" }),
+      readLabel: () => "Group",
       subscribe: () => () => {},
       capture: captureSelection,
       invoke: () => ({ kind: "unavailable" }),
@@ -1477,13 +1483,12 @@ it.each([
   });
   try {
     await controller.select("workbench");
-    expect(controller.readComposerEditorSelection()).toBe("svg-selection");
+    expect(controller.readComposerEditorSelection()).toBe("Group");
     controller.selectOperatingRegime("plan");
     expect(controller.readComposerEditorSelection()).toBeUndefined();
     controller.selectOperatingRegime("act");
 
     const sending = controller.submit(prompt);
-    textTarget = crypto.randomUUID();
     selectionTarget = crypto.randomUUID();
     await expect(sending).rejects.toThrow("fixture lost reply");
     await controller.submit(prompt);
@@ -1494,13 +1499,12 @@ it.each([
       prompt,
       "act",
       undefined,
-      originalText,
+      undefined,
       undefined,
       undefined,
       originalSelection,
     ]);
     expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
-    expect(captureText).toHaveBeenCalledTimes(1);
     expect(captureSelection).toHaveBeenCalledTimes(1);
   } finally {
     controller.disconnect();
@@ -1603,44 +1607,157 @@ it("sends ordinary text but does not strip a pending observation on an older pre
   }
 });
 
-it("queues an Act follow-up with the captured SVG target", async () => {
-  const { bridge, running } = fixture();
-  running.add("workbench");
-  bridge.publishEditorSurfaces = async () => {};
-  bridge.onEditorSvgText = () => () => {};
-  bridge.enqueue = async () => {
-    throw new Error("fixture uses submitInRegime");
+it.each([
+  {
+    name: "slide",
+    active: "/portfolio.canvas",
+    first: { kind: "svg", path: "/portfolio.canvas/first.svg" },
+    second: { kind: "svg", path: "/portfolio.canvas/second.svg" },
+  },
+  {
+    name: "board pin sharing the same SVG",
+    active: "/references.canvas",
+    first: {
+      kind: "document",
+      path: "/references.canvas/sample.svg",
+      placement: { boardPath: "/references.canvas", pinId: "first" },
+    },
+    second: {
+      kind: "document",
+      path: "/references.canvas/sample.svg",
+      placement: { boardPath: "/references.canvas", pinId: "second" },
+    },
+  },
+] satisfies Array<{
+  name: string;
+  active: string;
+  first: NativeEditorSelection.Subject;
+  second: NativeEditorSelection.Subject;
+}>)(
+  "publishes a newly selected $name before queuing its captured target",
+  async ({ active, first, second }) => {
+    const { bridge, running } = fixture();
+    running.add("workbench");
+    Object.assign(bridge, { editorSelectionContext: true });
+    const published = Promise.withResolvers<void>();
+    const publish = vi.fn<
+      NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+    >(async (_, snapshot) => {
+      if (snapshot.selection === second) await published.promise;
+    });
+    bridge.publishEditorSurfaces = publish;
+    bridge.onEditorSvgSelection = () => () => {};
+    bridge.enqueue = async () => {
+      throw new Error("fixture uses submitInRegime");
+    };
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 2,
+        turnId: null,
+      })
+    );
+    send.mockRejectedValueOnce(new Error("fixture lost reply"));
+    bridge.submitInRegime = send;
+    const target = crypto.randomUUID();
+    const capture = vi.fn<() => string>(() => target);
+    let onChange!: () => void;
+    let selection = first;
+    const controller = new NativeChatController(bridge, undefined, undefined, {
+      readEditorSurfaces: () => ({
+        active,
+        open: [active],
+        truncated: false,
+        selection,
+      }),
+      subscribeToEditorSurfaces: (listener) => {
+        onChange = listener;
+        return () => {};
+      },
+      editorSelection: {
+        clear: () => {},
+        readSubject: () => selection,
+        readLabel: () => "Group",
+        subscribe: () => () => {},
+        capture,
+        invoke: () => ({ kind: "unavailable" }),
+      },
+    });
+    try {
+      await controller.select("workbench");
+      selection = second;
+      onChange();
+      const sending = controller.submit("Then tighten this selection.");
+      expect(capture).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenLastCalledWith("workbench", {
+        active,
+        open: [active],
+        truncated: false,
+        selection: second,
+      });
+      expect(send).not.toHaveBeenCalled();
+      selection = first;
+      onChange();
+      published.resolve();
+      await expect(sending).rejects.toThrow("fixture lost reply");
+      await controller.submit("Then tighten this selection.");
+      expect(send.mock.calls[0]?.[0]).toBe("enqueue");
+      expect(send.mock.calls[0]?.at(-1)).toEqual({
+        targetId: target,
+        subject: second,
+      });
+      expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+      expect(capture).toHaveBeenCalledTimes(1);
+    } finally {
+      published.resolve();
+      controller.disconnect();
+    }
+  }
+);
+
+it("omits whole-document selection on an earlier SVG bridge", async () => {
+  const { bridge } = fixture();
+  Object.assign(bridge, { svgSelectionContext: true });
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  bridge.onEditorSvgSelection = () => () => {};
+  const target: NativeEditorSelection.Subject = {
+    kind: "document",
+    path: "/references.canvas/sample.svg",
+    placement: { boardPath: "/references.canvas", pinId: "sample" },
   };
-  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
-    async (_action, sessionId, inputId) => ({
-      sessionId,
-      inputId,
-      disposition: "queued",
-      inputPosition: 2,
-      turnId: null,
-    })
-  );
-  bridge.submitInRegime = send;
-  const target = crypto.randomUUID();
+  const capture = vi.fn<() => string>(() => crypto.randomUUID());
   const controller = new NativeChatController(bridge, undefined, undefined, {
     readEditorSurfaces: () => ({
-      active: "/poster.svg",
-      open: ["/poster.svg"],
+      active: "/references.canvas",
+      open: ["/references.canvas"],
       truncated: false,
+      selection: target,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: {
-      hasSelection: () => true,
+    editorSelection: {
+      clear: () => {},
+      readSubject: () => target,
+      readLabel: () => "Selection",
       subscribe: () => () => {},
-      capture: () => target,
+      capture,
       invoke: () => ({ kind: "unavailable" }),
     },
   });
   try {
     await controller.select("workbench");
-    await controller.submit("Then tighten this selection.");
-    expect(send.mock.calls[0]?.[0]).toBe("enqueue");
-    expect(send.mock.calls[0]?.at(-1)).toBe(target);
+    expect(controller.readComposerEditorSelection()).toBeUndefined();
+    expect(publish).toHaveBeenCalledExactlyOnceWith("workbench", {
+      active: "/references.canvas",
+      open: ["/references.canvas"],
+      truncated: false,
+    });
+    await controller.submit("Which SVG is selected?");
+    expect(capture).not.toHaveBeenCalled();
   } finally {
     controller.disconnect();
   }
@@ -4235,6 +4352,30 @@ describe("composer predictions", () => {
       }
     }
   );
+
+  it("restores the same suggestion when an accepted draft is cleared", async () => {
+    const f = await opened();
+    try {
+      const prompt = "Draft the speaker notes.";
+      f.predict.mockResolvedValueOnce(prompt);
+      await f.complete("finished");
+      expect(f.prediction.take(prompt)).toBe(true);
+      expect(f.prediction.read()).toBeNull();
+      expect(f.prediction.take(prompt)).toBe(false);
+      f.prediction.setDraft(f.scope, false);
+      await f.controller.repair();
+      f.prediction.setDraft(f.scope, true);
+      expect(f.prediction.read()).toBe(prompt);
+      expect(f.predict).toHaveBeenCalledTimes(1);
+
+      expect(f.prediction.take(prompt)).toBe(true);
+      f.controller.selectEffort("high");
+      f.prediction.setDraft(f.scope, true);
+      expect(f.prediction.read()).toBeNull();
+    } finally {
+      f.close();
+    }
+  });
 
   it("retires a displayed suggestion when the same chat changes effort", async () => {
     const f = await opened();

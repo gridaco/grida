@@ -30,9 +30,16 @@ export default defineConfig(async () => {
         "clsx",
         "tailwind-merge",
         "cmdk",
+        "date-fns",
+        "sonner",
+        "react-resizable-panels",
+        "next-themes",
+        "masonic",
         "@tiptap/react",
         "@tiptap/core",
+        "@tiptap/extension-link",
         "@tiptap/extension-placeholder",
+        "@tiptap/pm/markdown",
         "@tiptap/starter-kit",
         "@dnd-kit/core",
         "@dnd-kit/sortable",
@@ -56,6 +63,12 @@ export default defineConfig(async () => {
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("../../../../../", import.meta.url)),
+        "server-only": fileURLToPath(
+          new URL(
+            "../../../../../lib/__tests__/server-only.shim.ts",
+            import.meta.url
+          )
+        ),
       },
     },
     test: {

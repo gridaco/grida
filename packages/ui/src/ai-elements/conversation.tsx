@@ -6,7 +6,7 @@ import { cn } from "@app/ui/lib/utils";
 import { ArrowDownIcon } from "lucide-react";
 import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 import type { ComponentProps } from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
@@ -44,6 +44,16 @@ export const ConversationContent = ({
     />
   );
 
+const SCROLL_KEYS = new Set([
+  "ArrowDown",
+  "ArrowUp",
+  "PageDown",
+  "PageUp",
+  "Home",
+  "End",
+  " ",
+]);
+
 function ConversationScrollAreaContent({
   className,
   scrollClassName,
@@ -51,10 +61,22 @@ function ConversationScrollAreaContent({
   ...props
 }: ComponentProps<typeof StickToBottom.Content>) {
   const context = useStickToBottomContext();
+  const [scrollbarActive, setScrollbarActive] = useState(false);
+  const hideScrollbar = useRef<number>(undefined);
+  useEffect(() => () => window.clearTimeout(hideScrollbar.current), []);
+
+  function revealScrollbar() {
+    setScrollbarActive(true);
+    window.clearTimeout(hideScrollbar.current);
+    hideScrollbar.current = window.setTimeout(
+      () => setScrollbarActive(false),
+      800
+    );
+  }
+
   return (
     <ScrollAreaPrimitive.Root
-      type="scroll"
-      scrollHideDelay={800}
+      type="auto"
       className="relative h-full min-h-0 min-w-0"
     >
       {/* Share one native viewport. Radix's table wrapper measures horizontal
@@ -65,6 +87,22 @@ function ConversationScrollAreaContent({
         style={{ overflowX: "scroll", overflowY: "scroll" }}
         className={cn("size-full [&>div]:!block", scrollClassName)}
         data-slot="scroll-area-viewport"
+        tabIndex={0}
+        onWheel={(event) => {
+          if (event.deltaY && !event.ctrlKey && !event.defaultPrevented) {
+            revealScrollbar();
+          }
+        }}
+        onTouchMove={revealScrollbar}
+        onKeyDown={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            !event.defaultPrevented &&
+            SCROLL_KEYS.has(event.key)
+          ) {
+            revealScrollbar();
+          }
+        }}
       >
         <div
           {...props}
@@ -74,7 +112,12 @@ function ConversationScrollAreaContent({
           {typeof children === "function" ? children(context) : children}
         </div>
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar className="z-10 w-2.5 border-0 bg-transparent p-0.5 data-[state=visible]:animate-in data-[state=visible]:fade-in-0 data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 duration-200 motion-reduce:animate-none [&_[data-slot=scroll-area-thumb]]:bg-foreground/35 [&_[data-slot=scroll-area-thumb]]:transition-[scale] [&_[data-slot=scroll-area-thumb]]:duration-150 [&_[data-slot=scroll-area-thumb]]:ease-out [&:hover_[data-slot=scroll-area-thumb]]:scale-x-125 motion-reduce:[&_[data-slot=scroll-area-thumb]]:transition-none" />
+      {/* Radix handles overflow and dragging. User input controls visibility
+          because streaming autoscroll also emits native scroll events. */}
+      <ScrollBar
+        data-scroll-active={scrollbarActive ? "" : undefined}
+        className="pointer-events-none z-10 w-2.5 border-0 bg-transparent p-0.5 opacity-0 transition-opacity duration-200 hover:pointer-events-auto hover:opacity-100 active:pointer-events-auto active:opacity-100 motion-reduce:transition-none data-[scroll-active]:pointer-events-auto data-[scroll-active]:opacity-100 [&_[data-slot=scroll-area-thumb]]:bg-foreground/35 [&_[data-slot=scroll-area-thumb]]:transition-[scale] [&_[data-slot=scroll-area-thumb]]:duration-150 [&_[data-slot=scroll-area-thumb]]:ease-out [&:hover_[data-slot=scroll-area-thumb]]:scale-x-125 motion-reduce:[&_[data-slot=scroll-area-thumb]]:transition-none"
+      />
     </ScrollAreaPrimitive.Root>
   );
 }

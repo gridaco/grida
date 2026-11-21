@@ -1,15 +1,16 @@
-import { ScanIcon, ScanTextIcon } from "lucide-react";
+import { ScanIcon, XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 
 /** An editor context label shared by a draft and its sent message. */
 export function EditorSelectionIndicator({
-  kind,
+  label,
   className,
+  onClear,
 }: {
-  kind: keyof typeof LABELS;
+  label: string;
   className?: string;
+  onClear?: () => void;
 }) {
-  const Icon = kind === "svg-text" ? ScanTextIcon : ScanIcon;
   return (
     <span
       className={cn(
@@ -17,13 +18,18 @@ export function EditorSelectionIndicator({
         className
       )}
     >
-      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
-      <span className="truncate">{LABELS[kind]}</span>
+      <ScanIcon aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="truncate">{label}</span>
+      {onClear && (
+        <button
+          type="button"
+          aria-label="Clear selection"
+          onClick={onClear}
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <XIcon aria-hidden="true" className="size-3" />
+        </button>
+      )}
     </span>
   );
 }
-
-const LABELS = {
-  "svg-text": "SVG text selection",
-  "svg-selection": "SVG selection",
-} as const;

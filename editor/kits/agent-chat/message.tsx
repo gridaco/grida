@@ -218,7 +218,7 @@ export function ChatMessageView({
       <Message from="user" ref={ref}>
         {(svgSelection || svgTextSelection) && !edit && (
           <EditorSelectionIndicator
-            kind={svgSelection ? "svg-selection" : "svg-text"}
+            label={svgSelection ? "Selection" : "Text selection"}
             className="self-end"
           />
         )}

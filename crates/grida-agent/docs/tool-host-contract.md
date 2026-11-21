@@ -204,28 +204,29 @@ A file reveal through the trusted workbench remains auxiliary when its reply is
 unconfirmed. URL opens, tab selection and explicit focus retain ordinary
 uncertain-outcome handling.
 
-The SVG text binding captures one plain selected text node when an eligible
-Act input is submitted or queued. The renderer owns the loaded editor, tab
-and selection identity.
-`svg_read_selected_text` supplies the text and its opaque revision.
-`svg_replace_selected_text` verifies that same capture and calls the editor's
-undoable text command. The result reports the live edit separately from disk
-save. The editor's normal Save command retains its existing mtime precondition.
-An unverified mutation reply remains uncertain and the bridge does not replay it.
-
-The SVG selection contribution captures the active editor and all selected
-objects or vector points for an eligible Act input. `svg_inspect_selection`
-returns the scoped file path, capture revision, and paged locators of the live
-editor buffer. Each page carries up to 32 items and 28 KiB of encoded JSON.
+The editor selection contribution captures the exact selection when an
+eligible Act input is sent or queued. `svg_inspect_selection` returns the
+scoped SVG path and capture revision. For a whole document selected on a
+board, it returns a single read-only target with the board path, pin ID, and
+placement. The path addresses the SVG source. The pin ID addresses one
+placement. For an editable SVG or slide, it returns paged locators of the live
+editor buffer. A slide's SVG is its document identity and the deck is its
+workbench tab identity. Each page carries up to 32 items and 28 KiB of encoded JSON.
 Element locators are zero-based element-child paths from the document root.
 Point locators use zero-based ordinals in the editor's vector model. A cursor
 belongs to that capture. Each omitted locator identifies its original position
 in the selection. Optional tags and authored IDs are included only when they
 fit the label limit and contain valid Unicode. `svg_set_selection_opacity`
 checks the inspected revision and applies the existing undoable opacity command
-to the captured objects. An invalidated capture or closed editor yields a stale
+to the captured objects. For a capture of one editable plain text element,
+`svg_read_selected_text` returns its text and the same capture revision.
+`svg_replace_selected_text` verifies that revision and uses the editor's
+undoable text command. An invalidated capture or closed editor yields a stale
 or unavailable result. An unverified mutation reply stays uncertain. The editor
-owns Save.
+owns Save and retains its existing mtime precondition.
+
+Peers with the earlier selected-text binding retain the accepted text grant
+and its original tool revision.
 
 The document tool defines the meaning of its document, selection, and content
 arguments. It returns its own domain result or error. A tool that requires a

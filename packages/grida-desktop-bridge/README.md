@@ -59,6 +59,9 @@ the same action as the app's Settings menu. It accepts no arguments and leaves
 the calling window mounted. Check that this optional method exists before
 offering the action: older protocol-1 hosts do not expose it. Native Main owns
 the destination and authenticated window admission.
+`window.open_llm_provider_settings()` uses the same window and selects
+**LLM Providers** whether the window is new or already open. The method
+is optional. Callers on older hosts can use the general Settings action.
 
 `window.navigation` describes one adjacent entry in each direction in the
 Desktop window's own history. Back and Forward take that exact step when the
@@ -79,6 +82,22 @@ readiness values.
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
+
+With `nativeChat.editorSelectionContext`, an editor surface publication can
+include a typed `selection` subject. An editable SVG can be the active SVG tab
+or a document in the active `.canvas` tab. A selected SVG placement on a board
+is identified by its SVG path, board path, and pin ID. The tab inventory
+continues to report the bundle path. In a dedicated board window the empty
+inventory and board path `/` identify the admitted bundle root. The host binds
+the full subject to the accepted capture and includes it when dispatching a
+request. The editor verifies that identity before applying an operation.
+
+The SVG selection can be inspected, edited for opacity, or used to read and
+replace eligible plain text. A board placement can be inspected as one whole
+document with its layout. Hosts that expose only `nativeChat.svgSelectionContext`
+accept `activeSvg` for the older editable SVG subject. Publish just the tab
+inventory when neither capability is present.
+
 The optional catalogue flag `inputRoutes` means the live workspace host can
 accept inputs on different saved connections. After saving the chat selection,
 submit or enqueue with its revision on the existing attachment. An accepted

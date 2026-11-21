@@ -220,6 +220,35 @@ describe("desktop bridge client contract", () => {
     expect(open).toHaveBeenCalledExactlyOnceWith();
   });
 
+  it("opens LLM Providers through the focused native action when available", async () => {
+    const open = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const openProviders = vi.fn<() => Promise<void>>().mockResolvedValue();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        window: {
+          open_settings: open,
+          open_llm_provider_settings: openProviders,
+        },
+      },
+    });
+    await app.openSettings("models");
+    expect(openProviders).toHaveBeenCalledExactlyOnceWith();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("opens general Settings when an older build cannot target LLM Providers", async () => {
+    const open = vi.fn<() => Promise<void>>().mockResolvedValue();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        window: { open_settings: open },
+      },
+    });
+    await app.openSettings("models");
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+  });
+
   it("refuses Settings window requests on older native hosts", async () => {
     installBridge({
       grida: { protocol: DESKTOP_BRIDGE_PROTOCOL, window: {} },

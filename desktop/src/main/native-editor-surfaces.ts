@@ -1,7 +1,9 @@
 // GRIDA-SEC-004 — editor observations belong to one exact chat attachment.
 import { createHash, randomUUID } from "node:crypto";
 import {
+  NativeEditorSelection,
   NativeEditorSurfaces,
+  NativeEditorSvgSelection,
   NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
   type NativeEditorSurfaceSnapshot,
@@ -32,7 +34,7 @@ const ENDPOINT_ID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 export type NativeEditorSurfaceLease = Readonly<{
   selection(
     editorSvgTargetId?: string,
-    context?: { targetId: string; inputId: string }
+    context?: EditorToolCapture
   ): NativeEditorSurfaceSelection;
   update(snapshot: NativeEditorSurfaceSnapshot, revision?: number): void;
   registerToolSource(source: DesktopToolSource): { close(): void };
@@ -64,6 +66,12 @@ type ToolScope = Readonly<{
 }>;
 
 type ScopedTools = Readonly<{ scope?: ToolScope; call: boolean }>;
+
+type EditorToolCapture = Readonly<{
+  targetId: string;
+  inputId: string;
+  subject?: NativeEditorSelection.Subject;
+}>;
 
 type PresentationReceipt = {
   path: string;
@@ -115,7 +123,14 @@ export class NativeEditorSurfaceEndpoints {
   private readonly endpoints = new Map<string, Endpoint>();
   private readonly contexts = new Map<
     string,
-    { endpointId: string; targetId: string; path: string | null }
+    {
+      endpointId: string;
+      targetId: string;
+      tab: string | null;
+      subject?: NativeEditorSelection.Subject;
+      supportsText: boolean;
+      staleAtAdmission: boolean;
+    }
   >();
   private readonly targetContexts = new Map<string, string>();
 
@@ -163,10 +178,7 @@ export class NativeEditorSurfaceEndpoints {
     );
     this.endpoints.set(id, endpoint);
     return Object.freeze({
-      selection: (
-        editorSvgTargetId?: string,
-        context?: { targetId: string; inputId: string }
-      ) => {
+      selection: (editorSvgTargetId?: string, context?: EditorToolCapture) => {
         const current = this.endpoints.get(id) === endpoint;
         const contextId =
           context && endpoint.svgSelection
@@ -181,7 +193,9 @@ export class NativeEditorSurfaceEndpoints {
             }),
           ...(editorSvgTargetId &&
             current &&
-            endpoint.svgText && {
+            endpoint.svgText &&
+            !context?.subject &&
+            endpoint.snapshot.selection?.kind !== "document" && {
               editorSvgTargetId,
             }),
           ...(contextId && { editorToolContextId: contextId }),
@@ -218,7 +232,7 @@ export class NativeEditorSurfaceEndpoints {
   private bindContext(
     sessionId: string,
     endpointId: string,
-    { targetId, inputId }: { targetId: string; inputId: string }
+    { targetId, inputId, subject }: EditorToolCapture
   ): string {
     // Keep retry identity stable across native process replacement. Only an
     // admitted endpoint has the mapping back to the editable renderer target.
@@ -240,8 +254,10 @@ export class NativeEditorSurfaceEndpoints {
     const previous = this.contexts.get(contextId);
     if (previous) {
       if (
-        previous.endpointId !== endpointId &&
-        this.endpoints.has(previous.endpointId)
+        (previous.endpointId !== endpointId &&
+          this.endpoints.has(previous.endpointId)) ||
+        (subject &&
+          !NativeEditorSelection.sameSubject(subject, previous.subject))
       )
         throw new Error("native_chat_editor_tool_context_unavailable");
       // Keep the original binder even when its endpoint was retired.
@@ -256,10 +272,18 @@ export class NativeEditorSurfaceEndpoints {
         this.targetContexts.delete(oldest[1].targetId);
       }
     }
+    const published = activeSelection(endpoint.snapshot);
     this.contexts.set(contextId, {
       endpointId,
       targetId,
-      path: endpoint.snapshot.active,
+      tab: endpoint.snapshot.active,
+      subject: subject ?? published,
+      supportsText:
+        endpoint.snapshot.selection?.kind === "svg" ||
+        endpoint.snapshot.activeSvg !== undefined,
+      staleAtAdmission:
+        subject !== undefined &&
+        !NativeEditorSelection.sameSubject(subject, published),
     });
     this.targetContexts.set(targetId, contextId);
     return contextId;
@@ -389,14 +413,15 @@ export class NativeEditorSurfaceEndpoints {
     )
       return null;
     const endpoint = this.current(sessionId, endpointId);
-    const result = endpoint?.svgText
-      ? await endpoint.svgText({
-          callId,
-          targetId,
-          operation: action,
-          expiresAtMs: Math.min(expiresAtMs, Date.now() + 1500),
-        })
-      : { kind: "unavailable" };
+    const result =
+      endpoint?.svgText && endpoint.snapshot.selection?.kind !== "document"
+        ? await endpoint.svgText({
+            callId,
+            targetId,
+            operation: action,
+            expiresAtMs: Math.min(expiresAtMs, Date.now() + 1500),
+          })
+        : { kind: "unavailable" };
     if (endpoint?.svgText && this.current(sessionId, endpointId) !== endpoint)
       throw new Error("native_chat_svg_text_unverified");
     return { sessionId, endpointId, targetId, callId, result };
@@ -416,7 +441,12 @@ export class NativeEditorSurfaceEndpoints {
       return null;
     const endpoint = this.current(sessionId, endpointId);
     if (endpoint)
-      return { sessionId, endpointId, available: true, ...endpoint.snapshot };
+      return {
+        sessionId,
+        endpointId,
+        available: true,
+        ...DesktopWorkbenchInventory.tabs(endpoint.snapshot),
+      };
     return {
       sessionId,
       endpointId,
@@ -557,37 +587,62 @@ export class NativeEditorSurfaceEndpoints {
           )
         );
     }
-    if (endpoint.svgText && scope?.svgTargetId)
+    const context = scope?.contextId
+      ? this.contexts.get(scope.contextId)
+      : undefined;
+    if (
+      endpoint.svgText &&
+      scope?.svgTargetId &&
+      endpoint.snapshot.selection?.kind !== "document" &&
+      context?.subject?.kind !== "document" &&
+      !context?.supportsText
+    )
       tools.push(
         ...DesktopSelectedSvgText.bind(scope.svgTargetId, endpoint.svgText)
       );
     const svgSelection = endpoint.svgSelection;
     if (svgSelection && scope?.contextId) {
-      const context = this.contexts.get(scope.contextId);
-      if (context?.endpointId === endpointId)
+      if (context?.endpointId === endpointId && context.subject) {
+        const { subject, tab, supportsText, targetId, staleAtAdmission } =
+          context;
+        const matchesView = () =>
+          !staleAtAdmission &&
+          endpoint.snapshot.active === tab &&
+          NativeEditorSelection.sameSubject(
+            activeSelection(endpoint.snapshot),
+            subject
+          );
         tools.push(
           ...DesktopSelectedSvgSelection.bind(
-            context.targetId,
+            targetId,
             async (request, signal) => {
+              if (!matchesView()) return { kind: "stale" };
+              const result = await svgSelection(
+                { ...request, path: subject.path, subject },
+                signal
+              );
               if (
-                context.path === null ||
-                endpoint.snapshot.active !== context.path
+                "path" in result &&
+                (result.path !== subject.path || !matchesView())
               )
-                return { kind: "stale" };
-              const result = await svgSelection(request, signal);
-              if ("path" in result && result.path !== context.path)
                 throw new Error("native_chat_svg_selection_unverified");
               return result;
-            }
+            },
+            { subject, supportsText }
           )
         );
-      else if (call)
+      } else if (call)
         // A retained catalog may call after its live capture was retired.
         // Deny it through the domain result and keep it out of discovery.
         tools.push(
-          ...DesktopSelectedSvgSelection.bind(scope.contextId, async () => ({
-            kind: "stale",
-          }))
+          ...DesktopSelectedSvgSelection.bind(
+            context?.targetId ?? scope.contextId,
+            async () => ({ kind: "stale" }),
+            {
+              subject: context?.subject,
+              supportsText: context?.supportsText ?? !scope.svgTargetId,
+            }
+          )
         );
     }
     return scope?.sources && !scope.browser && !modern
@@ -749,7 +804,7 @@ export class NativeEditorSurfaceEndpoints {
         (Object.hasOwn(scoped, "svgTargetId") &&
           !NativeEditorSvgText.isId(scoped.svgTargetId)) ||
         (Object.hasOwn(scoped, "contextId") &&
-          !NativeEditorSvgText.isId(scoped.contextId)) ||
+          !NativeEditorSvgSelection.isId(scoped.contextId)) ||
         (Object.hasOwn(scoped, "browser") &&
           (!browserNegotiated || scoped.browser !== true)) ||
         (Object.hasOwn(scoped, "sources") &&
@@ -872,4 +927,13 @@ export class NativeEditorSurfaceEndpoints {
     this.contexts.clear();
     this.targetContexts.clear();
   }
+}
+
+function activeSelection(
+  snapshot: NativeEditorSurfaceSnapshot
+): NativeEditorSelection.Subject | undefined {
+  if (snapshot.selection) return snapshot.selection;
+  // Earlier renderers published the SVG itself as the active tab.
+  const path = snapshot.activeSvg ?? snapshot.active;
+  if (NativeEditorSurfaces.isSvgPath(path)) return { kind: "svg", path };
 }

@@ -1,17 +1,24 @@
 // GRIDA-SEC-004 — the tools operate only on the admitted live selection.
-import {
-  NativeEditorSvgSelection,
-  NativeEditorSvgText,
-} from "@grida/desktop-bridge";
+import { NativeEditorSelection } from "@grida/desktop-bridge";
 import { NativeDesktopTools } from "./native-desktop-tools";
 
 export namespace DesktopSelectedSvgSelection {
   export type Delivery = (
-    request: NativeEditorSvgSelection.Request & { callId: string },
+    request: NativeEditorSelection.Request & { callId: string },
     signal: AbortSignal
-  ) => Promise<NativeEditorSvgSelection.Result>;
+  ) => Promise<NativeEditorSelection.Result>;
 
   const revision = { type: "string", minLength: 36, maxLength: 36 } as const;
+  const mutation = {
+    type: "object",
+    properties: {
+      kind: { enum: ["applied", "unchanged"] },
+      path: { type: "string" },
+      saved: { const: false },
+    },
+    required: ["kind", "path", "saved"],
+    additionalProperties: false,
+  } as const;
   const cursor = {
     type: "object",
     properties: {
@@ -24,7 +31,7 @@ export namespace DesktopSelectedSvgSelection {
   const inspect = {
     name: "svg_inspect_selection",
     description:
-      "Inspect the exact SVG elements or vector points selected when this Act message was sent. Returns the scoped file path, capture revision and zero-based element-child paths or vector ordinals. Pass nextCursor as cursor to continue. Use the revision to edit the same live selection.",
+      "Inspect the exact SVG selection captured at Send. An open SVG can provide element paths or vector points. A selected board item provides the whole SVG document path and its placement identity. Pass nextCursor as cursor to continue. Use the revision for supported live SVG edits.",
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: "object",
@@ -37,11 +44,11 @@ export namespace DesktopSelectedSvgSelection {
         kind: { const: "inspection" },
         path: { type: "string" },
         revision,
-        mode: { enum: ["objects", "vector"] },
+        mode: { enum: ["objects", "vector", "document"] },
         total: { type: "integer", minimum: 1 },
         targets: {
           type: "array",
-          maxItems: NativeEditorSvgSelection.MAX_PAGE_ITEMS,
+          maxItems: NativeEditorSelection.MAX_PAGE_ITEMS,
           items: { type: "object" },
         },
         vectorElement: { type: "object" },
@@ -72,53 +79,94 @@ export namespace DesktopSelectedSvgSelection {
       required: ["revision", "opacity"],
       additionalProperties: false,
     },
+    outputSchema: mutation,
+  } as const;
+  export const readText = {
+    name: "svg_read_selected_text",
+    description:
+      "Read the string from one plain text element in the captured SVG selection. The revision is valid only while the exact view, document and selection remain current.",
+    annotations: { readOnlyHint: true },
+    inputSchema: { type: "object", additionalProperties: false },
     outputSchema: {
       type: "object",
       properties: {
-        kind: { enum: ["applied", "unchanged"] },
+        kind: { const: "read" },
         path: { type: "string" },
-        saved: { const: false },
+        revision: { type: "string" },
+        text: { type: "string" },
       },
-      required: ["kind", "path", "saved"],
+      required: ["kind", "path", "revision", "text"],
       additionalProperties: false,
     },
+  } as const;
+  export const replaceText = {
+    name: "svg_replace_selected_text",
+    description:
+      "Replace one plain text element in the captured SVG selection using the revision from svg_read_selected_text. The live edit is undoable and leaves writing to the editor's normal Save action.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        revision: { type: "string", maxLength: 36 },
+        text: {
+          type: "string",
+          maxLength: NativeEditorSelection.MAX_TEXT_BYTES,
+        },
+      },
+      required: ["revision", "text"],
+      additionalProperties: false,
+    },
+    outputSchema: mutation,
   } as const;
 
   export function bind(
     targetId: string,
-    deliver: Delivery
+    deliver: Delivery,
+    {
+      subject,
+      supportsText = false,
+    }: {
+      subject?: NativeEditorSelection.Subject;
+      supportsText?: boolean;
+    } = {}
   ): readonly NativeDesktopTools.Tool[] {
-    return [
-      bindOperation(inspect, "inspect"),
-      bindOperation(opacity, "set-opacity"),
-    ];
+    const tools = [bindOperation(inspect, "inspect")];
+    if (subject?.kind === "document") return tools;
+    tools.push(bindOperation(opacity, "set-opacity"));
+    if (supportsText) {
+      tools.push(
+        bindOperation(readText, "read-text"),
+        bindOperation(replaceText, "replace-text")
+      );
+    }
+    return tools;
 
     function bindOperation(
       definition: NativeDesktopTools.Tool["definition"],
-      kind: NativeEditorSvgSelection.Operation["kind"]
+      kind: NativeEditorSelection.Operation["kind"]
     ): NativeDesktopTools.Tool {
       return {
         definition,
         revision: 1,
         async invoke(args, call) {
-          const action = NativeEditorSvgSelection.operation({ ...args, kind });
+          const action = NativeEditorSelection.operation({ ...args, kind });
           if (
             !action ||
             (args && Object.hasOwn(args, "kind")) ||
-            !NativeEditorSvgText.isId(call.id)
+            !NativeEditorSelection.isId(call.id)
           )
             return NativeDesktopTools.failure(
               "invalid_svg_selection_arguments"
             );
           if (
-            (action.kind === "set-opacity" && action.revision !== targetId) ||
+            ("revision" in action && action.revision !== targetId) ||
             (action.kind === "inspect" &&
               action.cursor &&
-              action.cursor.revision !== targetId)
+              (action.cursor.revision !== targetId ||
+                (subject?.kind === "document" && action.cursor.offset !== 0)))
           )
             return NativeDesktopTools.failure("svg_selection_stale");
           call.signal.throwIfAborted();
-          const result = NativeEditorSvgSelection.result(
+          const result = NativeEditorSelection.result(
             await deliver(
               {
                 targetId,
@@ -137,10 +185,27 @@ export namespace DesktopSelectedSvgSelection {
           if (result?.kind === "unsupported")
             return NativeDesktopTools.failure("svg_selection_unsupported");
           if (
+            action.kind === "read-text" &&
+            result?.kind === "text" &&
+            result.revision === targetId
+          ) {
+            return {
+              content: [],
+              structuredContent: { ...result, kind: "read" },
+              isError: false,
+            };
+          }
+          if (
             (action.kind === "inspect" &&
               result?.kind === "inspection" &&
-              verifiedPage(result, targetId, action.cursor?.offset ?? 0)) ||
-            (action.kind === "set-opacity" &&
+              verifiedPage(
+                result,
+                targetId,
+                action.cursor?.offset ?? 0,
+                subject
+              )) ||
+            ((action.kind === "set-opacity" ||
+              action.kind === "replace-text") &&
               (result?.kind === "applied" || result?.kind === "unchanged"))
           )
             return { content: [], structuredContent: result, isError: false };
@@ -151,13 +216,36 @@ export namespace DesktopSelectedSvgSelection {
   }
 
   function verifiedPage(
-    result: NativeEditorSvgSelection.Inspection,
+    result: NativeEditorSelection.Inspection,
     targetId: string,
-    offset: number
+    offset: number,
+    subject: NativeEditorSelection.Subject | undefined
   ): boolean {
+    if (
+      !subject ||
+      result.revision !== targetId ||
+      result.path !== subject.path
+    )
+      return false;
+    if (result.mode === "document") {
+      const { placement } = result.targets[0];
+      return (
+        offset === 0 &&
+        NativeEditorSelection.sameSubject(subject, {
+          kind: "document",
+          path: result.path,
+          ...(placement && {
+            placement: {
+              boardPath: placement.boardPath,
+              pinId: placement.pinId,
+            },
+          }),
+        })
+      );
+    }
     const end = offset + result.targets.length;
     return (
-      result.revision === targetId &&
+      subject.kind === "svg" &&
       (result.nextCursor === null
         ? end === result.total
         : result.nextCursor.offset === end)

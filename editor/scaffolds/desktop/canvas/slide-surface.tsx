@@ -10,10 +10,12 @@
  */
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import type { SvgEditor } from "@grida/svg-editor";
 import { useSvgEditor } from "@grida/svg-editor/react";
 import { keynote } from "@grida/svg-editor/presets";
-import type { DocumentSurfaceHost } from "../file/document-surface-host";
+import { SvgCanvasContextMenu } from "@/scaffolds/svg-editor/context-menu";
+import type { Slide } from "./deck-store";
 import { useWorkspaceFileSave } from "../workbench/use-workspace-file-save";
 import type { WorkspaceFileReloadGuard } from "../workbench/workspace-file-reload-guard";
 import {
@@ -21,6 +23,13 @@ import {
   SaveConflictDialog,
   SaveErrorToast,
 } from "../workbench/editor-pane-save-ui";
+
+export type BindSlideEditor = (
+  editor: SvgEditor,
+  slide: Pick<Slide, "id" | "src"> & { relPath: string }
+) => (() => void) | undefined;
+
+export const SLIDE_VIEWPORT_PADDING = 80;
 
 export function SlideSurface({
   workspaceId,
@@ -30,7 +39,8 @@ export function SlideSurface({
   active = true,
   onDirtyChange,
   onSaved,
-  liveText,
+  binding,
+  bindToolbarEditor,
   prepareContentForEditor,
   prepareContentForWrite,
 }: {
@@ -43,7 +53,8 @@ export function SlideSurface({
   active?: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
-  liveText?: { host: DocumentSurfaceHost; path: string };
+  binding?: { slide: Pick<Slide, "id" | "src">; bindEditor: BindSlideEditor };
+  bindToolbarEditor?: (editor: SvgEditor) => () => void;
   prepareContentForEditor?: (
     diskContent: string
   ) =>
@@ -54,20 +65,30 @@ export function SlideSurface({
 }) {
   const editor = useSvgEditor();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const liveHost = liveText?.host;
-  const livePath = liveText?.path;
+  const bindEditor = binding?.bindEditor;
+  const slideId = binding?.slide.id;
+  const slideSrc = binding?.slide.src;
 
-  useEffect(() => {
-    if (active && liveHost && livePath)
-      return liveHost.bindEditor(editor, livePath);
-  }, [active, editor, liveHost, livePath]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const handle = keynote.attach(editor, { container });
-    return () => handle.detach();
-  }, [editor]);
+    const handle = keynote.attach(editor, {
+      container,
+      padding: SLIDE_VIEWPORT_PADDING,
+      min_fit_scale: 0.25,
+      pan_overshoot: 80,
+    });
+    const unbind = bindToolbarEditor?.(editor);
+    return () => {
+      unbind?.();
+      handle.detach();
+    };
+  }, [editor, bindToolbarEditor]);
+
+  useLayoutEffect(() => {
+    if (active && bindEditor && slideId !== undefined && slideSrc !== undefined)
+      return bindEditor(editor, { id: slideId, src: slideSrc, relPath });
+  }, [active, bindEditor, editor, relPath, slideId, slideSrc]);
 
   // `active` gates Cmd+S: true for the deck's single mounted slide when the
   // deck itself is visible; false when the deck is a hidden workbench tab.
@@ -118,7 +139,9 @@ export function SlideSurface({
 
   return (
     <div className="relative h-full w-full bg-muted">
-      <div ref={containerRef} className="absolute inset-0" />
+      <SvgCanvasContextMenu enabled={active}>
+        <div ref={containerRef} className="absolute inset-0" />
+      </SvgCanvasContextMenu>
       {(save.dirty || save.saving) && (
         <DirtyBadge
           dirty={save.dirty}
@@ -126,7 +149,7 @@ export function SlideSurface({
           className="left-3 right-auto top-3 z-10"
         />
       )}
-      {save.saveError && (
+      {active && save.saveError && (
         <SaveErrorToast
           message={save.saveError}
           onDismiss={save.dismissError}
@@ -134,7 +157,7 @@ export function SlideSurface({
       )}
       <SaveConflictDialog
         relPath={relPath}
-        open={save.conflictOpen}
+        open={active && save.conflictOpen}
         onKeepEditing={save.keepEditing}
         onReload={save.reloadFromDisk}
         onOverwrite={save.overwriteAnyway}

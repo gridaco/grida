@@ -7,7 +7,7 @@ import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 
 const settings = vi.hoisted(() => ({
   supported: true,
-  open: vi.fn<() => Promise<void>>(),
+  open: vi.fn<(section?: "models") => Promise<void>>(),
 }));
 const commands = vi.hoisted(() => new Map<string, (value: string) => void>());
 
@@ -288,7 +288,7 @@ describe("native model shortlist", () => {
     { id: "other", connection: "Other provider", model: "Other model" },
   ];
 
-  it("opens the native Settings window from Manage models", () => {
+  it("opens LLM Providers in native Settings from Manage models", () => {
     renderToStaticMarkup(
       <NativeModelPicker
         profiles={{ active: null, choices, saved: [] }}
@@ -298,7 +298,7 @@ describe("native model shortlist", () => {
       />
     );
     commands.get("Manage models")!("Manage models");
-    expect(settings.open).toHaveBeenCalledExactlyOnceWith();
+    expect(settings.open).toHaveBeenCalledExactlyOnceWith("models");
   });
 
   it("withholds Manage models on older native hosts", () => {
@@ -327,7 +327,7 @@ describe("native model shortlist", () => {
     );
     commands.get("Manage models")!("Manage models");
     await Promise.resolve();
-    expect(settings.open).toHaveBeenCalledExactlyOnceWith();
+    expect(settings.open).toHaveBeenCalledExactlyOnceWith("models");
   });
 
   it.each([0, 7])(

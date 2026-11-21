@@ -3,6 +3,7 @@
    (typography plugin, fonts, streamdown, workbench colors, animations, custom
    utilities) layer on top below. */
 @import "@app/ui/globals.css";
+@import "../components/chat-web-link.css";
 @plugin "@tailwindcss/typography";
 
 /* Editor-provided font tokens (the package leaves fonts to the consumer). */

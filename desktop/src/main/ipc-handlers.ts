@@ -101,7 +101,7 @@ type RegisterIpcHandlersOptions = {
   on_browser_tools?: (tools: DesktopBrowserTools) => void;
   on_native_chat?: (chat: NativeChatIpc) => void;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
-  open_settings: () => void;
+  open_settings: (section?: "models") => void | Promise<void>;
   archives?: NativeArchives;
   chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
@@ -1554,17 +1554,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
 
   guarded(IPC_CHANNELS.WINDOW_OPEN_SETTINGS, (event, ...args: unknown[]) => {
-    // Only the admitted top-level Desktop document can request this fixed
-    // native action; subframes cannot borrow their window's admission.
+    // Only the admitted top-level Desktop document can request this action.
+    // Main owns the Settings URL and accepts only a known section.
     if (
       event.sender.isDestroyed() ||
       !event.senderFrame ||
-      event.senderFrame !== event.sender.mainFrame ||
-      args.length !== 0
+      event.senderFrame !== event.sender.mainFrame
     ) {
       throw new Error("settings window request denied");
     }
-    options.open_settings();
+    if (args.length === 0) return options.open_settings();
+    if (args.length === 1 && args[0] === "models")
+      return options.open_settings("models");
+    throw new Error("settings window request denied");
   });
 
   guarded(

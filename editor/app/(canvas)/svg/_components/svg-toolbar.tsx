@@ -1,63 +1,60 @@
 "use client";
 
-import {
-  BoxIcon,
-  CircleIcon,
-  CursorArrowIcon,
-  SlashIcon,
-  TextIcon,
-} from "@radix-ui/react-icons";
 import * as React from "react";
-import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 
 import {
+  DrawingToolbar,
   ToolGroupItem,
+  ToolIcon,
   ToolbarPosition,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
-import { useSvgEditor, useTool } from "@grida/svg-editor/react";
-import type { Tool } from "@grida/svg-editor";
+import { useSvgEditor } from "@grida/svg-editor/react";
+import type { SvgEditor, Tool } from "@grida/svg-editor";
 
 type ToolEntry = {
   value: string;
   tool: Tool;
-  Icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentProps<typeof ToolIcon>["type"];
   label: string;
   shortcut: string;
 };
 
+const CURSOR_TOOL: Tool = { type: "cursor" };
+const readCursorTool = () => CURSOR_TOOL;
+
 const TOOLS: ReadonlyArray<ToolEntry> = [
   {
     value: "cursor",
-    tool: { type: "cursor" },
-    Icon: CursorArrowIcon,
+    tool: CURSOR_TOOL,
+    icon: "cursor",
     label: "Move",
     shortcut: "V",
   },
   {
     value: "rect",
     tool: { type: "insert", tag: "rect" },
-    Icon: BoxIcon,
+    icon: "rectangle",
     label: "Rectangle",
     shortcut: "R",
   },
   {
     value: "ellipse",
     tool: { type: "insert", tag: "ellipse" },
-    Icon: CircleIcon,
+    icon: "ellipse",
     label: "Ellipse",
     shortcut: "O",
   },
   {
     value: "line",
     tool: { type: "insert", tag: "line" },
-    Icon: SlashIcon,
+    icon: "line",
     label: "Line",
     shortcut: "L",
   },
   {
     value: "text",
     tool: { type: "insert-text" },
-    Icon: TextIcon,
+    icon: "text",
     label: "Text",
     shortcut: "T",
   },
@@ -65,7 +62,27 @@ const TOOLS: ReadonlyArray<ToolEntry> = [
 
 export function SvgToolbar({ className }: { className?: string }) {
   const editor = useSvgEditor();
-  const tool = useTool();
+  return <SvgToolbarControls editor={editor} className={className} />;
+}
+
+export function SvgToolbarControls({
+  editor,
+  disabled = false,
+  className,
+}: {
+  editor: SvgEditor | null;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const subscribe = React.useCallback(
+    (listener: () => void) => editor?.subscribe(listener) ?? (() => {}),
+    [editor]
+  );
+  const readTool = React.useCallback(
+    () => editor?.state.tool ?? CURSOR_TOOL,
+    [editor]
+  );
+  const tool = React.useSyncExternalStore(subscribe, readTool, readCursorTool);
   // `lasso` and `bend` are path-edit-only and SvgToolbar is mounted in
   // select mode, so they're never actually visible while either is active
   // — fall back to cursor to keep this toolbar's active value defined.
@@ -78,27 +95,32 @@ export function SvgToolbar({ className }: { className?: string }) {
 
   return (
     <ToolbarPosition className={className}>
-      <ToggleGroupPrimitive.Root
+      <DrawingToolbar
         type="single"
+        aria-label="Drawing tools"
         value={value}
+        inert={disabled}
+        disabled={!editor}
         onValueChange={(next) => {
+          if (disabled || !editor) return;
           // Radix clears value on re-click of active item; collapse to cursor.
           const t = next ? TOOLS.find((x) => x.value === next) : undefined;
-          editor.set_tool(t ? t.tool : { type: "cursor" });
+          editor.set_tool(t?.tool ?? CURSOR_TOOL);
         }}
-        className="pointer-events-auto flex items-center gap-0.5 rounded-md border bg-popover p-1 shadow-md"
       >
-        {TOOLS.map(({ value, Icon, label, shortcut }) => (
+        {TOOLS.map(({ value, icon, label, shortcut }) => (
           <ToolGroupItem
             key={value}
             value={value}
+            className="aspect-square"
             label={label}
+            aria-label={label}
             shortcut={shortcut}
           >
-            <Icon className="size-4" />
+            <ToolIcon type={icon} className="size-4" />
           </ToolGroupItem>
         ))}
-      </ToggleGroupPrimitive.Root>
+      </DrawingToolbar>
     </ToolbarPosition>
   );
 }

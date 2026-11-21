@@ -1,36 +1,103 @@
-"use client";
-
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@app/ui/components/tabs";
-import { ComposerKitDemo } from "./kit-demo";
+import type { ReactNode } from "react";
 import { DesktopComposerDemo } from "./desktop-demo";
+import { DictateDemo } from "./dictate-demo";
+import { ComposerKitDemo } from "./kit-demo";
+import { LinkDemo } from "./link-demo";
+import { LongPasteDemo } from "./long-paste-demo";
 
 export default function ComposerPage() {
   return (
-    <Tabs defaultValue="desktop" className="flex min-h-screen flex-col gap-0">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-        <div>
-          <h1 className="text-xl font-semibold">Composer playground</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Refine the chat composer with local fixtures and shared Desktop
-            components.
-          </p>
-        </div>
-        <TabsList aria-label="Composer playground">
-          <TabsTrigger value="desktop">Desktop chat</TabsTrigger>
-          <TabsTrigger value="kit">Kit and files</TabsTrigger>
-        </TabsList>
-      </header>
-      <TabsContent value="desktop" className="m-0 flex-1">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-4 py-8 sm:px-6">
+      <h1 className="text-2xl font-semibold">Composer playground</h1>
+      <Example id="question" title="Question">
+        <DesktopComposerDemo scenario="question" />
+      </Example>
+      <Example id="blocking-question" title="Blocking question">
+        <DesktopComposerDemo scenario="blocking-question" />
+      </Example>
+      <Example
+        id="multiple-questions"
+        title="Long choices and multiple questions"
+      >
+        <DesktopComposerDemo scenario="multiple-questions" />
+      </Example>
+      <Example id="chat-composer" title="Chat composer">
         <DesktopComposerDemo />
-      </TabsContent>
-      <TabsContent value="kit" className="m-0 flex-1">
+      </Example>
+      <Example id="suggested-prompt" title="Suggested prompt">
+        <p className="text-sm text-muted-foreground">
+          Focus the composer and press Tab to use the suggestion. Clear the
+          draft to see it again.
+        </p>
+        <DesktopComposerDemo scenario="suggested-prompt" />
+      </Example>
+      <Example id="dictate" title="Dictate">
+        <DictateDemo />
+      </Example>
+      <Example id="links" title="Links">
+        <LinkDemo />
+      </Example>
+      <Example id="message-queue" title="Message queue">
+        <DesktopComposerDemo queued />
+      </Example>
+      <Example id="attachments" title="Attachments">
+        <DesktopComposerDemo scenario="attachments" />
+      </Example>
+      <Example id="long-paste" title="Long pasted text">
+        <LongPasteDemo />
+      </Example>
+      <Example id="svg-text-selection" title="Slide selection">
+        <DesktopComposerDemo scenario="svg-selection" />
+      </Example>
+      <Example id="tool-activity" title="Tool activity">
+        <DesktopComposerDemo scenario="activity" />
+      </Example>
+      <Example id="subagents" title="Subagents">
+        <DesktopComposerDemo scenario="subagents" />
+      </Example>
+      <Example id="streaming" title="Streaming">
+        <DesktopComposerDemo scenario="streaming" />
+      </Example>
+      <Example id="pause-and-resume" title="Pause and resume">
+        <DesktopComposerDemo scenario="paused" />
+      </Example>
+      <Example id="empty-conversation" title="Empty conversation">
+        <DesktopComposerDemo scenario="empty" />
+      </Example>
+      <Example id="loading" title="Model and access loading">
+        <DesktopComposerDemo scenario="loading" />
+      </Example>
+      <Example id="reconnect" title="Reconnection">
+        <DesktopComposerDemo scenario="reconnect" />
+      </Example>
+      <Example id="approval" title="Permission approval">
+        <DesktopComposerDemo scenario="approval" />
+      </Example>
+      <Example id="library-request" title="Library request">
+        <DesktopComposerDemo scenario="library-request" />
+      </Example>
+      <Example id="kit-and-files" title="Kit and files">
         <ComposerKitDemo />
-      </TabsContent>
-    </Tabs>
+      </Example>
+    </div>
+  );
+}
+
+function Example({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="min-w-0 space-y-3">
+      <h2 id={id} className="text-lg font-semibold">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }

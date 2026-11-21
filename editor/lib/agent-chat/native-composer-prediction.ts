@@ -6,16 +6,20 @@ import type {
 } from "@grida/desktop-bridge";
 import type { NativeChatView } from "./native-chat-controller";
 
+type PredictionRequest = {
+  scope: number;
+  attachment: string;
+  turn: string;
+  profile: string | null;
+  effort: NativeChatView["effort"];
+  suggestion?: string;
+};
+
 /** One optional next prompt for the currently presented, empty Desktop draft. */
 export class NativeComposerPrediction {
   private readonly listeners = new Set<() => void>();
   private text: string | null = null;
-  private request?: {
-    attachment: string;
-    turn: string;
-    profile: string | null;
-    effort: NativeChatView["effort"];
-  };
+  private request?: PredictionRequest;
   private preference?: DesktopComposerPredictionSettings;
   private presented = false;
   private emptyScope?: number;
@@ -66,21 +70,28 @@ export class NativeComposerPrediction {
 
   /** Called synchronously on document edits as well as after draft restoration. */
   setDraft(scope: number, empty: boolean): void {
-    if (empty) this.emptyScope = scope;
-    else if (this.emptyScope === scope) {
-      this.emptyScope = undefined;
-      this.dismiss();
-    }
+    if (!empty && this.emptyScope !== scope) return;
+    this.emptyScope = empty ? scope : undefined;
+
+    const request = this.request;
+    if (!request) return;
+    // Editing invalidates an in-flight prediction. A displayed suggestion
+    // can wait for the same draft to become empty again.
+    if (this.emptyScope === request.scope)
+      this.publish(request.suggestion ?? null);
+    else if (request.suggestion) this.publish(null);
+    else this.dismiss();
   }
 
   viewChanged(attachment: string | undefined, view: NativeChatView): void {
     if (
       this.request &&
-      (this.request.attachment !== attachment ||
+      (this.request.scope !== view.scope ||
+        this.request.attachment !== attachment ||
         this.request.turn !== view.observation?.snapshot.latest?.turnId ||
         this.request.profile !== (view.profiles?.active ?? null) ||
         this.request.effort !== view.effort ||
-        !this.eligible(view))
+        !this.chatEligible(view))
     )
       this.dismiss();
   }
@@ -101,7 +112,8 @@ export class NativeComposerPrediction {
       !latest ||
       latest.disposition !== "settled" ||
       latest.status !== "succeeded" ||
-      !this.eligible(view)
+      this.emptyScope !== view.scope ||
+      !this.chatEligible(view)
     )
       return;
     const prior = previous?.snapshot.latest;
@@ -110,7 +122,8 @@ export class NativeComposerPrediction {
       (prior?.turnId === latest.turnId && prior.disposition === "settled")
     )
       return;
-    const request = {
+    const request: PredictionRequest = {
+      scope: view.scope,
       attachment,
       turn: latest.turnId,
       profile: view.profiles?.active ?? null,
@@ -119,7 +132,9 @@ export class NativeComposerPrediction {
     this.request = request;
     void predict.call(this.bridge, attachment, observation.observationId).then(
       (text) => {
-        if (this.request === request) this.publish(text?.trim() || null);
+        if (this.request !== request) return;
+        request.suggestion = text?.trim() || undefined;
+        this.publish(request.suggestion ?? null);
       },
       () => {}
     );
@@ -127,8 +142,9 @@ export class NativeComposerPrediction {
 
   /** Enforce the live state even between a preference update and React's repaint. */
   readonly take = (displayed: string): boolean => {
-    if (!displayed || displayed !== this.text) return false;
-    this.dismiss();
+    const request = this.request;
+    if (!request || !displayed || displayed !== this.text) return false;
+    this.setDraft(request.scope, false);
     return true;
   };
 
@@ -137,12 +153,11 @@ export class NativeComposerPrediction {
     this.publish(null);
   }
 
-  private eligible(view: NativeChatView): boolean {
+  private chatEligible(view: NativeChatView): boolean {
     const snapshot = view.observation?.snapshot;
     return !!(
       this.preference?.enabled &&
       this.presented &&
-      this.emptyScope === view.scope &&
       snapshot &&
       snapshot.sessionId === view.selected &&
       !snapshot.side &&

@@ -13,7 +13,7 @@
  * the host: dropped or pasted items go to `onAttachmentTransfer`, and staged
  * items render through `attachments`.
  *
- * Lowering: the prompt is `message.meta.text` plus an explicit list of
+ * Lowering: the prompt is the composer's formatted or plain text plus a list of
  * any referenced file paths (from `@`-mentions / file-ref parts) so the
  * agent can resolve them even when the chip text alone is ambiguous.
  */
@@ -49,8 +49,10 @@ import {
   ComposerContent,
   ComposerMenuAnchor,
   ComposerProvider,
+  ComposerToolbarTooltip,
   ComposerTransfer,
   ComposerTriggerMenu,
+  composerToolbarButtonClassName,
   useComposer,
   type ComposerCatalog,
   type ComposerController,
@@ -63,6 +65,7 @@ import {
 } from "./agent-composer-queue-submit";
 
 const ESCAPE_CONFIRM_MS = 2000;
+const toolbarIconClassName = cn(composerToolbarButtonClassName, "w-7");
 const noSuggestion = () => null;
 const noSubscription = () => () => {};
 
@@ -162,7 +165,8 @@ export type AgentComposerInputProps = {
   /** Attachments the host stages itself, shown above the editor. */
   attachments?: ReactNode;
   /** A live editor selection eligible to go with the next message. */
-  selectionContext?: "svg-text" | "svg-selection";
+  selectionLabel?: string;
+  onClearSelection?: () => void;
   /** Footer content at the start of the toolbar. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
@@ -229,7 +233,8 @@ function AgentComposerInner({
   allowEmptySubmit = false,
   emptySubmitLabel,
   attachments,
-  selectionContext,
+  selectionLabel,
+  onClearSelection,
   toolbarStart,
   toolbarEnd,
   className,
@@ -287,6 +292,7 @@ function AgentComposerInner({
     prediction?.read ?? noSuggestion,
     noSuggestion
   );
+  const hasEditorSelection = !!selectionLabel;
   const reportDraft = useCallback(
     (empty: boolean) => {
       if (typeof submissionScope === "number")
@@ -294,11 +300,18 @@ function AgentComposerInner({
           submissionScope,
           empty &&
             !editing &&
-            !selectionContext &&
+            !hasEditorSelection &&
             (!draftKey || binding.held === draftKey)
         );
     },
-    [prediction, submissionScope, editing, selectionContext, draftKey, binding]
+    [
+      prediction,
+      submissionScope,
+      editing,
+      hasEditorSelection,
+      draftKey,
+      binding,
+    ]
   );
   useEffect(() => {
     reportDraft(composer.isEmptyDraft());
@@ -376,10 +389,11 @@ function AgentComposerInner({
   const submit = async () => {
     if (editing) {
       if (readOnly || editing.saveDisabled) return;
-      const text = composer.submit({
+      const message = composer.submit({
         submitted_at: Date.now(),
         allow_empty: editing.allowEmpty,
-      })?.meta.text;
+      });
+      const text = message?.meta.markdown ?? message?.meta.text;
       if (text === undefined || (!editing.allowEmpty && !text.trim())) return;
       const lease = queueSubmitGuard.begin(submissionScope);
       if (!lease) return;
@@ -532,17 +546,32 @@ function AgentComposerInner({
   const primaryAction = isStreaming
     ? {
         label: "Stop",
-        icon: <SquareIcon className="size-3.5" />,
+        icon: <SquareIcon className="size-3 fill-current" />,
         onClick: onStop,
         confirmWithEscape: true,
       }
     : !composer.snapshot.text.trim()
       ? emptyAction
       : undefined;
+  const sending = isQueueing || submitting;
   const escapeAction =
-    !editing && !isQueueing && !submitting && primaryAction?.confirmWithEscape
+    !editing && !sending && primaryAction?.confirmWithEscape
       ? primaryAction
       : undefined;
+  const submitLabel =
+    allowEmptySubmit && emptySubmitLabel && !composer.snapshot.text.trim()
+      ? emptySubmitLabel
+      : "Send";
+  const actionLabel = sending
+    ? "Sending…"
+    : (primaryAction?.label ?? submitLabel);
+  const actionKey = sending
+    ? undefined
+    : escapeAction
+      ? "Escape"
+      : primaryAction
+        ? undefined
+        : "Enter";
   const [confirmUntil, setConfirmUntil] = useState(0);
   useLayoutEffect(() => {
     setConfirmUntil(0);
@@ -557,10 +586,15 @@ function AgentComposerInner({
     return () => clearTimeout(timer);
   }, [confirmUntil]);
 
+  const isFormattingMenuEvent = (event: KeyboardEvent<HTMLDivElement>) =>
+    event.target instanceof Element &&
+    event.target.closest("[data-composer-formatting]") !== null;
+
   const confirmEscape = (event: KeyboardEvent<HTMLDivElement>) => {
     if (
       !escapeAction ||
       composer.trigger ||
+      isFormattingMenuEvent(event) ||
       event.defaultPrevented ||
       event.repeat ||
       event.nativeEvent.isComposing ||
@@ -586,22 +620,6 @@ function AgentComposerInner({
 
   return (
     <ComposerMenuAnchor
-      onClick={(event) => {
-        const { currentTarget, target } = event;
-        if (
-          readOnly ||
-          event.defaultPrevented ||
-          !(target instanceof Element) ||
-          !currentTarget.contains(target) ||
-          currentTarget.ownerDocument.getSelection()?.isCollapsed === false
-        ) {
-          return;
-        }
-        const control = target.closest(
-          "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu]"
-        );
-        if (!control || !currentTarget.contains(control)) composer.focus();
-      }}
       onPointerDown={() => setConfirmUntil(0)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -613,7 +631,13 @@ function AgentComposerInner({
         else if (confirmUntil) setConfirmUntil(0);
       }}
       onKeyDownCapture={(event) => {
-        if (editing && event.key === "Escape" && !editing.busy && !isQueueing) {
+        if (
+          editing &&
+          event.key === "Escape" &&
+          !editing.busy &&
+          !isQueueing &&
+          !isFormattingMenuEvent(event)
+        ) {
           event.preventDefault();
           event.stopPropagation();
           editing.onCancel();
@@ -634,15 +658,25 @@ function AgentComposerInner({
           {editing.label}
         </div>
       )}
-      {!editing && (attachments || selectionContext) && (
+      {!editing && (attachments || selectionLabel) && (
         <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
           {attachments}
-          {selectionContext && (
-            <EditorSelectionIndicator kind={selectionContext} />
+          {selectionLabel && (
+            <EditorSelectionIndicator
+              label={selectionLabel}
+              onClear={
+                onClearSelection &&
+                (() => {
+                  onClearSelection();
+                  composer.focus();
+                })
+              }
+            />
           )}
         </div>
       )}
       <ComposerContent
+        scrollFade
         onKeyDownCapture={(event) => {
           // ProseMirror prevents Escape even when there is no completion open.
           if (event.key === "Escape") confirmEscape(event);
@@ -664,7 +698,8 @@ function AgentComposerInner({
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
       )}
-      <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+      {/* Give the default ghost hover contrast against the composer surface. */}
+      <div className="flex items-center gap-2 px-2 pb-2 pt-1 [--accent:color-mix(in_oklab,var(--foreground)_8%,transparent)] dark:[--accent:color-mix(in_oklab,var(--foreground)_16%,transparent)]">
         {/* Start/end tools share a shrinkable, clipping track. `ml-auto`
             creates the space-between split while the submit button stays
             outside as shrink-0, so pickers truncate before the terminal
@@ -678,91 +713,85 @@ function AgentComposerInner({
         <div className="shrink-0">
           {editing ? (
             <div className="flex items-center gap-2">
+              <ComposerToolbarTooltip label="Cancel edit" shortcut="Esc">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={composerToolbarButtonClassName}
+                  disabled={readOnly}
+                  onClick={editing.onCancel}
+                  aria-keyshortcuts="Escape"
+                >
+                  Cancel
+                </Button>
+              </ComposerToolbarTooltip>
+              <ComposerToolbarTooltip label="Apply edit" shortcut="Enter">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={composerToolbarButtonClassName}
+                  disabled={
+                    readOnly ||
+                    editing.saveDisabled ||
+                    (!editing.allowEmpty && !composer.snapshot.text.trim())
+                  }
+                  onClick={submit}
+                  aria-busy={readOnly}
+                  aria-keyshortcuts="Enter"
+                >
+                  {readOnly ? (
+                    <LoaderCircleIcon
+                      aria-hidden="true"
+                      className="size-3.5 animate-spin motion-reduce:animate-none"
+                    />
+                  ) : (
+                    <CheckIcon className="size-3.5" />
+                  )}
+                  Save changes
+                </Button>
+              </ComposerToolbarTooltip>
+            </div>
+          ) : (
+            <ComposerToolbarTooltip
+              label={sending ? undefined : primaryAction?.label}
+              shortcut={escapeAction ? "Esc ×2" : undefined}
+            >
               <Button
                 type="button"
-                size="sm"
-                variant="ghost"
-                disabled={editing.busy || isQueueing}
-                onClick={editing.onCancel}
+                size="icon-xs"
+                className={toolbarIconClassName}
+                disabled={sending || (!primaryAction && !canSubmit)}
+                aria-label={actionLabel}
+                aria-busy={sending || undefined}
+                aria-keyshortcuts={actionKey}
+                onClick={() => {
+                  if (primaryAction) {
+                    setConfirmUntil(0);
+                    primaryAction.onClick();
+                  } else void submit();
+                }}
               >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="rounded-xl"
-                disabled={
-                  readOnly ||
-                  editing.saveDisabled ||
-                  (!editing.allowEmpty && !composer.snapshot.text.trim())
-                }
-                onClick={submit}
-                aria-busy={readOnly}
-              >
-                {readOnly ? (
+                {sending ? (
                   <LoaderCircleIcon
                     aria-hidden="true"
-                    className="size-3.5 animate-spin motion-reduce:animate-none"
+                    className="size-4 animate-spin motion-reduce:animate-none"
                   />
+                ) : escapeAction && confirmUntil ? (
+                  <kbd
+                    aria-hidden="true"
+                    className="font-sans text-[10px] leading-none font-semibold"
+                  >
+                    Esc
+                  </kbd>
+                ) : primaryAction ? (
+                  primaryAction.icon
                 ) : (
-                  <CheckIcon className="size-3.5" />
+                  <ArrowUpIcon className="size-4" />
                 )}
-                Save changes
               </Button>
-            </div>
-          ) : isQueueing || submitting ? (
-            <Button
-              type="button"
-              size="icon-xs"
-              className="size-7 rounded-full"
-              disabled
-              aria-label="Sending…"
-              aria-busy="true"
-            >
-              <LoaderCircleIcon
-                aria-hidden="true"
-                className="size-4 animate-spin motion-reduce:animate-none"
-              />
-            </Button>
-          ) : primaryAction ? (
-            <Button
-              type="button"
-              size="icon-xs"
-              className="size-7 rounded-full"
-              onClick={() => {
-                setConfirmUntil(0);
-                primaryAction.onClick();
-              }}
-              aria-label={primaryAction.label}
-            >
-              {escapeAction && confirmUntil ? (
-                <kbd
-                  aria-hidden="true"
-                  className="font-sans text-[10px] leading-none font-semibold"
-                >
-                  Esc
-                </kbd>
-              ) : (
-                primaryAction.icon
-              )}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="icon-xs"
-              className="size-7 rounded-full"
-              onClick={submit}
-              disabled={!canSubmit || isQueueing}
-              aria-label={
-                allowEmptySubmit &&
-                emptySubmitLabel &&
-                !composer.snapshot.text.trim()
-                  ? emptySubmitLabel
-                  : "Send"
-              }
-            >
-              <ArrowUpIcon className="size-4" />
-            </Button>
+            </ComposerToolbarTooltip>
           )}
           <span role="status" className="sr-only">
             {escapeAction && confirmUntil
@@ -776,7 +805,7 @@ function AgentComposerInner({
 }
 
 /**
- * Build the prompt text the agent receives: the composer's plain text, then
+ * Build the prompt text the agent receives: the authored message, then
  * any referenced workspace paths (`@`-mentions / file-refs) as an explicit
  * list so the agent can resolve them.
  */
@@ -787,7 +816,7 @@ function lowerPrompt(message: ComposerMessage): string {
       paths.add(part.target.path);
     else if (part.type === "file-ref") paths.add(part.ref.path);
   }
-  const sections = [message.meta.text.trim()];
+  const sections = [(message.meta.markdown ?? message.meta.text).trim()];
   if (paths.size > 0)
     sections.push(
       `Referenced workspace files:\n${[...paths]

@@ -62,7 +62,7 @@ function render(parts: ChatMessage["parts"], controls?: ChatMessageActions) {
   );
 }
 
-it("shows one passive SVG selection marker on the accepted user message", () => {
+it("shows one passive selection marker on the accepted user message", () => {
   const parts = native_message_parts.of({
     messageId: "selected",
     role: "user",
@@ -72,8 +72,9 @@ it("shows one passive SVG selection marker on the accepted user message", () => 
   });
   expect(parts[0]).toEqual({ type: "data-svg-selection", data: true });
   const html = render(parts);
-  expect(html).toContain("SVG selection");
-  expect(html).not.toContain("SVG text selection");
+  expect(html).toContain(">Selection</span>");
+  expect(html).not.toContain(">Text selection</span>");
+  expect(html).not.toContain('aria-label="Clear selection"');
 });
 
 /** Extract an actual rendered element including nested elements of its tag. */

@@ -1060,7 +1060,8 @@ app.on("ready", async () => {
       app.getPath("downloads")
     ),
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
-    open_settings: () => open_or_focus_settings(app, windowAdmission),
+    open_settings: (section) =>
+      open_or_focus_settings(app, windowAdmission, section),
     archives: createDesktopArchives(
       native,
       NativeDesktopProfile.resourcesPath(app)

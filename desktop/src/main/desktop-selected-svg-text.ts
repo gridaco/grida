@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — only expose and dispatch an admitted selection capture.
 import { NativeEditorSvgText } from "@grida/desktop-bridge";
+import { DesktopSelectedSvgSelection } from "./desktop-selected-svg-selection";
 import { NativeDesktopTools } from "./native-desktop-tools";
 
 export namespace DesktopSelectedSvgText {
@@ -8,56 +9,13 @@ export namespace DesktopSelectedSvgText {
     signal?: AbortSignal
   ) => Promise<NativeEditorSvgText.Result>;
 
-  const read = {
-    name: "svg_read_selected_text",
-    description:
-      "Read the selected plain text in the SVG captured when this workspace Act message was sent. The revision is valid only while the exact view, document and selection remain current.",
-    annotations: { readOnlyHint: true },
-    inputSchema: { type: "object", additionalProperties: false },
-    outputSchema: {
-      type: "object",
-      properties: {
-        kind: { const: "read" },
-        path: { type: "string" },
-        revision: { type: "string" },
-        text: { type: "string" },
-      },
-      required: ["kind", "path", "revision", "text"],
-      additionalProperties: false,
-    },
-  } as const;
-  const replace = {
-    name: "svg_replace_selected_text",
-    description:
-      "Replace the captured selected SVG text using the revision from svg_read_selected_text. The live edit is undoable and leaves saving to the editor's normal Save action.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        revision: { type: "string", maxLength: 36 },
-        text: { type: "string", maxLength: 4096 },
-      },
-      required: ["revision", "text"],
-      additionalProperties: false,
-    },
-    outputSchema: {
-      type: "object",
-      properties: {
-        kind: { enum: ["applied", "unchanged"] },
-        path: { type: "string" },
-        saved: { const: false },
-      },
-      required: ["kind", "path", "saved"],
-      additionalProperties: false,
-    },
-  } as const;
-
   export function bind(
     targetId: string,
     deliver: Delivery
   ): readonly NativeDesktopTools.Tool[] {
     return [
       {
-        definition: read,
+        definition: DesktopSelectedSvgSelection.readText,
         revision: 1,
         invoke: (args, call) => {
           if (args && Object.keys(args).length !== 0)
@@ -66,7 +24,7 @@ export namespace DesktopSelectedSvgText {
         },
       },
       {
-        definition: replace,
+        definition: DesktopSelectedSvgSelection.replaceText,
         revision: 1,
         invoke: (args, call) => {
           const action = NativeEditorSvgText.operation({

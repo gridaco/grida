@@ -69,25 +69,22 @@ describe("native_tool_parts", () => {
     expect(part).not.toHaveProperty("output");
   });
 
-  it("shows a read with the file content the card counts", () => {
-    const part = native_tool_parts.entry(
-      call(
-        "read_file",
-        { path: "src/cart.js" },
-        {
-          text: "a\nb\n",
-          truncated: false,
-        }
-      )
-    );
-    expect(part).toMatchObject({
-      type: "tool-read_file",
-      toolCallId: "call-read_file",
-      state: "output-available",
-      input: { path: "src/cart.js" },
-      output: { content: "a\nb\n" },
-    });
-  });
+  it.each(["read_file", "read_scoped_file"])(
+    "shows a %s result in the read card",
+    (tool) => {
+      const input = { directory: "selected", path: "src/cart.js" };
+      const part = native_tool_parts.entry(
+        call(tool, input, { text: "a\nb\n", truncated: false })
+      );
+      expect(part).toMatchObject({
+        type: "tool-read_file",
+        toolCallId: `call-${tool}`,
+        state: "output-available",
+        input,
+        output: { content: "a\nb\n" },
+      });
+    }
+  );
 
   it("shows a command line with its exit code and output", () => {
     const part = native_tool_parts.entry(

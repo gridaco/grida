@@ -4,19 +4,23 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, onTestFinished, vi } from "vitest";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
 import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
   type NativeEditorSvgSelectionDelivery,
+  type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 
-it("binds SVG inspection and opacity to one private input and exact active file", async () => {
+it("binds all SVG operations to one private input and the active slide under a deck tab", async () => {
   const endpoints = new NativeEditorSurfaceEndpoints();
-  const path = "/poster.svg";
+  const tab = "/talk.canvas";
+  const path = "/talk.canvas/slide.svg";
   const snapshot = {
-    active: path,
-    open: [path, "/other.svg"],
+    active: tab,
+    activeSvg: path,
+    open: [tab, path, "/other.svg"],
     truncated: false,
   };
   const sessionId = "chat";
@@ -27,14 +31,22 @@ it("binds SVG inspection and opacity to one private input and exact active file"
     path,
     revision: targetId,
     total: 1,
-    targets: [{ kind: "element", elementPath: [1], tag: "rect" }],
+    targets: [{ kind: "element", elementPath: [1], tag: "text" }],
     nextCursor: null,
   } as const;
   const deliver = vi.fn<NativeEditorSvgSelectionDelivery>(
-    async ({ operation }) =>
-      operation.kind === "inspect"
-        ? inspect
-        : { kind: "applied", path, saved: false }
+    async ({ operation, path: expectedPath }) => {
+      expect(expectedPath).toBe(path);
+      switch (operation.kind) {
+        case "inspect":
+          return inspect;
+        case "read-text":
+          return { kind: "text", path, revision: targetId, text: "First" };
+        case "replace-text":
+        case "set-opacity":
+          return { kind: "applied", path, saved: false };
+      }
+    }
   );
   const register = () =>
     endpoints.register(
@@ -81,17 +93,17 @@ it("binds SVG inspection and opacity to one private input and exact active file"
   }
   const list = (contextId?: string, endpointId?: string) =>
     request({ method: "tools/list" }, contextId, endpointId);
-  const call = (name: string, args: object, contextId = editorToolContextId) =>
+  const call = (name: string, args: object, revision = 1) =>
     request(
       {
         method: "tools/call",
         params: {
           name,
           arguments: args,
-          _meta: { "co.grida/definitionRevision": 1 },
+          _meta: { "co.grida/definitionRevision": revision },
         },
       },
-      contextId
+      editorToolContextId
     );
 
   expect(JSON.stringify(await list())).not.toContain("svg_inspect_selection");
@@ -106,8 +118,54 @@ it("binds SVG inspection and opacity to one private input and exact active file"
   expect(JSON.stringify(await list(editorToolContextId))).toContain(
     "svg_inspect_selection"
   );
+  expect(JSON.stringify(await list(editorToolContextId))).toContain(
+    "svg_read_selected_text"
+  );
+  const tabInventory = {
+    active: tab,
+    open: [tab, path, "/other.svg"],
+    truncated: false,
+  };
+  expect(endpoints.read({ sessionId, endpointId: editorEndpointId })).toEqual({
+    sessionId,
+    endpointId: editorEndpointId,
+    available: true,
+    ...tabInventory,
+  });
+  const inventory = await call(
+    "surface_list_open",
+    {},
+    DesktopWorkbenchInventory.revision
+  );
+  expect(inventory).toMatchObject({
+    message: {
+      result: {
+        structuredContent: { interactive: true, ...tabInventory },
+        isError: false,
+      },
+    },
+  });
+  expect(JSON.stringify(inventory)).not.toContain("activeSvg");
   await expect(call("svg_inspect_selection", {})).resolves.toMatchObject({
     message: { result: { structuredContent: inspect, isError: false } },
+  });
+  await expect(call("svg_read_selected_text", {})).resolves.toMatchObject({
+    message: {
+      result: {
+        structuredContent: {
+          kind: "read",
+          path,
+          revision: targetId,
+          text: "First",
+        },
+        isError: false,
+      },
+    },
+  });
+  await expect(
+    call("svg_replace_selected_text", { revision: targetId, text: "Revised" })
+  ).resolves.toMatchObject({
+    message: { result: { structuredContent: { kind: "applied", path } } },
   });
   await expect(
     call("svg_set_selection_opacity", {
@@ -129,7 +187,7 @@ it("binds SVG inspection and opacity to one private input and exact active file"
       },
     },
   });
-  lease.update({ ...snapshot, active: "/other.svg" });
+  lease.update({ ...snapshot, activeSvg: "/talk.canvas/next.svg" });
   await expect(
     call("svg_set_selection_opacity", { opacity: 0.4, revision: targetId })
   ).resolves.toMatchObject({
@@ -137,8 +195,14 @@ it("binds SVG inspection and opacity to one private input and exact active file"
       result: { content: [{ text: "svg_selection_stale" }], isError: true },
     },
   });
+  lease.update({ ...snapshot, active: path });
+  await expect(call("svg_read_selected_text", {})).resolves.toMatchObject({
+    message: {
+      result: { content: [{ text: "svg_selection_stale" }], isError: true },
+    },
+  });
   expect(deliver.mock.calls.map(([request]) => request.operation.kind)).toEqual(
-    ["inspect", "set-opacity"]
+    ["inspect", "read-text", "replace-text", "set-opacity"]
   );
 
   lease.close();
@@ -152,6 +216,173 @@ it("binds SVG inspection and opacity to one private input and exact active file"
       await list(editorToolContextId, replacement.editorEndpointId)
     )
   ).not.toContain("svg_inspect_selection");
+  endpoints.close();
+});
+
+it("inspects only the captured board placement when two pins share an SVG", async () => {
+  const endpoints = new NativeEditorSurfaceEndpoints();
+  const sessionId = "chat";
+  const boardPath = "/talk.canvas";
+  const path = `${boardPath}/cover.svg`;
+  const selection = {
+    kind: "document",
+    path,
+    placement: { boardPath, pinId: "left" },
+  } as const;
+  const snapshot = {
+    active: boardPath,
+    open: [boardPath],
+    truncated: false,
+    selection,
+  };
+  const targetId = randomUUID();
+  let returnedPin: string = selection.placement.pinId;
+  const deliver = vi.fn<NativeEditorSvgSelectionDelivery>(async (request) => {
+    expect(request).toMatchObject({ targetId, path, subject: selection });
+    return {
+      kind: "inspection",
+      mode: "document",
+      path,
+      revision: targetId,
+      total: 1,
+      nextCursor: null,
+      targets: [
+        {
+          kind: "document",
+          placement: { boardPath, pinId: returnedPin, layout: { x: 12 } },
+        },
+      ],
+    };
+  });
+  const legacyText = vi.fn<NativeEditorSvgTextDelivery>(async () => ({
+    kind: "unavailable",
+  }));
+  const lease = endpoints.register(
+    sessionId,
+    snapshot,
+    () => {},
+    undefined,
+    undefined,
+    legacyText,
+    undefined,
+    deliver
+  );
+  const legacyTarget = randomUUID();
+  const capture = lease.selection(legacyTarget, { inputId: "input", targetId });
+  expect(capture.editorSvgTargetId).toBeUndefined();
+  const request = (message: object, scoped = capture) =>
+    endpoints.desktopTools(
+      {
+        sessionId,
+        endpointId: scoped.editorEndpointId,
+        scope: {
+          contextId: scoped.editorToolContextId,
+          svgTargetId: legacyTarget,
+        },
+        expiresAtMs: Date.now() + 2000,
+        timeoutMs: 2000,
+        message: { jsonrpc: "2.0", id: randomUUID(), ...message },
+      },
+      new AbortController().signal
+    );
+  const call = (name: string, args: object = {}, scoped = capture) =>
+    request(
+      {
+        method: "tools/call",
+        params: {
+          name,
+          arguments: args,
+          _meta: { "co.grida/definitionRevision": 1 },
+        },
+      },
+      scoped
+    );
+
+  const catalog = JSON.stringify(await request({ method: "tools/list" }));
+  expect(catalog).toContain("svg_inspect_selection");
+  expect(catalog).not.toContain("svg_set_selection_opacity");
+  expect(catalog).not.toContain("svg_read_selected_text");
+  expect(catalog).not.toContain("svg_replace_selected_text");
+  await expect(call("svg_set_selection_opacity")).resolves.toMatchObject({
+    message: { error: { message: "Unknown tool" } },
+  });
+  await expect(call("svg_inspect_selection")).resolves.toMatchObject({
+    message: {
+      result: {
+        structuredContent: {
+          mode: "document",
+          path,
+          targets: [
+            {
+              kind: "document",
+              placement: { ...selection.placement, layout: { x: 12 } },
+            },
+          ],
+        },
+      },
+    },
+  });
+  await expect(
+    call("svg_inspect_selection", { cursor: { revision: targetId, offset: 1 } })
+  ).resolves.toMatchObject({
+    message: {
+      result: { content: [{ text: "svg_selection_stale" }], isError: true },
+    },
+  });
+  returnedPin = "right";
+  await expect(call("svg_inspect_selection")).rejects.toThrow(
+    "native_chat_svg_selection_unverified"
+  );
+  lease.update({
+    ...snapshot,
+    selection: { ...selection, placement: { boardPath, pinId: "right" } },
+  });
+  await expect(call("svg_inspect_selection")).resolves.toMatchObject({
+    message: {
+      result: { content: [{ text: "svg_selection_stale" }], isError: true },
+    },
+  });
+  expect(deliver).toHaveBeenCalledTimes(2);
+  expect(legacyText).not.toHaveBeenCalled();
+
+  // The user sent the board pin, then switched tabs before native admission.
+  // Tool discovery still sees the captured board subject after that switch.
+  const svgPath = "/drawing.svg";
+  lease.update({
+    active: svgPath,
+    open: [boardPath, svgPath],
+    truncated: false,
+    selection: { kind: "svg", path: svgPath },
+  });
+  const boardSend = {
+    inputId: "racing-input",
+    targetId: randomUUID(),
+    subject: selection,
+  };
+  const staleCapture = lease.selection(undefined, boardSend);
+  const staleCatalog = JSON.stringify(
+    await request({ method: "tools/list" }, staleCapture)
+  );
+  expect(staleCatalog).toContain("svg_inspect_selection");
+  expect(staleCatalog).not.toContain("svg_set_selection_opacity");
+  expect(staleCatalog).not.toContain("svg_read_selected_text");
+  expect(staleCatalog).not.toContain("svg_replace_selected_text");
+  lease.update(snapshot);
+  expect(lease.selection(undefined, boardSend)).toEqual(staleCapture);
+  expect(() =>
+    lease.selection(undefined, {
+      ...boardSend,
+      subject: { kind: "svg", path: svgPath },
+    })
+  ).toThrow("native_chat_editor_tool_context_unavailable");
+  await expect(
+    call("svg_inspect_selection", {}, staleCapture)
+  ).resolves.toMatchObject({
+    message: {
+      result: { content: [{ text: "svg_selection_stale" }], isError: true },
+    },
+  });
+  expect(deliver).toHaveBeenCalledTimes(2);
   endpoints.close();
 });
 

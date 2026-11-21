@@ -14,6 +14,7 @@ export namespace native_tool_parts {
   /** Native tool names the kit knows under another name. */
   const NAMES: Readonly<Record<string, string>> = {
     search_text: "grep_files",
+    read_scoped_file: "read_file",
   };
 
   export function entry(call: NativeChatActivity): ToolCallEntry {
@@ -85,6 +86,7 @@ export namespace native_tool_parts {
           omittedImages: output.omittedImages,
         };
       case "read_file":
+      case "read_scoped_file":
         return { content: output.text, truncated: output.truncated };
       case "edit_file":
         return {

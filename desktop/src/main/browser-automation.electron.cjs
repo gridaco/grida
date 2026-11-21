@@ -239,6 +239,9 @@ async function main() {
     width: 864,
     height: 628,
     webPreferences: {
+      // The test runner may cover this window. Keep the embedder compositing
+      // the visible workbench guest for Chromium's real screenshot request.
+      backgroundThrottling: false,
       webviewTag: true,
       sandbox: true,
       contextIsolation: true,
@@ -683,10 +686,31 @@ async function main() {
       );
     }),
   ]).finally(() => clearTimeout(frameTimer));
-  await ok("browser_capture", {
+  const visibleCapture = await ok("browser_capture", {
     target: foreground.target,
     documentId: selected.documentId,
   });
+  assert.equal(visibleCapture.data.documentId, selected.documentId);
+  assert.equal(visibleCapture.image.mimeType, "image/jpeg");
+  const screenshot = nativeImage.createFromBuffer(
+    Buffer.from(visibleCapture.image.base64, "base64")
+  );
+  const { width, height } = screenshot.getSize();
+  assert(width > 0 && height > 0);
+  // The center of the fixture is its orange background, clear of the form.
+  // Allow for the display color profile and JPEG quantization.
+  const [blue, green, red, alpha] = screenshot
+    .crop({
+      x: Math.floor(width / 2),
+      y: Math.floor(height / 2),
+      width: 1,
+      height: 1,
+    })
+    .toBitmap();
+  assert(
+    red > 220 && green > 130 && green < 190 && blue < 100 && alpha === 255,
+    `Expected orange page pixels, got rgba(${red}, ${green}, ${blue}, ${alpha})`
+  );
   const workbenchSnapshot = (
     await ok("browser_snapshot", {
       target: foreground.target,

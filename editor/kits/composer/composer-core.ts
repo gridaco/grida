@@ -160,6 +160,8 @@ export type ComposerMessage = {
   parts: ComposerPart[];
   meta: {
     text: string;
+    /** Markdown for a draft with structured editor formatting. */
+    markdown?: string;
     attachments: ComposerAttachment[];
     submitted_at: number;
   };

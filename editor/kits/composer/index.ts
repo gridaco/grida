@@ -13,12 +13,17 @@ export {
 } from "./composer-defaults";
 
 export { ComposerTransfer } from "./composer-transfer";
+export { Dictation } from "./dictation";
 
 export {
   ComposerActionMenu,
   ComposerMenuAnchor,
   type ComposerMenuAction,
 } from "./composer-menu";
+export {
+  ComposerToolbarTooltip,
+  composerToolbarButtonClassName,
+} from "./composer-toolbar";
 
 export { ComposerDropZone } from "./composer-drop-zone";
 

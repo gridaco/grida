@@ -249,8 +249,12 @@ covers both switches and preference changes that arrive
 while an older read is pending.
 The [Responses adapter fixtures](../../agent-kit-providers/tests/responses.rs) cover
 mixed hosted and local tools, duplicate search evidence and safe citations.
-Sparse terminal items preserve streamed actions. Failed and incomplete responses
-retain reported sources without dispatching pending local functions. Malformed
+Sparse terminal items preserve streamed actions. A subscription response
+whose completion carries an empty output array still continues when its
+ordered, finalized items provide an answer, refusal, or tool call. A turn
+with only commentary remains interrupted. A nonempty terminal array still
+has to agree with the streamed items. Failed and incomplete responses retain
+reported sources without dispatching pending local functions. Malformed
 optional annotations leave the assistant's answer readable.
 The [workspace composer interaction](../../../editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx)
 checks what the person selects, sends and sees when the reply arrives.
@@ -1107,6 +1111,15 @@ establish a user hook runner. [Hook process tests](../tests/process/hooks.rs).
 
 ### Foreign tool host
 
+When Desktop returns from a workspace to Welcome, Main retires the old chat
+observer and browser guests. A running chat keeps running. Late renderer
+cleanup resolves locally after the route changes. The
+[Electron preload case](../../../desktop/src/bridge/workspace-cleanup.electron.test.ts)
+checks which calls cross IPC, and the
+[chat](../../../desktop/src/main/native-chat-ipc.test.ts) and
+[Browser](../../../desktop/src/main/browser-host.test.ts) cases exercise
+Main's navigation and resource retirement.
+
 The [concrete contract](./tool-host-contract.md) gives native and MCP calls the
 same Grida dispatcher, while each document implementation owns its operations
 and state. The required boundary cases cover shared definitions and results,
@@ -1134,6 +1147,18 @@ The private source registration tests cover colliding local operation names
 and replacement with an identical definition after accepted input. The
 retired generation must refuse its call while the sibling source on the same
 workbench remains usable.
+
+Skill discovery must also preserve owners when two extensions and a workspace
+each supply `inspect`. The ordinary workspace name and both qualified
+extension reads must select their respective bodies, including after capture.
+A second skill under the same extension must leave its initial summary count
+at one. Swapping equivalent tool and skill providers, or adding more matching
+tools to one provider, must preserve the order in which discovery offers the
+sources. The [native skill cases](../src/skills/extension_tests.rs) and
+[product discovery cases](../../grida-agent-master/src/discovery.rs) exercise
+these claims. The [FX process cases](../tests/process/desktop_fx_discovery.rs)
+inspect the submitted model requests.
+
 The authenticated export and actual guest interaction have separate
 [loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
 [Electron](../../../desktop/src/main/browser-automation.electron.test.ts)

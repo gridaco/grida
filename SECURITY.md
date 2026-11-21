@@ -1308,31 +1308,33 @@ pixels through this reader, with no additional filesystem or model grant.
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
-- The separately scoped [SVG text tools](desktop/src/main/desktop-selected-svg-text.ts)
-  capture one exact workbench, standalone SVG, or slide selection for an
-  accepted Act text input, including queued input. Main dispatches to the
-  admitted frame and validates the bounded
-  [correlated response](desktop/src/main/native-editor-svg-replies.ts).
-  Canceling the private request releases that pending reply and discards late
-  renderer results. It supplies no evidence of reversing a dispatched edit.
-  A deck may publish one bundle-relative slide and must reply for the same
-  observed slide. Main rechecks the deck's directory generation before sending
-  the call and accepting its reply.
-  The [renderer owner](editor/scaffolds/desktop/shared/selected-svg-text.ts)
-  requires the captured editor, view, selection, and revision before the
-  existing SVG text command can run. Its result is a live edit. The normal
-  editor save remains a separate operation. An unverified mutation reply
-  stays uncertain and is never replayed.
 - The [SVG selection tools](desktop/src/main/desktop-selected-svg-selection.ts)
-  use an additional negotiated editor-tool context for an eligible Act text
-  input. The scope resolves through the exact input and owning attachment.
-  The renderer captures the live document and selection at Send and rechecks
-  them before dispatch. Inspection supplies bounded pages of locators under
-  the attached file scope. The opacity operation verifies the capture revision
-  and invokes the editor command once. It leaves disk writes to Save. Main
-  validates the correlated reply, bound path, and original deadline before
-  accepting it. The transcript marker carries no token and the external
+  use one negotiated editor-tool context for an eligible Act text input,
+  including queued input. The scope resolves through the exact input and
+  owning attachment. The [surface validator](packages/grida-desktop-bridge/src/native-editor-surfaces.ts)
+  validates the selection source against the active tab. Slide and board pin
+  paths must stay inside their bundle. A dedicated bundle window publishes
+  bundle-relative source paths. Main rechecks its directory generation before
+  dispatch and before accepting the result, and accepts a root board selection
+  only on that route.
+  The [renderer owner](editor/scaffolds/desktop/shared/editor-selection.ts)
+  captures the active view and exact target at Send. The capture binds the
+  content revision of an editable SVG or the board and pin identity of a
+  whole document. Main compares the submitted target with the published
+  selection before binding the input. A mismatch makes the capture stale,
+  including on retry. The renderer checks the capture against the live source
+  before dispatch. A board pin exposes bounded read-only inspection. Editable SVG
+  selections expose bounded locators and supported editor commands.
+  Mutations use editor commands and leave disk writes to Save. Main checks
+  the original deadline and [correlated reply](desktop/src/main/native-editor-svg-replies.ts)
+  against the captured scope. Cancellation releases the pending reply and
+  discards late results. An unverified mutation remains uncertain and is
+  never replayed. The transcript marker carries no token and the external
   inventory has no grant.
+- The [earlier SVG text binding](desktop/src/main/desktop-selected-svg-text.ts)
+  remains available to earlier peers with the original captured text grant.
+  Its scoped and bounded replies still require the same admitted frame,
+  attachment, and deadline.
 - [Workbench presentation](desktop/src/main/desktop-workbench-tools.ts) and
   the [earlier binding](desktop/src/main/desktop-artifact-presentation.ts)
   require a separately issued grant and a subscription from the exact attached
@@ -1702,6 +1704,13 @@ pixels through this reader, with no additional filesystem or model grant.
   transport adaptation. Preload still exposes the original typed bridge object
   under its existing path guard; optional methods and subscription ownership
   are unchanged.
+
+- Main retires chat attachments and workspace browser guests when navigation
+  leaves their scope. The preload resolves late teardown locally once the
+  active route has lost the corresponding capability. The
+  [Electron navigation regression](desktop/src/bridge/workspace-cleanup.electron.test.ts)
+  and its [isolated fixture](desktop/src/bridge/workspace-cleanup.electron.cjs)
+  exercise both active-route dispatch and late cleanup after navigation.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
@@ -2138,7 +2147,7 @@ Today:
 - Queued input inspection uses the separately negotiated private [native routes](crates/grida-agent/src/acp/extensions/input_images.rs). The [host](crates/grida-agent/src/host/images.rs) verifies the exact queued input, owning attachment, and observed session revision before and after reading retained bytes. Each chunk is at most 256 KiB and its original is bounded to 20 MiB. Claimed, withdrawn, replaced, stale and foreign inputs reject without dispatch or mutation. [Main's queued display owner](desktop/src/main/native-queued-messages.ts) replaces hidden transport URIs with bounded opaque selectors scoped to the session, input and revision; [IPC](desktop/src/main/native-chat-ipc.ts) additionally rechecks the initiating frame and latest observation after delivery. The existing input inspection reports factual text-only eligibility, so rendering an image does not permit text replacement to discard it. [Native process fixtures](crates/grida-agent/tests/process/raster_images.rs), [Main decoder fixtures](desktop/src/main/native-queued-messages.test.ts) and [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) cover scope, revocation, bounded bytes and observational behavior.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
-- The [agent settings file adapter](crates/grida-agent/src/file_tools/settings.rs) reaches only the host settings file through the [settings owner](crates/grida-agent/src/configuration.rs). [Permission admission](crates/grida-agent/src/permissions.rs) asks for every write and withholds the file unless command denials cover its folder; [Desktop approval review](desktop/src/main/native-agent-permissions.ts) admits only that exact write. [Permission tests](crates/grida-agent/tests/permissions.rs), the [headless approval process test](crates/grida-agent/tests/process/approvals.rs) and [Desktop approval tests](desktop/src/main/native-agent-permissions.test.ts) cover the ask, decline, invalid content, scope and command coverage.
+- The [settings owner](crates/grida-agent/src/configuration.rs) loads and validates protected configuration. [Permission admission](crates/grida-agent/src/permissions.rs) withholds the settings-file grant from new inputs. It binds the [settings file adapter](crates/grida-agent/src/file_tools/settings.rs) for earlier accepted authority and rechecks command denials and exact-action approval on writes. [Desktop approval review](desktop/src/main/native-agent-permissions.ts) verifies the retained destination. [Native configuration tests](crates/grida-agent/tests/process/configuration.rs), [approval process tests](crates/grida-agent/tests/process/approvals.rs), and [Desktop approval tests](desktop/src/main/native-agent-permissions.test.ts) cover the respective boundaries.
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.

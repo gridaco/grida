@@ -541,13 +541,15 @@ export function open_document_window({
 export function open_settings_window({
   app,
   base_url: baseUrl,
+  section,
 }: {
   app: App;
   base_url: string;
+  section?: "models";
 }) {
   return create_desktop_window({
     base_url: baseUrl,
-    urlPath: "/desktop/settings",
+    urlPath: section ? `/desktop/settings#${section}` : "/desktop/settings",
     title: "Grida Settings",
     presentation: "compact",
     additionalArguments: buildDesktopArguments({ app }),

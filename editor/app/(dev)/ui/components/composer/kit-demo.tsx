@@ -117,43 +117,34 @@ function ComposerDemo() {
   };
 
   return (
-    <main className="flex h-[100svh] w-full flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-border px-6 py-4">
-        <h1 className="font-semibold text-2xl">Composer</h1>
-        <p className="text-muted-foreground text-sm">
-          Demo for the reusable Tiptap prompt composer kit.
-        </p>
-      </header>
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="flex min-h-0 flex-col border-r border-border">
-          <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
-            <MessageLog messages={messages} />
-            <DemoComposerInput
-              addLocalFiles={addLocalFiles}
-              fileInputRef={fileInputRef}
-              isDraggingOverComposer={isDraggingOverComposer}
-              onRemoveAttachment={(attachment) =>
-                revokeTrackedObjectUrl(
-                  attachment.kind === "directory" ? undefined : attachment.url
-                )
-              }
-              onDrop={onComposerDrop}
-              onSubmit={submit}
-              setIsDraggingOverComposer={setIsDraggingOverComposer}
-            />
-          </div>
-        </section>
-
-        <FileSidebar
-          dropMode={dropMode}
-          selectedItem={selectedItem}
-          selectedItemId={selectedItemId}
-          setDropMode={setDropMode}
-          setSelectedItemId={setSelectedItemId}
-        />
+    <div className="grid h-[36rem] grid-cols-1 grid-rows-2 overflow-hidden rounded-xl border bg-background md:grid-cols-[minmax(0,1fr)_17rem] md:grid-rows-1">
+      <div className="flex min-h-0 flex-col border-b border-border md:border-r md:border-b-0">
+        <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
+          <MessageLog messages={messages} />
+          <DemoComposerInput
+            addLocalFiles={addLocalFiles}
+            fileInputRef={fileInputRef}
+            isDraggingOverComposer={isDraggingOverComposer}
+            onRemoveAttachment={(attachment) =>
+              revokeTrackedObjectUrl(
+                attachment.kind === "directory" ? undefined : attachment.url
+              )
+            }
+            onDrop={onComposerDrop}
+            onSubmit={submit}
+            setIsDraggingOverComposer={setIsDraggingOverComposer}
+          />
+        </div>
       </div>
-    </main>
+
+      <FileSidebar
+        dropMode={dropMode}
+        selectedItem={selectedItem}
+        selectedItemId={selectedItemId}
+        setDropMode={setDropMode}
+        setSelectedItemId={setSelectedItemId}
+      />
+    </div>
   );
 }
 
@@ -204,7 +195,6 @@ function DemoComposerInput({
           onRemoveAttachment={onRemoveAttachment}
         />
         <ComposerContent
-          autofocus
           onSubmitRequest={() => onSubmit()}
           placeholder="Type / for commands"
         />

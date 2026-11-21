@@ -181,7 +181,7 @@ it("revokes an endpoint Save request after navigation or role loss during native
 
 function setup(hooks?: NativeAgentHooks, preferences?: DesktopPersonalization) {
   let role: DesktopIpcRole | null = "main";
-  const open = vi.fn<() => void>();
+  const open = vi.fn<(section?: "models") => void>();
   registerIpcHandlers({
     resolve_ipc_role: () => role,
     open_settings: open,
@@ -379,7 +379,13 @@ it("opens native Settings from an admitted main frame without navigating its cal
   expect(mainFrame.url).toBe(url);
 });
 
-it("rejects same-origin subframes, missing frames, destroyed senders, and arguments", () => {
+it("passes the fixed LLM Providers target to the native Settings window", () => {
+  const { invoke, open } = setup();
+  invoke("models");
+  expect(open).toHaveBeenCalledExactlyOnceWith("models");
+});
+
+it("rejects subframes, destroyed senders, and unsupported Settings arguments", () => {
   const { event, mainFrame, invoke, open } = setup();
   event.senderFrame = { url: mainFrame.url };
   expect(invoke).toThrow("denied");
@@ -389,6 +395,10 @@ it("rejects same-origin subframes, missing frames, destroyed senders, and argume
   expect(() => invoke("/desktop/settings")).toThrow(
     "settings window request denied"
   );
+  expect(() => invoke("models", "extra")).toThrow(
+    "settings window request denied"
+  );
+  expect(() => invoke("account")).toThrow("settings window request denied");
   vi.spyOn(event.sender, "isDestroyed").mockReturnValue(true);
   expect(invoke).toThrow("settings window request denied");
   expect(open).not.toHaveBeenCalled();

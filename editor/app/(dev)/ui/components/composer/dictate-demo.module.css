@@ -1,0 +1,41 @@
+.composer {
+  --dictate-transition-duration: 200ms;
+  --dictate-transition-easing: cubic-bezier(0.2, 0, 0.2, 1);
+
+  transition: border-radius var(--dictate-transition-duration)
+    var(--dictate-transition-easing);
+}
+
+.composer :global([data-composer-content]) {
+  block-size: auto;
+  interpolate-size: allow-keywords;
+  transition:
+    block-size var(--dictate-transition-duration)
+      var(--dictate-transition-easing),
+    min-block-size var(--dictate-transition-duration)
+      var(--dictate-transition-easing),
+    padding-block var(--dictate-transition-duration)
+      var(--dictate-transition-easing),
+    opacity var(--dictate-transition-duration) ease-out,
+    overflow 0s var(--dictate-transition-duration) allow-discrete;
+}
+
+.compact {
+  border-radius: 1.5rem;
+}
+
+.compact :global([data-composer-content]) {
+  block-size: 0;
+  min-block-size: 0;
+  padding-block: 0;
+  overflow: clip;
+  opacity: 0;
+  visibility: hidden;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    --dictate-transition-duration: 0ms;
+  }
+}

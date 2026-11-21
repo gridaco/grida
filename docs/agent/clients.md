@@ -861,7 +861,9 @@ Select a named skill with `run --skill NAME` or through the ACP skill catalog.
 Repeat the flag to select more than one. Bundled skills include `dotcanvas`,
 `slides`, and `svg`. On Unix, a local run can also use skills in its selected
 project. An ACP host must explicitly allow reads from the primary project
-directory. Project skills override bundled skills with the same name.
+directory. Project skills take precedence for bare names. An eligible
+extension skill can also be selected by its full `extension/skill` name.
+ACP clients can use the versioned URI returned by the catalog.
 
 With a permission profile, the agent also sees each available skill's name
 and description and reads one when the request calls for it, without a

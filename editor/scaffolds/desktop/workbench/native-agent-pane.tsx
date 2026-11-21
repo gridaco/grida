@@ -21,13 +21,21 @@ import type {
 import { Button } from "@app/ui/components/button";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
-import { PlayIcon, SquareIcon, GoalIcon, XIcon } from "lucide-react";
+import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
+import {
+  PlayIcon,
+  SquareIcon,
+  GoalIcon,
+  ImagesIcon,
+  XIcon,
+} from "lucide-react";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
 import {
+  AgentPromptCard,
   ChatMessageView,
   CompactionNotice,
   PendingTurnIndicator,
@@ -44,6 +52,7 @@ import {
 } from "@/lib/agent-chat/native-chat-controller";
 import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { PanelIsPresented } from "./workbench-panel-content";
+import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
   ComposerDropArea,
@@ -79,12 +88,13 @@ import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-
 import { NativeChatHeader } from "./native-chat-controls";
 import { attachedChatActivity } from "@/lib/agent-chat/native-chat-activity";
 import { ChatActivityIndicators } from "./chat-activity-indicators";
+import layout from "./native-chat-layout.module.css";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
-const readNoSvgSelection = () => undefined;
+const readNoEditorSelection = () => undefined;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
   setItem: (key: string, value: string) =>
@@ -108,6 +118,8 @@ export type NativeFirstMessage = Readonly<{
 
 type NativeChatPresentation = {
   subagentPlacement?: SubagentPlacement;
+  /** Working directory already resolved by the owning workspace UI. */
+  workingDirectory?: string;
   /** Registered project folder to open from the access confirmation. */
   projectFolderId?: string;
   /** Lends the selected main chat's existing controller to its workspace. */
@@ -115,6 +127,10 @@ type NativeChatPresentation = {
     processes: NativeBackgroundProcessController | null
   ) => void;
 };
+
+type ComposerPredictionPreferences = Parameters<
+  NativeComposerPrediction["connect"]
+>[0];
 
 type ConnectionRecovery = {
   note: string;
@@ -126,6 +142,7 @@ export function NativeAgentPaneGate({
   bridge,
   selectionKey,
   workspaceId,
+  workingDirectory,
   projectFolderId,
   initialSession,
   editorSurfaces,
@@ -258,6 +275,7 @@ export function NativeAgentPaneGate({
       }
       selectionKey={selectionKey}
       workspaceId={workspaceId}
+      workingDirectory={workingDirectory}
       projectFolderId={projectFolderId}
       initialSession={initialSession}
       startupProfileId={
@@ -294,23 +312,34 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
 };
 
+type LibraryRequestSource = {
+  loadPage: LibraryExplorerPageLoader;
+  readPng(id: string, maxBytes: number): Promise<ArrayBuffer>;
+};
+
 export function NativeAgentPane({
   bridge,
+  predictionPreferences,
+  autofocus,
   starting = false,
   recovery,
   recovered,
   selectionKey,
   workspaceId,
+  workingDirectory,
   projectFolderId,
   initialSession,
   startupProfileId,
   editorSurfaces,
+  libraryRequestSource,
   sideChatPlacement,
   firstMessage,
   onProcessesChange,
   subagentPlacement,
 }: {
   bridge: DesktopNativeChat;
+  predictionPreferences?: ComposerPredictionPreferences;
+  autofocus?: boolean;
   /** The agent is still starting; the pane shows but does not connect yet. */
   starting?: boolean;
   /** No connection can run yet; the composer's model picker starts the chat. */
@@ -322,6 +351,7 @@ export function NativeAgentPane({
   /** An untouched chat's recommended connection, selected before startup. */
   startupProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
+  libraryRequestSource?: LibraryRequestSource;
   /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
@@ -334,7 +364,7 @@ export function NativeAgentPane({
       selectionMemory,
       selectionKey && `grida.nativeChat.${selectionKey}`,
       editorSurfaces,
-      !!workspaceId
+      !!workspaceId || !!libraryRequestSource
     );
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone", {
       sessionId:
@@ -342,7 +372,7 @@ export function NativeAgentPane({
       fromHome: firstMessage?.waiting() === true,
     });
     return created;
-  }, [bridge, selectionKey, editorSurfaces, workspaceId]);
+  }, [bridge, selectionKey, editorSurfaces, workspaceId, libraryRequestSource]);
   useEffect(() => {
     const publish = () =>
       onProcessesChange?.(
@@ -429,10 +459,13 @@ export function NativeAgentPane({
     <NativeChatPane
       controller={controller}
       bridge={bridge}
+      predictionPreferences={predictionPreferences}
+      autofocus={autofocus}
       initialSession={initialSession}
       workspaceId={workspaceId}
       projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
+      libraryRequestSource={libraryRequestSource}
       recovery={recovery}
       waitingForHome={!!recovery && firstMessage?.waiting()}
       draftRef={draft}
@@ -441,6 +474,7 @@ export function NativeAgentPane({
         <NativeChatHeader
           controller={controller}
           state={state}
+          workingDirectory={workingDirectory}
           disabled={starting || connectionRequired}
           onChatSelected={() => draft.current?.focus()}
         />
@@ -478,7 +512,9 @@ export function NativeSideChatPane({
       autofocus
       testId="native-side-chat"
       header={(state) => (
-        <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium">
+        <header
+          className={`flex h-10 shrink-0 items-center gap-2 text-xs font-medium ${layout.contentInset}`}
+        >
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
             {chat.sideChatTitle()}
           </span>
@@ -509,10 +545,12 @@ export function NativeSideChatPane({
 function NativeChatPane({
   controller,
   bridge,
+  predictionPreferences,
   initialSession,
   workspaceId,
   projectFolderId = workspaceId,
   editorSurfaces,
+  libraryRequestSource,
   recovery,
   waitingForHome,
   draftRef: draft,
@@ -523,10 +561,12 @@ function NativeChatPane({
 }: {
   controller: NativeChatController;
   bridge: DesktopNativeChat;
+  predictionPreferences?: ComposerPredictionPreferences;
   initialSession?: string | null;
   workspaceId?: string;
   projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
+  libraryRequestSource?: LibraryRequestSource;
   /** No connection can run yet; the composer's model picker starts the chat. */
   recovery?: ConnectionRecovery;
   waitingForHome?: boolean;
@@ -563,7 +603,7 @@ function NativeChatPane({
   const editorSelection = useSyncExternalStore(
     controller.subscribeToComposerEditorSelection,
     controller.readComposerEditorSelection,
-    readNoSvgSelection
+    readNoEditorSelection
   );
   const subagentActivity = useSyncExternalStore(
     state.subagents?.subscribe ?? subscribeNoActivity,
@@ -600,7 +640,7 @@ function NativeChatPane({
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
   const desktop = useDesktopBridge();
-  const preferences = desktop?.composerPredictions;
+  const preferences = predictionPreferences ?? desktop?.composerPredictions;
   const personalization = desktop?.personalization;
   useEffect(
     () => controller.connectPersonalization(personalization),
@@ -835,14 +875,19 @@ function NativeChatPane({
         {(state.profileError ||
           state.catalogEntryError ||
           state.permissionModeError) && (
-          <p role="alert" className="px-3 py-1 text-xs text-destructive">
+          <p
+            role="alert"
+            className={`py-1 text-xs text-destructive ${layout.contentInset}`}
+          >
             {state.profileError ??
               state.catalogEntryError ??
               state.permissionModeError}
           </p>
         )}
         {recovery && (
-          <div className="text-muted-foreground px-3 py-1 text-xs">
+          <div
+            className={`py-1 text-xs text-muted-foreground ${layout.contentInset}`}
+          >
             <p role="status">{recovery.note}</p>
             {waitingForHome && (
               <p>Your message from Home is still waiting to send.</p>
@@ -868,14 +913,14 @@ function NativeChatPane({
         )}
         <workspace_links.Opener.Provider value={openWorkspaceLink}>
           <Conversation
-            className="min-h-0 flex-1"
+            className={questions.length ? "min-h-8 flex-1" : "min-h-0 flex-1"}
             initial="instant"
             resize={running ? "smooth" : "instant"}
           >
             {/* See test/desktop-agent-chat-scrollbar.md. */}
             <ConversationContent
               scrollbar="custom"
-              className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
+              className={`gap-4 py-4 ${layout.contentInset}`}
               scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
               {sessionId && readState && (
@@ -977,7 +1022,7 @@ function NativeChatPane({
         {!state.revisionDraft && state.revisionSubmitting ? (
           <div
             role="status"
-            className="px-3 pt-2 text-xs text-muted-foreground"
+            className={`pt-2 text-xs text-muted-foreground ${layout.contentInset}`}
           >
             Opening edit…
           </div>
@@ -985,7 +1030,7 @@ function NativeChatPane({
         {state.connectionRecovery === "reconnecting" && (
           <div
             role="status"
-            className="px-3 pt-2 text-xs text-muted-foreground"
+            className={`pt-2 text-xs text-muted-foreground ${layout.contentInset}`}
           >
             Reconnecting to this chat…
           </div>
@@ -993,7 +1038,7 @@ function NativeChatPane({
         {state.connectionRecovery === "disconnected" && (
           <div
             role="alert"
-            className="flex items-center gap-2 px-3 pt-2 text-xs"
+            className={`flex items-center gap-2 pt-2 text-xs ${layout.contentInset}`}
           >
             <span className="flex-1">
               {controller.canReconnect
@@ -1015,7 +1060,7 @@ function NativeChatPane({
         {interrupted && (
           <div
             role="status"
-            className="flex items-center gap-2 px-3 pt-2 text-xs"
+            className={`flex items-center gap-2 pt-2 text-xs ${layout.contentInset}`}
           >
             <span className="flex-1">
               {turn.cancelled
@@ -1036,7 +1081,7 @@ function NativeChatPane({
         {error && !state.connectionRecovery && (
           <div
             role="alert"
-            className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
+            className={`flex items-center gap-2 pt-2 text-xs text-destructive ${layout.contentInset}`}
           >
             <span className="flex-1">{error}</span>
             <Button
@@ -1049,17 +1094,20 @@ function NativeChatPane({
             </Button>
           </div>
         )}
-        {approval && (
-          <AgentApprovalPrompt
-            approval={approval}
-            disabled={state.acting}
-            onDecision={(decision) =>
-              controller.answerApproval(approval.reviewId, decision)
-            }
-          />
-        )}
-        {questions.length > 0 && (
-          <div className="max-h-[50%] shrink-0 space-y-2 overflow-y-auto px-3 py-2 empty:hidden">
+        {(approval || questions.length > 0 || librarySelection) && (
+          // The scroll viewport's padding leaves room for the card shadows.
+          <div
+            className={`relative z-10 -my-1 flex min-h-0 max-h-[75%] flex-col gap-3 overflow-y-auto py-3 empty:hidden [&>[data-question-prompt]:not(:only-child)]:min-h-44 ${layout.contentInset}`}
+          >
+            {approval && (
+              <AgentApprovalPrompt
+                approval={approval}
+                disabled={state.acting}
+                onDecision={(decision) =>
+                  controller.answerApproval(approval.reviewId, decision)
+                }
+              />
+            )}
             {questions.map((question, index) => (
               <QuestionPrompt
                 key={JSON.stringify([state.scope, question.questionId])}
@@ -1088,30 +1136,42 @@ function NativeChatPane({
                 submitDisabled={!state.questionReady || state.acting}
               />
             ))}
+            {librarySelection && (
+              <AgentPromptCard
+                role="group"
+                aria-label="Library request"
+                className="shrink-0"
+              >
+                <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
+                  <ImagesIcon aria-hidden="true" className="size-4" />
+                  Library request
+                </div>
+                <p className="px-2">
+                  The agent is asking for a Library reference.
+                </p>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="xs"
+                    className="text-sm font-normal"
+                    disabled={state.acting}
+                    onClick={() =>
+                      setLibraryRequest({
+                        scope: state.scope,
+                        selectionId: librarySelection.selectionId,
+                      })
+                    }
+                  >
+                    {state.librarySelectionRetry
+                      ? "Review answer"
+                      : "Choose reference"}
+                  </Button>
+                </div>
+              </AgentPromptCard>
+            )}
           </div>
         )}
-        {librarySelection && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
-            <p>The agent is asking for a Library reference.</p>
-            <Button
-              type="button"
-              size="xs"
-              variant="outline"
-              disabled={state.acting}
-              onClick={() =>
-                setLibraryRequest({
-                  scope: state.scope,
-                  selectionId: librarySelection.selectionId,
-                })
-              }
-            >
-              {state.librarySelectionRetry
-                ? "Review answer"
-                : "Choose reference"}
-            </Button>
-          </div>
-        )}
-        <div className="shrink-0 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-3">
+        <div className={`shrink-0 pt-3 pb-4 ${layout.contentInset}`}>
           {state.imageInput && (
             <input
               key={`png-${state.scope}`}
@@ -1311,7 +1371,8 @@ function NativeChatPane({
               (!!state.draftMessageContext.displayParts.length ||
                 !!state.attachmentDraft)
             }
-            selectionContext={editorSelection}
+            selectionLabel={editorSelection}
+            onClearSelection={controller.clearComposerEditorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
             canSubmit={
@@ -1333,7 +1394,7 @@ function NativeChatPane({
                   : running && !turn?.paused
                     ? {
                         label: "Pause",
-                        icon: <SquareIcon className="size-3.5" />,
+                        icon: <SquareIcon className="size-3 fill-current" />,
                         onClick: () => void controller.control("pause"),
                         confirmWithEscape: true,
                       }
@@ -1461,6 +1522,7 @@ function NativeChatPane({
                 key={librarySelection.selectionId}
                 open
                 single
+                loadPage={libraryRequestSource?.loadPage}
                 onOpenChange={(open) => {
                   if (!open) setLibraryRequest(null);
                 }}
@@ -1470,7 +1532,11 @@ function NativeChatPane({
                       librarySelection.selectionId,
                       {
                         id: pin.id,
-                        readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
+                        readPng: (maxBytes) =>
+                          (libraryRequestSource?.readPng ?? readLibraryPng)(
+                            pin.id,
+                            maxBytes
+                          ),
                       }
                     );
                 }}

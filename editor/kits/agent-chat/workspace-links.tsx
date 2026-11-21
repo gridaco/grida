@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ComponentProps } from "react";
 import { defaultRehypePlugins, type StreamdownProps } from "streamdown";
+import { chatWebLinkIcon } from "@/components/chat-web-link";
 
 /**
  * Links in agent replies that point at files in the person's workspace: a
@@ -102,18 +103,21 @@ export namespace workspace_links {
     const open = useContext(Opener);
     const target = marked(href);
     const style = "wrap-anywhere font-medium text-primary underline";
-    if (target === null)
+    if (target === null) {
+      const icon = chatWebLinkIcon(href);
       return (
         <a
           {...props}
           href={href}
-          className={className ?? style}
+          className={className ?? (icon ? undefined : style)}
+          data-chat-web-link={icon}
           rel="noreferrer"
           target="_blank"
         >
           {children}
         </a>
       );
+    }
     if (!open) return <span>{children}</span>;
     return (
       <a

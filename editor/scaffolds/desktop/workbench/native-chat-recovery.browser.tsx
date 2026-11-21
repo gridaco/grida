@@ -315,6 +315,7 @@ it("shows an inline prediction after a reply, then Tab makes it an editable draf
   );
   const f = await setup(predict);
   const suggestion = "Compare the two <drafts>.";
+  const hint = () => document.querySelector("[data-composer-suggestion] kbd");
   await send("Review the two slides.");
   await act(async () =>
     f.settle("succeeded", "The second draft has tighter margins.")
@@ -322,10 +323,9 @@ it("shows an inline prediction after a reply, then Tab makes it an editable draf
   await expect.poll(() => predict.mock.calls.length).toBe(1);
   await act(async () => pending.resolve(suggestion));
   await expect
-    .poll(() =>
-      composer()?.querySelector("p")?.getAttribute("data-placeholder")
-    )
+    .poll(() => hint()?.previousElementSibling?.textContent)
     .toBe(suggestion);
+  expect(hint()?.textContent).toContain("Tab");
   expect(composer()?.textContent).toBe("");
   expect(f.submit).toHaveBeenCalledTimes(1);
   await act(async () => {
@@ -345,6 +345,13 @@ it("shows an inline prediction after a reply, then Tab makes it an editable draf
   expect(composer()?.textContent).toBe(suggestion);
   expect(document.activeElement).toBe(composer());
   expect(f.submit).toHaveBeenCalledTimes(1);
+  await act(async () => userEvent.fill(composer()!, ""));
+  await expect
+    .poll(() => hint()?.previousElementSibling?.textContent)
+    .toBe(suggestion);
+  expect(predict).toHaveBeenCalledTimes(1);
+  await act(async () => userEvent.keyboard("{Tab}"));
+  expect(composer()?.textContent).toBe(suggestion);
   await writeDraft(" Use the cover.");
   const edited = suggestion + " Use the cover.";
   expect(composer()?.textContent).toBe(edited);

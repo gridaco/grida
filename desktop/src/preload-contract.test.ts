@@ -65,9 +65,12 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).not.toContain("mediaClient.providers.set_endpoint");
     expect(preloadSource).not.toContain("mediaClient.providers.probe_endpoint");
   });
-  it("requests the fixed native Settings action without a destination argument", () => {
+  it("exposes fixed native actions for Settings and LLM Providers", () => {
     expect(preloadSource).toMatch(
       /open_settings:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.WINDOW_OPEN_SETTINGS\)/
+    );
+    expect(preloadSource).toMatch(
+      /open_llm_provider_settings:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.WINDOW_OPEN_SETTINGS,\s*"models"\)/
     );
   });
   it("keeps native selected-file reads and saves separate from the chat offer", () => {

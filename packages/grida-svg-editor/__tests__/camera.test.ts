@@ -296,6 +296,7 @@ const SLIDE: Rect = { x: 0, y: 0, width: 1920, height: 1080 };
 function mk_cover_camera(opts?: {
   padding?: number;
   bounds?: Rect | "<root>";
+  min_fit_scale?: number;
   pan_overshoot?: number;
   width?: number;
   height?: number;
@@ -309,6 +310,7 @@ function mk_cover_camera(opts?: {
     type: "cover",
     bounds: opts?.bounds ?? "<root>",
     padding: opts?.padding ?? 0,
+    min_fit_scale: opts?.min_fit_scale,
     pan_overshoot: opts?.pan_overshoot,
   };
   return c;
@@ -352,6 +354,34 @@ describe("Camera — constraints (cover)", () => {
     // Padded version has a SMALLER min_zoom (the effective viewport is smaller).
     expect(c_pad.zoom).toBeLessThan(c_no_pad.zoom);
   });
+
+  it("allows a smaller centered zoom and recomputes the floor on resize", () => {
+    const c = mk_cover_camera({ padding: 80, min_fit_scale: 0.25 });
+    const fit = (800 - 2 * 80) / SLIDE.width;
+
+    c.fit("<root>", { margin: 80 });
+    expect(c.zoom).toBeCloseTo(fit);
+    c.set_zoom(fit / 2);
+    expect(c.zoom).toBeCloseTo(fit / 2);
+    c.set_zoom(0);
+    expect(c.zoom).toBeCloseTo(fit / 4);
+
+    const centered = c.transform;
+    c.pan({ x: 500, y: -500 });
+    expect(c.transform).toEqual(centered);
+
+    c._set_viewport_size(1440, 900);
+    expect(c.zoom).toBeCloseTo((1440 - 2 * 80) / SLIDE.width / 4);
+  });
+
+  it.each([0, -0.5, 1.1, NaN, Infinity])(
+    "retains the default zoom floor for an invalid factor of %s",
+    (min_fit_scale) => {
+      const c = mk_cover_camera({ min_fit_scale });
+      c.set_zoom(0);
+      expect(c.zoom).toBeCloseTo(800 / SLIDE.width);
+    }
+  );
 
   it("accepts an explicit Rect for bounds (no resolver call)", () => {
     const c = mk_camera({ resolve: () => null });

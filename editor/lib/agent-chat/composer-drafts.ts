@@ -18,7 +18,7 @@
  * restarts.
  */
 import {
-  NativeEditorSvgSelection,
+  NativeEditorSelection,
   parseNativeChatMessageContext,
   type NativeChatEffort,
   type NativeChatMessageContext,
@@ -74,7 +74,7 @@ export type ComposerDraftPending = Readonly<{
   allowLibrarySelection: boolean;
   editorSvgTargetId?: string;
   editorContextId?: string;
-  editorToolContextId?: string;
+  editorToolContextId?: string | NativeEditorSelection.Capture;
   messageContext?: NativeChatMessageContext;
   attachment?:
     | StoredDraftAttachment
@@ -653,7 +653,8 @@ function validPending(value: ComposerDraftPending): boolean {
       (typeof value.editorContextId !== "string" ||
         !/^[a-f0-9-]{36}$/.test(value.editorContextId))) ||
     (value.editorToolContextId !== undefined &&
-      !NativeEditorSvgSelection.isId(value.editorToolContextId))
+      !NativeEditorSelection.isId(value.editorToolContextId) &&
+      !NativeEditorSelection.capture(value.editorToolContextId))
   )
     return false;
   if (

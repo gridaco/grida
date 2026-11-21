@@ -39,7 +39,14 @@ describe("composer menus in a browser", () => {
         <ComposerProvider
           catalog={{
             commands: [{ id: "review", title: "Review" }],
-            mentions: [],
+            mentions: [
+              {
+                id: "readme",
+                label: "README.md",
+                kind: "file",
+                path: "README.md",
+              },
+            ],
           }}
         >
           <Access />
@@ -71,6 +78,28 @@ describe("composer menus in a browser", () => {
     });
   }
 
+  it("fills an empty draft and appends later text as a new paragraph", async () => {
+    const fixture = await setup();
+    const editor = fixture.current().editor!;
+    const paragraphs = () =>
+      Array.from(editor.view.dom.querySelectorAll("p"), (p) => p.textContent);
+    await act(async () => {
+      expect(ComposerTiptap.appendText(editor, "First", 5)).toBe(true);
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
+    });
+    expect(paragraphs()).toEqual(["First"]);
+
+    await act(async () => {
+      expect(ComposerTiptap.appendText(editor, "Second", 12)).toBe(true);
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
+    });
+    expect(paragraphs()).toEqual(["First", "Second"]);
+  });
+
   it("dismisses outside clicks without losing the typed completion and stays dismissed on unchanged inspection", async () => {
     const fixture = await setup();
     typeTrigger(fixture);
@@ -96,6 +125,21 @@ describe("composer menus in a browser", () => {
     expect(
       fixture.container.querySelector("[data-composer-trigger-menu]")
     ).not.toBeNull();
+  });
+
+  it("opens and dismisses a mention without remounting the editor", async () => {
+    const fixture = await setup();
+    const { editor } = fixture.current();
+    typeTrigger(fixture, "@");
+    expect(
+      fixture.container.querySelector("[data-composer-trigger-menu]")
+        ?.textContent
+    ).toContain("README.md");
+    typeTrigger(fixture, "Draft");
+    expect(
+      fixture.container.querySelector("[data-composer-trigger-menu]")
+    ).toBeNull();
+    expect(fixture.current().editor).toBe(editor);
   });
 
   it.each(["mouse", "keyboard"] as const)(

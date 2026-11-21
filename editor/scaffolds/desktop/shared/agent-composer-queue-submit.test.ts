@@ -7,6 +7,7 @@ import {
 
 function message(input: {
   text: string;
+  markdown?: string;
   submittedAt?: number;
   contextSource?: string;
   attachmentId?: string;
@@ -35,6 +36,7 @@ function message(input: {
     ],
     meta: {
       text: input.text,
+      markdown: input.markdown,
       attachments: attachment ? [attachment] : [],
       submitted_at: input.submittedAt ?? 1,
     },
@@ -111,6 +113,15 @@ describe("isSameComposerDraft", () => {
       isSameComposerDraft(
         message({ text: "queue me" }),
         message({ text: "queue me", attachmentId: "newer" })
+      )
+    ).toBe(false);
+  });
+
+  it("keeps changes to list formatting made during a pending acknowledgement", () => {
+    expect(
+      isSameComposerDraft(
+        message({ text: "First step", markdown: "1. First step" }),
+        message({ text: "First step", markdown: "3. First step" })
       )
     ).toBe(false);
   });

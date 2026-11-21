@@ -83,7 +83,7 @@ export class AgentComposerQueueSubmitGuard {
  *
  * Editor contexts are host-owned and `composer.clear()` intentionally retains
  * them, so context churn must not prevent clearing. Everything the clear does
- * remove—document-derived parts, raw text, and attachments—is compared.
+ * remove—document-derived parts, text, formatting, and attachments—is compared.
  */
 export function isSameComposerDraft(
   submitted: ComposerMessage,
@@ -91,6 +91,7 @@ export function isSameComposerDraft(
 ): boolean {
   return (
     submitted.meta.text === current.meta.text &&
+    submitted.meta.markdown === current.meta.markdown &&
     equal(clearableParts(submitted), clearableParts(current), { strict: true })
   );
 }

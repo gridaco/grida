@@ -83,7 +83,7 @@ reach only the files within the deck.
 
 ## Continue from a suggested prompt
 
-With **Settings → Personalization → Suggested prompts** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
+With **Settings → Personalization → Suggested prompts** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. If you clear the draft before sending, the same suggestion reappears while it still applies to the chat. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
 
 ## Attach an image
 
@@ -154,33 +154,34 @@ shows an update message and keeps the draft and current attachment.
 
 ## Work with an SVG selection
 
-Open an SVG or a slide in Desktop, then select objects or points on a path.
-Send an **Act** message that refers to the selection, such as “Set these two
-shapes to 50% opacity.” The marker above the composer shows when the selection
-will go with your message. The sent message keeps a marker for that capture.
+Open an SVG or a deck in Desktop, then select objects or points on a path in
+the editable view. On a freeform board, click an SVG pin to select the whole
+SVG and its placement. Send an **Act** message that refers to the selection.
+The chip above the composer names the selected layer, such as **Group** or
+**Rectangle**, or previews the selected text. Select **×** on the chip to clear
+the selection. The sent message shows a **Selection** marker.
 
 The agent can inspect the selected objects or path points in the live editor.
 Opacity edits apply to the selected objects in one Undo step. Use **Save** in
 the editor to write the change to disk.
 
-A queued message keeps the selection you sent. Switching tabs or slides,
-changing the selection, or editing the document can make that capture stale.
-Select the targets again and send a new message. **Plan** messages omit the
-selection.
+For a board pin, ask “Which SVG is selected?” or “Where is this pin on the
+board?” Chat can inspect the file and placement, including which pin you
+selected when several use the same file. Open the source SVG to select and
+edit its contents.
+
+A queued message keeps the selection you sent. Switching tabs, slides, or
+pins, or changing the captured content or placement, can make that capture
+stale. Select the target again and send a new message. **Plan** messages omit
+the selection.
 
 ## Edit selected text in an SVG or slide
 
-Open an SVG or a slide in Desktop and select one plain text element. Without
-the **Plan** badge, send a message asking the agent to read or replace it, for
-example “Make this heading shorter.” Look for the selection marker above the
-composer and the sent message. The change appears in the editor and can
-be undone there; use the editor's **Save** command to write it to disk. If
-another program has changed the file, the save dialog handles the conflict.
-
-Switching tabs or slides, changing the selection, or editing the document
-before the agent acts makes the selected text unavailable; select it again
-and send a new message. A queued message keeps its original selection, which
-can become unavailable while it waits. **Plan** messages omit the selection.
+Select one plain text element and send an **Act** message such as “Make this
+heading shorter.” The agent uses the SVG selection attached to that message
+to read and replace the text. The change appears in the editor and can be
+undone there. Use **Save** to write it to disk. If another program has changed
+the file, the save dialog handles the conflict.
 
 ## Current limits
 

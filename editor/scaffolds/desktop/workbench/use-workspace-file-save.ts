@@ -12,7 +12,13 @@
  */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useEditorState, useSvgEditor } from "@grida/svg-editor/react";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceChanges } from "./workspace-changes";
@@ -234,7 +240,7 @@ export function useWorkspaceFileSave({
     if (!dirty && !saving && conflict === null) void reloadFromDisk();
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     function onKey(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;

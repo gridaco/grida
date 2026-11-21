@@ -13,17 +13,24 @@
 
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { getToolName } from "ai";
-import { MessageCircleQuestionIcon, XIcon } from "lucide-react";
+import { MessageCircleQuestionIcon, PencilIcon, XIcon } from "lucide-react";
+import { RadioGroup } from "radix-ui";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { Checkbox } from "@app/ui/components/checkbox";
 import { Label } from "@app/ui/components/label";
-import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import { Textarea } from "@app/ui/components/textarea";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
+import { AgentPromptCard } from "./prompt-card";
 import {
   parseQuestions,
   QuestionSurvey,
@@ -41,17 +48,15 @@ function inputOf(entry: ToolCallEntry): unknown {
   return "input" in entry ? entry.input : undefined;
 }
 
-function optionCardClassName(selected: boolean, disabled: boolean) {
-  return cn(
-    "flex cursor-pointer items-start gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm font-normal transition-colors hover:bg-muted/50",
-    selected &&
-      "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15",
-    disabled && "cursor-default opacity-70"
-  );
-}
+const questionTextClassName = "text-sm leading-5 font-normal";
 
-function optionDescriptionClassName(selected: boolean) {
-  return cn("text-xs", selected ? "text-primary/80" : "text-muted-foreground");
+function optionRowClassName(selected: boolean, disabled: boolean) {
+  return cn(
+    "flex min-h-8 cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 transition-colors",
+    questionTextClassName,
+    selected && "bg-accent text-accent-foreground",
+    disabled ? "cursor-default opacity-70" : "hover:bg-accent/70"
+  );
 }
 
 export function QuestionPrompt({
@@ -75,13 +80,14 @@ export function QuestionPrompt({
   const [closed, setClosed] = useState(dismissal?.initiallyClosed ?? false);
   const form = useRef<HTMLDivElement>(null);
   const reopen = useRef<HTMLButtonElement>(null);
+  const writeInInput = useRef<HTMLTextAreaElement>(null);
   const restoreFocus = useRef(false);
   useLayoutEffect(() => {
     if (restoreFocus.current) {
       (closed ? reopen.current : form.current)?.focus();
       restoreFocus.current = false;
     }
-  }, [closed]);
+  }, [closed, survey.step]);
 
   if (survey.count === 0) return null;
 
@@ -90,9 +96,9 @@ export function QuestionPrompt({
   const q = survey.questions[qi];
   if (!q) return null;
   const questionId = `${labelId}-q${qi}`;
-  const hasOptions = (q.options?.length ?? 0) > 0;
+  const options = q.options ?? [];
+  const hasOptions = options.length > 0;
   const writeIn = survey.writeInFor(qi);
-  const writeInSelected = survey.isCustomSelected(qi);
   const hasNext = survey.multiStep && !survey.isLast;
   const canAdvance =
     !busy && (hasNext ? survey.currentAnswered : survey.canSubmit);
@@ -138,27 +144,79 @@ export function QuestionPrompt({
         () => setSubmitted(false)
       );
   };
+  const showStep = (next: QuestionSurvey) => {
+    restoreFocus.current = true;
+    setSurvey(next);
+  };
   // Dismissing keeps the draft. A required question submits an explicit skip.
   const onSkip = () => {
     if (dismissal) return changeClosed(true);
     if (busy) return;
     const skipped = survey.skipCurrent();
-    if (hasNext) setSurvey(skipped.next());
+    if (hasNext) showStep(skipped.next());
     else finalize(skipped);
   };
   const advance = () => {
     if (!canAdvance) return;
-    if (hasNext) setSurvey(survey.next());
+    if (hasNext) showStep(survey.next());
     else finalize(survey);
+  };
+  // Radix prevents Enter on radio items, so handle submission in capture.
+  const handleChoiceKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    const { key, target } = event;
+    if (
+      submitted ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing ||
+      event.keyCode === 229 ||
+      !(target instanceof Element) ||
+      target.closest("input, textarea, select, [contenteditable]")
+    ) {
+      return;
+    }
+
+    if (
+      key === "Enter" &&
+      target.closest('[role="radio"], [role="checkbox"]')
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) advance();
+      return;
+    }
+
+    if (q.multi_select || !/^[1-9]$/.test(key)) return;
+    const option =
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[
+        Number(key) - 1
+      ];
+    if (!option) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) {
+      option.focus();
+      option.click();
+    }
   };
 
   return (
-    <div
+    <AgentPromptCard
       ref={form}
       tabIndex={-1}
       role="group"
       aria-labelledby={questionId}
-      className="flex flex-col gap-4 rounded-lg border bg-background p-3 shadow-lg shadow-black/10 outline-none"
+      data-question-prompt=""
+      className={cn(
+        "outline-none",
+        hasOptions
+          ? "min-h-36 grid-rows-[auto_minmax(0,auto)_minmax(2.5rem,1fr)_auto]"
+          : "grid-rows-[auto_minmax(0,auto)_auto]"
+      )}
+      onKeyDownCapture={handleChoiceKey}
       onKeyDown={(event) => {
         if (event.key === "Escape" && dismissal && !submitted) {
           event.stopPropagation();
@@ -166,7 +224,7 @@ export function QuestionPrompt({
         }
       }}
     >
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
         <MessageCircleQuestionIcon className="size-4" />
         Question
         {dismissal && (
@@ -183,102 +241,118 @@ export function QuestionPrompt({
           </Button>
         )}
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex min-h-0 flex-col gap-1 overflow-y-auto px-2">
         {(q.header || survey.multiStep) && (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {q.header}
-            </span>
+            <span className="text-muted-foreground">{q.header}</span>
             {survey.multiStep && (
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              <span className="shrink-0 text-muted-foreground tabular-nums">
                 Question {survey.step + 1} of {survey.count}
               </span>
             )}
           </div>
         )}
-        <p id={questionId} className="text-sm font-medium">
+        <p id={questionId} className="wrap-anywhere">
           {q.question}
         </p>
+      </div>
 
-        {hasOptions && !q.multi_select && (
-          <RadioGroup
-            aria-labelledby={questionId}
-            value={survey.pickedFor(qi)[0] ?? ""}
-            onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
-            disabled={submitted}
-            className="gap-1.5"
-          >
-            {q.options!.map((opt, oi) => {
-              const selected = survey.pickedFor(qi)[0] === opt.label;
-              return (
-                <Label
-                  key={oi}
-                  className={optionCardClassName(selected, submitted)}
-                >
-                  <RadioGroupItem value={opt.label} className="mt-0.5" />
-                  <span className="flex flex-col">
-                    <span>{opt.label}</span>
-                    {opt.description && (
-                      <span className={optionDescriptionClassName(selected)}>
-                        {opt.description}
-                      </span>
+      {hasOptions && (
+        <div className="-m-1 min-h-0 overflow-y-auto p-1">
+          {!q.multi_select ? (
+            <RadioGroup.Root
+              aria-labelledby={questionId}
+              value={survey.pickedFor(qi)[0] ?? ""}
+              onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
+              disabled={submitted}
+              className="grid gap-0.5"
+            >
+              {options.map((opt, oi) => {
+                const selected = survey.pickedFor(qi)[0] === opt.label;
+                return (
+                  <RadioGroup.Item
+                    key={oi}
+                    value={opt.label}
+                    aria-keyshortcuts={oi < 9 ? String(oi + 1) : undefined}
+                    className={cn(
+                      "w-full text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                      optionRowClassName(selected, submitted)
                     )}
-                  </span>
-                </Label>
-              );
-            })}
-          </RadioGroup>
-        )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "grid h-5 min-w-5 shrink-0 place-items-center rounded-sm border bg-muted px-1 leading-none text-muted-foreground tabular-nums",
+                        selected &&
+                          "border-primary bg-primary text-primary-foreground"
+                      )}
+                    >
+                      {oi + 1}
+                    </span>
+                    <span className="flex min-w-0 flex-col wrap-anywhere">
+                      <span>{opt.label}</span>
+                      {opt.description && (
+                        <span className="text-muted-foreground">
+                          {opt.description}
+                        </span>
+                      )}
+                    </span>
+                  </RadioGroup.Item>
+                );
+              })}
+            </RadioGroup.Root>
+          ) : (
+            <div
+              role="group"
+              aria-labelledby={questionId}
+              className="flex flex-col gap-0.5"
+            >
+              {options.map((opt, oi) => {
+                const selected = survey.pickedFor(qi).includes(opt.label);
+                return (
+                  <Label
+                    key={oi}
+                    className={optionRowClassName(selected, submitted)}
+                  >
+                    <Checkbox
+                      checked={selected}
+                      onCheckedChange={() =>
+                        setSurvey(survey.togglePick(qi, opt.label))
+                      }
+                      disabled={submitted}
+                      className="mt-0.5"
+                    />
+                    <span className="flex min-w-0 flex-col wrap-anywhere">
+                      <span>{opt.label}</span>
+                      {opt.description && (
+                        <span className="text-muted-foreground">
+                          {opt.description}
+                        </span>
+                      )}
+                    </span>
+                  </Label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-        {hasOptions && q.multi_select && (
-          <div
-            role="group"
-            aria-labelledby={questionId}
-            className="flex flex-col gap-1.5"
+      <div className="flex flex-wrap items-end gap-2 rounded-lg pe-1 ring-1 ring-transparent ring-inset transition-colors hover:bg-muted/45 has-[textarea:focus]:ring-foreground">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 basis-44 items-start gap-2 px-2 py-2.5",
+            submitted && "opacity-70"
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className="grid size-5 shrink-0 place-items-center text-muted-foreground"
           >
-            {q.options!.map((opt, oi) => {
-              const selected = survey.pickedFor(qi).includes(opt.label);
-              return (
-                <Label
-                  key={oi}
-                  className={optionCardClassName(selected, submitted)}
-                >
-                  <Checkbox
-                    checked={selected}
-                    onCheckedChange={() =>
-                      setSurvey(survey.togglePick(qi, opt.label))
-                    }
-                    disabled={submitted}
-                    className="mt-0.5"
-                  />
-                  <span className="flex flex-col">
-                    <span>{opt.label}</span>
-                    {opt.description && (
-                      <span className={optionDescriptionClassName(selected)}>
-                        {opt.description}
-                      </span>
-                    )}
-                  </span>
-                </Label>
-              );
-            })}
-          </div>
-        )}
-
-        <div className={optionCardClassName(writeInSelected, submitted)}>
-          <Checkbox
-            checked={writeInSelected}
-            onCheckedChange={(checked) =>
-              setSurvey((current) =>
-                checked === true
-                  ? current.selectCustom(qi)
-                  : current.clearCustom(qi)
-              )
-            }
-            disabled={submitted}
-            className="mt-0.5"
-          />
+            <PencilIcon className="size-3.5" />
+          </span>
           <Textarea
+            ref={writeInInput}
             aria-labelledby={questionId}
             value={writeIn}
             onFocus={() => {
@@ -300,47 +374,65 @@ export function QuestionPrompt({
               if (!event.repeat) advance();
             }}
             readOnly={submitted}
-            rows={2}
-            placeholder={
-              hasOptions ? "Or write your own answer…" : "Type your answer…"
-            }
-            className="min-h-14 resize-y border-0 bg-transparent p-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
+            rows={1}
+            placeholder={hasOptions ? "Write your own…" : "Type your answer…"}
+            className={cn(
+              "max-h-24 min-h-5 min-w-0 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent",
+              questionTextClassName
+            )}
           />
+          {writeIn && !submitted && (
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              className="size-5 shrink-0 text-muted-foreground"
+              aria-label="Clear custom answer"
+              onClick={() => {
+                writeInInput.current?.focus();
+                setSurvey((current) => current.clearCustom(qi));
+              }}
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+          )}
         </div>
-      </div>
 
-      <div className="flex items-center gap-2">
-        {survey.multiStep && survey.step > 0 && (
+        <div className="ml-auto flex h-10 shrink-0 items-center gap-1.5">
+          {survey.multiStep && survey.step > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              className={questionTextClassName}
+              onClick={() => showStep(survey.back())}
+              disabled={busy}
+            >
+              Back
+            </Button>
+          )}
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="xs"
-            onClick={() => setSurvey(survey.back())}
-            disabled={busy}
+            className={questionTextClassName}
+            onClick={onSkip}
+            disabled={dismissal ? submitted : busy}
           >
-            Back
+            Skip
           </Button>
-        )}
-        <div className="flex-1" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={onSkip}
-          disabled={dismissal ? submitted : busy}
-        >
-          Skip
-        </Button>
-        <Button
-          type="button"
-          size="xs"
-          onClick={advance}
-          disabled={!canAdvance}
-        >
-          {hasNext ? "Next" : "Submit"}
-        </Button>
+          <Button
+            type="button"
+            size="xs"
+            className={questionTextClassName}
+            onClick={advance}
+            disabled={!canAdvance}
+          >
+            {hasNext ? "Next" : "Submit"}
+          </Button>
+        </div>
       </div>
-    </div>
+    </AgentPromptCard>
   );
 }
 

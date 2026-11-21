@@ -805,8 +805,12 @@ export type DesktopAppInfo = {
  */
 export namespace app {
   /** Open or focus the native Settings window, keeping the caller in place. */
-  export async function openSettings(): Promise<void> {
-    const open = bridgeOrThrow().window.open_settings;
+  export async function openSettings(section?: "models"): Promise<void> {
+    const window = bridgeOrThrow().window;
+    const open =
+      section === "models"
+        ? (window.open_llm_provider_settings ?? window.open_settings)
+        : window.open_settings;
     if (!open) throw new DesktopBridgeMissingError();
     await open();
   }

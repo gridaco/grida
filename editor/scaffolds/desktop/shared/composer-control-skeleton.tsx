@@ -1,5 +1,6 @@
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
+import { composerToolbarButtonClassName } from "@/kits/composer";
 
 export const composerAccessLabelClassName = "hidden @[26rem]:inline";
 export const composerAccessReviewLabel = "Ask for approval";
@@ -15,7 +16,8 @@ export function ComposerControlSkeleton({
       role="status"
       aria-label={model ? "Loading models…" : "Checking access…"}
       className={cn(
-        "flex h-6 items-center rounded-xl px-1.5",
+        composerToolbarButtonClassName,
+        "flex items-center px-1.5",
         model ? "w-32 min-w-16 shrink" : "shrink-0"
       )}
     >

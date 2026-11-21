@@ -1,14 +1,30 @@
-import { act, useState } from "react";
+import { act, useState, type ComponentProps, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
+import { DesktopConversationFixtures } from "./desktop-conversation-fixtures";
+import ComposerPage from "./page";
 import { DesktopComposerDemo } from "./desktop-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
-import { DesktopQueueFixture } from "./desktop-queue-fixture";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import { QuestionPrompt } from "@/kits/agent-chat";
+
+// These examples exercise Desktop layout and chat IPC with local fixtures.
+vi.mock("@/app/(library)/library/attachment", () => ({
+  readLibraryAttachment: async () => null,
+}));
+vi.mock("@/scaffolds/desktop/shared/design-search", () => ({
+  DESIGN_SEARCH_PAGE: 30,
+  resolveDesignBrowsePage: async () => {
+    throw new Error("Unexpected live Library browse");
+  },
+  resolveLibraryExplorerPage: async () => {
+    throw new Error("Unexpected live Library search");
+  },
+}));
 
 const roots: Root[] = [];
-async function mountConversationDemo(): Promise<HTMLDivElement> {
+async function mountDemo(example: ReactNode): Promise<HTMLDivElement> {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -16,24 +32,23 @@ async function mountConversationDemo(): Promise<HTMLDivElement> {
   document.body.append(container);
   const root = createRoot(container);
   roots.push(root);
-  await act(async () => root.render(<DesktopComposerDemo />));
+  await act(async () => root.render(example));
   return container;
 }
 
-async function selectConversation(container: HTMLElement, value: string) {
-  const select = container.querySelector<HTMLSelectElement>(
-    'select[aria-label="Conversation example"]'
-  )!;
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+async function mountConversationDemo(
+  props: ComponentProps<typeof DesktopComposerDemo> = { queued: true }
+) {
+  const container = await mountDemo(<DesktopComposerDemo {...props} />);
+  await expect.poll(() => container.textContent).toContain("Example model A");
+  await expect
+    .poll(() => queuedPreviews(container).length)
+    .toBe(props.queued ? 3 : 0);
+  return container;
 }
 
 function conversation(container: HTMLElement): HTMLElement {
-  return container.querySelector<HTMLElement>(
-    '[data-testid="desktop-conversation-preview"]'
-  )!;
+  return container.querySelector<HTMLElement>('[role="log"]')!;
 }
 
 function menuItem(panel: HTMLElement, title: string): HTMLElement {
@@ -63,6 +78,33 @@ async function openAddMenu(container: HTMLElement): Promise<HTMLElement> {
 async function selectAddMenuAction(container: HTMLElement, title: string) {
   const item = menuItem(await openAddMenu(container), title);
   await act(async () => userEvent.click(item));
+}
+
+async function stageAttachment(container: HTMLElement, kind: "image" | "file") {
+  const file =
+    kind === "image"
+      ? new File(
+          [await fixtures.readImage(fixtures.image.previewId!)],
+          "reference.jpg",
+          { type: "image/jpeg" }
+        )
+      : new File(["# Composer notes"], "README.md", { type: "text/markdown" });
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+  await act(async () => {
+    conversation(container).dispatchEvent(
+      new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: transfer,
+      })
+    );
+  });
+  await expect
+    .poll(() =>
+      container.querySelector(`button[aria-label="Remove ${file.name}"]`)
+    )
+    .not.toBeNull();
 }
 
 function runningTurn(container: HTMLElement): HTMLInputElement {
@@ -124,7 +166,423 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("focuses the draft from composer padding and lets its controls take focus", async () => {
+it("preserves lists and code from the composer in the sent user bubble", async () => {
+  const container = await mountConversationDemo({ scenario: "empty" });
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  const clipboard = new DataTransfer();
+  clipboard.setData(
+    "text/html",
+    "<ul><li>First bullet</li><li>Second bullet</li></ul>" +
+      '<ol start="3"><li>Review <code>status()</code></li><li>Run checks</li></ol>'
+  );
+  await act(async () => {
+    editor.focus();
+    editor.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: clipboard,
+      })
+    );
+  });
+  expect(editor.querySelectorAll("ul > li")).toHaveLength(2);
+  expect(editor.querySelector("ol")?.start).toBe(3);
+  await clickButton("Send");
+
+  const bubble = page.getByRole("group", { name: "Message text" });
+  await expect.element(bubble).toHaveTextContent("First bullet");
+  expect(bubble.element().querySelectorAll("ul > li")).toHaveLength(2);
+  expect(bubble.element().querySelector("ol")?.start).toBe(3);
+  expect(bubble.element().querySelector("ol code")?.textContent).toBe(
+    "status()"
+  );
+});
+
+it("turns explicit Markdown links into draft links and keeps them when sent", async () => {
+  const container = await mountConversationDemo({ scenario: "empty" });
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+
+  await act(async () => {
+    editor.focus();
+    await userEvent.keyboard("See [[this](https://example.com) and ");
+  });
+  expect(editor.querySelector("a")?.textContent).toBe("this");
+  expect(editor.querySelector("a")?.getAttribute("href")).toBe(
+    "https://example.com"
+  );
+  expect(editor.lastElementChild?.textContent).toBe("See this and ");
+
+  const clipboard = new DataTransfer();
+  clipboard.setData(
+    "text/plain",
+    "[the docs](https://example.com/Guide_(draft))"
+  );
+  await act(async () => {
+    editor.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: clipboard,
+      })
+    );
+  });
+  expect(
+    Array.from(editor.querySelectorAll("a"), (link) => link.textContent)
+  ).toEqual(["this", "the docs"]);
+
+  await act(async () => userEvent.keyboard("{Enter}"));
+  const bubble = page.getByRole("group", { name: "Message text" });
+  await expect
+    .element(bubble.getByRole("link", { name: "this" }))
+    .toHaveAttribute("href", "https://example.com/");
+  await expect
+    .element(bubble.getByRole("link", { name: "the docs" }))
+    .toHaveAttribute("href", "https://example.com/Guide_(draft)");
+});
+
+it("formats a draft selection and edits a link without sending the draft", async () => {
+  const container = await mountConversationDemo({ scenario: "empty" });
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  await act(async () => {
+    editor.focus();
+    await userEvent.keyboard("Guide{Shift>}{ArrowLeft>5/}{/Shift}");
+  });
+  const formatting = page.getByRole("group", { name: "Text formatting" });
+  const bold = formatting.getByRole("button", { name: "Bold" });
+  await act(async () => bold.hover());
+  await expect
+    .element(page.getByRole("tooltip", { name: "Bold" }))
+    .toBeInTheDocument();
+  expect(formatting.element().querySelectorAll("button")).toHaveLength(3);
+  await act(async () => {
+    await bold.click();
+    await formatting.getByRole("button", { name: "Italic" }).click();
+  });
+  await act(async () =>
+    formatting.getByRole("button", { name: "Add link" }).click()
+  );
+  const url = page.getByRole("textbox", { name: "Link URL" });
+  await expect.element(url).toHaveFocus();
+  await act(async () => {
+    await url.fill("https://example.com/first");
+    await userEvent.keyboard("{Enter}");
+  });
+  expect(editor.querySelector("a strong em")?.textContent).toBe("Guide");
+  await act(async () => userEvent.click(editor.querySelector("a")!));
+  const actions = page.getByRole("group", { name: "Link actions" });
+  await expect
+    .element(actions.getByRole("link", { name: "Open link" }))
+    .toHaveAttribute("href", "https://example.com/first");
+  await act(async () =>
+    actions.getByRole("button", { name: "Edit text" }).click()
+  );
+  const label = page.getByRole("textbox", { name: "Link text" });
+  await expect.element(label).toHaveValue("Guide");
+  await act(async () => {
+    await label.fill("Guide notes");
+    await userEvent.keyboard("{Enter}");
+  });
+  expect(editor.querySelector("a strong em")?.textContent).toBe("Guide notes");
+  await act(async () => userEvent.click(editor.querySelector("a")!));
+  await act(async () =>
+    actions.getByRole("button", { name: "Edit link" }).click()
+  );
+  await expect.element(url).toHaveValue("https://example.com/first");
+  await act(async () => {
+    await url.fill("https://example.com/guide");
+    await userEvent.keyboard("{Enter}");
+  });
+  const bubble = page.getByRole("group", { name: "Message text" });
+  await expect.element(bubble).not.toBeInTheDocument();
+  await act(async () => userEvent.keyboard("{Enter}"));
+  const link = bubble.getByRole("link", { name: "Guide notes" });
+  await expect
+    .element(link)
+    .toHaveAttribute("href", "https://example.com/guide");
+  expect(
+    link.element().querySelector('em [data-streamdown="strong"]')
+  ).not.toBeNull();
+});
+
+it("continues composer lists on Shift+Enter and hides the empty-list placeholder", async () => {
+  const container = await mountConversationDemo({ scenario: "empty" });
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  expect(getComputedStyle(editor.firstElementChild!, "::before").content).toBe(
+    '"Ask anything…"'
+  );
+
+  await act(async () => {
+    editor.focus();
+    await userEvent.keyboard("- ");
+  });
+  const list = editor.querySelector("ul");
+  expect(list).not.toBeNull();
+  expect(getComputedStyle(list!, "::before").content).toBe("none");
+
+  await act(async () =>
+    userEvent.keyboard("First{Shift>}{Enter}{/Shift}Second")
+  );
+  expect(
+    Array.from(editor.querySelectorAll("ul > li"), (item) => item.textContent)
+  ).toEqual(["First", "Second"]);
+
+  await act(async () =>
+    userEvent.keyboard(
+      "{Shift>}{Enter}{Enter}{/Shift}Steps{Shift>}{Enter}{/Shift}1. Review{Shift>}{Enter}{/Shift}Send"
+    )
+  );
+  expect(
+    Array.from(editor.querySelectorAll(":scope > p"), (p) => p.textContent)
+  ).toEqual(["Steps"]);
+  expect(
+    Array.from(editor.querySelectorAll("ol > li"), (item) => item.textContent)
+  ).toEqual(["Review", "Send"]);
+
+  await act(async () => userEvent.keyboard("{Enter}"));
+  const bubble = page.getByRole("group", { name: "Message text" });
+  await expect.element(bubble).toHaveTextContent("Steps");
+  expect(bubble.element().querySelectorAll("ul > li, ol > li")).toHaveLength(4);
+});
+
+it("keeps a question write-in focused during streaming and shows the accepted answer in chat", async () => {
+  const playground = await mountDemo(<ComposerPage />);
+  const container = playground.querySelector<HTMLElement>(
+    'section[aria-labelledby="question"]'
+  )!;
+  const example = page.getByRole("region", { name: "Question", exact: true });
+  const { question } = DesktopConversationFixtures.question;
+  await act(async () => {
+    await example.getByRole("radio", { name: "Large print" }).click();
+    await userEvent.keyboard("{Enter}");
+  });
+  expect(conversation(container).textContent).toContain("Large print");
+  await act(async () => example.getByRole("button", { name: "Reset" }).click());
+
+  const input = example.getByRole("textbox", { name: question });
+  await act(async () => {
+    await example.getByRole("checkbox", { name: "Streaming" }).click();
+    await input.fill("Use a folded sheet");
+    await userEvent.keyboard(
+      "{End}{Shift>}{Enter}{/Shift}with 2 large-print pages"
+    );
+  });
+  await expect
+    .poll(() => conversation(container).textContent)
+    .toContain("organizing the handout");
+  await expect.element(input).toHaveFocus();
+  await expect
+    .element(input)
+    .toHaveValue("Use a folded sheet\nwith 2 large-print pages");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(input).not.toBeInTheDocument();
+  expect(conversation(container).querySelector("blockquote")?.textContent).toBe(
+    question
+  );
+  expect(conversation(container).textContent).toContain("Use a folded sheet");
+});
+
+it("selects numbered choices by key and advances survey questions with Enter", async () => {
+  const submit = vi.fn<(output: unknown) => void>();
+  const first = "Which format should the handout use?";
+  const last = "How many copies should the printer prepare?";
+  await mountDemo(
+    <QuestionPrompt
+      input={{
+        questions: [
+          {
+            question: first,
+            options: [{ label: "Compact" }, { label: "Large print" }],
+          },
+          { question: last },
+        ],
+      }}
+      onSubmit={(survey) => submit(survey.buildOutput())}
+    />
+  );
+  const largePrint = page.getByRole("radio", { name: "Large print" });
+  await act(async () => {
+    await page.getByRole("radio", { name: "Compact" }).click();
+    await userEvent.keyboard("2");
+  });
+  await expect.element(largePrint).toHaveFocus();
+  await expect.element(largePrint).toHaveAttribute("aria-checked", "true");
+  expect(submit).not.toHaveBeenCalled();
+
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByRole("group", { name: last })).toHaveFocus();
+  const writeIn = page.getByRole("textbox", { name: last });
+  await act(async () => {
+    await writeIn.click();
+    await userEvent.keyboard("12");
+  });
+  await expect.element(writeIn).toHaveValue("12");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  expect(submit).toHaveBeenCalledExactlyOnceWith({
+    answers: [["Large print"], ["12"]],
+  });
+});
+
+async function clickButton(name: string) {
+  await act(async () =>
+    page.getByRole("button", { name, exact: true }).click()
+  );
+}
+
+it("shows pending, refused and expired question answers through the production prompt", async () => {
+  await mountConversationDemo({ scenario: "question" });
+  const prompt = page.getByRole("textbox", {
+    name: DesktopConversationFixtures.question.question,
+  });
+  const submit = page.getByRole("button", { name: "Submit", exact: true });
+  await act(async () => {
+    await page.getByRole("checkbox", { name: "Hold answer" }).click();
+    await prompt.fill("A two-page handout");
+    await submit.click();
+  });
+  await expect.element(submit).toBeDisabled();
+  await clickButton("Refuse answer");
+  await expect
+    .element(page.getByRole("alert"))
+    .toHaveTextContent("Couldn't confirm the answer");
+  await expect.element(prompt).toHaveValue("A two-page handout");
+  await expect.element(submit).toBeEnabled();
+  await clickButton("Expire question");
+  await expect.element(prompt).not.toBeInTheDocument();
+});
+
+it("shows a blocking text-only question and the long and overlapping question variants", async () => {
+  await mountConversationDemo({ scenario: "blocking-question" });
+  await expect
+    .element(
+      page.getByRole("textbox", {
+        name: "How many copies should the printer prepare?",
+      })
+    )
+    .toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: "Close question" }))
+    .not.toBeInTheDocument();
+  await clickButton("Skip");
+  await expect
+    .element(page.getByText("I’ll leave the print quantity open for now."))
+    .toBeVisible();
+
+  await mountConversationDemo({ scenario: "multiple-questions" });
+  const edition = page.getByRole("radiogroup", {
+    name: /^Which edition of the gallery handout/,
+  });
+  await expect.element(edition).toBeVisible();
+  expect(edition.getByRole("radio").all()).toHaveLength(6);
+  const reopen = page.getByRole("button", { name: "Answer question" }).first();
+  await act(async () => reopen.click());
+  await expect
+    .element(
+      page.getByRole("textbox", {
+        name: "Should the map include the accessible entrance?",
+      })
+    )
+    .toBeVisible();
+  await expect.element(edition).toBeVisible();
+});
+
+it("drives model and access loading, failure and retry from the actual composer controls", async () => {
+  await mountDemo(<DesktopComposerDemo scenario="loading" />);
+  const models = page.getByRole("group", { name: "Model read" });
+  const access = page.getByRole("group", { name: "Access read" });
+  await expect
+    .element(page.getByRole("status", { name: "Loading models…" }))
+    .toBeInTheDocument();
+  await expect
+    .element(page.getByRole("status", { name: "Checking access…" }))
+    .toBeInTheDocument();
+  await act(async () => models.getByRole("button", { name: "Fail" }).click());
+  await act(async () => access.getByRole("button", { name: "Fail" }).click());
+  await clickButton("Retry loading models");
+  await act(async () =>
+    models.getByRole("button", { name: "Complete" }).click()
+  );
+  await expect
+    .element(page.getByRole("combobox", { name: "Model connection" }))
+    .toHaveTextContent("Example model A");
+  await clickButton("Access: Access unknown");
+  await clickButton("Check access");
+  await act(async () =>
+    access.getByRole("button", { name: "Complete" }).click()
+  );
+  await expect
+    .element(page.getByRole("button", { name: "Access: Full access" }))
+    .toBeVisible();
+});
+
+it("demonstrates disconnecting, failing a reconnect and restoring the same chat", async () => {
+  const container = await mountConversationDemo({ scenario: "reconnect" });
+  const composer = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  await act(async () => userEvent.fill(composer, "Keep this draft"));
+  await clickButton("Disconnect");
+  await expect
+    .element(page.getByText("Reconnecting to this chat…"))
+    .toBeVisible();
+  await clickButton("Fail");
+  await expect
+    .element(
+      page.getByText(
+        "This chat is disconnected. Saved messages are still visible."
+      )
+    )
+    .toBeVisible();
+  await clickButton("Reconnect");
+  await clickButton("Complete");
+  await expect
+    .element(page.getByRole("button", { name: "Disconnect" }))
+    .toBeVisible();
+  await expect
+    .element(page.getByText("Reconnecting to this chat…"))
+    .not.toBeInTheDocument();
+  expect(composer.textContent).toBe("Keep this draft");
+});
+
+it("uses the actual approval and Library prompts with local responses", async () => {
+  await mountConversationDemo({ scenario: "approval" });
+  await clickButton("Decline");
+  await expect
+    .element(
+      page.getByText("I’ll prepare the handout without the printer notes.")
+    )
+    .toBeVisible();
+
+  await mountConversationDemo({ scenario: "library-request" });
+  await clickButton("Choose reference");
+  const picker = page.getByRole("dialog", {
+    name: "Choose a Library reference",
+  });
+  await expect
+    .element(picker.getByRole("searchbox", { name: "Search the Library" }))
+    .toHaveValue("Gallery cover");
+  await act(async () =>
+    picker.getByRole("button", { name: "Add to selection" }).click()
+  );
+  await act(async () =>
+    picker.getByRole("button", { name: "Use reference" }).click()
+  );
+  await expect.element(picker).not.toBeInTheDocument();
+  await expect
+    .element(
+      page.getByText("I’ll use the selected Library image for the cover.")
+    )
+    .toBeVisible();
+});
+
+it("focuses the draft on pointer-down in the composer padding", async () => {
   const container = await mountConversationDemo();
   const editor = container.querySelector<HTMLElement>(
     "[data-composer-editor]"
@@ -136,14 +594,38 @@ it("focuses the draft from composer padding and lets its controls take focus", a
   const add = composer.querySelector<HTMLButtonElement>(
     'button[aria-label="Add to message"]'
   )!;
+  const pointerDown = (target: HTMLElement) =>
+    target.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        isPrimary: true,
+        button: 0,
+      })
+    );
 
   for (const background of [composer, padding]) {
     await act(async () => {
       runningTurn(container).focus();
-      background.click();
+      pointerDown(background);
       await expect.poll(() => document.activeElement === editor).toBe(true);
     });
   }
+
+  await act(async () => {
+    editor.focus();
+    await userEvent.keyboard("Draft{Shift>}{ArrowLeft>5/}{/Shift}");
+  });
+  expect(document.getSelection()?.toString()).toBe("Draft");
+  await act(async () => {
+    pointerDown(editor);
+  });
+  expect(document.getSelection()?.toString()).toBe("Draft");
+  await act(async () => {
+    pointerDown(padding);
+    await expect.poll(() => document.activeElement === editor).toBe(true);
+  });
+  expect(document.getSelection()?.isCollapsed).toBe(true);
 
   await openAddMenu(container);
   expect(document.activeElement).not.toBe(editor);
@@ -196,10 +678,12 @@ it("confirms Pause with two distinct Escape presses while the composer is focuse
   await act(async () => userEvent.keyboard("{Escape}"));
   expect(runningTurn(container).checked).toBe(false);
 
-  await act(async () => userEvent.click(runningTurn(container)));
   await act(async () =>
-    userEvent.click(container.querySelector('button[aria-label="Pause"]')!)
+    page.getByRole("button", { name: "Resume", exact: true }).click()
   );
+  const resumePause = page.getByRole("button", { name: "Pause" });
+  await expect.element(resumePause).toBeEnabled();
+  await act(async () => resumePause.click());
   expect(runningTurn(container).checked).toBe(false);
 });
 
@@ -218,8 +702,7 @@ async function editSentMessage(container: HTMLElement) {
 }
 
 it("edits the sent bubble inline, cancels without changing it and resubmits multiline text without replacing the composer draft", async () => {
-  const container = await mountConversationDemo();
-  await act(async () => userEvent.click(runningTurn(container)));
+  const container = await mountConversationDemo({});
   const composer = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -264,8 +747,7 @@ it("edits the sent bubble inline, cancels without changing it and resubmits mult
 });
 
 it("keeps the inline editor open when Enter confirms IME composition", async () => {
-  const container = await mountConversationDemo();
-  await act(async () => userEvent.click(runningTurn(container)));
+  const container = await mountConversationDemo({});
   const editor = await editSentMessage(container);
   await act(async () => {
     await userEvent.fill(editor, "Composition in progress");
@@ -290,8 +772,7 @@ it("keeps the inline editor open when Enter confirms IME composition", async () 
 });
 
 it("keeps inline edits on refusal and shows pending Send before acknowledgement", async () => {
-  const container = await mountConversationDemo();
-  await act(async () => userEvent.click(runningTurn(container)));
+  const container = await mountConversationDemo({});
   const hold = Array.from(container.querySelectorAll("label"))
     .find((label) => label.textContent?.includes("Hold submission"))!
     .querySelector<HTMLInputElement>("input")!;
@@ -308,9 +789,7 @@ it("keeps inline edits on refusal and shows pending Send before acknowledgement"
   );
   await expect.poll(() => editor.readOnly).toBe(false);
   expect(editor.value).toBe("Keep the revised request");
-  expect(form.querySelector('[role="alert"]')?.textContent).toContain(
-    "Fixture submission refused"
-  );
+  expect(container.textContent).toContain("Couldn't revise this message.");
   await act(async () => userEvent.click(textButton(form, "Send")));
   await act(async () =>
     userEvent.click(textButton(container, "Accept submission"))
@@ -324,16 +803,7 @@ it("keeps inline edits on refusal and shows pending Send before acknowledgement"
 });
 
 it("mounts the production composer without a native bridge and offers full queued text locally", async () => {
-  (
-    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-  ).IS_REACT_ACT_ENVIRONMENT = true;
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  roots.push(root);
-  await act(async () => {
-    root.render(<DesktopComposerDemo />);
-  });
+  const container = await mountConversationDemo();
   await expect
     .poll(() => container.querySelector('[contenteditable="true"]'))
     .not.toBeNull();
@@ -366,16 +836,7 @@ it("mounts the production composer without a native bridge and offers full queue
 });
 
 it("uses the shared + panel at the production composer anchor", async () => {
-  (
-    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-  ).IS_REACT_ACT_ENVIRONMENT = true;
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  roots.push(root);
-  await act(async () => {
-    root.render(<DesktopComposerDemo />);
-  });
+  const container = await mountConversationDemo();
   const add = container.querySelector<HTMLButtonElement>(
     'button[aria-label="Add to message"]'
   )!;
@@ -389,34 +850,20 @@ it("uses the shared + panel at the production composer anchor", async () => {
   expect(panel?.parentElement?.hasAttribute("data-composer-menu-anchor")).toBe(
     true
   );
-  const image = menuItem(panel!, "Image");
-  await act(async () => {
-    image.click();
-  });
+  const plan = menuItem(panel!, "Plan mode");
+  await act(async () => plan.click());
   expect(container.querySelector("[data-composer-action-menu]")).toBeNull();
-  expect(container.textContent).toContain("reference.jpg");
+  expect(
+    container.querySelector('button[aria-label="Remove plan"]')
+  ).not.toBeNull();
 });
 
 it("reorders the production queue with its keyboard handle and resets the examples", async () => {
-  (
-    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-  ).IS_REACT_ACT_ENVIRONMENT = true;
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  roots.push(root);
-  await act(async () => {
-    root.render(<DesktopComposerDemo />);
-  });
+  const container = await mountConversationDemo();
   const queue = container.querySelector<HTMLElement>(
     '[data-testid="native-composer-queue"]'
   )!;
-  const previews = () =>
-    Array.from(
-      queue.querySelectorAll<HTMLButtonElement>(
-        'button[aria-label="Preview queued message"]'
-      )
-    );
+  const previews = () => queuedPreviews(container);
   const grip = queue.querySelector<HTMLButtonElement>(
     'button[aria-label="Reorder queued message"]'
   )!;
@@ -454,31 +901,24 @@ it("reorders the production queue with its keyboard handle and resets the exampl
     .poll(() => previews()[0].querySelector('img[alt="reference.jpg"]'))
     .not.toBeNull();
   const reset = Array.from(container.querySelectorAll("button")).find(
-    (button) => button.textContent === "Reset examples"
+    (button) => button.textContent === "Reset"
   )!;
   await act(async () => reset.click());
-  expect(previews()[0].textContent).toContain("Check the composer");
+  await expect
+    .poll(() => previews()[0]?.textContent)
+    .toContain("Check the composer");
   expect(previews()).toHaveLength(3);
 });
 
 it("demonstrates production Steer controls for a running turn and resets their local result", async () => {
-  (
-    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-  ).IS_REACT_ACT_ENVIRONMENT = true;
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  roots.push(root);
-  await act(async () => root.render(<DesktopComposerDemo />));
-  const queue = container.querySelector<HTMLElement>(
-    '[data-testid="native-composer-queue"]'
-  )!;
+  const container = await mountConversationDemo();
   const steeringButtons = () =>
-    Array.from(queue.querySelectorAll<HTMLButtonElement>("button")).filter(
-      (button) => button.textContent?.trim() === "Steer"
-    );
-  const previews = () =>
-    queue.querySelectorAll('button[aria-label="Preview queued message"]');
+    Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="native-composer-queue"] button'
+      )
+    ).filter((button) => button.textContent?.trim() === "Steer");
+  const previews = () => queuedPreviews(container);
   const running = Array.from(container.querySelectorAll("label"))
     .find((label) => label.textContent?.includes("Running turn"))!
     .querySelector<HTMLInputElement>('input[type="checkbox"]')!;
@@ -492,37 +932,33 @@ it("demonstrates production Steer controls for a running turn and resets their l
   await act(async () => steeringButtons()[0].click());
   await expect.poll(() => previews().length).toBe(2);
   await expect
-    .poll(
-      () =>
-        container.querySelector('[aria-label="Steering preview"]')?.textContent
-    )
-    .toContain(fixtures.queue[0].text);
+    .poll(() => conversation(container).textContent)
+    .toContain("Keep this entire queued message readable.");
   expect(container.querySelector('[contenteditable="true"]')?.textContent).toBe(
     ""
   );
 
   await act(async () => running.click());
   expect(running.checked).toBe(false);
-  expect(steeringButtons()).toHaveLength(0);
+  await expect.poll(steeringButtons).toHaveLength(0);
   const reset = Array.from(container.querySelectorAll("button")).find(
-    (button) => button.textContent === "Reset examples"
+    (button) => button.textContent === "Reset"
   )!;
   await act(async () => reset.click());
   expect(running.checked).toBe(true);
-  expect(previews()).toHaveLength(3);
+  await expect.poll(previews).toHaveLength(3);
   expect(steeringButtons().map((button) => button.disabled)).toEqual([
     false,
     true,
     true,
   ]);
-  expect(
-    container.querySelector('[aria-label="Steering preview"]')?.textContent ??
-      ""
-  ).not.toContain(fixtures.queue[0].text);
+  expect(conversation(container).textContent).not.toContain(
+    fixtures.queue[0].text
+  );
 });
 
 it("renders production Markdown, recorded work, streaming and empty conversation states", async () => {
-  const container = await mountConversationDemo();
+  let container = await mountConversationDemo({});
   await expect
     .poll(() => conversation(container).querySelector("h3")?.textContent)
     .toBe("Composer review");
@@ -546,7 +982,7 @@ it("renders production Markdown, recorded work, streaming and empty conversation
     )
     .toBe(true);
 
-  await selectConversation(container, "activity");
+  container = await mountConversationDemo({ scenario: "activity" });
   const activity = conversation(container).querySelector<HTMLElement>(
     '[data-testid="native-turn-activity"]'
   )!;
@@ -564,7 +1000,27 @@ it("renders production Markdown, recorded work, streaming and empty conversation
     "I’ll read the notes, then check the example."
   );
 
-  await selectConversation(container, "streaming");
+  container = await mountConversationDemo({ scenario: "subagents" });
+  const transcript = conversation(container);
+  await act(async () =>
+    page.getByRole("button", { name: "Worked for 12s" }).click()
+  );
+  const started = page.getByRole("button", {
+    name: "Layout review started working",
+  });
+  const finished = page.getByRole("button", { name: "Layout review finished" });
+  await expect.element(started).toBeVisible();
+  await expect.element(finished).toBeVisible();
+  expect(transcript.textContent?.replace(/\s+/g, " ")).toMatch(
+    /Layout review started working.*Copy review started working.*Read.*Accessibility review started working.*Copy review failed.*Accessibility review stopped.*Layout review finished/
+  );
+  await act(async () => finished.click());
+  await expect.element(finished).toBeVisible();
+  expect(
+    container.querySelector('[data-testid="native-subagent-conversation"]')
+  ).toBeNull();
+
+  container = await mountConversationDemo({ scenario: "streaming" });
   const assistant =
     conversation(container).querySelector<HTMLElement>(".is-assistant")!;
   expect(assistant.textContent).toContain(
@@ -576,17 +1032,17 @@ it("renders production Markdown, recorded work, streaming and empty conversation
     )
   ).toBe(false);
   const running = Array.from(container.querySelectorAll("label"))
-    .find((label) => label.textContent?.includes("Running turn"))!
+    .find((label) => label.textContent?.includes("Streaming"))!
     .querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   await act(async () => running.click());
-  expect(
-    Array.from(assistant.querySelectorAll("button")).some(
-      (button) => button.textContent?.trim() === "Copy"
+  await expect
+    .poll(
+      () => conversation(container).querySelector(".is-assistant")?.textContent
     )
-  ).toBe(true);
+    .toContain("Copy");
 
-  await selectConversation(container, "empty");
-  expect(conversation(container).textContent).toContain("No messages yet");
+  container = await mountConversationDemo({ scenario: "empty" });
+  expect(container.querySelector('[contenteditable="true"]')).not.toBeNull();
   expect(
     conversation(container).querySelector('[aria-label="Message text"]')
   ).toBeNull();
@@ -595,28 +1051,33 @@ it("renders production Markdown, recorded work, streaming and empty conversation
   ).toBeNull();
 });
 
-it("shows the live SVG selection for eligible sends and keeps the sent indicator after deselection", async () => {
-  const container = await mountConversationDemo();
-  await selectConversation(container, "svg-selection");
+it("shows the slide text selection in the composer until it is cleared", async () => {
+  const container = await mountConversationDemo({ scenario: "svg-selection" });
   const surface = container.querySelector<HTMLElement>(
-    '[data-testid="desktop-composer-surface"]'
+    '[data-testid="workspace-native-chat"]'
   )!;
   const transcript = conversation(container);
-  const countIndicators = (root: HTMLElement) =>
-    root.textContent?.match(/SVG text selection/g)?.length ?? 0;
-  expect(countIndicators(surface)).toBe(2);
-  expect(countIndicators(transcript)).toBe(1);
+  const clearButton = () =>
+    surface.querySelector<HTMLButtonElement>(
+      'button[aria-label="Clear selection"]'
+    );
+  const sentMarkers = () =>
+    Array.from(transcript.querySelectorAll("span")).filter(
+      (span) => span.childElementCount === 0 && span.textContent === "Selection"
+    ).length;
+  expect(clearButton()?.parentElement?.textContent).toBe("Quiet tide");
+  expect(sentMarkers()).toBe(1);
 
   await selectAddMenuAction(container, "Plan mode");
-  expect(countIndicators(surface)).toBe(1);
+  expect(clearButton()).toBeNull();
   await selectAddMenuAction(container, "Plan mode");
-  expect(countIndicators(surface)).toBe(2);
+  expect(clearButton()?.parentElement?.textContent).toBe("Quiet tide");
 
   const composer = surface.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
   const selection = Array.from(container.querySelectorAll("label"))
-    .find((label) => label.textContent?.trim() === "SVG text selected")!
+    .find((label) => label.textContent?.trim() === "Slide item selected")!
     .querySelector("input")!;
   const send = async (text: string) =>
     act(async () => {
@@ -626,23 +1087,36 @@ it("shows the live SVG selection for eligible sends and keeps the sent indicator
       );
     });
   await send("Read this selection.");
-  await expect.poll(() => countIndicators(transcript)).toBe(2);
-  await act(async () => userEvent.click(selection));
-  expect(countIndicators(surface)).toBe(2);
+  await expect
+    .poll(() => transcript.textContent)
+    .toContain("Read this selection.");
+  await expect.poll(sentMarkers).toBe(2);
+  await act(async () =>
+    userEvent.fill(composer, "This message has no selection.")
+  );
+  expect(transcript.querySelector('[aria-label="Clear selection"]')).toBeNull();
+  await act(async () => userEvent.click(clearButton()!));
+  expect(selection.checked).toBe(false);
+  expect(clearButton()).toBeNull();
+  expect(composer.textContent).toBe("This message has no selection.");
+  expect(document.activeElement).toBe(composer);
 
-  await send("This message has no selection.");
+  await act(async () =>
+    userEvent.click(
+      surface.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!
+    )
+  );
   await expect
     .poll(() => transcript.textContent)
     .toContain("This message has no selection.");
-  expect(countIndicators(transcript)).toBe(2);
+  expect(sentMarkers()).toBe(2);
   expect(
     transcript.querySelector('[aria-label="Message attachments"]')
   ).toBeNull();
 });
 
 it("uses production attachment cards, retained-image loading and fullscreen inspection", async () => {
-  const container = await mountConversationDemo();
-  await selectConversation(container, "attachments");
+  const container = await mountConversationDemo({ scenario: "attachments" });
   const transcript = conversation(container);
   const captions = Array.from(transcript.querySelectorAll("figcaption"));
   expect(
@@ -726,23 +1200,8 @@ it("uses production attachment cards, retained-image loading and fullscreen insp
 });
 
 it("sends a staged image into the real user transcript in the idle local fixture", async () => {
-  const container = await mountConversationDemo();
-  await selectConversation(container, "empty");
-  const running = Array.from(container.querySelectorAll("label"))
-    .find((label) => label.textContent?.includes("Running turn"))!
-    .querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-  await act(async () => running.click());
-  expect(running.checked).toBe(false);
-  await act(async () =>
-    container
-      .querySelector<HTMLButtonElement>('button[aria-label="Add to message"]')!
-      .click()
-  );
-  const panel = container.querySelector<HTMLElement>(
-    "[data-composer-action-menu]"
-  )!;
-  const image = menuItem(panel, "Image");
-  await act(async () => image.click());
+  const container = await mountConversationDemo({ scenario: "empty" });
+  await stageAttachment(container, "image");
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -851,7 +1310,7 @@ it("keeps the draft while shared + tools combine, toggle and remove Goal and Pla
   expect(editor.textContent).toBe(draft);
 });
 
-it("keeps the shared placeholder across modes and attachments while preserving restrictions and Default access", async () => {
+it("keeps the shared placeholder across modes and attachments with Ask for approval", async () => {
   const container = await mountConversationDemo();
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
@@ -889,12 +1348,13 @@ it("keeps the shared placeholder across modes and attachments while preserving r
       .click()
   );
 
-  const image = menuItem(await openAddMenu(container), "Image");
-  await act(async () => image.click());
+  await stageAttachment(container, "image");
   await expect.poll(placeholder).toBe("Ask anything…");
   const blockedGoal = menuItem(await openAddMenu(container), "Goal");
-  expect(blockedGoal.getAttribute("aria-disabled")).toBe("true");
   await act(async () => blockedGoal.click());
+  expect(container.textContent).toContain(
+    "Send or remove the attachment before starting a goal."
+  );
   expect(
     container.querySelector('button[aria-label="Remove goal"]')
   ).toBeNull();
@@ -903,6 +1363,9 @@ it("keeps the shared placeholder across modes and attachments while preserving r
       .querySelector<HTMLButtonElement>('button[aria-label="Add to message"]')!
       .click()
   );
+  await expect
+    .poll(() => container.querySelector("[data-composer-action-menu]"))
+    .toBeNull();
   await act(async () =>
     container
       .querySelector<HTMLButtonElement>(
@@ -911,19 +1374,19 @@ it("keeps the shared placeholder across modes and attachments while preserving r
       .click()
   );
 
-  const access = container.querySelector<HTMLButtonElement>(
-    'button[aria-label="Access: Default"]'
-  )!;
-  expect(access.querySelector("svg")).not.toBeNull();
-  await act(async () => userEvent.click(access));
+  const access = page.getByRole("button", { name: "Access: Ask for approval" });
+  await expect.element(access).toBeEnabled();
+  expect(access.element().querySelector("svg")).not.toBeNull();
+  await clickButton("Access: Ask for approval");
+  const dialog = page.getByRole("dialog");
+  await expect.element(dialog).toHaveTextContent("Access for new messages");
   await expect
-    .poll(() => document.querySelector('[role="dialog"]')?.textContent)
-    .toContain("Access for new messages");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
-    "Reads and edits this project's files and runs sandboxed commands. Commands cannot use the internet."
-  );
+    .element(dialog)
+    .toHaveTextContent(
+      "Reads and edits project files and runs sandboxed commands. You review requests for extra access."
+    );
   await act(async () => userEvent.keyboard("{Escape}"));
-  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+  await expect.element(dialog).not.toBeInTheDocument();
 });
 
 it("selects slash Goal and Plan without consuming the surrounding draft", async () => {
@@ -1039,8 +1502,7 @@ it("keeps staged image and Plan context separate from a queued text replacement"
   const container = await mountConversationDemo();
   const plan = menuItem(await openAddMenu(container), "Plan mode");
   await act(async () => userEvent.click(plan));
-  const image = menuItem(await openAddMenu(container), "Image");
-  await act(async () => userEvent.click(image));
+  await stageAttachment(container, "image");
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -1067,10 +1529,7 @@ it("keeps staged image and Plan context separate from a queued text replacement"
     .toBe(replacement);
   const preview = queuedPreviews(container)[0];
   expect(preview.querySelector("img")).toBeNull();
-  const steer = Array.from(
-    preview.parentElement!.querySelectorAll<HTMLButtonElement>("button")
-  ).find((button) => button.textContent?.trim() === "Steer")!;
-  expect(steer.disabled).toBe(false);
+  expect(textButton(container, "Steer")).toBeUndefined();
   expect(editor.textContent).toBe(draft);
   expect(
     container.querySelector('button[aria-label="Remove reference.jpg"]')
@@ -1085,8 +1544,7 @@ it("cancels queue edits with Cancel or Escape while restoring ordinary intent an
   const container = await mountConversationDemo();
   const plan = menuItem(await openAddMenu(container), "Plan mode");
   await act(async () => userEvent.click(plan));
-  const image = menuItem(await openAddMenu(container), "Image");
-  await act(async () => userEvent.click(image));
+  await stageAttachment(container, "image");
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -1238,11 +1696,9 @@ it("makes the mounted composer read-only during a pending queue save and retains
 });
 
 it("edits and clears an image caption while retaining its queue icon, image and Plan settings", async () => {
-  const saves = vi.spyOn(DesktopQueueFixture.prototype, "saveQueueDraft");
-  const edits = vi.spyOn(DesktopQueueFixture.prototype, "editQueue");
   const container = await mountConversationDemo();
   await selectAddMenuAction(container, "Plan mode");
-  await selectAddMenuAction(container, "Image");
+  await stageAttachment(container, "image");
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -1259,25 +1715,9 @@ it("edits and clears an image caption while retaining its queue icon, image and 
     "Plan · Use this image to plan the spacing."
   );
   await selectAddMenuAction(container, "Plan mode");
-  await selectAddMenuAction(container, "Files");
-  await act(async () =>
-    userEvent.fill(editor, "Keep my notes linked to @read")
-  );
-  await expect
-    .poll(() => container.querySelector("[data-composer-trigger-menu]"))
-    .not.toBeNull();
-  await act(async () =>
-    userEvent.click(
-      menuItem(
-        container.querySelector<HTMLElement>("[data-composer-trigger-menu]")!,
-        "README.md"
-      )
-    )
-  );
-  const ordinaryDraft = editor.textContent;
-  expect(
-    editor.querySelector('[data-composer-mention="readme"]')?.textContent
-  ).toBe("@README.md");
+  await stageAttachment(container, "file");
+  const ordinaryDraft = "Keep my notes linked to the design.";
+  await act(async () => userEvent.fill(editor, ordinaryDraft));
 
   await editQueuedMessage(container, 3);
   expect(container.querySelector('[contenteditable="true"]')).toBe(editor);
@@ -1292,11 +1732,6 @@ it("edits and clears an image caption while retaining its queue icon, image and 
     .poll(() => queuedPreviews(container)[3].textContent)
     .toBe(`Plan · ${caption}`);
   await expect.poll(() => editor.textContent).toBe(ordinaryDraft);
-  expect(
-    editor
-      .querySelector('[data-composer-mention="readme"]')
-      ?.getAttribute("path")
-  ).toBe("README.md");
   expect(
     container.querySelector('button[aria-label="Remove README.md"]')
   ).not.toBeNull();
@@ -1326,11 +1761,6 @@ it("edits and clears an image caption while retaining its queue icon, image and 
     .not.toBeNull();
   expect(textButton(container, "Save changes").disabled).toBe(false);
   await act(async () => userEvent.click(textButton(container, "Save changes")));
-  expect(saves.mock.calls).toEqual([[caption], [""]]);
-  expect(edits.mock.calls.at(-1)?.[0]).toMatchObject({
-    action: "replaceText",
-    text: "",
-  });
   await expect
     .poll(() => queuedPreviews(container)[3].textContent)
     .toBe("Plan · reference.jpg");
@@ -1344,9 +1774,6 @@ it("edits and clears an image caption while retaining its queue icon, image and 
   ).toBe("svg");
   expect(editor.textContent).toBe(ordinaryDraft);
   expect(
-    editor.querySelector('[data-composer-mention="readme"]')?.textContent
-  ).toBe("@README.md");
-  expect(
     container.querySelector('button[aria-label="Remove README.md"]')
   ).not.toBeNull();
   const steer = (index: number) =>
@@ -1355,6 +1782,12 @@ it("edits and clears an image caption while retaining its queue icon, image and 
         index
       ].parentElement!.querySelectorAll<HTMLButtonElement>("button")
     ).find((button) => button.textContent?.trim() === "Steer")!;
+  expect(textButton(container, "Steer")).toBeUndefined();
+  await act(async () =>
+    userEvent.click(
+      container.querySelector('button[aria-label="Remove README.md"]')!
+    )
+  );
   expect(steer(0).disabled).toBe(false);
   expect(steer(1).disabled).toBe(true);
   expect(steer(3).disabled).toBe(true);
@@ -1363,7 +1796,7 @@ it("edits and clears an image caption while retaining its queue icon, image and 
 
 it("edits and clears a file caption while keeping the file queued and steering disabled", async () => {
   const container = await mountConversationDemo();
-  await selectAddMenuAction(container, "Files");
+  await stageAttachment(container, "file");
   const editor = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
@@ -1411,91 +1844,6 @@ it("edits and clears a file caption while keeping the file queued and steering d
   expect(steer.disabled).toBe(true);
   expect(editor.textContent).toBe(ordinaryDraft);
   expect(container.querySelector('[contenteditable="true"]')).toBe(editor);
-});
-
-it("uses the same Home composer controls and retains text, attachment, modes and effort across surfaces", async () => {
-  const container = await mountConversationDemo();
-  const surface = container.querySelector<HTMLSelectElement>(
-    'select[aria-label="Composer surface"]'
-  )!;
-  await act(async () => {
-    surface.value = "home";
-    surface.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(
-    container.querySelector('[data-testid="native-composer-queue"]')
-  ).toBeNull();
-  expect(
-    container
-      .querySelector('[data-testid="desktop-composer-surface"]')!
-      .querySelector('[data-testid="desktop-conversation-preview"]')
-  ).toBeNull();
-  expect(runningTurn(container).disabled).toBe(true);
-  const editor = container.querySelector<HTMLElement>(
-    '[contenteditable="true"]'
-  )!;
-  await act(async () =>
-    userEvent.fill(editor, "Keep my Home draft and reference.")
-  );
-  await selectAddMenuAction(container, "Plan mode");
-  await selectAddMenuAction(container, "Image");
-  expect(
-    container.querySelector('button[aria-label="Remove plan"]')
-  ).not.toBeNull();
-  expect(
-    container.querySelector('button[aria-label="Remove reference.jpg"]')
-  ).not.toBeNull();
-  await act(async () => {
-    container
-      .querySelector<HTMLButtonElement>('button[aria-label="Add to message"]')!
-      .focus();
-    await userEvent.keyboard("{Enter}");
-  });
-  expect(
-    menuItem(
-      container.querySelector("[data-composer-action-menu]")!,
-      "Goal"
-    ).getAttribute("aria-disabled")
-  ).toBe("true");
-  await act(async () => userEvent.keyboard("{Escape}"));
-  await act(async () => {
-    container
-      .querySelector<HTMLButtonElement>(
-        '[role="combobox"][aria-label="Model connection"]'
-      )!
-      .focus();
-    await userEvent.keyboard("{Enter}");
-  });
-  await expect
-    .poll(() => document.querySelector('[role="slider"]'))
-    .not.toBeNull();
-  await act(async () => {
-    (document.querySelector('[role="slider"]') as HTMLElement).focus();
-    await userEvent.keyboard("{ArrowRight}");
-  });
-  await expect
-    .poll(() =>
-      document.querySelector('[role="slider"]')?.getAttribute("aria-valuenow")
-    )
-    .toBe("3");
-  await act(async () => userEvent.keyboard("{Escape}"));
-  expect(editor.textContent).toBe("Keep my Home draft and reference.");
-  await act(async () => {
-    surface.value = "workspace";
-    surface.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(container.querySelector('[contenteditable="true"]')).toBe(editor);
-  expect(editor.textContent).toBe("Keep my Home draft and reference.");
-  expect(
-    container.querySelector('button[aria-label="Remove plan"]')
-  ).not.toBeNull();
-  expect(
-    container.querySelector('button[aria-label="Remove reference.jpg"]')
-  ).not.toBeNull();
-  expect(
-    container.querySelector('[role="combobox"][aria-label="Model connection"]')
-      ?.textContent
-  ).toContain("Extra high");
 });
 
 it("shows a pending send spinner through empty-draft controls, preserves newer edits and retains refused drafts", async () => {
@@ -1695,19 +2043,12 @@ it("shows a host-owned first send across activation without needing a local subm
   expect(editor.textContent).toBe("Do not send twice");
 });
 
-it("accepts Home drops over the surrounding surface with the shared overlay and intake", async () => {
-  const container = await mountConversationDemo();
-  const select = container.querySelector<HTMLSelectElement>(
-    'select[aria-label="Composer surface"]'
-  )!;
-  await act(async () => {
-    select.value = "home";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+it("accepts drops over the surrounding chat surface with the shared overlay and intake", async () => {
+  const container = await mountConversationDemo({});
   const surface = container.querySelector<HTMLElement>(
-    '[data-testid="desktop-composer-surface"]'
+    '[data-testid="workspace-native-chat"]'
   )!;
-  const outsideInput = surface.querySelector<HTMLElement>("h2")!;
+  const outsideInput = conversation(container);
   const editor = container.querySelector<HTMLElement>(
     "[data-composer-editor]"
   )!;
@@ -1728,7 +2069,13 @@ it("accepts Home drops over the surrounding surface with the shared overlay and 
     return event;
   };
   const data = new DataTransfer();
-  data.items.add(new File(["image"], "drop.png", { type: "image/png" }));
+  data.items.add(
+    new File(
+      [await fixtures.readImage(fixtures.image.previewId!)],
+      "reference.jpg",
+      { type: "image/jpeg" }
+    )
+  );
   dispatch(outsideInput, "dragenter", data);
   const overlay = surface.querySelector<HTMLElement>(
     "[data-composer-drop-overlay]"
@@ -1737,9 +2084,13 @@ it("accepts Home drops over the surrounding surface with the shared overlay and 
   expect(overlay?.textContent).toBe("Drop to attach");
   expect(dispatch(outsideInput, "drop", data).defaultPrevented).toBe(true);
   expect(surface.querySelector("[data-composer-drop-overlay]")).toBeNull();
-  expect(
-    surface.querySelectorAll('button[aria-label="Remove reference.jpg"]')
-  ).toHaveLength(1);
+  await expect
+    .poll(
+      () =>
+        surface.querySelectorAll('button[aria-label="Remove reference.jpg"]')
+          .length
+    )
+    .toBe(1);
   expect(editor.textContent).toBe("Keep my draft.");
 
   await act(async () => {
@@ -1751,13 +2102,16 @@ it("accepts Home drops over the surrounding surface with the shared overlay and 
     await userEvent.keyboard("{Enter}");
   });
   const file = new DataTransfer();
-  file.items.add(new File(["notes"], "notes.txt", { type: "text/plain" }));
+  file.items.add(new File(["notes"], "README.md", { type: "text/markdown" }));
   dispatch(editor, "dragenter", file);
   expect(surface.querySelector("[data-composer-drop-overlay]")).not.toBeNull();
   dispatch(editor, "drop", file);
-  expect(
-    surface.querySelectorAll('button[aria-label="Remove README.md"]')
-  ).toHaveLength(1);
+  await expect
+    .poll(
+      () =>
+        surface.querySelectorAll('button[aria-label="Remove README.md"]').length
+    )
+    .toBe(1);
   expect(surface.querySelector("[data-composer-drop-overlay]")).toBeNull();
   expect(editor.textContent).toBe("Keep my draft.");
 

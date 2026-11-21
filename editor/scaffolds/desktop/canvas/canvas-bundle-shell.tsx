@@ -20,23 +20,24 @@ import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceChanges } from "../workbench/workspace-changes";
 import { workspaceBundleFs } from "./workspace-bundle-fs";
 import { DesktopCanvasShell } from "./canvas-shell";
-import { DesktopBoardShell } from "./board-shell";
-import type { DocumentSurfaceHost } from "../file/document-surface-host";
+import { DesktopBoardShell, type BindBoardSelection } from "./board-shell";
+import type { BindSlideEditor } from "./slide-surface";
 
 export function DesktopCanvasBundleShell({
   workspaceId,
   basePath = "",
   active,
   onDirtyChange,
-  slideSurfaceHost,
+  bindSlideEditor,
+  bindBoardSelection,
 }: {
   workspaceId: string;
   basePath?: string;
-  /** Slides-only: gates the deck's Cmd+S when embedded as an inactive tab. The
-   *  board host auto-persists, so it ignores this. */
+  /** Gates publication and the deck's Cmd+S for an inactive tab. */
   active?: boolean;
   onDirtyChange: (dirty: boolean) => void;
-  slideSurfaceHost?: DocumentSurfaceHost;
+  bindSlideEditor?: BindSlideEditor;
+  bindBoardSelection?: BindBoardSelection;
 }) {
   const [editor, setEditor] = useState<dotcanvas.EditorType | null>(null);
 
@@ -90,7 +91,13 @@ export function DesktopCanvasBundleShell({
     );
   }
   if (editor === "board") {
-    return <DesktopBoardShell workspaceId={workspaceId} basePath={basePath} />;
+    return (
+      <DesktopBoardShell
+        workspaceId={workspaceId}
+        basePath={basePath}
+        bindSelection={active === false ? undefined : bindBoardSelection}
+      />
+    );
   }
   return (
     <DesktopCanvasShell
@@ -98,7 +105,7 @@ export function DesktopCanvasBundleShell({
       basePath={basePath}
       active={active}
       onDirtyChange={onDirtyChange}
-      slideSurfaceHost={slideSurfaceHost}
+      bindSlideEditor={bindSlideEditor}
     />
   );
 }

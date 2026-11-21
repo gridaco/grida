@@ -18,7 +18,12 @@ import cmath from "@grida/cmath";
 import { create_defs } from "./defs";
 import { clipboard as clipboard_codec } from "./clipboard";
 import { subtree } from "./subtree";
-import { SvgDocument, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
+import {
+  SvgDocument,
+  SVG_NS,
+  WELL_KNOWN_NS_PREFIXES,
+  XMLNS_NS,
+} from "./document";
 import type { GeometryProvider } from "./geometry";
 import type { SurfaceBridge } from "./surface-bridge";
 import { group as group_policy } from "./group";
@@ -100,6 +105,27 @@ export type {
 const PROVIDER_ID = "svg-editor";
 /** Max characters in a synthesized display label before truncation. */
 const DISPLAY_LABEL_MAX_LEN = 40;
+
+function label_text(doc: SvgDocument, id: NodeId): string {
+  const pending = [...doc.children_of(id)].reverse();
+  const chunks: string[] = [];
+  while (pending.length > 0) {
+    const node = doc.get(pending.pop()!);
+    if (node?.kind === "text" || node?.kind === "cdata") {
+      chunks.push(node.value);
+    } else if (
+      node?.kind === "element" &&
+      (node.ns === SVG_NS || node.ns === null) &&
+      (node.local === "tspan" ||
+        node.local === "textPath" ||
+        node.local === "a")
+    ) {
+      for (let i = node.children.length - 1; i >= 0; i--)
+        pending.push(node.children[i]);
+    }
+  }
+  return chunks.join("");
+}
 
 export type CreateSvgEditorOptions = {
   svg: string;
@@ -3155,24 +3181,24 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
      * the rule.
      *
      * Rule:
-     *   - `<text>` → text content, whitespace-collapsed and truncated at
-     *     ~40 chars (falls back to `"text"` for empty content).
+     *   - Text elements → text content including nested SVG spans,
+     *     whitespace-collapsed and truncated at ~40 chars. Empty elements
+     *     use their type label.
      *   - Otherwise → tag name, suffixed with `#id` when the `id` attribute
      *     is present (e.g. `"rect #sun"`).
      *
      * `opts.tagLabel` lets callers substitute a friendlier or localized
-     * term for the raw tag (e.g. `"rect"` → `"Rectangle"`). Only invoked
-     * on the non-text branch.
+     * term for the raw tag (e.g. `"rect"` → `"Rectangle"`) when there is no
+     * text preview.
      */
     display_label(
       id: NodeId,
       opts?: { tagLabel?: (tag: string) => string }
     ): string {
       const tag = doc.tag_of(id);
-      if (tag === "text") {
-        const raw = doc.text_of(id);
-        const collapsed = raw.replace(/\s+/g, " ").trim();
-        if (collapsed.length === 0) return "text";
+      if (tag === "text" || tag === "tspan" || tag === "textPath") {
+        const collapsed = label_text(doc, id).replace(/\s+/g, " ").trim();
+        if (collapsed.length === 0) return opts?.tagLabel?.(tag) ?? tag;
         return collapsed.length > DISPLAY_LABEL_MAX_LEN
           ? `${collapsed.slice(0, DISPLAY_LABEL_MAX_LEN)}…`
           : collapsed;

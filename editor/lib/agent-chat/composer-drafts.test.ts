@@ -250,6 +250,29 @@ describe("durable pending composer sends", () => {
     expect(await new ComposerDrafts(null, blobs).readPending("w:c")).toBeNull();
   });
 
+  it("restores a board selection with its original pin and token", async () => {
+    const blobs = new MemoryBlobs();
+    const draft = {
+      inputId: "board-message",
+      text: "Which pin is this?",
+      mode: "enqueue",
+      operatingRegime: "act",
+      allowLibrarySelection: false,
+      editorToolContextId: {
+        targetId: crypto.randomUUID(),
+        subject: {
+          kind: "document",
+          path: "/references.canvas/hero.svg",
+          placement: { boardPath: "/references.canvas", pinId: "hero" },
+        },
+      },
+    } as const;
+    await new ComposerDrafts(null, blobs).writePending("workspace:chat", draft);
+    expect(
+      await new ComposerDrafts(null, blobs).readPending("workspace:chat")
+    ).toEqual(draft);
+  });
+
   it("rejects an invalid retry row instead of treating it as a new send", async () => {
     const blobs = new MemoryBlobs();
     blobs.items.set("\0pending:w:c", {

@@ -69,7 +69,10 @@ export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
-export { NativeEditorSvgSelection } from "./native-editor-svg-selection";
+export {
+  NativeEditorSelection,
+  NativeEditorSelection as NativeEditorSvgSelection,
+} from "./native-editor-selection";
 export { NativeEditorSvgText } from "./native-editor-svg-text";
 export type {
   NativeEditorSurfaceOpen,
@@ -371,6 +374,8 @@ export type DesktopBridge = {
      * Optional because older protocol-1 hosts expose no Settings action.
      */
     open_settings?: () => Promise<void>;
+    /** Open the LLM Providers section of the native Settings window. */
+    open_llm_provider_settings?: () => Promise<void>;
     /**
      * Finish the dedicated onboarding surface and promote the same entry
      * BrowserWindow to the regular workstation. Optional because older

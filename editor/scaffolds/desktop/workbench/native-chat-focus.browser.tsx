@@ -59,7 +59,15 @@ function enableAutomaticSearch() {
 
 async function setup(
   overrides: Partial<DesktopNativeChat> = {},
-  { waitForHistory = true, sideChat = false } = {}
+  {
+    waitForHistory = true,
+    sideChat = false,
+    workingDirectory,
+  }: {
+    waitForHistory?: boolean;
+    sideChat?: boolean;
+    workingDirectory?: string;
+  } = {}
 ) {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -199,6 +207,7 @@ async function setup(
             <NativeAgentPane
               bridge={bridge}
               initialSession={initialSession}
+              workingDirectory={workingDirectory}
               sideChatPlacement={{ present() {}, withdraw() {} }}
             />
           )}
@@ -240,6 +249,46 @@ async function click(name: string) {
     page.getByRole("button", { name, exact: true }).click()
   );
 }
+
+it("copies the saved chat ID and workspace path and forks through the existing command", async () => {
+  const workingDirectory = "/projects/fixture";
+  const runCommand = vi
+    .fn<NonNullable<DesktopNativeChat["runCommand"]>>()
+    .mockResolvedValue({ command: "fork", sessionId: crypto.randomUUID() });
+  const { first } = await setup(
+    { commands: async () => ["fork"], runCommand },
+    { workingDirectory }
+  );
+  const clipboard = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue();
+  try {
+    for (const item of ["Copy chat ID", "Copy working directory"]) {
+      await click("Chat options");
+      await act(async () => {
+        await page.getByRole("menuitem", { name: "Copy", exact: true }).click();
+        await page.getByRole("menuitem", { name: item, exact: true }).click();
+      });
+    }
+    expect(clipboard.mock.calls).toEqual([[first], [workingDirectory]]);
+
+    await click("Chat options");
+    await act(async () =>
+      page.getByRole("menuitem", { name: "Fork chat" }).click()
+    );
+    await expect
+      .element(page.getByRole("button", { name: "Open fork" }))
+      .toBeVisible();
+    expect(runCommand).toHaveBeenCalledExactlyOnceWith(
+      first,
+      "fork",
+      expect.any(String)
+    );
+    await expect.element(page.getByText("First saved request")).toBeVisible();
+  } finally {
+    clipboard.mockRestore();
+  }
+});
 
 it("shows an unread reply in another chat, acknowledges it on display, and preserves a manual mark until revisited", async () => {
   let invalidate!: () => void;
@@ -332,7 +381,7 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
 
   await click("Chat options");
   await act(async () =>
-    page.getByRole("menuitem", { name: "Mark unread" }).click()
+    page.getByRole("menuitem", { name: "Mark as unread" }).click()
   );
   await expect
     .poll(() => change.mock.lastCall)
@@ -395,7 +444,7 @@ it.each(["file window", "archived chat"] as const)(
       .element(page.getByRole("menuitem", { name: "Rename" }))
       .toBeVisible();
     await expect
-      .element(page.getByRole("menuitem", { name: "Mark unread" }))
+      .element(page.getByRole("menuitem", { name: "Mark as unread" }))
       .not.toBeInTheDocument();
     expect(receipt).not.toHaveBeenCalled();
   }

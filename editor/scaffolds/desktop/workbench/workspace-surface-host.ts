@@ -4,11 +4,13 @@ import {
   type DesktopFxViewer,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
+import type { SvgEditor } from "@grida/svg-editor";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
+import type { CanvasBoard } from "../canvas/board-store";
+import { EditorSelectionSurface } from "../shared/editor-selection-surface";
 import type { EditorGroup } from "./editor-group";
 import { WorkbenchTab } from "./workbench-tab";
-import { WorkspaceSvgText } from "./workspace-svg-text";
 
 /**
  * Interactive surface host for one workspace workbench.
@@ -21,8 +23,9 @@ import { WorkspaceSvgText } from "./workspace-svg-text";
  * to the agent nor remembered for a later restore.
  */
 export class WorkspaceSurfaceHost {
-  readonly svgText: WorkspaceSvgText;
-  readonly svgSelection: WorkspaceSvgText["svgSelection"];
+  private readonly surfaces: EditorSelectionSurface;
+  readonly editorSelection: EditorSelectionSurface["selection"];
+  readonly subscribeToEditorSurfaces: EditorSelectionSurface["subscribe"];
 
   constructor(
     private readonly readdir: WorkspaceArtifact.Readdir,
@@ -31,9 +34,34 @@ export class WorkspaceSurfaceHost {
       "getSnapshot" | "open" | "restore" | "subscribe"
     >
   ) {
-    this.svgText = new WorkspaceSvgText(this.group);
-    this.svgSelection = this.svgText.svgSelection;
+    this.surfaces = new EditorSelectionSurface(
+      () => this.group.getSnapshot().active,
+      this.group.subscribe
+    );
+    this.editorSelection = this.surfaces.selection;
+    this.subscribeToEditorSurfaces = this.surfaces.subscribe;
   }
+
+  /** A tab can host its own SVG or an editable SVG inside a deck. */
+  readonly bindSvgEditor = (
+    tabPath: string,
+    documentPath: string,
+    editor: SvgEditor
+  ): (() => void) | undefined => {
+    const path = WorkspaceArtifact.toAgentPath(documentPath);
+    if (path)
+      return this.surfaces.bindSvg(WorkbenchTab.file(tabPath), path, editor);
+  };
+
+  readonly bindBoardSelection = (tabPath: string, board: CanvasBoard) => {
+    const boardPath = WorkspaceArtifact.toAgentPath(tabPath);
+    if (boardPath)
+      return this.surfaces.bindDocument(WorkbenchTab.file(tabPath), {
+        read: () => board.selectedDocument(boardPath),
+        clear: () => board.selectFrame(null),
+        subscribe: board.subscribe,
+      });
+  };
 
   async open(
     path: string,
@@ -156,11 +184,10 @@ export class WorkspaceSurfaceHost {
   }
 
   readEditorSurfaces() {
-    return NativeEditorSurfaces.capture(this.listOpen());
-  }
-
-  subscribeToEditorSurfaces(listener: () => void): () => void {
-    return this.group.subscribe(listener);
+    return NativeEditorSurfaces.capture({
+      ...this.listOpen(),
+      selection: this.editorSelection.readSubject(),
+    });
   }
 
   publishEditorSurfaces(
@@ -174,8 +201,9 @@ export class WorkspaceSurfaceHost {
       while (current && dirty) {
         dirty = false;
         current =
-          (await publish(this.readEditorSurfaces()).catch(() => false)) &&
-          current;
+          (await publish(NativeEditorSurfaces.capture(this.listOpen())).catch(
+            () => false
+          )) && current;
       }
       pending = false;
     };
@@ -186,7 +214,7 @@ export class WorkspaceSurfaceHost {
       pending = true;
       void flush();
     };
-    const unsubscribe = this.subscribeToEditorSurfaces(update);
+    const unsubscribe = this.group.subscribe(update);
     const unsubscribeAdditional = additionalChanges?.(update);
     update();
     return () => {

@@ -20,7 +20,13 @@ messages.map((m, i) => (
 
 ## What it renders
 
-- **Text** parts → `MessageResponse` (Streamdown Markdown).
+- **Editor selection** → the live composer supplies the selected layer’s label,
+  such as its shape type or a short text preview. A sent message with captured
+  selection context shows a passive marker.
+- **Text** parts → `MessageResponse` (Streamdown Markdown). Web links share the
+  composer's blue style and destination icons. Grida, GitHub, Figma, Linear,
+  Slack, and Notion have their own marks. Google Docs, Sheets, and Drive share
+  the Drive mark. Other web links use a globe.
 - **User attachments** → a separate row outside the text bubble. Raster images
   show only a natural-aspect, bounded thumbnail that opens fullscreen; their
   filename stays in accessible and download metadata. Videos, ordinary files
@@ -91,6 +97,10 @@ loading pixels. Legacy inline `{ok, mime, data}` results remain displayable.
 ## Questions and replies
 
 The surface pins pending questions above the owning chat's composer.
+When space is limited, choices scroll within each prompt while the question,
+write-in, and actions stay in view. The write-in starts on one line and grows as
+the answer wraps. The prompt stack can scroll if several open questions exceed
+the pane's available height.
 A required question waits for an answer or an explicit skip. An optional
 question allows independent work to continue. Close and Skip return it to an
 **Answer question** button in the transcript. The person can reopen their
@@ -101,10 +111,11 @@ their explicit skip behavior.
 transient UI state as the collapsibles); the **committed** answer leaves through
 `onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
 the agent. `submitDisabled` gates the submission while the surface refreshes
-the review. Draft controls stay editable. Enter in the custom field invokes
-Next or Submit, and Shift+Enter inserts a line break. The kit never touches the
-transport. A native reply carries the host-attributed question and displays it
-above the person's answer in one bubble. The finished turn's **Worked**
+the review. Draft controls stay editable. Within the card, keys 1–9 select
+numbered choices. Enter on a choice or in the custom field invokes Next or
+Submit when the answer is ready. Shift+Enter inserts a line break in the
+custom field. The kit never touches the transport. A native reply displays the
+host-attributed question above the person's answer in one bubble. The finished turn's **Worked**
 disclosure contains the reply. Survey-shaped tool outputs keep their
 read-only `AnsweredQuestionSummary`.
 
@@ -119,6 +130,7 @@ read-only `AnsweredQuestionSummary`.
     (`PendingTurnIndicator`, `CompactionNotice`).
   - The session-global question prompt: `QuestionPrompt`,
     `AnsweredQuestionSummary`, and the `QuestionAnswerOutput` type.
+  - `AgentPromptCard` for floating requests above the composer.
   - `workspace_links`, the Markdown link handling for workspace paths.
   - The `ChatMessage` / `ChatMessageActions` / `ToolCallEntry` types.
     `toolDisplay` (label/summary formatting) is internal.

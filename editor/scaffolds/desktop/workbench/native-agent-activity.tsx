@@ -20,6 +20,7 @@ import { ChatMessageView, CompactionNotice } from "@/kits/agent-chat";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import layout from "./native-chat-layout.module.css";
 
 const EMPTY = Object.freeze({
   open: false,
@@ -184,7 +185,7 @@ export function NativeSubagentActivity({
           >
             <ConversationContent
               scrollbar="custom"
-              className="gap-4 p-0 px-[max(1rem,calc((100%_-_48rem)/2))] pb-4"
+              className={`gap-4 p-0 pb-4 ${layout.contentInset}`}
             >
               {view.activityAvailable && (
                 <NativeSubagentConversationView controller={controller} />

@@ -113,14 +113,12 @@ const FILE_TREE_PANE_MAX = "360px";
 const AGENT_PANE_DEFAULT = "30%";
 const AGENT_PANE_MIN = "320px";
 const EDITOR_PANE_MIN = "360px";
-const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS =
-  "h-full min-h-0 pb-3 pl-1.5 pr-3 pt-1.5";
+const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS = "h-full min-h-0 pt-1.5 pr-3 pb-3";
 const FLOATING_UTILITY_SURFACE_CLASS =
   "relative h-full min-h-0 overflow-hidden rounded-lg border border-border/60 bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]";
 const RESIZE_HANDLE_HIGHLIGHT_CLASS =
   "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 data-[separator=hover]:before:opacity-100 data-[separator=active]:before:via-foreground/70 data-[separator=active]:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
-// The hit box overlaps each pane by 8px and occupies the original 6px gap.
-const CHAT_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-2 w-[22px] cursor-col-resize bg-transparent after:pointer-events-none ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
+const CHAT_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 cursor-col-resize bg-transparent after:pointer-events-none ${RESIZE_HANDLE_HIGHLIGHT_CLASS} ${styles.chatSeparator}`;
 const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 // Bottom utility panel (VSCode-style). Collapsible: dragging it under
@@ -519,9 +517,12 @@ export function WorkspaceWorkbench({
       <WindowContentMarker workspaceId={workspace.id} surface="workbench" />
       <div
         data-testid="workspace-workbench"
-        className="h-screen w-screen overflow-hidden"
+        className={`h-screen w-screen overflow-hidden ${styles.workbench}`}
       >
-        <ResizablePanelGroup className={styles.decorativeOverflow}>
+        <ResizablePanelGroup
+          className={styles.decorativeOverflow}
+          resizeTargetMinimumSize={{ fine: 10, coarse: 10 }}
+        >
           {/* The title bar belongs to the agent column. This keeps the right
               region vertically uninterrupted while retaining the workspace
               identity, navigation, and utility controls exactly where the
@@ -561,7 +562,7 @@ export function WorkspaceWorkbench({
                   <WorkspaceTitleMenu workspace={workspace} />
                 </div>
               </TitleBar>
-              <div className="min-h-0 flex-1">
+              <div className={`min-h-0 flex-1 ${styles.chatPane}`}>
                 <AgentPane
                   workspace={workspace}
                   surfaceHost={surfaceHost}
@@ -573,8 +574,6 @@ export function WorkspaceWorkbench({
             </div>
           </ResizablePanel>
 
-          {/* A generous, invisible gutter preserves resizing without putting
-              a divider back into the visual hierarchy. */}
           <ResizableHandle
             aria-label="Resize chat and document"
             className={CHAT_PANE_RESIZE_HANDLE_CLASS}
@@ -604,7 +603,7 @@ export function WorkspaceWorkbench({
                     <ResizablePanel data-workbench-decorative-overflow>
                       <EditorPane
                         workspace={workspace}
-                        svgText={surfaceHost.svgText}
+                        surfaceHost={surfaceHost}
                         panels={panels}
                         browsers={browsers}
                         openTabs={openTabs}

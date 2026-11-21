@@ -24,10 +24,9 @@ For a selected `template-id`, look it up with `grida-fx init --list-templates --
 Install it with `grida-fx add <id> <new-dir> --json` and use the workflow entry
 and optional input preset from the receipt. For a private GitHub template the
 user specified, `add OWNER/REPO@REF --github-auth` uses their authenticated
-GitHub CLI. Offline planning and saved run inspection work under Default access.
-Downloads and live provider calls require Full access. Confirm the user's route
-and spending ceiling or subscription use before live generation. Use
-`grida-fx doctor` to check provider setup.
+GitHub CLI. You can plan workflows and inspect saved runs offline. Before live
+generation, confirm the user's provider route and spending ceiling or subscription
+use. Use `grida-fx doctor` to check provider setup.
 
 ## Register a plan or saved run
 
@@ -36,7 +35,7 @@ or `grida-fx inspect <run> --register --json`. Registration returns the entry's
 relative `route`. Resolve it against the running service URL returned by
 `grida-fx status --project-root <project-dir> --json` for that same project.
 When the user wants the viewer started, run `grida-fx start --json` in the
-project with Full access and retain its foreground process.
+project and keep its foreground process running while the viewer is in use.
 
 A registered route identifies a plan or saved run on that project's current
 service. Verify the viewer's subject and selection before using its presentation

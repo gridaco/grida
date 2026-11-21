@@ -1,7 +1,6 @@
 // GRIDA-SEC-004 — one operation on the captured live SVG text selection.
 import { NativeEditorSurfaces } from "./native-editor-surfaces";
-
-const utf8 = new TextEncoder();
+import { NativeEditorSelection } from "./native-editor-selection";
 
 export namespace NativeEditorSvgText {
   export type Operation =
@@ -17,30 +16,8 @@ export namespace NativeEditorSvgText {
     | { kind: "applied" | "unchanged"; path: string; saved: false }
     | { kind: "unavailable" | "stale" };
 
-  export function isId(value: unknown): value is string {
-    return (
-      typeof value === "string" &&
-      value.length === 36 &&
-      /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
-    );
-  }
-
-  export function isText(value: unknown): value is string {
-    if (typeof value !== "string" || utf8.encode(value).length > 4096)
-      return false;
-    for (const char of value) {
-      const code = char.codePointAt(0)!;
-      if (code === 9 || code === 10 || code === 13) continue;
-      if (
-        code < 32 ||
-        (code >= 0xd800 && code <= 0xdfff) ||
-        code === 0xfffe ||
-        code === 0xffff
-      )
-        return false;
-    }
-    return true;
-  }
+  export const isId = NativeEditorSelection.isId;
+  export const isText = NativeEditorSelection.isText;
 
   export function operation(value: unknown): Operation | undefined {
     const object = record(value);
@@ -65,11 +42,7 @@ export namespace NativeEditorSvgText {
       keys === 1
     )
       return { kind: object.kind };
-    if (
-      !NativeEditorSurfaces.isPath(object.path) ||
-      !object.path.toLowerCase().endsWith(".svg")
-    )
-      return;
+    if (!NativeEditorSurfaces.isSvgPath(object.path)) return;
     if (
       object.kind === "read" &&
       keys === 4 &&

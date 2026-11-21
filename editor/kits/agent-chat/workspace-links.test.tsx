@@ -73,10 +73,35 @@ describe("workspace_links", () => {
 
   it("keeps web links and still refuses unsafe ones", () => {
     const html = render(
-      "[Grida](https://grida.co) and [bad](javascript:alert(1))",
+      "[Grida](https://grida.co), [GitHub](https://github.com/gridaco/grida), [other](https://github.com.example.org), and [bad](javascript:alert(1))",
       () => {}
     );
-    expect(html).toContain('href="https://grida.co/"');
+    expect(html).toContain(
+      'href="https://grida.co/" data-chat-web-link="grida"'
+    );
+    expect(html).toContain(
+      'href="https://github.com/gridaco/grida" data-chat-web-link="github"'
+    );
+    expect(html).toContain(
+      'href="https://github.com.example.org/" data-chat-web-link="globe"'
+    );
     expect(html).not.toContain("javascript:");
+  });
+
+  it.each([
+    ["https://gist.github.com/user/example", "github"],
+    ["https://www.figma.com/design/example", "figma"],
+    ["https://linear.app/workspace/issue/ENG-123", "linear"],
+    ["https://docs.google.com/document/u/0/d/example/edit", "google-drive"],
+    ["https://docs.google.com/spreadsheets/d/example/edit", "google-drive"],
+    ["https://docs.google.com/forms/d/example/edit", "globe"],
+    ["https://drive.google.com/drive/folders/example", "google-drive"],
+    ["https://workspace.slack.com/archives/example", "slack"],
+    ["https://www.notion.com/templates/example", "notion"],
+    ["https://workspace.notion.site/example", "notion"],
+    ["https://slack.com.example.org/archives/example", "globe"],
+  ])("uses the matching icon for %s", (href, icon) => {
+    const html = render(`[Example](${href})`, null);
+    expect(html).toContain(`href="${href}" data-chat-web-link="${icon}"`);
   });
 });

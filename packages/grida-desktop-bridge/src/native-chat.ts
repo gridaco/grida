@@ -3,7 +3,7 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "./native-editor-surfaces";
-import type { NativeEditorSvgSelection } from "./native-editor-svg-selection";
+import type { NativeEditorSelection } from "./native-editor-selection";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
 import type { NativeSubagentClient } from "./native-subagents";
 import type {
@@ -1074,6 +1074,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   readonly nestedDeck?: true;
   /** The file window can lend its active slide's live SVG text selection. */
   readonly deckSvgText?: true;
+  /** The host accepts active SVG identities and text operations on SVG captures. */
+  readonly svgSelectionContext?: true;
+  /** The host accepts typed editor selections, including SVGs placed on boards. */
+  readonly editorSelectionContext?: true;
   /** This native package offers chat for the exact selected standalone SVG. */
   readonly document?: true;
   /**
@@ -1233,8 +1237,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   onEditorSvgSelection?(
     attachmentId: string,
     invoke: (
-      request: NativeEditorSvgSelection.Request
-    ) => NativeEditorSvgSelection.Result
+      request: NativeEditorSelection.Request
+    ) => NativeEditorSelection.Result
   ): () => void;
   /** Freeze the current workbench observation. Only its opaque ID leaves Main. */
   captureEditorContext?(): Promise<string | null>;
@@ -1258,7 +1262,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     editorSvgTargetId?: string,
     selectionRevision?: number,
     editorContextId?: string,
-    editorToolContextId?: string,
+    editorToolContext?: string | NativeEditorSelection.Capture,
     webSearch?: true
   ): Promise<NativeChatAcceptance>;
   submitMessage?(

@@ -1,47 +1,35 @@
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import type { SvgEditor } from "@grida/svg-editor";
-import { SelectedSvg } from "../shared/selected-svg";
-import { SelectedSvgText } from "../shared/selected-svg-text";
+import type { CanvasBoard } from "../canvas/board-store";
+import { EditorSelectionSurface } from "../shared/editor-selection-surface";
 
 /** The virtual path a file window's live SVG is published at. */
 export const CANVAS_PATH = "/canvas.svg" as const;
 
-/** The live SVG displayed in a file window. */
+/** The active SVG or board document in a file window. */
 export class DocumentSurfaceHost {
-  private editor: SvgEditor | null = null;
-  private path: string = CANVAS_PATH;
-  private readonly listeners = new Set<() => void>();
-  private readonly surface = () => {
-    const editor = this.editor;
-    if (editor) return { basis: editor, editor, path: this.path };
-  };
-  readonly svgText = new SelectedSvgText(this.surface);
-  readonly svgSelection = new SelectedSvg(this.surface);
+  private readonly surface = new EditorSelectionSurface(() => "document");
+  readonly editorSelection = this.surface.selection;
+  readonly subscribeToEditorSurfaces = this.surface.subscribe;
 
-  setEditor(editor: SvgEditor | null, path: string = CANVAS_PATH): void {
-    if (this.editor === editor && this.path === path) return;
-    this.editor = editor;
-    this.path = path;
-    this.svgText.surfaceChanged();
-    this.svgSelection.surfaceChanged();
-    for (const listener of this.listeners) listener();
-  }
+  readonly bindEditor = (editor: SvgEditor, path: string = CANVAS_PATH) =>
+    this.surface.bindSvg("document", path, editor);
 
-  bindEditor(editor: SvgEditor, path: string): () => void {
-    this.setEditor(editor, path);
-    return () => {
-      if (this.editor === editor && this.path === path) this.setEditor(null);
-    };
-  }
+  readonly bindBoardSelection = (board: CanvasBoard) =>
+    this.surface.bindDocument("document", {
+      read: () => board.selectedDocument("/"),
+      clear: () => board.selectFrame(null),
+      subscribe: board.subscribe,
+    });
 
   readEditorSurfaces(): NativeEditorSurfaceSnapshot {
-    return this.editor
-      ? { active: this.path, open: [this.path], truncated: false }
-      : { active: null, open: [], truncated: false };
-  }
-
-  subscribeToEditorSurfaces(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    const selection = this.editorSelection.readSubject();
+    const active = selection?.kind === "svg" ? selection.path : null;
+    return {
+      active,
+      open: active ? [active] : [],
+      truncated: false,
+      ...(selection && { selection }),
+    };
   }
 }

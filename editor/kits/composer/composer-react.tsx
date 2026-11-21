@@ -2,6 +2,7 @@
 
 import type { JSONContent } from "@tiptap/core";
 
+import { Kbd } from "@app/ui/components/kbd";
 import { cn } from "@app/ui/lib/utils";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
@@ -30,6 +31,7 @@ import {
   type ComposerSnapshot,
   type ComposerTrigger,
 } from "./composer-core";
+import { ComposerFormattingMenu } from "./composer-formatting-menu";
 import { ComposerTiptap } from "./composer-tiptap";
 import { ComposerTransfer } from "./composer-transfer";
 import "./composer-content.css";
@@ -207,7 +209,12 @@ export function useComposer() {
         if (editor) {
           ComposerTiptap.syncCore(core, editor);
         }
-        return core.createMessage(input);
+        const message = core.createMessage(input);
+        if (message && editor) {
+          const markdown = ComposerTiptap.formattedMarkdown(editor.state.doc);
+          if (markdown !== undefined) message.meta.markdown = markdown;
+        }
+        return message;
       },
     }),
     [core, editor, snapshot, commandSelection]
@@ -235,12 +242,15 @@ export function ComposerContent({
   onFiles,
   onDirectories,
   readOnly = false,
+  scrollFade = false,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
   autofocus?: boolean;
   /** Keep the mounted document visible while its submission is being confirmed. */
   readOnly?: boolean;
+  /** Fade clipped content when the editor has a constrained height. */
+  scrollFade?: boolean;
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
@@ -289,7 +299,6 @@ export function ComposerContent({
   suggestionRef.current = suggestion;
   const draftChangeRef = useRef(onDraftChange);
   draftChangeRef.current = onDraftChange;
-  const visiblePlaceholder = suggestion?.text ?? placeholder;
   const onTransferRef = useRef(onTransfer);
   onTransferRef.current = onTransfer;
   const onFilesRef = useRef(onFiles);
@@ -310,7 +319,12 @@ export function ComposerContent({
         "aria-autocomplete": "list",
         "aria-controls": resolvedTriggerMenuId,
         "aria-expanded": "false",
-        class: cn("outline-none", editorClassName),
+        class: cn(
+          "outline-none",
+          scrollFade &&
+            "data-[scroll-overflow]:scroll-fade-y scroll-fade-3 [--scroll-fade-reveal:0.75rem]",
+          editorClassName
+        ),
       },
       handleKeyDown(_view, event) {
         return ComposerTiptap.handleKeyDown({
@@ -325,6 +339,10 @@ export function ComposerContent({
           },
           onCommandSelect: commandSelection.current,
         });
+      },
+      handleClick(_view, _position, event) {
+        const current = editorRef.current;
+        return !!current && ComposerTiptap.selectPressedLink(current, event);
       },
       handleDOMEvents: {
         compositionstart() {
@@ -400,6 +418,33 @@ export function ComposerContent({
     editor?.setEditable(!readOnly);
   }, [editor, readOnly]);
 
+  useEffect(() => {
+    if (!editor || !scrollFade) return;
+
+    const viewport = editor.view.dom;
+    let frame = 0;
+    const measureOverflow = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        // Chromium can retain the last mask when a scroll timeline goes idle.
+        viewport.toggleAttribute(
+          "data-scroll-overflow",
+          viewport.scrollHeight > viewport.clientHeight
+        );
+      });
+    };
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(viewport);
+    editor.on("update", measureOverflow);
+    return () => {
+      editor.off("update", measureOverflow);
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      viewport.removeAttribute("data-scroll-overflow");
+    };
+  }, [editor, scrollFade]);
+
   // Keep the placeholder reactive. `useEditor` builds the editor once, so a
   // changed `placeholder` prop never reconfigures the Placeholder extension on
   // its own — the rendered `data-placeholder` would stay frozen at first mount
@@ -412,10 +457,10 @@ export function ComposerContent({
     const ext = editor.extensionManager.extensions.find(
       (e) => e.name === "placeholder"
     );
-    if (!ext || ext.options.placeholder === visiblePlaceholder) return;
-    ext.options.placeholder = visiblePlaceholder;
+    if (!ext || ext.options.placeholder === placeholder) return;
+    ext.options.placeholder = placeholder;
     editor.view.dispatch(editor.state.tr);
-  }, [editor, visiblePlaceholder]);
+  }, [editor, placeholder]);
 
   useEffect(() => {
     if (!editor) return;
@@ -457,11 +502,35 @@ export function ComposerContent({
       data-composer-suggestion={suggestion ? "" : undefined}
     >
       {suggestion && (
-        <kbd aria-hidden="true" className="composer-suggestion-key">
-          Tab
-        </kbd>
+        <div
+          className={cn("composer-suggestion", editorClassName)}
+          aria-hidden="true"
+        >
+          <p
+            className="composer-text-node composer-suggestion-lines"
+            data-suggestion-text={suggestion.text}
+          >
+            <span className="composer-suggestion-inline">
+              <span>{suggestion.text}</span>
+              <Kbd className="ms-1 h-4 border border-current bg-transparent align-middle whitespace-nowrap text-inherit">
+                <span>⇥</span>
+                Tab
+              </Kbd>
+            </span>
+          </p>
+        </div>
       )}
-      <EditorContent editor={editor} />
+      <EditorContent className="composer-editor" editor={editor} />
+      {/* Tiptap moves the menu's DOM. Keep the menu mounted when completion
+          opens or editability changes. */}
+      {editor && (
+        <div className="contents">
+          <ComposerFormattingMenu
+            editor={editor}
+            disabled={readOnly || !!snapshot.trigger}
+          />
+        </div>
+      )}
     </div>
   );
 }

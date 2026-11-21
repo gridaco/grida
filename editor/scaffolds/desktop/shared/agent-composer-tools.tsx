@@ -15,7 +15,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@app/ui/components/popover";
-import { ComposerActionMenu, type ComposerMenuAction } from "@/kits/composer";
+import { cn } from "@app/ui/lib/utils";
+import {
+  ComposerActionMenu,
+  ComposerToolbarTooltip,
+  composerToolbarButtonClassName,
+  type ComposerMenuAction,
+} from "@/kits/composer";
 import {
   ComposerControlSkeleton,
   composerAccessLabelClassName,
@@ -50,7 +56,10 @@ export function AgentComposerTools({
   const label = access?.uncertain ? "Access unknown" : modeLabel;
   return (
     <>
-      <ComposerActionMenu items={actions} />
+      <ComposerActionMenu
+        items={actions}
+        tooltip="Add files or choose a mode"
+      />
       {access?.loading ? (
         <ComposerControlSkeleton kind="access" />
       ) : (
@@ -61,20 +70,30 @@ export function AgentComposerTools({
             if (open) access?.onOpen?.();
           }}
         >
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className={`shrink-0 gap-1 rounded-xl px-1.5 ${full ? "text-amber-600 hover:text-amber-600" : "text-muted-foreground"}`}
-              aria-label={`Access: ${label}`}
-              title={`Access for new messages: ${label}`}
-              disabled={access?.busy}
-            >
-              <AccessIcon className="size-3.5" />
-              <span className={composerAccessLabelClassName}>{label}</span>
-            </Button>
-          </PopoverTrigger>
+          <ComposerToolbarTooltip
+            label={
+              access?.uncertain ? "Check permissions" : "Change permissions"
+            }
+          >
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className={cn(
+                  composerToolbarButtonClassName,
+                  full
+                    ? "text-amber-600 hover:text-amber-600"
+                    : "text-muted-foreground"
+                )}
+                aria-label={`Access: ${label}`}
+                disabled={access?.busy}
+              >
+                <AccessIcon className="size-3.5" />
+                <span className={composerAccessLabelClassName}>{label}</span>
+              </Button>
+            </PopoverTrigger>
+          </ComposerToolbarTooltip>
           <PopoverContent
             side="top"
             align="start"
@@ -182,23 +201,31 @@ export function AgentComposerTools({
         </Popover>
       )}
       {children}
-      {intents.map((intent) => (
-        <button
-          key={intent.id}
-          type="button"
-          disabled={intent.disabled}
-          aria-label={`Remove ${intent.label.toLowerCase()}`}
-          title={`Remove ${intent.label.toLowerCase()}`}
-          onClick={intent.onRemove}
-          className="group/chip flex h-6 shrink-0 items-center gap-1 rounded-xl px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
-        >
-          <span className="group-hover/chip:hidden group-focus-visible/chip:hidden">
-            {intent.icon}
-          </span>
-          <XIcon className="hidden group-hover/chip:block group-focus-visible/chip:block" />
-          {intent.label}
-        </button>
-      ))}
+      {intents.map((intent) => {
+        const label = `Remove ${intent.label.toLowerCase()}`;
+        return (
+          <ComposerToolbarTooltip key={intent.id} label={intent.tooltip}>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={intent.disabled}
+              aria-label={label}
+              onClick={intent.onRemove}
+              className={cn(
+                composerToolbarButtonClassName,
+                "group/chip px-1.5 font-normal text-muted-foreground [&_svg]:size-3.5"
+              )}
+            >
+              <span className="group-hover/chip:hidden group-focus-visible/chip:hidden">
+                {intent.icon}
+              </span>
+              <XIcon className="hidden group-hover/chip:block group-focus-visible/chip:block" />
+              {intent.label}
+            </Button>
+          </ComposerToolbarTooltip>
+        );
+      })}
     </>
   );
 }
@@ -208,6 +235,7 @@ export namespace AgentComposerTools {
     id: string;
     icon: ReactNode;
     label: string;
+    tooltip?: string;
     disabled?: boolean;
     onRemove(): void;
   }>;

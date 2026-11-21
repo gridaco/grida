@@ -1,8 +1,20 @@
+import {
+  isEditorBundleMember,
+  isEditorPath,
+  isEditorSvgPath,
+} from "./native-editor-path";
+import { NativeEditorSelection } from "./native-editor-selection";
+
+type PublishedSelection =
+  | Readonly<{ activeSvg?: string; selection?: never }>
+  | Readonly<{ activeSvg?: never; selection: NativeEditorSelection.Subject }>;
+
 export type NativeEditorSurfaceSnapshot = Readonly<{
   active: string | null;
   open: readonly string[];
   truncated: boolean;
-}>;
+}> &
+  PublishedSelection;
 
 export type NativeEditorSurfaceOpen = Readonly<{
   path: string;
@@ -12,43 +24,97 @@ export type NativeEditorSurfaceOpen = Readonly<{
 
 export namespace NativeEditorSurfaces {
   const MAX_OPEN = 50;
-  const MAX_PATH_BYTES = 4096;
   const MAX_SNAPSHOT_BYTES = 16 * 1024;
   const encoder = new TextEncoder();
+  export const isPath = isEditorPath;
+  export const isSvgPath = isEditorSvgPath;
+  type Selection = string | NativeEditorSelection.Subject;
 
   function bytes(value: string): number {
     return encoder.encode(value).byteLength;
   }
 
-  export function isPath(value: unknown): value is string {
+  function isActiveSvg(active: string | null, svg: unknown): svg is string {
     return (
-      typeof value === "string" &&
-      value.length <= MAX_PATH_BYTES &&
-      value.startsWith("/") &&
-      !value.includes("\0") &&
-      !/[\\\uD800-\uDFFF]/u.test(value) &&
-      value
-        .slice(1)
-        .split("/")
-        .every((part) => part && part !== "." && part !== "..") &&
-      bytes(value) <= MAX_PATH_BYTES
+      isSvgPath(svg) && (svg === active || isEditorBundleMember(active, svg))
     );
+  }
+
+  function isSelectionInView(
+    active: string | null,
+    openCount: number,
+    truncated: boolean,
+    selection: NativeEditorSelection.Subject
+  ): boolean {
+    if (selection.kind === "svg") return isActiveSvg(active, selection.path);
+    const board = selection.placement?.boardPath;
+    if (board === "/") return active === null && openCount === 0 && !truncated;
+    return active === (board ?? selection.path);
+  }
+
+  function snapshotBytes(
+    active: string | null,
+    open: readonly string[],
+    selection?: Selection
+  ): number {
+    return bytes(
+      JSON.stringify(
+        selection === undefined ? [active, open] : [active, open, selection]
+      )
+    );
+  }
+
+  function selectionFields(selection?: Selection): PublishedSelection {
+    if (typeof selection === "string") return { activeSvg: selection };
+    return selection === undefined ? {} : { selection };
   }
 
   /** Keep the active artifact and preserve the order of retained tabs. */
   export function capture(
-    source: Pick<NativeEditorSurfaceSnapshot, "active" | "open">
+    source: Pick<
+      NativeEditorSurfaceSnapshot,
+      "active" | "open" | "activeSvg" | "selection"
+    >
   ): NativeEditorSurfaceSnapshot {
     const active =
-      isPath(source.active) && source.open.includes(source.active)
+      isPath(source.active) &&
+      source.open.includes(source.active) &&
+      snapshotBytes(source.active, [source.active]) <= MAX_SNAPSHOT_BYTES
         ? source.active
         : null;
+    let selection: Selection | undefined;
+    if (source.activeSvg === undefined) {
+      const subject = NativeEditorSelection.subject(source.selection);
+      if (
+        subject &&
+        isSelectionInView(
+          active,
+          source.open.length,
+          source.active !== active,
+          subject
+        )
+      )
+        selection = subject;
+    } else if (
+      source.selection === undefined &&
+      isActiveSvg(active, source.activeSvg)
+    ) {
+      selection = source.activeSvg;
+    }
+    if (
+      snapshotBytes(active, active === null ? [] : [active], selection) >
+      MAX_SNAPSHOT_BYTES
+    )
+      selection = undefined;
     const open: string[] = [];
-    let truncated = source.active !== active;
+    let truncated =
+      source.active !== active ||
+      ((source.activeSvg !== undefined || source.selection !== undefined) &&
+        selection === undefined);
     let reserved = active !== null;
     const itemBytes = (path: string) => bytes(JSON.stringify(path)) + 1;
     // The first list entry does not need a comma.
-    let length = bytes(JSON.stringify([active, []])) - 1;
+    let length = snapshotBytes(active, [], selection) - 1;
     if (active !== null) length += itemBytes(active);
     for (const path of source.open) {
       if (!isPath(path) || open.includes(path)) {
@@ -69,16 +135,25 @@ export namespace NativeEditorSurfaces {
         open.push(path);
       }
     }
-    return { active, open, truncated };
+    return {
+      active,
+      open,
+      truncated,
+      ...selectionFields(selection),
+    };
   }
 
   /** Accept only the bounded presentation projection across the native bridge. */
   export function parse(value: unknown): NativeEditorSurfaceSnapshot | null {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return null;
-    const { active, open, truncated } = value as Record<string, unknown>;
+    const record = value as Record<string, unknown>;
+    const { active, open, truncated } = record;
+    const hasActiveSvg = Object.hasOwn(value, "activeSvg");
+    const hasSelection = Object.hasOwn(value, "selection");
     if (
-      Object.keys(value).length !== 3 ||
+      (hasActiveSvg && hasSelection) ||
+      Object.keys(value).length !== (hasActiveSvg || hasSelection ? 4 : 3) ||
       typeof truncated !== "boolean" ||
       !Array.isArray(open) ||
       open.length > MAX_OPEN
@@ -88,10 +163,30 @@ export namespace NativeEditorSurfaces {
     if (
       !paths.every(isPath) ||
       new Set(paths).size !== paths.length ||
-      (active !== null && (!isPath(active) || !paths.includes(active))) ||
-      bytes(JSON.stringify([active, paths])) > MAX_SNAPSHOT_BYTES
+      (active !== null && (!isPath(active) || !paths.includes(active)))
     )
       return null;
-    return Object.freeze({ active, open: Object.freeze(paths), truncated });
+    let selection: Selection | undefined;
+    if (hasActiveSvg) {
+      const path = record.activeSvg;
+      if (!isActiveSvg(active, path)) return null;
+      selection = path;
+    } else if (hasSelection) {
+      const subject = NativeEditorSelection.subject(record.selection);
+      if (
+        !subject ||
+        !isSelectionInView(active, paths.length, truncated, subject)
+      )
+        return null;
+      selection = subject;
+    }
+    if (snapshotBytes(active, paths, selection) > MAX_SNAPSHOT_BYTES)
+      return null;
+    return Object.freeze({
+      active,
+      open: Object.freeze(paths),
+      truncated,
+      ...selectionFields(selection),
+    });
   }
 }

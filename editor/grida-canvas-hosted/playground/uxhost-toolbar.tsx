@@ -16,11 +16,11 @@ import {
   ToolbarToolType,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar/utils";
 import {
+  DrawingToolbar,
   ToolGroupItem,
   ToolIcon,
   ToolsGroup,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
-import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import { ColorPicker32FWithOptions } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { Toggle, toggleVariants } from "@app/ui/components/toggle";
 import { PaintBucketIcon } from "lucide-react";
@@ -53,171 +53,156 @@ export function PlaygroundToolbar() {
           <BitmapEditModeAuxiliaryToolbar />
         </div>
       )}
-      <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
-        <ToggleGroupPrimitive.Root
-          data-slot="toggle-group"
+      <DrawingToolbar
+        onValueChange={(v) => {
+          editor.surface.surfaceSetTool(
+            toolbar_value_to_cursormode(v as ToolbarToolType)
+          );
+        }}
+        value={value}
+        defaultValue="cursor"
+        type="single"
+      >
+        <ToolsGroup
+          value={value}
+          open={open === "cursor"}
+          onOpenChange={(o) => setOpen(o ? "cursor" : null)}
+          options={[
+            {
+              value: "cursor",
+              label: "Cursor",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.cursor"),
+            },
+            {
+              value: "hand",
+              label: "Hand tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.hand"),
+            },
+            {
+              value: "scale",
+              label: "Scale tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.scale"),
+            },
+          ]}
           onValueChange={(v) => {
             editor.surface.surfaceSetTool(
               toolbar_value_to_cursormode(v as ToolbarToolType)
             );
           }}
+        />
+        <VerticalDivider />
+        <ToolsGroup
           value={value}
-          defaultValue="cursor"
-          type="single"
-          className="flex items-center justify-center gap-1"
+          open={open === "container"}
+          onOpenChange={(o) => setOpen(o ? "container" : null)}
+          options={[
+            {
+              value: "container",
+              label: "Container",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.container"
+              ),
+            },
+            {
+              value: "tray",
+              label: "Tray",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.tray"),
+            },
+          ]}
+          onValueChange={(v) => {
+            editor.surface.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
+          }}
+        />
+        <ToolGroupItem
+          value={"text" satisfies ToolbarToolType}
+          label="Text tool"
+          shortcut={keyboardShortcutText("workbench.surface.cursor.text")}
         >
-          <ToolsGroup
-            value={value}
-            open={open === "cursor"}
-            onOpenChange={(o) => setOpen(o ? "cursor" : null)}
-            options={[
-              {
-                value: "cursor",
-                label: "Cursor",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.cursor"
-                ),
-              },
-              {
-                value: "hand",
-                label: "Hand tool",
-                shortcut: keyboardShortcutText("workbench.surface.cursor.hand"),
-              },
-              {
-                value: "scale",
-                label: "Scale tool",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.scale"
-                ),
-              },
-            ]}
-            onValueChange={(v) => {
-              editor.surface.surfaceSetTool(
-                toolbar_value_to_cursormode(v as ToolbarToolType)
-              );
-            }}
-          />
-          <VerticalDivider />
-          <ToolsGroup
-            value={value}
-            open={open === "container"}
-            onOpenChange={(o) => setOpen(o ? "container" : null)}
-            options={[
-              {
-                value: "container",
-                label: "Container",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.container"
-                ),
-              },
-              {
-                value: "tray",
-                label: "Tray",
-                shortcut: keyboardShortcutText("workbench.surface.cursor.tray"),
-              },
-            ]}
-            onValueChange={(v) => {
-              editor.surface.surfaceSetTool(
-                toolbar_value_to_cursormode(v as ToolbarToolType)
-              );
-            }}
-          />
-          <ToolGroupItem
-            value={"text" satisfies ToolbarToolType}
-            label="Text tool"
-            shortcut={keyboardShortcutText("workbench.surface.cursor.text")}
-          >
-            <ToolIcon type="text" />
-          </ToolGroupItem>
-          <ToolsGroup
-            value={value}
-            open={open === "shape"}
-            onOpenChange={(o) => setOpen(o ? "shape" : null)}
-            options={[
-              {
-                value: "rectangle",
-                label: "Rectangle",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.rectangle"
-                ),
-              },
-              {
-                value: "ellipse",
-                label: "Ellipse",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.ellipse"
-                ),
-              },
-              {
-                value: "line",
-                label: "Line",
-                shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
-              },
-              {
-                value: "arrow",
-                label: "Arrow",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.arrow"
-                ),
-              },
-              {
-                value: "polygon",
-                label: "Polygon",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.polygon"
-                ),
-              },
-              { value: "star", label: "Star" },
-              { value: "image", label: "Image" },
-            ]}
-            onValueChange={(v) => {
-              editor.surface.surfaceSetTool(
-                toolbar_value_to_cursormode(v as ToolbarToolType)
-              );
-            }}
-          />
-          <ToolsGroup
-            value={value}
-            open={open === "draw"}
-            onOpenChange={(o) => setOpen(o ? "draw" : null)}
-            options={[
-              {
-                value: "pencil",
-                label: "Pencil tool",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.pencil"
-                ),
-              },
-              {
-                value: "path",
-                label: "Path tool",
-                shortcut: keyboardShortcutText("workbench.surface.cursor.path"),
-              },
-              {
-                value: "brush",
-                label: "Brush tool",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.brush"
-                ),
-              },
-              {
-                value: "eraser",
-                label: "Eraser tool",
-                shortcut: keyboardShortcutText(
-                  "workbench.surface.cursor.eraser"
-                ),
-              },
-            ]}
-            onValueChange={(v) => {
-              editor.surface.surfaceSetTool(
-                toolbar_value_to_cursormode(v as ToolbarToolType)
-              );
-            }}
-          />
-          <VerticalDivider />
-          <ClipboardColor />
-          {/* <VerticalDivider /> */}
-          {/* <Popover>
+          <ToolIcon type="text" />
+        </ToolGroupItem>
+        <ToolsGroup
+          value={value}
+          open={open === "shape"}
+          onOpenChange={(o) => setOpen(o ? "shape" : null)}
+          options={[
+            {
+              value: "rectangle",
+              label: "Rectangle",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.rectangle"
+              ),
+            },
+            {
+              value: "ellipse",
+              label: "Ellipse",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.ellipse"
+              ),
+            },
+            {
+              value: "line",
+              label: "Line",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.line"),
+            },
+            {
+              value: "arrow",
+              label: "Arrow",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.arrow"),
+            },
+            {
+              value: "polygon",
+              label: "Polygon",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.polygon"
+              ),
+            },
+            { value: "star", label: "Star" },
+            { value: "image", label: "Image" },
+          ]}
+          onValueChange={(v) => {
+            editor.surface.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
+          }}
+        />
+        <ToolsGroup
+          value={value}
+          open={open === "draw"}
+          onOpenChange={(o) => setOpen(o ? "draw" : null)}
+          options={[
+            {
+              value: "pencil",
+              label: "Pencil tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.pencil"),
+            },
+            {
+              value: "path",
+              label: "Path tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.path"),
+            },
+            {
+              value: "brush",
+              label: "Brush tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.brush"),
+            },
+            {
+              value: "eraser",
+              label: "Eraser tool",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.eraser"),
+            },
+          ]}
+          onValueChange={(v) => {
+            editor.surface.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
+          }}
+        />
+        <VerticalDivider />
+        <ClipboardColor />
+        {/* <VerticalDivider /> */}
+        {/* <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" className="px-3">
                 <OpenAILogo className="size-4" />
@@ -232,11 +217,10 @@ export function PlaygroundToolbar() {
               <Generate />
             </PopoverContent>
           </Popover> */}
-          {/* <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
+        {/* <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
             <MixIcon />
           </Button> */}
-        </ToggleGroupPrimitive.Root>
-      </div>
+      </DrawingToolbar>
     </div>
   );
 }

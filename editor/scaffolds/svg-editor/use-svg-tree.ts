@@ -9,9 +9,7 @@ import {
 } from "@grida/tree-view";
 import { useSvgEditor } from "@grida/svg-editor/react";
 import type { SvgEditor } from "@grida/svg-editor";
-import { tagLabel } from "./node-type-map";
-
-const TAG_LABEL_RESOLVER = (tag: string) => tagLabel(tag);
+import { svgTagLabel } from "@/lib/svg-tag-label";
 
 export type SvgNodeMeta = {
   tag: string;
@@ -29,8 +27,8 @@ export type SvgNodeMeta = {
  *   writes don't invalidate it.
  * - `subscribe` filters editor emissions down to structure changes for
  *   the same reason.
- * - `getLabel` reuses the editor's `display_label` (with our local
- *   `tagLabel` map for friendlier names).
+ * - `getLabel` reuses the editor's `display_label` with the shared SVG tag
+ *   names.
  *
  * `getNode` adapts the editor's TreeNode shape (`{tag, name, parent,
  * children}`) into the tree-view shape (`{parent, children, meta}`)
@@ -81,7 +79,7 @@ class SvgTreeSource implements TreeSource<SvgNodeMeta> {
   }
 
   getLabel(id: NodeId): string {
-    return this.editor.display_label(id, { tagLabel: TAG_LABEL_RESOLVER });
+    return this.editor.display_label(id, { tagLabel: svgTagLabel });
   }
 
   showRoot(): boolean {

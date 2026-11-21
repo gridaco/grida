@@ -64,9 +64,9 @@ import {
 import {
   useSvgTreeController,
   type SvgNodeMeta,
-} from "@/app/(canvas)/svg/_components/use-svg-tree";
-import { useSurfaceHover } from "@/app/(canvas)/svg/_components/use-surface-hover";
-import { tagInfo } from "@/app/(canvas)/svg/_components/node-type-map";
+} from "@/scaffolds/svg-editor/use-svg-tree";
+import { useSurfaceHover } from "@/scaffolds/svg-editor/use-surface-hover";
+import { tagIcon } from "@/scaffolds/svg-editor/node-type-map";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Section scaffold — one consistent header + a tree | gap | editor grid so
@@ -361,7 +361,7 @@ function SvgRow({ args, tone }: { args: RenderRowArgs; tone: SvgRowTone }) {
   const hoverId = useSurfaceHover();
   const setHover = useHoverOverride();
   const hovered = hoverId === row.id;
-  const Icon = tagInfo(meta?.tag ?? "").Icon;
+  const Icon = tagIcon(meta?.tag ?? "");
 
   let state: "selected" | "focused" | "hovered" | "idle" = "idle";
   if (selected) state = "selected";

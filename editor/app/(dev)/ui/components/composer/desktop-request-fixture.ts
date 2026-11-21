@@ -1,5 +1,5 @@
-/** A manually settled acknowledgement for inspecting the production send state. */
-export class DesktopSubmissionFixture {
+/** Holds a fixture bridge request until the example supplies its outcome. */
+export class DesktopRequestFixture {
   private listeners = new Set<() => void>();
   private view = { hold: false, pending: false };
   private settlement?: { resolve(): void; reject(reason: Error): void };
@@ -13,7 +13,8 @@ export class DesktopSubmissionFixture {
 
   wait(): Promise<void> {
     if (!this.view.hold) return Promise.resolve();
-    if (this.settlement) return Promise.reject(new Error("Already sending"));
+    if (this.settlement)
+      return Promise.reject(new Error("Fixture request already pending"));
     const promise = new Promise<void>((resolve, reject) => {
       this.settlement = { resolve, reject };
     });
@@ -31,7 +32,7 @@ export class DesktopSubmissionFixture {
     const pending = this.settlement;
     this.settlement = undefined;
     this.update({ pending: false });
-    pending?.reject(new Error("Fixture submission refused"));
+    pending?.reject(new Error("Fixture request refused"));
   };
   reset(): void {
     this.refuse();

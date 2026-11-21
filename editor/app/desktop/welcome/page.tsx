@@ -1024,6 +1024,7 @@ function WelcomeSurface({
                             {
                               id: preset,
                               label: presetSpec.label,
+                              tooltip: presetSpec.composerTooltip,
                               icon: <PresetIcon />,
                               disabled: busy,
                               onRemove: () =>

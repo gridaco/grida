@@ -75,6 +75,7 @@ export function AgentComposer({
       id: "plan",
       icon: <ListChecksIcon />,
       label: "Plan",
+      tooltip: "Plan before making changes",
       disabled: actions.plan.disabled,
       onRemove: () => actions.plan?.onChange(false),
     });
@@ -83,6 +84,7 @@ export function AgentComposer({
       id: "goal",
       icon: <GoalIcon />,
       label: "Goal",
+      tooltip: "Keep working toward a goal",
       // Entry can be unavailable while removing the selected intent stays valid.
       disabled: actions.goal.removeDisabled,
       onRemove: () => actions.goal?.onChange(false),

@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import type {
-  NativeEditorSvgSelection,
+  NativeEditorSelection,
   NativeEditorSvgText,
 } from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
@@ -105,43 +105,10 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         stateDirectory: path.join(root, "state"),
         cwd,
       });
-      const project = "eac20941e6a410aa";
       const deck = surface !== "workbench";
-      const nested = surface === "nested deck";
-      const workspaceId = nested ? "deck-fixture" : project;
-      const identity = { device: "1", inode: "2", birthTimeNs: "3" };
-      const active = { workspaceId, chat, directoryIdentity: identity };
-      const grant = { workspaceId, root: cwd, identity, protected: [] };
-      const ipc = new NativeChatIpc(
-        origin,
-        () => active,
-        deck ? { admits: () => true, ensure: async () => {} } : undefined,
-        undefined,
-        undefined,
-        undefined,
-        async () => grant,
-        false,
-        undefined,
-        nested
-          ? {
-              grant: async () => ({
-                ...grant,
-                parentWorkspaceId: project,
-                parentIdentity: identity,
-              }),
-              current: () => active,
-              ensure: async () => {},
-              close: async () => {},
-            }
-          : undefined
-      );
-      const fileRoute = `${origin}/desktop/file?id=${project}`;
+      const { ipc, url } = svgChatFixture(chat, cwd, surface);
       const frame = {
-        url: deck
-          ? nested
-            ? `${fileRoute}&path=decks%2FLaunch.canvas`
-            : fileRoute
-          : `${origin}/desktop/workspace?id=${project}`,
+        url,
         send(channel: string, request: (typeof delivered)[number]) {
           if (channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT) return;
           delivered.push(request);
@@ -348,19 +315,125 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
   20_000
 );
 
-it.runIf(Boolean(resources))(
-  "offers arbitrary SVG selection through the built native catalog and delivers one opacity edit",
-  async () => {
+it.runIf(Boolean(resources)).each([
+  {
+    name: "legacy SVG",
+    frame: "workbench",
+    kind: "legacy",
+    tab: "/poster.svg",
+    path: "/poster.svg",
+  },
+  {
+    name: "workbench slide",
+    frame: "workbench",
+    kind: "svg",
+    tab: "/talk.canvas",
+    path: "/talk.canvas/intro.svg",
+  },
+  {
+    name: "root deck slide",
+    frame: "root deck",
+    kind: "svg",
+    tab: "/poster.svg",
+    path: "/poster.svg",
+  },
+  {
+    name: "nested deck slide",
+    frame: "nested deck",
+    kind: "svg",
+    tab: "/poster.svg",
+    path: "/poster.svg",
+  },
+  {
+    name: "workbench board",
+    frame: "workbench",
+    kind: "document",
+    tab: "/art.canvas",
+    path: "/art.canvas/hero.svg",
+  },
+  {
+    name: "registered root board",
+    frame: "root deck",
+    kind: "document",
+    tab: null,
+    path: "/hero.svg",
+  },
+  {
+    name: "registered nested board",
+    frame: "nested deck",
+    kind: "document",
+    tab: null,
+    path: "/hero.svg",
+  },
+] as const)(
+  "dispatches one captured SVG selection through the built native catalog for $name",
+  async ({ frame: route, kind, tab, path: pathInView }) => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-svg-selection-")
     );
     const cwd = path.join(root, "workspace");
     await fs.mkdir(cwd, { mode: 0o700 });
     const targetId = randomUUID();
-    const pathInView = "/poster.svg";
+    const fileWindow = route !== "workbench";
+    const placement = { boardPath: tab ?? "/", pinId: "hero" };
+    const subject: NativeEditorSelection.Subject =
+      kind === "document"
+        ? { kind: "document", path: pathInView, placement }
+        : { kind: "svg", path: pathInView };
+    const targets =
+      kind === "svg"
+        ? [{ kind: "element", elementPath: [0], tag: "text" } as const]
+        : [
+            { kind: "element", elementPath: [0], tag: "rect" } as const,
+            { kind: "element", elementPath: [1], tag: "g" } as const,
+          ];
+    const inspection: NativeEditorSelection.Inspection = {
+      kind: "inspection",
+      path: pathInView,
+      revision: targetId,
+      nextCursor: null,
+      ...(kind === "document"
+        ? {
+            mode: "document",
+            total: 1,
+            targets: [
+              { kind: "document", placement: { ...placement, layout: null } },
+            ],
+          }
+        : { mode: "objects", total: targets.length, targets }),
+    };
+    const steps = [
+      { name: INSPECT, action: { kind: "inspect" }, args: {} },
+      ...(kind === "svg"
+        ? [
+            { name: READ, action: { kind: "read-text" }, args: {} },
+            {
+              name: REPLACE,
+              action: {
+                kind: "replace-text",
+                revision: targetId,
+                text: "Revised",
+              },
+              args: { revision: targetId, text: "Revised" },
+            },
+          ]
+        : kind === "legacy"
+          ? [
+              {
+                name: OPACITY,
+                action: {
+                  kind: "set-opacity",
+                  revision: targetId,
+                  opacity: 0.5,
+                },
+                args: { revision: targetId, opacity: 0.5 },
+              },
+            ]
+          : []),
+    ];
     const offered: string[][] = [];
     const toolResults: unknown[] = [];
-    const delivered: NativeEditorSvgSelection.Operation[] = [];
+    const delivered: NativeEditorSelection.Operation[] = [];
     const connection = await NativeGatewayConnection.open({
       origin,
       account: {
@@ -389,23 +462,11 @@ it.runIf(Boolean(resources))(
               )
           );
           if (offered.length === 1)
-            return tool(
-              SEARCH,
-              { query: "SVG selection opacity" },
-              "find-selection"
-            );
-          if (offered.length === 2)
-            return tool(INSPECT, {}, "inspect-selection");
-          if (offered.length === 3)
-            return tool(
-              OPACITY,
-              { revision: targetId, opacity: 0.5 },
-              "change-opacity"
-            );
-          return stream(
-            { content: "The selection is now at 50% opacity." },
-            "stop"
-          );
+            return tool(SEARCH, { query: "SVG selection" }, "find-selection");
+          const step = steps[offered.length - 2];
+          if (step)
+            return tool(step.name, step.args, `editor-${step.action.kind}`);
+          return stream({ content: "The selection was handled." }, "stop");
         },
       },
     });
@@ -418,46 +479,40 @@ it.runIf(Boolean(resources))(
         cwd,
       });
       expect(chat.acceptsEditorToolContext).toBe(true);
-      const project = "eac20941e6a410aa";
-      const active = {
-        workspaceId: project,
-        chat,
-        directoryIdentity: { device: "1", inode: "2", birthTimeNs: "3" },
-      };
-      const ipc = new NativeChatIpc(origin, () => active);
+      const { ipc, url } = svgChatFixture(chat, cwd, route);
       const frame = {
-        url: `${origin}/desktop/workspace?id=${project}`,
+        url,
         send(
           channel: string,
-          request: NativeEditorSvgSelection.Request & {
+          request: NativeEditorSelection.Request & {
             attachmentId: string;
             callId: string;
           }
         ) {
           if (channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION) return;
           expect(request.targetId).toBe(targetId);
+          expect(request.path).toBe(pathInView);
+          expect(request.subject).toEqual(subject);
           delivered.push(request.operation);
-          const result: NativeEditorSvgSelection.Result =
+          const result: NativeEditorSelection.Result =
             request.operation.kind === "inspect"
-              ? {
-                  kind: "inspection",
-                  path: pathInView,
-                  revision: targetId,
-                  mode: "objects",
-                  total: 2,
-                  targets: [
-                    { kind: "element", elementPath: [0], tag: "rect" },
-                    { kind: "element", elementPath: [1], tag: "g" },
-                  ],
-                  nextCursor: null,
-                }
-              : { kind: "applied", path: pathInView, saved: false };
-          ipc.replyEditorSvgSelection(
-            event,
-            request.attachmentId,
-            request.callId,
-            result
-          );
+              ? inspection
+              : request.operation.kind === "read-text"
+                ? {
+                    kind: "text",
+                    path: pathInView,
+                    revision: targetId,
+                    text: "Original",
+                  }
+                : { kind: "applied", path: pathInView, saved: false };
+          void onRoute(() =>
+            ipc.replyEditorSvgSelection(
+              event,
+              request.attachmentId,
+              request.callId,
+              result
+            )
+          ).catch(() => {});
         },
       };
       const contents = Object.assign(new EventEmitter(), {
@@ -469,30 +524,53 @@ it.runIf(Boolean(resources))(
         sender: contents,
         senderFrame: frame,
       } as unknown as IpcMainInvokeEvent;
-      const attachment = await ipc.create(event);
+      const onRoute = async <T>(invoke: () => T) =>
+        fileWindow ? await ipc.deckRequest(event, invoke) : await invoke();
+      const attachment = await onRoute(() => ipc.create(event));
       const id = attachment.attachmentId;
-      ipc.publishEditorSurfaces(event, id, {
-        active: pathInView,
-        open: [pathInView],
-        truncated: false,
-      });
+      /* eslint-disable jest/no-conditional-expect -- Each surface has different supported operations. */
+      if (!fileWindow && subject.kind === "document") {
+        expect(() =>
+          ipc.publishEditorSurfaces(event, id, {
+            active: null,
+            open: [],
+            truncated: false,
+            selection: {
+              ...subject,
+              placement: { boardPath: "/", pinId: "hero" },
+            },
+          })
+        ).toThrow("native_chat_editor_surfaces_invalid");
+      }
+      await onRoute(() =>
+        ipc.publishEditorSurfaces(event, id, {
+          active: tab,
+          open: tab ? [tab] : [],
+          truncated: false,
+          ...(kind !== "legacy" && { selection: subject }),
+        })
+      );
       const send = (capture?: string) =>
-        ipc.submit(
-          event,
-          id,
-          "selection-fixture",
-          "Change this selection.",
-          "act",
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          capture
+        onRoute(() =>
+          ipc.submit(
+            event,
+            id,
+            "selection-fixture",
+            "Inspect this selection.",
+            "act",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            capture && kind !== "legacy"
+              ? { targetId: capture, subject }
+              : capture
+          )
         );
       const receipt = await send(targetId);
       await vi.waitFor(
         async () => {
-          const { snapshot } = await ipc.observe(event, id);
+          const { snapshot } = await onRoute(() => ipc.observe(event, id));
           expect(snapshot.latest).toMatchObject({
             turnId: receipt.turnId,
             status: "succeeded",
@@ -500,38 +578,53 @@ it.runIf(Boolean(resources))(
         },
         { timeout: 6000 }
       );
-      expect(offered).toHaveLength(4);
+      expect(offered).toHaveLength(steps.length + 2);
       expect(offered[0]).toContain(SEARCH);
       expect(offered[0]).not.toContain(INSPECT);
       expect(offered[0]).not.toContain(OPACITY);
-      expect(offered[1]).toEqual(expect.arrayContaining([INSPECT, OPACITY]));
-      expect(offered.flat()).not.toContain(READ);
-      expect(offered.flat()).not.toContain(REPLACE);
-      expect(delivered).toEqual([
-        { kind: "inspect" },
-        { kind: "set-opacity", revision: targetId, opacity: 0.5 },
-      ]);
-      expect(toolResults).toEqual(
-        expect.arrayContaining([
+      expect(offered[1]).toContain(INSPECT);
+      if (kind === "document") expect(offered.flat()).not.toContain(OPACITY);
+      else expect(offered[1]).toContain(OPACITY);
+      const expectedOperations = steps.map(({ action }) => action);
+      if (kind === "svg") {
+        expect(offered[1]).toEqual(expect.arrayContaining([READ, REPLACE]));
+        expect(toolResults).toContainEqual(
           expect.objectContaining({
             status: "succeeded",
-            structured: expect.objectContaining({
-              kind: "inspection",
+            structured: {
+              kind: "read",
+              path: pathInView,
               revision: targetId,
-              total: 2,
-            }),
-          }),
+              text: "Original",
+            },
+          })
+        );
+      } else {
+        expect(offered.flat()).not.toContain(READ);
+        expect(offered.flat()).not.toContain(REPLACE);
+      }
+      expect(delivered).toEqual(expectedOperations);
+      expect(toolResults).toContainEqual(
+        expect.objectContaining({
+          status: "succeeded",
+          structured: inspection,
+        })
+      );
+      if (kind !== "document")
+        expect(toolResults).toContainEqual(
           expect.objectContaining({
             status: "succeeded",
             structured: { kind: "applied", path: pathInView, saved: false },
-          }),
-        ])
-      );
-      expect((await ipc.transcriptPage(event, id)).messages).toEqual(
+          })
+        );
+      /* eslint-enable jest/no-conditional-expect */
+      expect(
+        (await onRoute(() => ipc.transcriptPage(event, id))).messages
+      ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             role: "user",
-            text: "Change this selection.",
+            text: "Inspect this selection.",
             svgSelection: true,
           }),
         ])
@@ -546,7 +639,7 @@ it.runIf(Boolean(resources))(
       await expect(send()).rejects.toThrow(
         "submission_editor_tool_context_changed"
       );
-      expect(delivered).toHaveLength(2);
+      expect(delivered).toEqual(expectedOperations);
     } finally {
       try {
         await chat?.close();
@@ -558,6 +651,43 @@ it.runIf(Boolean(resources))(
   },
   20_000
 );
+
+function svgChatFixture(chat: NativeAgentChat, cwd: string, surface: string) {
+  const project = "eac20941e6a410aa";
+  const deck = surface !== "workbench";
+  const nested = surface === "nested deck";
+  const workspaceId = nested ? "deck-fixture" : project;
+  const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+  const active = { workspaceId, chat, directoryIdentity: identity };
+  const grant = { workspaceId, root: cwd, identity, protected: [] };
+  const ipc = new NativeChatIpc(
+    origin,
+    () => active,
+    deck ? { admits: () => true, ensure: async () => {} } : undefined,
+    undefined,
+    undefined,
+    undefined,
+    async () => grant,
+    false,
+    undefined,
+    nested
+      ? {
+          grant: async () => ({
+            ...grant,
+            parentWorkspaceId: project,
+            parentIdentity: identity,
+          }),
+          current: () => active,
+          ensure: async () => {},
+          close: async () => {},
+        }
+      : undefined
+  );
+  const url = deck
+    ? `${origin}/desktop/file?id=${project}${nested ? "&path=decks%2FLaunch.canvas" : ""}`
+    : `${origin}/desktop/workspace?id=${project}`;
+  return { ipc, url };
+}
 
 function tool(name: string, arguments_: object, id: string): Response {
   return stream(

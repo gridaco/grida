@@ -1,0 +1,8 @@
+.contentInset {
+  --chat-centering-inset: calc((100% - 48rem) / 2);
+  padding-inline-start: max(1rem, var(--chat-centering-inset));
+  padding-inline-end: max(
+    var(--chat-content-end-inset, 1rem),
+    var(--chat-centering-inset)
+  );
+}
