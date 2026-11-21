@@ -751,6 +751,8 @@ export class DesktopChatFixture {
         (question) => question.reviewId === reviewId
       );
       if (!question) throw new Error("question_no_longer_answerable");
+      if ("questions" in question || answer.kind === "batch")
+        throw new Error("fixture_only_supports_single_questions");
       this.questions = this.questions.filter((entry) => entry !== question);
       if (answer.kind === "skipped" && question.style === "answer_dependent")
         return this.finishRequest(

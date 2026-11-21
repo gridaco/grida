@@ -105,18 +105,20 @@ write-in, and actions stay in view. The write-in starts on one line and grows as
 the answer wraps. The prompt stack can scroll if several open questions exceed
 the pane's available height.
 A required question waits for an answer or an explicit skip. An optional
-question allows independent work to continue. Close and Skip return it to an
-**Answer question** button in the transcript. The person can reopen their
-draft until the question is answered or the turn ends. Earlier hosts keep
-their explicit skip behavior.
+question allows independent work to continue. Close returns it to an
+**Answer question** action in the transcript. The person can reopen their
+draft until the question is answered or the turn ends. Single optional
+questions also offer Skip to close the card.
 
 `QuestionPrompt` owns its in-progress form selections (the same kind of
 transient UI state as the collapsibles); the **committed** answer leaves through
 `onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
 the agent. `submitDisabled` gates the submission while the surface refreshes
-the review. Draft controls stay editable. Within the card, keys 1–9 select
-numbered choices. Enter on a choice or in the custom field invokes Next or
-Submit when the answer is ready. Shift+Enter inserts a line break in the
+the review. In a batch, Back and Next preserve each draft and stay available
+while the review refreshes. Submit confirms skipping any unanswered questions
+before sending the batch. An optional batch can be submitted from any step.
+Within the card, keys 1–9 select numbered choices. Enter on a choice or in the
+custom field invokes Next or Submit. Shift+Enter inserts a line break in the
 custom field. The kit never touches the transport. A native reply displays the
 host-attributed question above the person's answer in one bubble. The finished turn's **Worked**
 disclosure contains the reply. Survey-shaped tool outputs keep their

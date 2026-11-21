@@ -256,6 +256,7 @@ impl Host {
                     selection_revision: None,
                     selection_goal: false,
                     questions: false,
+                    question_batches: false,
                     allow_wakeups: false,
                     allow_library_selection: false,
                     allow_host_tools: false,

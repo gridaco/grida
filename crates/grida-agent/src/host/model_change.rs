@@ -226,6 +226,7 @@ mod tests {
                 text: "Retain this work".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: None,

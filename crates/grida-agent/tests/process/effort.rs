@@ -379,7 +379,11 @@ async fn stopping_suspended_ultra_does_not_require_live_review_tools() {
     let root = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
     let state = root.path().join("state");
-    let mut endpoint = Endpoint::start(vec![Reply::Question("question")]).await;
+    let mut endpoint = Endpoint::start(vec![Reply::Tool(
+        "question",
+        super::questions::EDITION_QUESTION,
+    )])
+    .await;
     let mut command = executable();
     command.arg("run");
     configured(&mut command, &state, &endpoint.url);

@@ -10,6 +10,7 @@ use agent_kit_core::messages::{
 use agent_kit_core::turn::{OperationOutcome, TurnBinding, TurnState};
 use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
+use grida_agent_master::questions::QuestionReply;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -90,6 +91,12 @@ pub(super) fn publish_lifecycle(
 }
 
 #[derive(Clone)]
+pub(crate) enum LiveTextKind {
+    Assistant(Vec<UrlCitation>),
+    QuestionReply(Vec<QuestionReply>),
+}
+
+#[derive(Clone)]
 pub(crate) struct LiveText {
     pub session: SessionId,
     pub turn: TurnId,
@@ -97,7 +104,7 @@ pub(crate) struct LiveText {
     pub offset: usize,
     pub replace: bool,
     pub text: Arc<str>,
-    pub citations: Vec<UrlCitation>,
+    pub kind: LiveTextKind,
 }
 
 pub(super) struct Publisher {
@@ -281,7 +288,7 @@ impl Publisher {
             offset,
             replace,
             text: Arc::from(text),
-            citations,
+            kind: LiveTextKind::Assistant(citations),
         }));
     }
 }

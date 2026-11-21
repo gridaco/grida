@@ -20,6 +20,7 @@ use agent_kit_core::{ChangeId, MessageId};
 use agent_kit_runtime::TurnUpdate;
 use agent_kit_store_sqlite::history::{ReplayCursor, ReplayRecord, ReplayTurn};
 use grida_agent_master::activity::{self, ActivityKind};
+use grida_agent_master::questions::QuestionReply;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::borrow::Cow;
@@ -213,14 +214,8 @@ impl Projection {
                 });
             }
             let mut text_meta = meta.clone();
-            let text: String =
-                if let Some(reply) = grida_agent_master::questions::visible_reply(&message) {
-                    text_meta["questionReply"] =
-                        json!({ "waitId": reply.question_item_id, "question": reply.question });
-                    reply.answer
-                } else {
-                    visible_parts(&message).collect()
-                };
+            let text = question_text(&message, &mut text_meta)
+                .unwrap_or_else(|| visible_parts(&message).collect());
             if message.role == Role::User
                 && turn.is_some()
                 && input_facts.svg_text_selections.contains(&message.id)
@@ -369,17 +364,16 @@ impl Projection {
         {
             return Ok(());
         }
-        let text: String = grida_agent_master::questions::visible_reply(&message)
-            .map(|reply| reply.answer)
-            .unwrap_or_else(|| visible_parts(&message).collect());
+        let mut question_meta = json!({});
+        let question_text = question_text(&message, &mut question_meta);
+        let has_question = question_text.is_some();
+        let text: String = question_text.unwrap_or_else(|| visible_parts(&message).collect());
         let suffix = if let Some(prefix) = self.streamed_text.remove(&message.id) {
             text.strip_prefix(&prefix)
                 .ok_or_else(|| unavailable("session_message_projection_conflict"))?
         } else {
             &text
         };
-        self.chunk(connection, delivery, message.role, &message.id, suffix)
-            .await?;
         let mut meta = self
             .replay_id
             .as_ref()
@@ -390,6 +384,31 @@ impl Projection {
                 fact["turnId"] = json!(turn);
             }
             self.stamp(fact, self.turn.as_ref(), Some(&message.id), None);
+        }
+        if has_question && let Some(fact) = &meta {
+            let mut text_fact = fact.clone();
+            text_fact
+                .as_object_mut()
+                .expect("object metadata")
+                .append(question_meta.as_object_mut().expect("object metadata"));
+            let metadata = self.metadata(
+                self.replay_id
+                    .as_ref()
+                    .map(|_| (TRANSCRIPT_WINDOW, text_fact.clone())),
+                &text_fact,
+            );
+            self.chunk_with(
+                connection,
+                delivery,
+                message.role,
+                &message.id,
+                suffix,
+                metadata,
+            )
+            .await?;
+        } else {
+            self.chunk(connection, delivery, message.role, &message.id, suffix)
+                .await?;
         }
         self.attachments(connection, delivery, &message, meta.as_ref())
             .await?;
@@ -504,6 +523,11 @@ impl Projection {
                 }
                 has_display_parts = false;
             }
+            for key in [TRANSCRIPT_WINDOW, ACTIVITY_ORDER] {
+                if let Some(Value::Object(facts)) = metadata.get_mut(key) {
+                    facts.remove("questionReplies");
+                }
+            }
             text = remaining;
         }
         Ok(())
@@ -550,6 +574,38 @@ impl Projection {
         }
         Ok(())
     }
+}
+
+fn question_text(message: &Message, metadata: &mut Value) -> Option<String> {
+    let replies = grida_agent_master::questions::visible_replies(message)?;
+    if let [reply] = replies.as_slice()
+        && reply.question_id.is_none()
+    {
+        metadata["questionReply"] =
+            json!({"waitId": reply.question_item_id, "question": reply.question});
+        return Some(reply.answer.clone());
+    }
+    metadata["questionReplies"] = question_replies_metadata(&replies);
+    Some(crate::host::question_reply_text(&replies))
+}
+
+pub(super) fn question_replies_metadata(replies: &[QuestionReply]) -> Value {
+    let entries = replies
+        .iter()
+        .map(|reply| {
+            let mut entry = json!({
+                "waitId": reply.question_item_id,
+                "id": reply.question_id,
+                "question": reply.question,
+                "answer": reply.answer,
+            });
+            if reply.skipped {
+                entry["skipped"] = true.into();
+            }
+            entry
+        })
+        .collect::<Vec<_>>();
+    json!(entries)
 }
 
 /// Recorded tool calls and results are displayed as activity, so they occupy

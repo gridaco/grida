@@ -27,6 +27,7 @@ import {
   type Ref,
 } from "react";
 import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import type { NativeChatQuestionReply } from "@grida/desktop-bridge";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
@@ -150,6 +151,24 @@ export type ChatMessageActions = {
   hidden?: boolean;
 };
 
+function isQuestionBatchReply(
+  value: unknown
+): value is NativeChatQuestionReply {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "waitId" in value &&
+    typeof value.waitId === "string" &&
+    "question" in value &&
+    typeof value.question === "string" &&
+    "answer" in value &&
+    typeof value.answer === "string" &&
+    (!("skipped" in value) || value.skipped === true)
+  );
+}
+
 export function ChatMessageView({
   ref,
   message,
@@ -190,6 +209,13 @@ export function ChatMessageView({
     const questionReply = message.parts.find(
       (part) => part.type === chat_vocabulary.CONTEXT_PARTS.questionReply
     );
+    const questionReplyData =
+      questionReply && "data" in questionReply ? questionReply.data : undefined;
+    const questionReplies =
+      Array.isArray(questionReplyData) &&
+      questionReplyData.every(isQuestionBatchReply)
+        ? questionReplyData
+        : undefined;
     const svgTextSelection = message.parts.some(
       (part) =>
         part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
@@ -244,21 +270,44 @@ export function ChatMessageView({
               role="group"
               aria-label="Message text"
             >
-              {questionReply &&
-                "data" in questionReply &&
-                typeof questionReply.data === "string" && (
-                  <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
-                    {questionReply.data}
-                  </blockquote>
-                )}
               <CollapsibleBubbleBody>
-                <MessageResponse
-                  plugins={markdown.plugins}
-                  rehypePlugins={markdown.rehypePlugins}
-                  components={markdown.components}
-                >
-                  {text}
-                </MessageResponse>
+                {questionReplies ? (
+                  <div className="space-y-3">
+                    {questionReplies.map((reply) => (
+                      <div key={reply.id}>
+                        <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                          {reply.question}
+                        </blockquote>
+                        {reply.skipped ? (
+                          <span className="text-muted-foreground">Skipped</span>
+                        ) : (
+                          <MessageResponse
+                            plugins={markdown.plugins}
+                            rehypePlugins={markdown.rehypePlugins}
+                            components={markdown.components}
+                          >
+                            {reply.answer}
+                          </MessageResponse>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {typeof questionReplyData === "string" && (
+                      <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                        {questionReplyData}
+                      </blockquote>
+                    )}
+                    <MessageResponse
+                      plugins={markdown.plugins}
+                      rehypePlugins={markdown.rehypePlugins}
+                      components={markdown.components}
+                    >
+                      {text}
+                    </MessageResponse>
+                  </>
+                )}
               </CollapsibleBubbleBody>
             </MessageContent>
           )

@@ -1513,6 +1513,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
                 text: "Continue work".into()
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -2621,6 +2622,7 @@ async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
                 text: "Continue under the selected route".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),

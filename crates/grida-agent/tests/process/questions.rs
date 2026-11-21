@@ -3,17 +3,35 @@ use super::lifecycle::{
 };
 use super::*;
 
+pub(super) const EDITION_QUESTION: &str = r#"{"questions":[{"id":"edition","question":"Which edition?","options":[{"label":"Screen"},{"label":"Print"}]}]}"#;
+
+const QUESTION_BATCH: &str = r#"{"questions":[
+    {"id":"edition","header":"Edition","question":"Which edition?","options":[{"label":"Screen","description":"For on-screen reading"},{"label":"Print"}]},
+    {"id":"title","question":"What title should we use?"},
+    {"id":"notes","question":"Any other notes?"}
+]}"#;
+
 pub(super) async fn question_socket(url: &str, questions: bool) -> SharedSocket {
+    question_socket_with_batches(url, questions, false).await
+}
+
+async fn question_socket_with_batches(url: &str, questions: bool, batches: bool) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
     let mut capabilities = extension_initialize();
-    if questions {
+    if questions || batches {
         let meta = capabilities["clientCapabilities"]["_meta"]
             .as_object_mut()
             .unwrap();
-        meta.insert("co.grida/session/questions".into(), 1.into());
-        meta.insert("co.grida/session/answer-question".into(), 1.into());
+        if questions {
+            meta.insert("co.grida/session/questions".into(), 1.into());
+            meta.insert("co.grida/session/answer-question".into(), 1.into());
+        }
+        if batches {
+            meta.insert("co.grida/session/questions-v2".into(), 1.into());
+            meta.insert("co.grida/session/answer-question-v2".into(), 1.into());
+        }
     }
     let initialized = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
@@ -174,7 +192,9 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     terminate_shared_server(first_host).await;
 
     let (second_host, url) = shared_server(&state, &endpoint.url).await;
-    let mut second = question_socket(&url, true).await;
+    // A client that enables batches still recovers the exact singleton tool
+    // captured before batches were available for this input.
+    let mut second = question_socket_with_batches(&url, true, true).await;
     let loaded = ws_rpc(
         &mut second,
         2,
@@ -184,6 +204,7 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     .await;
     assert!(loaded.get("result").is_some(), "{loaded}");
     assert_eq!(question_list(&mut second, session, turn).await, pending);
+    assert_eq!(batch_list(&mut second, session, turn).await, pending);
     assert!(matches!(
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
@@ -263,7 +284,7 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Question("question")]).await;
+    let mut endpoint = Endpoint::start(vec![Reply::Tool("question", QUESTION_BATCH)]).await;
     let mut command = executable();
     command.arg("run");
     configured(&mut command, &state, &endpoint.url);
@@ -285,7 +306,17 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     assert_eq!(result[1]["session_id"], result[0]["session_id"]);
     assert_eq!(result[1]["turn_id"], result[0]["turn_id"]);
     assert_eq!(result[1]["questions"][0]["style"], "answer_dependent");
-    assert_eq!(result[1]["questions"][0]["question"], "Which edition?");
+    assert_eq!(
+        result[1]["questions"][0]["questions"][0]["question"],
+        "Which edition?"
+    );
+    assert_eq!(
+        result[1]["questions"][0]["questions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
     assert!(result[1]["questions"][0]["waitId"].is_string());
     endpoint.request().await;
     endpoint.done().await;
@@ -310,7 +341,7 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     // The same one-shot CLI must finish without an input-required exit when
     // the tool only invited an optional refinement.
     let mut endpoint = Endpoint::start(vec![
-        Reply::Question("question_async"),
+        Reply::Tool("question_async", QUESTION_BATCH),
         Reply::Finished("Applied the default."),
     ])
     .await;
@@ -338,6 +369,398 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     endpoint.request().await;
     endpoint.request().await;
     endpoint.done().await;
+}
+
+async fn batch_list(socket: &mut SharedSocket, session: &str, turn: &str) -> Value {
+    let reply = ws_rpc(
+        socket,
+        40,
+        "_co.grida/session/questions-v2",
+        json!({"sessionId": session, "turnId": turn}),
+    )
+    .await;
+    assert!(reply.get("error").is_none(), "{reply}");
+    reply["result"].clone()
+}
+
+fn batch_response(session: &str, turn: &str, snapshot: &Value, pending: &Value) -> Value {
+    let batch = &pending["questions"][0];
+    assert_eq!(batch["questions"], {
+        let request: Value = serde_json::from_str(QUESTION_BATCH).unwrap();
+        // The pending projection normalizes omitted option lists to empty.
+        let mut questions = request["questions"].clone();
+        for index in [1, 2] {
+            questions[index]["options"] = json!([]);
+        }
+        questions
+    });
+    json!({
+        "sessionId":session, "turnId":turn, "requestId":"answer-batch",
+        "expectedSessionRevision":snapshot["sessionRevision"],
+        "expectedControlRevision":pending["controlRevision"],
+        "expectedHistoryPosition":pending["historyPosition"],
+        "waitId":batch["waitId"],
+        "answers":[
+            {"id":"title","answer":{"kind":"text","text":"The Atlas"}},
+            {"id":"notes","answer":{"kind":"skipped"}},
+            {"id":"edition","answer":{"kind":"choice","index":1}}
+        ],
+    })
+}
+
+#[tokio::test]
+async fn negotiated_question_client_can_capture_singleton_tools_for_one_input() {
+    let root = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Question("question"),
+        Reply::Finished("Applied the singleton answer."),
+        Reply::Tool("question", QUESTION_BATCH),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = question_socket_with_batches(&url, true, true).await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let mut submit = prompt_request(session, "older-view", "Prepare the document.");
+    submit["_meta"] = json!({"co.grida/session/questions-v2": false});
+    let started = ws_rpc(&mut socket, 3, "_co.grida/session/submit", submit).await;
+    let turn = started["result"]["turnId"].as_str().unwrap();
+    let request = endpoint.request().await;
+    let tools = request["tools"].as_array().unwrap();
+    for name in ["question", "question_async"] {
+        assert!(tools.iter().any(|tool| {
+            tool["function"]["name"] == name
+                && tool["function"]["parameters"]["required"] == json!(["question"])
+        }));
+    }
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let pending = question_list(&mut socket, session, turn).await;
+    assert_eq!(pending["questions"][0]["question"], "Which edition?");
+    assert_eq!(batch_list(&mut socket, session, turn).await, pending);
+    answer_edition(&mut socket, session, turn).await;
+    endpoint.request().await;
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+
+    let started = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/submit",
+        prompt_request(session, "current-view", "Update the document."),
+    )
+    .await;
+    let turn = started["result"]["turnId"].as_str().unwrap();
+    let request = endpoint.request().await;
+    let tools = request["tools"].as_array().unwrap();
+    for name in ["question", "question_async"] {
+        assert!(tools.iter().any(|tool| {
+            tool["function"]["name"] == name
+                && tool["function"]["parameters"]["required"] == json!(["questions"])
+        }));
+    }
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let pending = batch_list(&mut socket, session, turn).await;
+    assert_eq!(
+        pending["questions"][0]["questions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
+#[tokio::test]
+async fn required_question_batch_restarts_and_settles_atomically() {
+    let root = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("question", QUESTION_BATCH),
+        Reply::Finished("Applied the answers."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut first = question_socket_with_batches(&url, false, true).await;
+    let (session, turn) = start_question(&mut first, workspace.path()).await;
+    let request = endpoint.request().await;
+    assert!(request["tools"].as_array().unwrap().iter().any(|tool| {
+        tool["function"]["name"] == "question"
+            && tool["function"]["parameters"]["properties"]["questions"].is_object()
+    }));
+    wait_for_snapshot(&mut first, &session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let pending = batch_list(&mut first, &session, &turn).await;
+    assert_eq!(pending["questions"].as_array().unwrap().len(), 1);
+    assert_eq!(pending["questions"][0]["style"], "answer_dependent");
+    drop(first);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut second = question_socket_with_batches(&url, true, true).await;
+    let loaded = ws_rpc(
+        &mut second,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    assert_eq!(batch_list(&mut second, &session, &turn).await, pending);
+    assert_eq!(
+        question_list(&mut second, &session, &turn).await["questions"],
+        json!([])
+    );
+    let snapshot = session_snapshot(&mut second, &session).await;
+    let response = batch_response(&session, &turn, &snapshot, &pending);
+
+    let mut incomplete = response.clone();
+    incomplete["requestId"] = "incomplete-batch".into();
+    incomplete["answers"].as_array_mut().unwrap().pop();
+    let rejected = ws_rpc(
+        &mut second,
+        3,
+        "_co.grida/session/answer-question-v2",
+        incomplete,
+    )
+    .await;
+    assert!(rejected.get("error").is_some(), "{rejected}");
+    assert_eq!(batch_list(&mut second, &session, &turn).await, pending);
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let accepted = ws_rpc(
+        &mut second,
+        4,
+        "_co.grida/session/answer-question-v2",
+        response.clone(),
+    )
+    .await;
+    assert_eq!(accepted["result"]["turnId"], turn, "{accepted}");
+    let request = endpoint.request().await;
+    let result = request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["role"] == "tool")
+        .unwrap();
+    let content: Value = serde_json::from_str(result["content"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        content["structured"]["answers"],
+        json!([
+            {"id":"edition","answer":"Print"},
+            {"id":"title","answer":"The Atlas"},
+            {"id":"notes","answer":null},
+        ])
+    );
+    let settled = wait_for_snapshot(&mut second, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["turnId"], turn);
+    assert_eq!(settled["latest"]["status"], "succeeded");
+    assert_eq!(
+        batch_list(&mut second, &session, &turn).await["questions"],
+        json!([])
+    );
+    let replay = ws_rpc(
+        &mut second,
+        5,
+        "_co.grida/session/answer-question-v2",
+        response,
+    )
+    .await;
+    assert_eq!(replay["result"], accepted["result"], "{replay}");
+    endpoint.done().await;
+    drop(second);
+    terminate_shared_server(host).await;
+    check_reopened_batch_reply(&state, workspace.path(), &session).await;
+}
+
+async fn check_reopened_batch_reply(state: &Path, workspace: &Path, session: &str) {
+    use super::approvals::Stdio;
+    const WINDOW: &str = "co.grida/session/transcript-window";
+    let mut client = Stdio::from_child(spawn_serve(state, "http://127.0.0.1:1"));
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"][WINDOW] = 1.into();
+    client.request("initialize", capabilities).await;
+    let mut load = json!({"sessionId":session,"cwd":workspace,"mcpServers":[],
+        "_meta":{WINDOW:{"kind":"attach"}}});
+    let attached = client.request("session/load", load.clone()).await;
+    assert!(attached.get("error").is_none(), "{attached}");
+    load["_meta"][WINDOW] = json!({"kind":"read","requestId":"batch-window"});
+    let read = client.send("session/load", load).await;
+    let mut accepted = Vec::new();
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == read {
+            assert!(frame.get("error").is_none(), "{frame}");
+            break;
+        }
+        let params = &frame["params"];
+        if let Some(replies) = params["_meta"][WINDOW].get("questionReplies") {
+            assert_eq!(params["update"]["sessionUpdate"], "user_message_chunk");
+            let fallback = params["update"]["content"]["text"].as_str().unwrap();
+            assert!(fallback.contains("Question: Which edition?\nAnswer: Print"));
+            assert!(!fallback.contains("send_user_message_question_reply"));
+            accepted.push(replies.clone());
+        }
+    }
+    let [replies] = accepted.as_slice() else {
+        panic!("Expected one accepted contribution, received {accepted:?}");
+    };
+    let wait = &replies[0]["waitId"];
+    assert!(wait.as_str().unwrap().starts_with("question/"));
+    assert_eq!(
+        replies,
+        &json!([
+            {"waitId":wait,"id":"edition","question":"Which edition?","answer":"Print"},
+            {"waitId":wait,"id":"title","question":"What title should we use?","answer":"The Atlas"},
+            {"waitId":wait,"id":"notes","question":"Any other notes?","answer":"The user skipped this question.","skipped":true},
+        ])
+    );
+    client.close().await;
+}
+
+#[tokio::test]
+async fn optional_question_batch_reaches_the_next_decision_during_work() {
+    use super::approvals::Stdio;
+    const LIVE: &str = "co.grida/session/updates";
+
+    let root = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let (release, blocked) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("question_async", QUESTION_BATCH),
+        Reply::Release("Independent work is complete.", blocked),
+        Reply::Finished("Applied the answers."),
+    ])
+    .await;
+    let mut client = Stdio::from_child(spawn_serve(&state, &endpoint.url));
+    let mut capabilities = extension_initialize();
+    for capability in [
+        LIVE,
+        "co.grida/session/questions-v2",
+        "co.grida/session/answer-question-v2",
+    ] {
+        capabilities["clientCapabilities"]["_meta"][capability] = 1.into();
+    }
+    client.request("initialize", capabilities).await;
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let submitted = client
+        .request(
+            "_co.grida/session/submit",
+            prompt_request(session, "optional-batch", "Prepare the document."),
+        )
+        .await;
+    let turn = submitted["result"]["turnId"].as_str().unwrap().to_owned();
+    endpoint.request().await;
+    endpoint.request().await;
+    let pending = client
+        .request(
+            "_co.grida/session/questions-v2",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await;
+    assert_eq!(pending["result"]["questions"][0]["style"], "nonblocking");
+    let snapshot = client
+        .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+        .await;
+    assert_eq!(snapshot["result"]["current"]["disposition"], "running");
+    let response = batch_response(session, &turn, &snapshot["result"], &pending["result"]);
+    let receipt = client
+        .send("_co.grida/session/answer-question-v2", response)
+        .await;
+    let mut ack = false;
+    let mut live = false;
+    while !ack || !live {
+        let frame = client.read_frame().await;
+        if frame["id"] == receipt {
+            assert_eq!(frame["result"]["turnId"], turn, "{frame}");
+            ack = true;
+        } else if let Some(replies) = frame["params"]["_meta"][LIVE].get("questionReplies") {
+            assert!(!live, "{frame}");
+            assert_eq!(
+                frame["params"]["update"]["sessionUpdate"],
+                "user_message_chunk"
+            );
+            assert_eq!(frame["params"]["_meta"][LIVE]["turnId"], turn);
+            assert_eq!(replies[0]["answer"], "Print");
+            assert_eq!(replies[1]["answer"], "The Atlas");
+            assert_eq!(replies[2]["skipped"], true);
+            live = true;
+        }
+    }
+    let pending = client
+        .request(
+            "_co.grida/session/questions-v2",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await;
+    assert_eq!(pending["result"]["questions"], json!([]));
+    release.send(()).unwrap();
+
+    let request = endpoint.request().await;
+    let last = request["messages"].as_array().unwrap().last().unwrap();
+    assert_eq!(last["role"], "user");
+    let body = last["content"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("<send_user_message_question_reply>")
+        .unwrap()
+        .strip_suffix("</send_user_message_question_reply>")
+        .unwrap();
+    let replies: Value = serde_json::from_str(body).unwrap();
+    assert_eq!(replies[0]["questionId"], "edition");
+    assert_eq!(replies[0]["answer"], "Print");
+    assert_eq!(replies[1]["questionId"], "title");
+    assert_eq!(replies[1]["answer"], "The Atlas");
+    assert_eq!(replies[2]["questionId"], "notes");
+    assert_eq!(replies[2]["skipped"], true);
+    let settled = timeout(WAIT, async {
+        loop {
+            let observed = client
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            if observed["result"]["current"].is_null() {
+                break observed;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(settled["result"]["latest"]["turnId"], turn);
+    assert_eq!(settled["result"]["latest"]["epoch"], 1);
+    endpoint.done().await;
+    client.close().await;
+    check_reopened_batch_reply(&state, workspace.path(), session).await;
 }
 
 async fn start_question(socket: &mut SharedSocket, workspace: &Path) -> (String, String) {
@@ -627,6 +1050,7 @@ async fn answer_before_a_deferred_step_suspends_keeps_its_resume_wake() {
                 text: "Prepare the document.".into(),
             }],
             questions: true,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),

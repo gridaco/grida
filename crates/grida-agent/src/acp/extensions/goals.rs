@@ -130,11 +130,14 @@ pub(super) fn handlers(
                     if request.max_cost_mills.is_some() {
                         require(&start.1, SPENDING, None)?;
                     }
+                    let (questions, question_batches) =
+                        questions::support(&start.1, request.meta.as_ref())?;
                     let prompt = PromptRequest {
                         id: request.input_id,
                         session: request.session_id,
                         parts,
-                        questions: questions::available(&start.1),
+                        questions,
+                        question_batches,
                         operating_regime: operating_regime(&start.1, request.operating_regime)?,
                         effort: effort(&start.1, request.effort)?,
                         reasoning: Default::default(),

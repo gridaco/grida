@@ -78,16 +78,22 @@ export function QuestionPrompt({
   const [survey, setSurvey] = useState(() => QuestionSurvey.from(input));
   const [submitted, setSubmitted] = useState(false);
   const [closed, setClosed] = useState(dismissal?.initiallyClosed ?? false);
+  const [confirmingSkips, setConfirmingSkips] = useState(false);
   const form = useRef<HTMLDivElement>(null);
   const reopen = useRef<HTMLButtonElement>(null);
   const writeInInput = useRef<HTMLTextAreaElement>(null);
+  const keepAnsweringButton = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   useLayoutEffect(() => {
+    if (confirmingSkips) {
+      keepAnsweringButton.current?.focus();
+      return;
+    }
     if (restoreFocus.current) {
       (closed ? reopen.current : form.current)?.focus();
       restoreFocus.current = false;
     }
-  }, [closed, survey.step]);
+  }, [closed, confirmingSkips, survey.step]);
 
   if (survey.count === 0) return null;
 
@@ -100,8 +106,7 @@ export function QuestionPrompt({
   const hasOptions = options.length > 0;
   const writeIn = survey.writeInFor(qi);
   const hasNext = survey.multiStep && !survey.isLast;
-  const canAdvance =
-    !busy && (hasNext ? survey.currentAnswered : survey.canSubmit);
+  const canSubmit = !busy && (survey.multiStep || survey.canSubmit);
   const changeClosed = (next: boolean) => {
     restoreFocus.current = true;
     setClosed(next);
@@ -123,7 +128,7 @@ export function QuestionPrompt({
           onClick={() => changeClosed(false)}
         >
           <MessageCircleQuestionIcon />
-          Answer question
+          {survey.multiStep ? "Answer questions" : "Answer question"}
         </Button>
       </div>
     );
@@ -148,19 +153,75 @@ export function QuestionPrompt({
     restoreFocus.current = true;
     setSurvey(next);
   };
-  // Dismissing keeps the draft. A required question submits an explicit skip.
+  // The single-question card preserves its separate skip shortcut.
   const onSkip = () => {
     if (dismissal) return changeClosed(true);
-    if (busy) return;
-    const skipped = survey.skipCurrent();
-    if (hasNext) showStep(skipped.next());
-    else finalize(skipped);
+    finalize(survey.skipCurrent());
+  };
+  const requestSubmit = () => {
+    if (!canSubmit) return;
+    if (survey.canSubmit) finalize(survey);
+    else setConfirmingSkips(true);
   };
   const advance = () => {
-    if (!canAdvance) return;
+    if (submitted) return;
     if (hasNext) showStep(survey.next());
-    else finalize(survey);
+    else requestSubmit();
   };
+
+  if (confirmingSkips) {
+    const unanswered = survey.unanswered;
+    const titleId = `${labelId}-confirm-skips`;
+    const keepAnswering = () => {
+      setConfirmingSkips(false);
+      showStep(survey.goTo(unanswered[0]));
+    };
+    return (
+      <AgentPromptCard
+        data-question-prompt=""
+        role="group"
+        aria-labelledby={titleId}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.stopPropagation();
+          keepAnswering();
+        }}
+      >
+        <div className="flex items-center gap-2 px-2 text-muted-foreground">
+          <MessageCircleQuestionIcon className="size-4" />
+          Question
+        </div>
+        <p id={titleId} className="px-2">
+          Skip {unanswered.length} unanswered{" "}
+          {unanswered.length === 1 ? "question" : "questions"}?
+        </p>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <Button
+            ref={keepAnsweringButton}
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={keepAnswering}
+          >
+            Keep answering
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            disabled={busy}
+            onClick={() => {
+              restoreFocus.current = true;
+              setConfirmingSkips(false);
+              finalize(survey.skipUnanswered());
+            }}
+          >
+            Submit with skips
+          </Button>
+        </div>
+      </AgentPromptCard>
+    );
+  }
+
   // Radix prevents Enter on radio items, so handle submission in capture.
   const handleChoiceKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const { key, target } = event;
@@ -244,7 +305,9 @@ export function QuestionPrompt({
       <div className="flex min-h-0 flex-col gap-1 overflow-y-auto px-2">
         {(q.header || survey.multiStep) && (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground">{q.header}</span>
+            <span className="min-w-0 wrap-anywhere text-muted-foreground">
+              {q.header}
+            </span>
             {survey.multiStep && (
               <span className="shrink-0 text-muted-foreground tabular-nums">
                 Question {survey.step + 1} of {survey.count}
@@ -355,9 +418,6 @@ export function QuestionPrompt({
             ref={writeInInput}
             aria-labelledby={questionId}
             value={writeIn}
-            onFocus={() => {
-              if (!submitted) setSurvey((current) => current.selectCustom(qi));
-            }}
             onChange={(e) =>
               setSurvey((current) => current.setWriteIn(qi, e.target.value))
             }
@@ -406,30 +466,46 @@ export function QuestionPrompt({
               size="xs"
               className={questionTextClassName}
               onClick={() => showStep(survey.back())}
-              disabled={busy}
+              disabled={submitted}
             >
               Back
             </Button>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            className={questionTextClassName}
-            onClick={onSkip}
-            disabled={dismissal ? submitted : busy}
-          >
-            Skip
-          </Button>
-          <Button
-            type="button"
-            size="xs"
-            className={questionTextClassName}
-            onClick={advance}
-            disabled={!canAdvance}
-          >
-            {hasNext ? "Next" : "Submit"}
-          </Button>
+          {!survey.multiStep && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className={questionTextClassName}
+              onClick={onSkip}
+              disabled={dismissal ? submitted : busy}
+            >
+              Skip
+            </Button>
+          )}
+          {hasNext && (
+            <Button
+              type="button"
+              variant={dismissal ? "outline" : "default"}
+              size="xs"
+              className={questionTextClassName}
+              onClick={advance}
+              disabled={submitted}
+            >
+              Next
+            </Button>
+          )}
+          {(!hasNext || dismissal) && (
+            <Button
+              type="button"
+              size="xs"
+              className={questionTextClassName}
+              onClick={requestSubmit}
+              disabled={!canSubmit}
+            >
+              Submit
+            </Button>
+          )}
         </div>
       </div>
     </AgentPromptCard>
@@ -446,7 +522,10 @@ export function QuestionPrompt({
 export function AnsweredQuestionSummary({ entry }: { entry: ToolCallEntry }) {
   const questions = parseQuestions(inputOf(entry));
   const output = ("output" in entry ? entry.output : undefined) as
-    | QuestionAnswerOutput
+    | {
+        answers?: (string[] | { id: string; answer: string | null })[];
+        skipped?: boolean;
+      }
     | undefined;
   if (questions.length === 0) return null;
 
@@ -458,21 +537,31 @@ export function AnsweredQuestionSummary({ entry }: { entry: ToolCallEntry }) {
     );
   }
 
-  const answers = output?.answers ?? [];
+  // An optional tool call only registers the questions. Its answer may arrive
+  // separately as a host-attributed user message.
+  if (!Array.isArray(output?.answers)) return null;
+  const answers = output.answers;
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/40 p-3">
       {questions.map((q, qi) => {
-        const a = answers[qi] ?? [];
+        const answer = q.id
+          ? answers.find((item) => !Array.isArray(item) && item?.id === q.id)
+          : answers[qi];
+        const values = Array.isArray(answer)
+          ? answer
+          : typeof answer?.answer === "string"
+            ? [answer.answer]
+            : [];
         return (
           <div key={qi} className="flex flex-col gap-0.5">
             <span className="text-xs text-muted-foreground">{q.question}</span>
             <span
               className={cn(
                 "text-sm font-medium",
-                a.length === 0 && "text-muted-foreground italic"
+                values.length === 0 && "text-muted-foreground italic"
               )}
             >
-              {a.length ? a.join(", ") : "Skipped"}
+              {values.length ? values.join(", ") : "Skipped"}
             </span>
           </div>
         );

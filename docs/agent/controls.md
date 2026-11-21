@@ -76,17 +76,21 @@ while keeping the attachment. The attached content, captured settings and queue
 position stay the same. Older runtimes offer editing for plain text only.
 Goals cannot be edited; remove the queued goal and send a new one instead.
 
-If the current turn asks a question, answer it in its card. In the custom answer
-field, press Enter to submit or Shift+Enter to add a line. You can keep typing
-while other work streams. For an optional question, **Skip** or the close button
-puts the card away. Select **Answer question** in the chat to reopen it while
-that turn is active. The agent can keep working and gives you time to reply
-before proceeding on a stated assumption. The question expires when the turn
-ends. A required question waits for an answer or an explicit **Skip**. A
-separate queued message leaves the question open.
+If the current turn asks a question, answer it in its card. Use Shift+Enter
+to add a line in a custom answer. For a set of questions, use **Back** and
+**Next** in any order. Your selections and custom answers stay in place. When
+you **Submit**, you can go back to an unanswered question or confirm that you
+want to skip the remaining questions.
 
-Your answer appears with the original question above it. Open **Worked for …**
-on a finished turn to read that exchange again.
+A required question or set waits for your submission. An optional question or
+set lets the agent keep working. You can submit an optional set at any step.
+Use the close button to put the card away. The chat shows an **Answer question**
+or **Answer questions** button while the request is open. The agent gives you
+time to reply before proceeding on a stated assumption. The card expires when
+the turn ends. A separate queued message leaves the questions open.
+
+Your answers appear with their questions. Open **Worked for …** on a finished
+turn to read the exchange again.
 
 ## Pause, resume, or move on
 

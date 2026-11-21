@@ -333,10 +333,14 @@ export namespace toolDisplay {
         count: (ranking.get(desc.action)?.count ?? 0) + 1,
         last: index,
       });
+      const count =
+        desc.action === "question"
+          ? asArray(asRecord(readToolInput(entry)).questions)?.length || 1
+          : 1;
       if (desc.tone === "running") {
         runningCounts.set(
           desc.action,
-          (runningCounts.get(desc.action) ?? 0) + 1
+          (runningCounts.get(desc.action) ?? 0) + count
         );
       } else if (desc.tone === "warn" || desc.tone === "error") {
         failedCounts.set(desc.action, (failedCounts.get(desc.action) ?? 0) + 1);
@@ -345,7 +349,7 @@ export namespace toolDisplay {
         targets.add(desc.target);
         files.set(desc.action, targets);
       } else {
-        counts.set(desc.action, (counts.get(desc.action) ?? 0) + 1);
+        counts.set(desc.action, (counts.get(desc.action) ?? 0) + count);
       }
     });
     for (const [action, targets] of files) {

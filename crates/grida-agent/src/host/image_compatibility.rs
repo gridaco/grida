@@ -62,6 +62,7 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
             text: "Accepted without a model call.".into(),
         }],
         questions: true,
+        question_batches: false,
         operating_regime: None,
         effort: None,
         reasoning: None,

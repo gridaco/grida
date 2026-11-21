@@ -1,5 +1,6 @@
 import type { ChatGptTurnCapabilities } from "@grida/ai-host";
 // GRIDA-SEC-004 / GRIDA-SEC-008 — main-owned ACP connection to the packaged agent.
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   execFile,
   spawn,
@@ -68,6 +69,17 @@ const LIBRARY_SELECTION_CAPABILITIES = {
   "co.grida/session/answer-library-selection": 1,
 } as const;
 const CATALOG_QUERY = "co.grida/session/catalog-query";
+export const QUESTION_BATCHES = {
+  list: "co.grida/session/questions-v2",
+  answer: "co.grida/session/answer-question-v2",
+} as const;
+const QUESTION_ADMISSION_METHODS = new Set([
+  "_co.grida/session/submit",
+  "_co.grida/session/enqueue",
+  "_co.grida/session/replace",
+  "_co.grida/session/revise",
+  "_co.grida/goal/start",
+]);
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
 export const PREDICT_PROMPT = "co.grida/session/predict-prompt";
 const MODEL_CHANGE = "co.grida/session/model-change";
@@ -211,6 +223,8 @@ export class NativeAgentProcess {
   private transcriptWindow = false;
   private activityOrder = false;
   private optionalQuestions = false;
+  private questionBatches = false;
+  private readonly questionBatchPreference = new AsyncLocalStorage<boolean>();
   private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
@@ -352,6 +366,10 @@ export class NativeAgentProcess {
 
   get acceptsOptionalQuestions(): boolean {
     return this.connected && this.optionalQuestions;
+  }
+
+  get acceptsQuestionBatches(): boolean {
+    return this.connected && this.questionBatches;
   }
 
   get acceptsEditorContext(): boolean {
@@ -876,6 +894,8 @@ export class NativeAgentProcess {
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
                 [CATALOG_QUERY]: 1,
+                [QUESTION_BATCHES.list]: 1,
+                [QUESTION_BATCHES.answer]: 1,
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
                 ...(inputRoutes && { [NativeProviderRoutes.capability]: 1 }),
@@ -909,6 +929,9 @@ export class NativeAgentProcess {
       processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
       processOwner.optionalQuestions =
         advertised?.["co.grida/session/optional-questions"] === 1;
+      processOwner.questionBatches =
+        advertised?.[QUESTION_BATCHES.list] === 1 &&
+        advertised?.[QUESTION_BATCHES.answer] === 1;
       processOwner.activityOrder =
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
@@ -1066,6 +1089,11 @@ export class NativeAgentProcess {
     }
   }
 
+  /** Keep the attached renderer's preference local to the admitting request. */
+  withQuestionBatchPreference<T>(available: boolean, admit: () => T): T {
+    return this.questionBatchPreference.run(available, admit);
+  }
+
   request(
     method: string,
     params: unknown,
@@ -1078,6 +1106,21 @@ export class NativeAgentProcess {
       return Promise.reject(new Error("native_agent_approval_requires_review"));
     if (method === `_${PREDICT_PROMPT}`)
       return this.predictPrompt(params, timeoutMs, permission);
+    if (
+      this.acceptsQuestionBatches &&
+      this.questionBatchPreference.getStore() === false &&
+      QUESTION_ADMISSION_METHODS.has(method)
+    ) {
+      const input = object(params);
+      if (input)
+        params = {
+          ...input,
+          _meta: {
+            ...object(input._meta),
+            [QUESTION_BATCHES.list]: false,
+          },
+        };
+    }
     return this.call(method, params, timeoutMs);
   }
 

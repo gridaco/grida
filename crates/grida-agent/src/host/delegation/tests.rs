@@ -106,6 +106,7 @@ async fn parent(host: &Host, root: &Path, ultra: bool) -> (ClaimedTurn, StoredPr
                 selection_revision: None,
                 selection_goal: false,
                 questions: true,
+                question_batches: false,
                 allow_wakeups: false,
                 allow_library_selection: false,
                 allow_host_tools: false,

@@ -801,6 +801,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/pause`, `resume`, `steer`                                                | Pause a turn, resume its verified suspension, or send a correction to that turn.                          |
 | `co.grida/session/stop`, `resume-queue`                                                    | Stop a turn and pause queue advancement, then reopen queue admission when ready.                          |
 | `co.grida/session/questions`, `answer-question`                                            | Inspect pending questions and submit a correlated choice, free-text answer, or skip.                      |
+| `co.grida/session/questions-v2`, `answer-question-v2`                                      | Inspect and answer a batch of one to three questions with one correlated submission.                      |
 | `co.grida/session/approvals`, `answer-approval`                                            | Inspect requests for additional access and decide each exact action.                                      |
 | `co.grida/session/history`, `fork`, `revise`                                               | Browse retained message anchors, branch a chat, or replace an earlier text message.                       |
 | `co.grida/session/compact`                                                                 | Summarize earlier model context and keep the original transcript available.                               |
@@ -851,7 +852,11 @@ Negotiate `co.grida/session/turn-summary` to read a settled turn by its
 fallback, recorded tool dispositions, unresolved operations, and any completion
 checks. The same record is available after reopening the chat.
 
-Negotiate both question operations to enable question tools for new inputs.
+Negotiate both v2 question operations to enable batches for new inputs. A batch
+answer supplies one choice, free-text answer, or skip for each item ID. Its
+answers commit together. Clients negotiating only the original pair can still
+receive and answer single questions. The v2 list preserves the original shape of
+retained singleton waits.
 An answer can resume suspended work when its other conditions allow execution.
 An explicit Pause remains effective after the answer. Question negotiation does
 not add image or file-input capabilities; clients keep the input profile their

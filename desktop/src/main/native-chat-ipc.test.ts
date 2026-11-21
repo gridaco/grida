@@ -2681,6 +2681,36 @@ describe("native chat IPC", () => {
     );
   });
 
+  it("keeps question batch support scoped to the renderer attachment", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const support: boolean[] = [];
+    chat.withQuestionBatchPreference = (available, action) => {
+      support.push(available);
+      return action();
+    };
+
+    ipc.subscribe(first.event, one.attachmentId, randomUUID(), true);
+    ipc.subscribe(first.event, one.attachmentId, randomUUID());
+    ipc.subscribe(second.event, two.attachmentId, randomUUID(), "true");
+
+    await ipc.submit(
+      first.event,
+      one.attachmentId,
+      "modern",
+      "First document."
+    );
+    await ipc.enqueue(
+      second.event,
+      two.attachmentId,
+      "legacy",
+      "Second document."
+    );
+
+    expect(support).toEqual([true, false]);
+  });
+
   it("binds question answers to their attachment and rejects approval and malformed inputs", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);
@@ -2762,6 +2792,86 @@ describe("native chat IPC", () => {
         selected
       )
     ).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
+  it("requires one valid answer per item in the observed question batch", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const observation = await ipc.observe(first.event, one.attachmentId);
+    const review = {
+      task: {
+        sessionId: one.sessionId,
+        turnId: "turn",
+        requestId: "batch-request",
+        expectedSessionRevision: observation.snapshot.sessionRevision,
+        expectedControlRevision: observation.snapshot.current!.controlRevision,
+      },
+      expectedHistoryPosition: observation.snapshot.current!.historyPosition,
+      waitId: "batch",
+      style: "nonblocking",
+      expiresWithTurn: true,
+      questions: [
+        {
+          id: "format",
+          question: "Which format?",
+          options: [{ label: "Print" }],
+        },
+        { id: "theme", question: "Which theme?", options: [] },
+      ],
+    } as const;
+    vi.spyOn(chat, "questions").mockResolvedValue([review]);
+    const send = vi.spyOn(chat, "answerQuestion");
+    const [shown] = await ipc.questions(
+      first.event,
+      one.attachmentId,
+      observation.observationId
+    );
+    expect(shown).toMatchObject({
+      questions: review.questions,
+      question: expect.stringContaining("latest chat view"),
+      options: [],
+    });
+    await expect(
+      ipc.answerQuestion(first.event, one.attachmentId, shown.reviewId, {
+        kind: "text",
+        text: "This renderer only understands single questions",
+      })
+    ).rejects.toThrow("native_chat_question_answer_invalid");
+
+    const format = { id: "format", answer: { kind: "choice", index: 0 } };
+    const theme = { id: "theme", answer: { kind: "text", text: "Modern" } };
+    const submit = (answers: unknown[]) =>
+      ipc.answerQuestion(first.event, one.attachmentId, shown.reviewId, {
+        kind: "batch",
+        answers,
+      });
+
+    for (const invalid of [
+      [format],
+      [format, format],
+      [format, { ...theme, id: "injected" }],
+      [format, { ...theme, answer: { kind: "choice", index: 0 } }],
+      [format, { ...theme, answer: { kind: "text", text: "é".repeat(2049) } }],
+    ]) {
+      await expect(submit(invalid)).rejects.toThrow(
+        "native_chat_question_answer_invalid"
+      );
+    }
+    await expect(
+      ipc.answerQuestion(second.event, two.attachmentId, shown.reviewId, {
+        kind: "batch",
+        answers: [format, theme],
+      })
+    ).rejects.toThrow("native_chat_question_unavailable");
+    expect(send).not.toHaveBeenCalled();
+
+    await submit([theme, format]);
+    expect(send).toHaveBeenCalledExactlyOnceWith(
+      { id: one.sessionId },
+      review,
+      { kind: "batch", answers: [format, theme] }
+    );
   });
 
   it("issues stable exact approval tokens only to their observing attachment", async () => {

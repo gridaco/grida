@@ -290,6 +290,8 @@ Pass `--questions` to let a tool-capable model request input. If work reaches
 a question it still needs answered, `run` preserves the turn and emits a
 `finished` record with `input_required` and the pending `questions`. The
 process exits so an automation can hand the retained session to an ACP client.
+Each pending batch includes its wait ID, style, and ordered questions with
+stable item IDs. A client answers the wait with one value or skip per item.
 
 Use `--require-completion-text` on `run` or `serve` to require a nonempty
 final answer on newly accepted tasks. The host records the check and its
@@ -575,16 +577,15 @@ have eight side chats open and a connection thirty-two. Close, parent
 deletion, disconnect and the next host start after a crash discard it with its
 data and processes. The parent task keeps its original controls.
 
-Clients can negotiate both `co.grida/session/questions` and
-`co.grida/session/answer-question` at version `1`. Prompts accepted through the
-product submit and queue extensions then capture question availability. Plain
-`session/prompt` uses the portable ACP flow. A pending question is listed by
-session and turn ID with its wait ID, question text, and suggested choices.
-An answer uses that wait ID and the current revisions. Free text, a suggested
-choice, and skipping are supported. A suspended turn can continue when its
-pending answers arrive. An explicit Pause still requires Resume. Repeating an
+Clients negotiate both `co.grida/session/questions-v2` and
+`co.grida/session/answer-question-v2` at version `1` to give product prompts
+the batched question tools. Plain `session/prompt` uses the portable ACP flow.
+An answer names the recorded wait and the current revisions, with one choice,
+write-in, or skip per item. A suspended turn can continue when its pending
+answers arrive. An explicit Pause still requires Resume. Repeating an
 accepted answer request returns its original receipt and can wake an answered
-turn after a reconnect.
+turn after a reconnect. Clients using the original question capability pair
+can still submit and answer singleton questions.
 
 Stdout carries only newline-delimited protocol frames. The host bounds each
 frame to 1 MiB, admits at most 16 unanswered requests per connection, and

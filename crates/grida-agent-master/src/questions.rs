@@ -43,13 +43,23 @@ const CLOSE_REPLY: &str = "</send_user_message_question_reply>";
 const REGISTRATION_SCHEMA: &str = "grida.agent.question.registration";
 const ANSWER_DEPENDENT: &str = "question";
 const NONBLOCKING: &str = "question_async";
+const LEGACY_VERSION: u32 = 1;
+const BATCH_VERSION: u32 = 2;
 const MAX_INPUT_BYTES: usize = 16 * 1024;
 const MAX_REQUEST_BYTES: usize = MAX_INPUT_BYTES + 1024;
+const MAX_QUESTIONS: usize = 3;
+const MAX_ID_BYTES: usize = 64;
+const MAX_HEADER_BYTES: usize = 48;
 const MAX_QUESTION_BYTES: usize = 2048;
 const MAX_OPTIONS: usize = 6;
 const MAX_OPTION_BYTES: usize = 256;
+const MAX_OPTION_DESCRIPTION_BYTES: usize = 512;
 const MAX_ANSWER_BYTES: usize = 4096;
-const MAX_ANSWER_ENVELOPE_BYTES: usize = 32 * 1024;
+const LEGACY_MAX_ANSWER_BYTES: usize = 32 * 1024;
+// Allow three free-text answers, including JSON escaping in both result forms.
+const MAX_BATCH_RESULT_BYTES: usize = 160 * 1024;
+const MAX_BATCH_ANSWER_BYTES: usize = 80 * 1024;
+const SKIP_TEXT: &str = "The user skipped this question.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -60,51 +70,114 @@ pub enum QuestionStyle {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QuestionPrompt {
-    pub question: String,
+struct LegacyPrompt {
+    question: String,
     #[serde(default)]
-    pub options: Vec<String>,
+    options: Vec<String>,
 }
 
-impl QuestionPrompt {
-    fn parse(arguments: &ToolArguments) -> Result<Self> {
-        let ToolArguments::Json(value) = arguments else {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "question_arguments_invalid",
-            ));
-        };
-        let prompt: Self = serde_json::from_value(value.clone())
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "question_arguments_invalid"))?;
-        prompt.validate()?;
-        Ok(prompt)
-    }
-
-    fn validate(&self) -> Result<()> {
-        let mut options = BTreeSet::new();
-        if self.question.trim().is_empty()
-            || self.question.len() > MAX_QUESTION_BYTES
-            || self.options.len() > MAX_OPTIONS
-            || self.options.iter().any(|option| {
-                let label = option.trim();
-                label.is_empty() || option.len() > MAX_OPTION_BYTES || !options.insert(label)
-            })
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "question_arguments_invalid",
-            ));
+impl LegacyPrompt {
+    fn into_item(self) -> QuestionItem {
+        QuestionItem {
+            id: "question".into(),
+            header: None,
+            question: self.question,
+            options: self
+                .options
+                .into_iter()
+                .map(|label| QuestionOption {
+                    label,
+                    description: None,
+                })
+                .collect(),
         }
-        Ok(())
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct QuestionOption {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QuestionItem {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
+    pub question: String,
+    #[serde(default)]
+    pub options: Vec<QuestionOption>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchPrompt {
+    questions: Vec<QuestionItem>,
+}
+
+fn arguments_invalid() -> Error {
+    Error::new(ErrorKind::InvalidInput, "question_arguments_invalid")
+}
+
+fn answer_invalid() -> Error {
+    Error::new(ErrorKind::InvalidInput, "question_answer_invalid")
+}
+
+fn valid_text(value: &str, maximum: usize) -> bool {
+    !value.trim().is_empty() && value.len() <= maximum
+}
+
+fn valid_id(value: &str) -> bool {
+    (1..=MAX_ID_BYTES).contains(&value.len())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+fn validate_questions(questions: &[QuestionItem]) -> Result<()> {
+    let mut ids = BTreeSet::new();
+    if !(1..=MAX_QUESTIONS).contains(&questions.len())
+        || questions.iter().any(|item| {
+            let mut labels = BTreeSet::new();
+            !valid_id(&item.id)
+                || !ids.insert(&item.id)
+                || !valid_text(&item.question, MAX_QUESTION_BYTES)
+                || item
+                    .header
+                    .as_deref()
+                    .is_some_and(|header| !valid_text(header, MAX_HEADER_BYTES))
+                || item.options.len() > MAX_OPTIONS
+                || item.options.iter().any(|option| {
+                    !valid_text(&option.label, MAX_OPTION_BYTES)
+                        || !labels.insert(option.label.trim())
+                        || option.description.as_deref().is_some_and(|description| {
+                            !valid_text(description, MAX_OPTION_DESCRIPTION_BYTES)
+                        })
+                })
+        })
+    {
+        return Err(arguments_invalid());
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredQuestionRequest<T> {
+    operation: OperationId,
+    style: QuestionStyle,
+    prompt: T,
+}
+
 pub struct QuestionRequest {
     pub operation: OperationId,
     pub style: QuestionStyle,
-    pub prompt: QuestionPrompt,
+    pub version: u32,
+    pub questions: Vec<QuestionItem>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,19 +189,25 @@ pub enum QuestionAnswer {
 }
 
 impl QuestionAnswer {
-    fn text<'a>(&'a self, prompt: &'a QuestionPrompt) -> Result<&'a str> {
+    fn text<'a>(&'a self, item: &'a QuestionItem) -> Result<Option<&'a str>> {
         match self {
-            Self::Text { text } if !text.trim().is_empty() && text.len() <= MAX_ANSWER_BYTES => {
-                Ok(text)
-            }
-            Self::Choice { index } if *index < prompt.options.len() => Ok(&prompt.options[*index]),
-            Self::Skipped => Ok("The user skipped this question."),
-            _ => Err(Error::new(
-                ErrorKind::InvalidInput,
-                "question_answer_invalid",
-            )),
+            Self::Text { text } if valid_text(text, MAX_ANSWER_BYTES) => Ok(Some(text)),
+            Self::Choice { index } => item
+                .options
+                .get(*index)
+                .map(|option| Some(option.label.as_str()))
+                .ok_or_else(answer_invalid),
+            Self::Skipped => Ok(None),
+            _ => Err(answer_invalid()),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QuestionItemAnswer {
+    pub id: String,
+    pub answer: QuestionAnswer,
 }
 
 pub struct PreparedAnswer {
@@ -143,13 +222,17 @@ pub struct PreparedAnswer {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QuestionReply {
     pub question_item_id: WaitId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question_id: Option<String>,
     pub question: String,
     pub answer: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skipped: bool,
 }
 
 /// A question reply is attributed by its host-created message. A user can
 /// freely quote or paste the same markup without changing how it is displayed.
-pub fn visible_reply(message: &Message) -> Option<QuestionReply> {
+pub fn visible_replies(message: &Message) -> Option<Vec<QuestionReply>> {
     if message.role != Role::User
         || !matches!(
             message.provenance.source.as_str(),
@@ -164,28 +247,40 @@ pub fn visible_reply(message: &Message) -> Option<QuestionReply> {
     let body = content
         .strip_prefix(OPEN_REPLY)?
         .strip_suffix(CLOSE_REPLY)?;
-    let [reply]: [QuestionReply; 1] = serde_json::from_str(body).ok()?;
+    let replies: Vec<QuestionReply> = serde_json::from_str(body).ok()?;
+    let first = replies.first()?;
+    let mut ids = BTreeSet::new();
+    if replies.len() > MAX_QUESTIONS
+        || replies.iter().any(|reply| {
+            reply.question_item_id != first.question_item_id
+                || reply
+                    .question_id
+                    .as_deref()
+                    .map_or(replies.len() != 1, |id| !valid_id(id) || !ids.insert(id))
+        })
+    {
+        return None;
+    }
     let attributed = match message.provenance.kind {
-        ProvenanceKind::Supplied => message.id.as_str() == reply.question_item_id.as_str(),
+        ProvenanceKind::Supplied => message.id.as_str() == first.question_item_id.as_str(),
         ProvenanceKind::Transformed => message.id.as_str().starts_with("seed/"),
         _ => false,
     };
-    attributed.then_some(reply)
+    attributed.then_some(replies)
 }
 
-/// The accepted answer that reached this inference, either as a contextual
+/// The accepted answers that reached this inference, either as a contextual
 /// user message or as the completed result of its exact question operation.
-pub fn reply_in_context(
+pub fn replies_in_context(
     state: &agent_kit_core::turn::TurnState,
     contribution: &Message,
     context: &[Message],
-) -> Option<QuestionReply> {
-    let reply = visible_reply(contribution)?;
-    let wait = state.waits().get(&reply.question_item_id)?;
+) -> Option<Vec<QuestionReply>> {
+    let replies = visible_replies(contribution)?;
+    let wait = state.waits().get(&replies.first()?.question_item_id)?;
     let request = read_question(wait).ok()?;
     let envelope = wait.answer.as_ref()?;
-    let answer = decode(ANSWER_SCHEMA, envelope).ok()?;
-    let prepared = prepare_answer(wait, answer).ok()?;
+    let prepared = recorded_answer(wait, &request, envelope).ok()?;
     let HistoryRecord::Message(expected) = prepared.contribution?;
     if expected != *contribution {
         return None;
@@ -202,6 +297,7 @@ pub fn reply_in_context(
             if outcome.receipt.as_ref() != Some(envelope) {
                 return None;
             }
+            let expected = answer_outcome(wait, &request, envelope).ok()?;
             context.iter().any(|message| {
                 let [Content::ToolResult(result)] = message.content.as_slice() else {
                     return false;
@@ -212,11 +308,12 @@ pub fn reply_in_context(
                     && result.status == OutcomeStatus::Succeeded
                     && !result.truncated
                     && answered_wait(result) == Some(wait.id.as_str())
-                    && matches!(result.content.as_slice(), [ResultContent::Text(text)] if text == &reply.answer)
+                    && result.content == expected.content
+                    && result.structured == expected.structured
             })
         }
     };
-    included.then_some(reply)
+    included.then_some(replies)
 }
 
 /// Older turns recorded required answers only in the tool result and used a
@@ -255,13 +352,13 @@ pub fn transcript(state: &agent_kit_core::turn::TurnState) -> Vec<HistoryRecord>
         let position = positions.get(wait.id.as_str()).copied();
         if let Some(index) = position {
             let HistoryRecord::Message(message) = &records[index];
-            if visible_reply(message).is_some() {
+            if visible_replies(message).is_some() {
                 continue;
             }
         }
-        let Some(reply) = decode(ANSWER_SCHEMA, answer)
+        let Some(reply) = read_question(wait)
             .ok()
-            .and_then(|answer| prepare_answer(wait, answer).ok())
+            .and_then(|request| recorded_answer(wait, &request, answer).ok())
             .and_then(|prepared| prepared.contribution)
         else {
             continue;
@@ -299,7 +396,7 @@ pub fn transcript(state: &agent_kit_core::turn::TurnState) -> Vec<HistoryRecord>
 /// even when a provider reuses a tool call ID in a subsequent generation.
 pub(crate) fn answered_wait(result: &ToolResult) -> Option<&str> {
     let data = result.structured.as_ref()?;
-    (data.get("status")?.as_str()? == "answered")
+    matches!(data.get("status")?.as_str()?, "answered" | "skipped")
         .then(|| data.get("wait")?.as_str())
         .flatten()
 }
@@ -327,28 +424,147 @@ pub fn read_registration(receipt: &Envelope) -> Result<QuestionRegistration> {
 
 /// Decode a durable wait for a client that supports product questions.
 pub fn read_question(wait: &WaitRecord) -> Result<QuestionRequest> {
-    if wait.request.bytes().len() > MAX_REQUEST_BYTES || wait.response != response_contract()? {
+    let version = wait.request.version();
+    if wait.request.bytes().len() > MAX_REQUEST_BYTES
+        || wait.request.schema().as_str() != REQUEST_SCHEMA
+        || !matches!(version, LEGACY_VERSION | BATCH_VERSION)
+        || wait.response != response_contract(version)?
+    {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "question_contract_invalid",
         ));
     }
-    let request: QuestionRequest = decode(REQUEST_SCHEMA, &wait.request)?;
-    if wait.id != wait_id(&request.operation)? {
+    let (operation, style, questions) = if version == LEGACY_VERSION {
+        let request: StoredQuestionRequest<LegacyPrompt> = decode(REQUEST_SCHEMA, &wait.request)?;
+        (
+            request.operation,
+            request.style,
+            vec![request.prompt.into_item()],
+        )
+    } else {
+        let request: StoredQuestionRequest<BatchPrompt> =
+            serde_json::from_slice(wait.request.bytes()).map_err(|_| arguments_invalid())?;
+        (request.operation, request.style, request.prompt.questions)
+    };
+    if wait.id != wait_id(&operation)? {
         return Err(Error::new(
             ErrorKind::Conflict,
             "question_identity_mismatch",
         ));
     }
-    request.prompt.validate()?;
-    Ok(request)
+    validate_questions(&questions)?;
+    Ok(QuestionRequest {
+        operation,
+        style,
+        version,
+        questions,
+    })
 }
 
-/// Validate a reply before the host commits the correlated resolution.
+/// Validate a reply using the original singleton contract.
 pub fn prepare_answer(wait: &WaitRecord, answer: QuestionAnswer) -> Result<PreparedAnswer> {
     let request = read_question(wait)?;
-    let text = answer.text(&request.prompt)?;
-    let envelope = encode(ANSWER_SCHEMA, &answer)?;
+    if request.version != LEGACY_VERSION {
+        return Err(answer_invalid());
+    }
+    prepare_answers(
+        wait,
+        &request,
+        vec![QuestionItemAnswer {
+            id: request.questions[0].id.clone(),
+            answer,
+        }],
+    )
+}
+
+/// Correlate each answer to its question and prepare a single atomic settlement.
+pub fn prepare_batch_answer(
+    wait: &WaitRecord,
+    answers: Vec<QuestionItemAnswer>,
+) -> Result<PreparedAnswer> {
+    let request = read_question(wait)?;
+    if request.version != BATCH_VERSION {
+        return Err(answer_invalid());
+    }
+    prepare_answers(wait, &request, answers)
+}
+
+fn ordered_answers(
+    request: &QuestionRequest,
+    answers: Vec<QuestionItemAnswer>,
+) -> Result<Vec<QuestionItemAnswer>> {
+    if answers.len() != request.questions.len() {
+        return Err(answer_invalid());
+    }
+    let mut by_id = BTreeMap::new();
+    for answer in answers {
+        if by_id.insert(answer.id, answer.answer).is_some() {
+            return Err(answer_invalid());
+        }
+    }
+    request
+        .questions
+        .iter()
+        .map(|item| {
+            let answer = by_id.remove(&item.id).ok_or_else(answer_invalid)?;
+            answer.text(item)?;
+            Ok(QuestionItemAnswer {
+                id: item.id.clone(),
+                answer,
+            })
+        })
+        .collect()
+}
+
+fn decode_answers(
+    request: &QuestionRequest,
+    envelope: &Envelope,
+) -> Result<Vec<QuestionItemAnswer>> {
+    if envelope.schema().as_str() != ANSWER_SCHEMA || envelope.version() != request.version {
+        return Err(answer_invalid());
+    }
+    let limit = if request.version == LEGACY_VERSION {
+        LEGACY_MAX_ANSWER_BYTES
+    } else {
+        MAX_BATCH_ANSWER_BYTES
+    };
+    if envelope.bytes().len() > limit {
+        return Err(Error::new(
+            ErrorKind::LimitExceeded,
+            "question_answer_limit",
+        ));
+    }
+    if request.version == LEGACY_VERSION {
+        Ok(vec![QuestionItemAnswer {
+            id: request.questions[0].id.clone(),
+            answer: decode(ANSWER_SCHEMA, envelope)?,
+        }])
+    } else {
+        serde_json::from_slice(envelope.bytes()).map_err(|_| answer_invalid())
+    }
+}
+
+fn recorded_answer(
+    wait: &WaitRecord,
+    request: &QuestionRequest,
+    envelope: &Envelope,
+) -> Result<PreparedAnswer> {
+    prepare_answers(wait, request, decode_answers(request, envelope)?)
+}
+
+fn prepare_answers(
+    wait: &WaitRecord,
+    request: &QuestionRequest,
+    answers: Vec<QuestionItemAnswer>,
+) -> Result<PreparedAnswer> {
+    let answers = ordered_answers(request, answers)?;
+    let legacy = request.version == LEGACY_VERSION;
+    let envelope = if legacy {
+        encode(ANSWER_SCHEMA, &answers[0].answer)?
+    } else {
+        encode_batch(ANSWER_SCHEMA, &answers)?
+    };
     if wait.withdrawn
         || wait
             .answer
@@ -360,16 +576,27 @@ pub fn prepare_answer(wait: &WaitRecord, answer: QuestionAnswer) -> Result<Prepa
             "question_no_longer_answerable",
         ));
     }
-    let contribution = if request.style == QuestionStyle::Nonblocking
-        || !matches!(answer, QuestionAnswer::Skipped)
+    let contribution = if !legacy
+        || request.style == QuestionStyle::Nonblocking
+        || !matches!(answers[0].answer, QuestionAnswer::Skipped)
     {
-        let reply = QuestionReply {
-            question_item_id: wait.id.clone(),
-            question: request.prompt.question.clone(),
-            answer: text.to_owned(),
-        };
+        let replies = request
+            .questions
+            .iter()
+            .zip(&answers)
+            .map(|(item, answer)| {
+                let text = answer.answer.text(item)?;
+                Ok(QuestionReply {
+                    question_item_id: wait.id.clone(),
+                    question_id: (!legacy).then(|| item.id.clone()),
+                    question: item.question.clone(),
+                    answer: text.unwrap_or(SKIP_TEXT).into(),
+                    skipped: !legacy && text.is_none(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
         // Keep quoted markup in model- or user-authored strings inside JSON.
-        let body = serde_json::to_string(&[reply])
+        let body = serde_json::to_string(&replies)
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "question_reply_invalid"))?
             .replace('<', "\\u003c");
         Some(HistoryRecord::Message(Message {
@@ -399,6 +626,41 @@ pub fn prepare_answer(wait: &WaitRecord, answer: QuestionAnswer) -> Result<Prepa
     })
 }
 
+fn answer_outcome(
+    wait: &WaitRecord,
+    request: &QuestionRequest,
+    envelope: &Envelope,
+) -> Result<ToolOutcome> {
+    let answers = ordered_answers(request, decode_answers(request, envelope)?)?;
+    let disposition = if answers
+        .iter()
+        .all(|entry| entry.answer == QuestionAnswer::Skipped)
+    {
+        "skipped"
+    } else {
+        "answered"
+    };
+    let mut structured = json!({"wait": wait.id, "status": disposition});
+    let text = if request.version == LEGACY_VERSION {
+        answers[0]
+            .answer
+            .text(&request.questions[0])?
+            .unwrap_or(SKIP_TEXT)
+            .to_owned()
+    } else {
+        let answers = request
+            .questions
+            .iter()
+            .zip(&answers)
+            .map(|(item, answer)| Ok(json!({"id": item.id, "answer": answer.answer.text(item)?})))
+            .collect::<Result<Vec<_>>>()?;
+        let text = json!({"answers": answers}).to_string();
+        structured["answers"] = json!(answers);
+        text
+    };
+    Ok(success(text, structured, Some(envelope.clone())))
+}
+
 /// A question executor bound to the current turn owner.
 pub struct QuestionTool {
     operations: TurnOperations,
@@ -408,6 +670,67 @@ pub struct QuestionTool {
 
 impl QuestionTool {
     pub fn new(operations: TurnOperations, style: QuestionStyle) -> Result<Self> {
+        let (name, description) = match style {
+            QuestionStyle::AnswerDependent => (
+                ANSWER_DEPENDENT,
+                "Ask one to three short questions when progress depends on the answers. Prefer one question when that is enough. Use stable snake_case IDs, short headings, and mutually exclusive options when helpful. The user can choose an option, write their own answer, or skip.",
+            ),
+            QuestionStyle::Nonblocking => (
+                NONBLOCKING,
+                "Ask one to three short questions and continue independent work after the registration result. Prefer one question when that is enough. Use stable snake_case IDs, short headings, and mutually exclusive options when helpful. The user can choose an option, write their own answer, or skip. Use later answers at the next decision point.",
+            ),
+        };
+        let options = json!({
+            "type": "array",
+            "description": "Suggested answers in display order. Put the recommended option first. Omit for free-text-only input. The client always offers a write-in answer.",
+            "maxItems": MAX_OPTIONS,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string", "minLength": 1, "maxLength": MAX_OPTION_BYTES},
+                    "description": {"type": "string", "minLength": 1, "maxLength": MAX_OPTION_DESCRIPTION_BYTES}
+                },
+                "required": ["label"],
+                "additionalProperties": false
+            }
+        });
+        Ok(Self {
+            operations,
+            style,
+            definition: ToolDefinition {
+                id: ToolId::new(name)?,
+                version: BATCH_VERSION,
+                description: description.into(),
+                input: InputFormat::Json(json!({
+                    "type": "object",
+                    "properties": {
+                        "questions": {
+                            "type": "array", "minItems": 1, "maxItems": MAX_QUESTIONS,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string", "pattern": "^[a-z0-9_]+$", "minLength": 1, "maxLength": MAX_ID_BYTES},
+                                    "header": {"type": "string", "minLength": 1, "maxLength": MAX_HEADER_BYTES},
+                                    "question": {"type": "string", "minLength": 1, "maxLength": MAX_QUESTION_BYTES},
+                                    "options": options
+                                },
+                                "required": ["id", "question"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["questions"],
+                    "additionalProperties": false
+                })),
+                max_input_bytes: MAX_INPUT_BYTES,
+                max_output_bytes: MAX_BATCH_RESULT_BYTES,
+                recovery: RecoveryKind::Reconcile,
+            },
+        })
+    }
+
+    /// Restore the exact tool definition captured by an accepted singleton call.
+    pub fn legacy(operations: TurnOperations, style: QuestionStyle) -> Result<Self> {
         let (name, description) = match style {
             QuestionStyle::AnswerDependent => (
                 ANSWER_DEPENDENT,
@@ -423,7 +746,7 @@ impl QuestionTool {
             style,
             definition: ToolDefinition {
                 id: ToolId::new(name)?,
-                version: 1,
+                version: LEGACY_VERSION,
                 description: description.into(),
                 input: InputFormat::Json(json!({
                     "type": "object",
@@ -438,7 +761,7 @@ impl QuestionTool {
                     "additionalProperties": false
                 })),
                 max_input_bytes: MAX_INPUT_BYTES,
-                max_output_bytes: MAX_ANSWER_ENVELOPE_BYTES,
+                max_output_bytes: LEGACY_MAX_ANSWER_BYTES,
                 recovery: RecoveryKind::Reconcile,
             },
         })
@@ -506,24 +829,8 @@ impl QuestionTool {
                 let envelope = wait.answer.as_ref().ok_or_else(|| {
                     Error::new(ErrorKind::InvalidState, "question_answer_pending")
                 })?;
-                if envelope.bytes().len() > MAX_ANSWER_ENVELOPE_BYTES {
-                    return Err(Error::new(
-                        ErrorKind::LimitExceeded,
-                        "question_answer_limit",
-                    ));
-                }
-                let answer: QuestionAnswer = decode(ANSWER_SCHEMA, envelope)?;
                 let request = read_question(wait)?;
-                let text = answer.text(&request.prompt)?.to_owned();
-                let disposition = match answer {
-                    QuestionAnswer::Skipped => "skipped",
-                    _ => "answered",
-                };
-                Ok(success(
-                    text,
-                    json!({"wait": wait.id, "status": disposition}),
-                    Some(envelope.clone()),
-                ))
+                answer_outcome(wait, &request, envelope)
             }
         }
     }
@@ -535,7 +842,13 @@ impl Tool for QuestionTool {
     }
 
     fn validate(&self, arguments: &ToolArguments) -> Result<()> {
-        QuestionPrompt::parse(arguments).map(|_| ())
+        if self.definition.version == LEGACY_VERSION {
+            let prompt: LegacyPrompt = parse_prompt(arguments)?;
+            validate_questions(&[prompt.into_item()])
+        } else {
+            let prompt: BatchPrompt = parse_prompt(arguments)?;
+            validate_questions(&prompt.questions)
+        }
     }
 
     fn invoke(
@@ -612,23 +925,57 @@ fn wait_id(operation: &OperationId) -> Result<WaitId> {
     WaitId::new(format!("question/{operation}"))
 }
 
-fn response_contract() -> Result<ResponseContract> {
+fn response_contract(version: u32) -> Result<ResponseContract> {
     Ok(ResponseContract {
         schema: SchemaId::new(ANSWER_SCHEMA)?,
-        version: 1,
+        version,
     })
 }
 
+fn parse_prompt<T: serde::de::DeserializeOwned>(arguments: &ToolArguments) -> Result<T> {
+    let ToolArguments::Json(value) = arguments else {
+        return Err(arguments_invalid());
+    };
+    T::deserialize(value).map_err(|_| arguments_invalid())
+}
+
+fn encode_batch(schema: &str, value: &impl Serialize) -> Result<Envelope> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|_| Error::new(ErrorKind::InvalidInput, "question_write_invalid"))?;
+    Envelope::new(SchemaId::new(schema)?, BATCH_VERSION, bytes)
+}
+
 fn question_wait(invocation: &Invocation, style: QuestionStyle) -> Result<WaitRecord> {
-    let request = QuestionRequest {
-        operation: invocation.id().clone(),
-        style,
-        prompt: QuestionPrompt::parse(invocation.arguments())?,
+    let version = invocation.definition().version;
+    let request = match version {
+        LEGACY_VERSION => {
+            let prompt: LegacyPrompt = parse_prompt(invocation.arguments())?;
+            encode(
+                REQUEST_SCHEMA,
+                &StoredQuestionRequest {
+                    operation: invocation.id().clone(),
+                    style,
+                    prompt,
+                },
+            )?
+        }
+        BATCH_VERSION => {
+            let prompt: BatchPrompt = parse_prompt(invocation.arguments())?;
+            encode_batch(
+                REQUEST_SCHEMA,
+                &StoredQuestionRequest {
+                    operation: invocation.id().clone(),
+                    style,
+                    prompt,
+                },
+            )?
+        }
+        _ => return Err(arguments_invalid()),
     };
     Ok(WaitRecord {
         id: wait_id(invocation.id())?,
-        request: encode(REQUEST_SCHEMA, &request)?,
-        response: response_contract()?,
+        request,
+        response: response_contract(version)?,
         answer: None,
         withdrawn: false,
     })

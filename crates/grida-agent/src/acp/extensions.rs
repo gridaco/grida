@@ -62,6 +62,7 @@ const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 const FILE_REFERENCE: &str = "co.grida/session/file-reference";
 const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
 pub(super) const MESSAGE_CONTEXT: &str = "co.grida/session/message-context";
+pub(super) const QUESTION_BATCH_LIST: &str = "co.grida/session/questions-v2";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -745,13 +746,16 @@ pub(super) fn handlers(
                     )?;
                     append_editor_context(&mut parts, request.editor_context, &submit_sessions)?;
                     append_message_context(&mut parts, request.message_context, &submit_sessions)?;
+                    let (questions, question_batches) =
+                        questions::support(&submit_sessions, request.meta.as_ref())?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
                             PromptRequest {
                                 id: request.input_id,
                                 session: request.session_id,
                                 parts,
-                                questions: questions::available(&submit_sessions),
+                                questions,
+                                question_batches,
                                 operating_regime: operating_regime(
                                     &submit_sessions,
                                     request.operating_regime,

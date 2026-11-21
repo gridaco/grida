@@ -406,7 +406,7 @@ fn lower_message(
 ) -> Result<(SeedEntry, Option<HistoryRecord>)> {
     let role = message.role;
     let editable = is_editable_user(&message);
-    let question_reply = questions::visible_reply(&message).is_some();
+    let question_reply = questions::visible_replies(&message).is_some();
     let (content, omissions) = portable_parts(role, message.content);
     let projected = if content.is_empty() {
         None

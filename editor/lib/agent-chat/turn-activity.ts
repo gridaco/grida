@@ -145,7 +145,8 @@ export namespace turn_activity {
       while (
         opening < members.length &&
         members[opening].role === "user" &&
-        !members[opening].questionReply
+        !members[opening].questionReply &&
+        !members[opening].questionReplies
       )
         opening++;
       const requests = members.slice(0, opening);
@@ -380,7 +381,7 @@ export namespace turn_activity {
     execute: "ran commands",
     generate: "generated images",
     delegate: "delegated work",
-    ask: "asked a question",
+    ask: "asked you",
     other: "used tools",
   };
 

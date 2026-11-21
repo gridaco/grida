@@ -9,6 +9,7 @@ import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeAgentProcess,
   PREDICT_PROMPT,
+  QUESTION_BATCHES,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
@@ -2862,6 +2863,227 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       } finally {
         test.close();
       }
+    }
+  });
+
+  it.each([true, false])(
+    "reads the negotiated question contract and sends the matching answer (%s)",
+    async (batchAvailable) => {
+      const batch = {
+        waitId: "batch",
+        style: "nonblocking",
+        questions: [
+          {
+            id: "format",
+            header: "Format",
+            question: "Which format?",
+            options: [{ label: "Print", description: "Ready for press" }],
+          },
+          { id: "theme", question: "Which theme?", options: [] },
+        ],
+      };
+      const singleton = {
+        waitId: "single",
+        style: "answer_dependent",
+        question: "Which edition?",
+        options: ["Screen"],
+      };
+      const legacyAnswers = { answer: { kind: "choice", index: 0 } };
+      const batchAnswers = {
+        answers: [
+          { id: "format", answer: { kind: "choice", index: 0 } },
+          { id: "theme", answer: { kind: "skipped" } },
+        ],
+      } as const;
+      const test = fixture(
+        `
+        if (request.method === 'session/new') {
+          send({id:request.id,result:{sessionId:'chat'}});
+          return;
+        }
+        if (request.method === '_co.grida/session/snapshot') {
+          const turn = {turnId:'turn',epoch:1,journalPosition:8,historyPosition:3,
+            controlRevision:4,paused:false,cancelled:false,disposition:'running',status:null};
+          send({id:request.id,result:{sessionId:'chat',sessionRevision:2,queuedInputs:0,
+            queue:[],admissionPaused:false,current:turn,latest:turn}});
+          return;
+        }
+        const p = request.params;
+        if (p.sessionId !== 'chat' || p.turnId !== 'turn') throw Error('wrong target');
+        const batchAvailable = ${batchAvailable};
+        const list = batchAvailable ? '_${QUESTION_BATCHES.list}' : '_co.grida/session/questions';
+        if (request.method === list) {
+          send({id:request.id,result:{sessionId:'chat',turnId:'turn',controlRevision:4,
+            historyPosition:3,questions:${JSON.stringify(batchAvailable ? [batch, singleton] : [singleton])}}});
+          return;
+        }
+        const isBatch = p.waitId === 'batch';
+        const method = isBatch ? '_${QUESTION_BATCHES.answer}' : '_co.grida/session/answer-question';
+        const expected = isBatch ? ${JSON.stringify(batchAnswers)} : ${JSON.stringify(legacyAnswers)};
+        const {answers, answer} = p;
+        if (request.method !== method || p.expectedHistoryPosition !== 3 ||
+          p.expectedSessionRevision !== 2 || p.expectedControlRevision !== 4 ||
+          JSON.stringify({answers, answer}) !== JSON.stringify(expected))
+          throw Error('wrong answer or basis');
+        send({id:request.id,result:{sessionId:'chat',turnId:'turn',requestId:p.requestId,
+          sessionRevision:3,journalPosition:9}});
+        `,
+        1,
+        {
+          [QUESTION_BATCHES.list]: 1,
+          [QUESTION_BATCHES.answer]: batchAvailable ? 1 : null,
+          "co.grida/session/optional-questions": 1,
+        }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const snapshot = await chat.observe(session);
+        const reviews = await chat.questions(session, snapshot);
+        expect(reviews).toHaveLength(batchAvailable ? 2 : 1);
+        expect(reviews.at(-1)).toMatchObject(singleton);
+        expect(
+          await chat.answerQuestion(session, reviews.at(-1)!, {
+            kind: "choice",
+            index: 0,
+          })
+        ).toMatchObject({ sessionId: "chat", turnId: "turn" });
+        expect(reviews.filter((review) => "questions" in review)).toMatchObject(
+          batchAvailable ? [{ ...batch, expiresWithTurn: true }] : []
+        );
+        const batchReceipt = batchAvailable
+          ? await chat.answerQuestion(session, reviews[0], {
+              kind: "batch",
+              answers: batchAnswers.answers,
+            })
+          : undefined;
+        expect(batchReceipt?.sessionId).toBe(
+          batchAvailable ? "chat" : undefined
+        );
+        expect(batchReceipt?.turnId).toBe(batchAvailable ? "turn" : undefined);
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it.each([true, false])(
+    "isolates the renderer question protocol across concurrent admissions (%s)",
+    async (batchAvailable) => {
+      const test = fixture("send({id:request.id,result:request.params});", 1, {
+        [QUESTION_BATCHES.list]: 1,
+        [QUESTION_BATCHES.answer]: batchAvailable ? 1 : null,
+      });
+      let process: NativeAgentProcess | undefined;
+      try {
+        const agent = (process = await NativeAgentProcess.start(test.options));
+        const methods = [
+          "_co.grida/session/submit",
+          "_co.grida/session/enqueue",
+          "_co.grida/session/replace",
+          "_co.grida/session/revise",
+          "_co.grida/goal/start",
+          "_co.grida/session/replace-text",
+          "_co.grida/session/questions",
+        ];
+        const payload = { _meta: { "co.grida/selectionRevision": 4 } };
+        const ready = Promise.withResolvers<void>();
+        const legacy = agent.withQuestionBatchPreference(false, async () => {
+          await ready.promise;
+          return await Promise.all(
+            methods.map((method) => agent.request(method, payload))
+          );
+        });
+        const modern = await agent.withQuestionBatchPreference(true, () =>
+          agent.request(methods[0], payload)
+        );
+        ready.resolve();
+        expect(modern).toEqual(payload);
+        const optedOut = batchAvailable
+          ? { _meta: { ...payload._meta, [QUESTION_BATCHES.list]: false } }
+          : payload;
+        expect(await legacy).toEqual([
+          optedOut,
+          optedOut,
+          optedOut,
+          optedOut,
+          optedOut,
+          payload,
+          payload,
+        ]);
+      } finally {
+        await process?.close();
+        test.close();
+      }
+    }
+  );
+
+  it("retains batch question replies through live updates and transcript replay", async () => {
+    const replies = [
+      {
+        waitId: "wait",
+        id: "format",
+        question: "Which format?",
+        answer: "Print",
+      },
+      {
+        waitId: "wait",
+        id: "theme",
+        question: "Which theme?",
+        answer: "The user skipped this question.",
+        skipped: true,
+      },
+    ];
+    const test = fixture(
+      `
+      if (request.method === 'session/new') {
+        send({id:request.id,result:{sessionId:'chat'}});
+        return;
+      }
+      const capability = '${TRANSCRIPT_WINDOW}';
+      const read = request.params._meta?.[capability];
+      if (read?.kind !== 'read') throw Error('unexpected request');
+      const reply = {turnId:'turn',questionReplies:${JSON.stringify(replies)}};
+      const update = {sessionUpdate:'user_message_chunk',messageId:'wait',
+        content:{type:'text',text:'Which format? Print. Which theme? Skipped.'}};
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:{'co.grida/session/updates':{...reply,offsetBytes:0,replace:true}},update}});
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:{[capability]:{...reply,requestId:read.requestId}},update}});
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const updates: unknown[] = [];
+      chat.subscribe(session, (update) => updates.push(update));
+      const page = await chat.transcriptPage(session);
+      expect(updates).toMatchObject([
+        {
+          kind: "text",
+          role: "user",
+          messageId: "wait",
+          questionReplies: replies,
+        },
+      ]);
+      expect(page.messages).toMatchObject([
+        { role: "user", messageId: "wait", questionReplies: replies },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
     }
   });
 

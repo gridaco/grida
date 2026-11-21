@@ -632,6 +632,7 @@ async fn serve_connection(
                         session,
                         parts,
                         questions: false,
+                        question_batches: false,
                         operating_regime: None,
                         effort: None,
                         reasoning: Default::default(),

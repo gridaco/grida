@@ -160,6 +160,7 @@ mod tests {
                 },
             ],
             questions: true,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: None,

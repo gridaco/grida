@@ -182,6 +182,7 @@ impl Host {
                     text: title_request(text),
                 }],
                 questions: false,
+                question_batches: false,
                 operating_regime: None,
                 effort: None,
                 reasoning: Default::default(),

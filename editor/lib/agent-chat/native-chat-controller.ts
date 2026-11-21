@@ -5520,7 +5520,8 @@ export class NativeChatController {
         (message) =>
           message.messageId === messageId &&
           message.role === "user" &&
-          !message.questionReply
+          !message.questionReply &&
+          !message.questionReplies
       )
     )
       return;
@@ -6758,7 +6759,19 @@ export class NativeChatController {
       this.view.acting
     )
       return false;
-    if (answer.kind === "text" && utf8.encode(answer.text).length > 4096) {
+    if (answer.kind === "batch" && "questions" in question) {
+      const oversized = question.questions.findIndex(({ id }) =>
+        answer.answers.some(
+          (entry) => entry.id === id && questionAnswerTooLong(entry.answer)
+        )
+      );
+      if (oversized >= 0) {
+        this.update({
+          error: `The answer to question ${oversized + 1} exceeds the 4 KiB limit.`,
+        });
+        return false;
+      }
+    } else if (questionAnswerTooLong(answer)) {
       this.update({ error: "The answer exceeds the 4 KiB limit." });
       return false;
     }
@@ -7949,7 +7962,8 @@ export class NativeChatController {
           if (!this.owns(scope) || scope.subscription !== subscription) return;
           if (update.kind === "closed") scope.subscription = undefined;
           this.receive(scope, update);
-        }
+        },
+        true
       );
       if (scope.subscription === subscription) subscription.id = id;
       else await this.bridge.unsubscribe(id).catch(() => {});
@@ -8380,6 +8394,10 @@ function applyText(
     ...((update.citations ?? existing?.citations)?.length && {
       citations: update.citations ?? existing?.citations,
     }),
+    ...(update.role === "user" && {
+      questionReply: update.questionReply ?? existing?.questionReply,
+      questionReplies: update.questionReplies ?? existing?.questionReplies,
+    }),
     ...activityOrderMetadata(
       previous?.turnId === update.turnId ? previous : undefined,
       update
@@ -8580,13 +8598,26 @@ function questionAnswerRevisionChanged(error: unknown): boolean {
   );
 }
 
+function questionAnswerTooLong(answer: NativeChatQuestionAnswer): boolean {
+  return answer.kind === "text" && utf8.encode(answer.text).length > 4096;
+}
+
 function sameQuestionPrompt(
   left: NativeChatQuestion,
   right: NativeChatQuestion
 ): boolean {
+  if (
+    left.style !== right.style ||
+    left.expiresWithTurn !== right.expiresWithTurn
+  )
+    return false;
+  if ("questions" in left || "questions" in right)
+    return (
+      "questions" in left &&
+      "questions" in right &&
+      activityPayloadEqual(left.questions, right.questions)
+    );
   return (
-    left.style === right.style &&
-    left.expiresWithTurn === right.expiresWithTurn &&
     left.question === right.question &&
     left.options.length === right.options.length &&
     left.options.every((option, index) => option === right.options[index])

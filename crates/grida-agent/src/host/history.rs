@@ -929,15 +929,14 @@ fn history_message(
     {
         return None;
     }
-    if let Some(reply) = grida_agent_master::questions::visible_reply(message) {
-        let end = reply
-            .answer
-            .floor_char_boundary(HISTORY_PREVIEW_BYTES.min(reply.answer.len()));
+    if let Some(replies) = grida_agent_master::questions::visible_replies(message) {
+        let text = super::question_reply_text(&replies);
+        let end = text.floor_char_boundary(HISTORY_PREVIEW_BYTES.min(text.len()));
         return Some(HistoryMessage {
             anchor,
             role: message.role,
             editable: false,
-            preview: reply.answer[..end].to_owned(),
+            preview: text[..end].to_owned(),
         });
     }
     if super::editor_observation::is_observation(message) {

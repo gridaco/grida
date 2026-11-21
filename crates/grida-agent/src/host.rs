@@ -67,7 +67,10 @@ pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use lifecycle_hooks::HookInspection;
 pub(crate) use permissions::ApprovalReview;
 pub use permissions::{Approvals, PendingApproval};
-pub use questions::{PendingQuestion, Questions};
+pub(crate) use questions::reply_text as question_reply_text;
+pub use questions::{
+    PendingQuestion, PendingQuestionBatch, PendingQuestionV2, Questions, QuestionsV2,
+};
 pub use retained_file::FileUpload;
 pub use selection::{
     ChatSelection, LegacySelection, SelectionEffort, SelectionOutcome, SelectionReceipt,
@@ -454,6 +457,7 @@ pub struct PromptRequest {
     pub session: SessionId,
     pub parts: Vec<PromptPart>,
     pub questions: bool,
+    pub question_batches: bool,
     pub operating_regime: Option<OperatingRegime>,
     pub effort: Option<EffortPreset>,
     /// The person's reasoning level for this request's turn.
@@ -537,6 +541,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "OperatingRegime::is_act")]
     operating_regime: OperatingRegime,
     questions: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    question_batches: bool,
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
@@ -636,6 +642,7 @@ struct SubmissionPolicy {
     selection_revision: Option<u64>,
     selection_goal: bool,
     questions: bool,
+    question_batches: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
     allow_host_tools: bool,
@@ -753,6 +760,7 @@ struct PreparedInput {
     retained_file: Option<crate::scratch::WorkingCopyReceipt>,
     limit: Option<NonZeroU64>,
     questions: bool,
+    question_batches: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -771,7 +779,7 @@ struct PreparedInput {
 #[derive(Clone, Debug, Serialize)]
 pub struct PendingInteractions {
     #[serde(flatten)]
-    pub questions: Questions,
+    pub questions: QuestionsV2,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub approvals: Vec<PendingApproval>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -2416,9 +2424,12 @@ impl Host {
             skills.insert(&mut inventory, &mut authority.tools)?;
         }
         if prepared.questions {
-            execution
-                .questions
-                .insert(operations.clone(), &mut inventory, &mut authority.tools)?;
+            execution.questions.insert(
+                operations.clone(),
+                &mut inventory,
+                &mut authority.tools,
+                prepared.question_batches,
+            )?;
         }
         if prepared.allow_library_selection {
             execution.questions.insert_library(
@@ -2671,6 +2682,7 @@ impl Host {
             selection_revision: None,
             selection_goal: false,
             questions: request.questions,
+            question_batches: request.questions && request.question_batches,
             allow_wakeups,
             allow_library_selection: false,
             allow_host_tools: true,
@@ -2703,6 +2715,7 @@ impl Host {
             selection_revision,
             selection_goal,
             questions,
+            question_batches,
             allow_wakeups,
             allow_library_selection,
             allow_host_tools,
@@ -2972,6 +2985,7 @@ impl Host {
                 }),
                 operating_regime,
                 questions,
+                question_batches,
                 allow_wakeups,
                 allow_library_selection,
                 unavailable_library_selection_requested,
@@ -3040,6 +3054,7 @@ impl Host {
             operating_regime,
             limit,
             questions,
+            question_batches,
             allow_wakeups,
             allow_library_selection,
             permission_capture,
@@ -3482,6 +3497,7 @@ impl Host {
                     stored.operating_regime,
                     stored.configuration.defaults.context.max_input_tokens,
                     stored.questions,
+                    stored.question_batches,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
                     !cancellation_only && stored.allow_library_selection,
                     if cancellation_only {
@@ -3564,6 +3580,7 @@ impl Host {
             retained_file,
             limit,
             questions,
+            question_batches,
             allow_wakeups,
             allow_library_selection,
             permission_capture,

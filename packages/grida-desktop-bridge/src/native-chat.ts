@@ -685,6 +685,8 @@ export type NativeChatMessage = Readonly<{
   svgSelection?: true;
   /** A host-attributed question reply. The message text is the person's answer. */
   questionReply?: Readonly<{ waitId: string; question: string }>;
+  /** The host-attributed replies to one question batch, in prompt order. */
+  questionReplies?: readonly NativeChatQuestionReply[];
 }>;
 
 /** A file attached to a person's message, named for display. */
@@ -979,20 +981,48 @@ export type NativeChatApproval = Readonly<{
 
 export type NativeChatApprovalDecision = "approve_once" | "decline";
 
+export type NativeChatQuestionReply = Readonly<{
+  waitId: string;
+  id: string;
+  question: string;
+  answer: string;
+  skipped?: true;
+}>;
+
+export type NativeChatQuestionItem = Readonly<{
+  id: string;
+  header?: string;
+  question: string;
+  options: readonly Readonly<{ label: string; description?: string }>[];
+}>;
+
+export type NativeChatQuestionPrompt =
+  | Readonly<{ question: string; options: readonly string[] }>
+  | Readonly<{ questions: readonly NativeChatQuestionItem[] }>;
+
 export type NativeChatQuestion = Readonly<{
   questionId: string;
   reviewId: string;
   style: "answer_dependent" | "nonblocking";
   /** This optional question can be dismissed until its turn finishes. */
   expiresWithTurn?: true;
-  question: string;
-  options: readonly string[];
-}>;
+}> &
+  NativeChatQuestionPrompt;
 
-export type NativeChatQuestionAnswer =
+export type NativeChatSingleQuestionAnswer =
   | { kind: "choice"; index: number }
   | { kind: "text"; text: string }
   | { kind: "skipped" };
+
+export type NativeChatQuestionAnswer =
+  | NativeChatSingleQuestionAnswer
+  | {
+      kind: "batch";
+      answers: readonly Readonly<{
+        id: string;
+        answer: NativeChatSingleQuestionAnswer;
+      }>[];
+    };
 
 export type NativeChatLibrarySelection = Readonly<{
   selectionId: string;
@@ -1020,7 +1050,8 @@ export type NativeChatTextUpdate = Readonly<{
   /** The same first-publication coordinate retained by replayed messages. */
   activityOrder?: number;
   activityOrderIncomplete?: true;
-}>;
+}> &
+  Pick<NativeChatMessage, "questionReply" | "questionReplies">;
 
 export type NativeChatActivityUpdate = Readonly<{
   kind: "activity";
@@ -1460,9 +1491,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     control: NativeChatControl
   ): Promise<NativeChatControlResult>;
+  /** Pass true when this attachment can render and settle a question batch. */
   subscribe(
     attachmentId: string,
-    update: (update: NativeChatUpdate) => void
+    update: (update: NativeChatUpdate) => void,
+    acceptsQuestionBatches?: true
   ): Promise<string>;
   unsubscribe(subscriptionId: string): Promise<void>;
 };

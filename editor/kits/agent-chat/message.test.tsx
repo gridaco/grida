@@ -63,6 +63,39 @@ function render(parts: ChatMessage["parts"], controls?: ChatMessageActions) {
   );
 }
 
+it("quotes each accepted batch answer with its question in order", () => {
+  const html = render(
+    native_message_parts.of({
+      messageId: "reply",
+      role: "user",
+      text: "Plain fallback",
+      questionReplies: [
+        {
+          waitId: "wait",
+          id: "format",
+          question: "Which format?",
+          answer: "Print",
+        },
+        {
+          waitId: "wait",
+          id: "theme",
+          question: "Which theme?",
+          answer: "The user skipped this question.",
+          skipped: true,
+        },
+      ],
+    })
+  );
+  expect(html).toContain("Which format?");
+  expect(html).toContain("Print");
+  expect(html).toContain("Which theme?");
+  expect(html).toContain("Skipped");
+  expect(html.indexOf("Which format?")).toBeLessThan(
+    html.indexOf("Which theme?")
+  );
+  expect(html).not.toContain("Plain fallback");
+});
+
 it("shows one passive selection marker on the accepted user message", () => {
   const parts = native_message_parts.of({
     messageId: "selected",

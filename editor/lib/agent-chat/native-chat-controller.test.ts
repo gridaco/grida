@@ -2405,6 +2405,99 @@ it.each([
   }
 );
 
+it.each(["same batch", "reordered items", "changed description"] as const)(
+  "rechecks the full question batch before retrying a stale answer (%s)",
+  async (change) => {
+    const { answer, controller, question, changeQuestion } =
+      questionAnswerFixture();
+    const batch = {
+      questionId: question.questionId,
+      reviewId: question.reviewId,
+      style: question.style,
+      expiresWithTurn: question.expiresWithTurn,
+      questions: [
+        {
+          id: "format",
+          question: "Which format?",
+          options: [{ label: "Print", description: "Ready for press" }],
+        },
+        { id: "theme", question: "Which theme?", options: [] },
+      ],
+    } as const;
+    const reply = {
+      kind: "batch",
+      answers: [
+        { id: "format", answer: { kind: "choice", index: 0 } },
+        { id: "theme", answer: { kind: "skipped" } },
+      ],
+    } as const;
+    changeQuestion([batch]);
+    await controller.select("chat-a");
+    const renewed = {
+      ...batch,
+      reviewId: "batch-review-current",
+      questions:
+        change === "reordered items"
+          ? [...batch.questions].reverse()
+          : change === "changed description"
+            ? [
+                {
+                  ...batch.questions[0],
+                  options: [{ label: "Print", description: "Low resolution" }],
+                },
+                batch.questions[1],
+              ]
+            : batch.questions,
+    };
+    changeQuestion([renewed]);
+    answer.mockRejectedValueOnce(new Error("history_position_changed"));
+    try {
+      await expect(
+        controller.answerQuestion(batch.questionId, reply)
+      ).resolves.toBe(change === "same batch");
+      const calls = [["chat-a", batch.reviewId, reply]];
+      if (change === "same batch")
+        calls.push(["chat-a", renewed.reviewId, reply]);
+      expect(answer.mock.calls).toEqual(calls);
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("identifies the prompt with an oversized batch answer without submitting", async () => {
+  const { answer, controller, question, changeQuestion } =
+    questionAnswerFixture();
+  const batch = {
+    questionId: question.questionId,
+    reviewId: question.reviewId,
+    style: question.style,
+    expiresWithTurn: question.expiresWithTurn,
+    questions: [
+      { id: "format", question: "Which format?", options: [] },
+      { id: "theme", question: "Which theme?", options: [] },
+    ],
+  } as const;
+  changeQuestion([batch]);
+  await controller.select("chat-a");
+  try {
+    await expect(
+      controller.answerQuestion(batch.questionId, {
+        kind: "batch",
+        answers: [
+          { id: "theme", answer: { kind: "text", text: "é".repeat(2049) } },
+          { id: "format", answer: { kind: "skipped" } },
+        ],
+      })
+    ).resolves.toBe(false);
+    expect(answer).not.toHaveBeenCalled();
+    expect(controller.read().error).toMatch(/answer to question 2/);
+    expect(controller.read().questions).toEqual([batch]);
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("does not retry an answer after the user switches chats", async () => {
   const { answer, controller, question, reply } = questionAnswerFixture();
   await controller.select("chat-a");
@@ -8541,6 +8634,7 @@ describe("a first message chosen before the chat opened", () => {
     };
     const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
     bridge.load = load;
+    const subscribe = vi.spyOn(bridge, "subscribe");
     const controller = new NativeChatController(bridge, memory, "project");
     const message = firstMessage();
     try {
@@ -8552,6 +8646,14 @@ describe("a first message chosen before the chat opened", () => {
       // The remembered chat and model are not reopened first.
       expect(load).not.toHaveBeenCalled();
       expect(create).toHaveBeenCalledOnce();
+      expect(subscribe).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.any(Function),
+        true
+      );
+      expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+        submit.mock.invocationCallOrder[0]!
+      );
       expect(submit).toHaveBeenCalledExactlyOnceWith(
         "first",
         expect.any(String),

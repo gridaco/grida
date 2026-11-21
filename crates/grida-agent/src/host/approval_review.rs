@@ -80,11 +80,21 @@ fn append_instructions<'a>(
         if message.role != Role::User {
             continue;
         }
-        let text = if let Some(reply) = grida_agent_master::questions::visible_reply(message) {
-            std::borrow::Cow::Owned(format!(
-                "Question: {}\nUser answer: {}",
-                reply.question, reply.answer
-            ))
+        let text = if let Some(replies) = grida_agent_master::questions::visible_replies(message) {
+            let answers = replies
+                .into_iter()
+                .filter(|reply| !reply.skipped)
+                .map(|reply| {
+                    format!(
+                        "Question: {}\nUser answer: {}",
+                        reply.question, reply.answer
+                    )
+                })
+                .collect::<Vec<_>>();
+            if answers.is_empty() {
+                continue;
+            }
+            std::borrow::Cow::Owned(answers.join("\n\n"))
         } else if message.provenance.kind == ProvenanceKind::Supplied
             && matches!(
                 message.provenance.source.as_str(),
@@ -167,12 +177,17 @@ impl AutomaticReview {
             ) {
                 break message;
             }
-            let Some(reply) =
-                grida_agent_master::questions::reply_in_context(state, message, &source.messages)
+            let Some(replies) =
+                grida_agent_master::questions::replies_in_context(state, message, &source.messages)
             else {
                 return Ok(None);
             };
-            answers.push(reply.answer);
+            answers.extend(
+                replies
+                    .into_iter()
+                    .filter(|reply| !reply.skipped)
+                    .map(|reply| reply.answer),
+            );
             if answers.len() >= MAX_USER_INSTRUCTIONS {
                 return Ok(None);
             }

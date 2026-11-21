@@ -757,6 +757,7 @@ function NativeChatPane({
     else if (
       message.role === "user" &&
       !message.questionReply &&
+      !message.questionReplies &&
       message.turnId &&
       !firstRequest.has(message.turnId)
     )
@@ -811,6 +812,7 @@ function NativeChatPane({
                 // Inline revision is for plain-text requests.
                 ...(editHistory &&
                   !message.questionReply &&
+                  !message.questionReplies &&
                   !message.attachments?.length &&
                   !message.displayParts?.length &&
                   !goalStart && {
@@ -1122,14 +1124,28 @@ function NativeChatPane({
                     : undefined
                 }
                 input={{
-                  questions: [
-                    {
-                      question: question.question,
-                      options: question.options.map((label) => ({ label })),
-                    },
-                  ],
+                  questions:
+                    "questions" in question
+                      ? question.questions
+                      : [
+                          {
+                            question: question.question,
+                            options: question.options.map((label) => ({
+                              label,
+                            })),
+                          },
+                        ],
                 }}
                 onSubmit={async (survey) => {
+                  if ("questions" in question) {
+                    const answers = survey.batchAnswers();
+                    return answers
+                      ? controller.answerQuestion(question.questionId, {
+                          kind: "batch",
+                          answers,
+                        })
+                      : false;
+                  }
                   const answer = survey.singleAnswer();
                   return answer
                     ? controller.answerQuestion(question.questionId, answer)

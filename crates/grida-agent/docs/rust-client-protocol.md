@@ -748,8 +748,10 @@ expired result needs no attention. Older consumers ignore unknown fact kinds.
 | `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                                                              |
 | `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                                                      |
 | `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                                                     |
-| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                                                               |
-| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                                                                  |
+| `questions`                              | `sessionId`, `turnId`. Read pending singleton questions and the current control/history basis.                                                                                                                  |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed singleton answer and its correlated contribution.                                                                        |
+| `questions-v2`                           | `sessionId`, `turnId`. Read pending question batches and retained singleton questions, with the current control/history basis.                                                                                  |
+| `answer-question-v2`                     | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answers`. Commit one answer or skip per question ID and its correlated contribution together.                                                    |
 | `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                                                     |
 | `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                                                          |
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                                    |
@@ -1021,24 +1023,52 @@ request. Pause holds the retry and Stop closes it. The value is absent when
 there is no current retry. An eligible pre-execution failure can reserve this
 retry, including a connection refusal verified by the direct HTTP host.
 
-Clients negotiate both question operations to enable the corresponding tools
-for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
+Clients negotiate both `co.grida/session/questions-v2` and
+`co.grida/session/answer-question-v2` with capability value `1` to enable
+question batches on newly accepted input. A connection advertising only the
+original pair still submits inputs with the singleton tools. The accepted
+input keeps its original tool definition across queueing, suspension, and
+restarts. A supervisor can pass `_meta: {"co.grida/session/questions-v2": false}`
+on submit, enqueue, queue replacement, revision, or goal start to select the
+negotiated singleton tools for that input. A text-only replacement retains
+the original input's question version.
+
+Both listing methods take `sessionId` and `turnId` and return their
+`controlRevision`, `historyPosition`, and pending `questions`. A v2
+batch entry has `waitId`, `style` (`answer_dependent` or `nonblocking`),
+and a `questions` array in display order. An item has `id`, `question`,
+optional `header`, and `options` with labeled choices and optional
+descriptions. A retained singleton keeps its original entry
+`{waitId, style, question, options}`, with string choices. The v1 listing
+only returns those singleton entries.
+
+Answer values are `{ "kind": "text", "text": "..." }`,
 `{ "kind": "choice", "index": 0 }`, or `{ "kind": "skipped" }`.
-Keep the request identity and all parameters stable when retrying. Accepted
-answers retain a scheduling wake across concurrent worker completion and
-capacity changes. An explicit task pause is independent of answer receipt.
+A v2 submission sends `answers: [{id, answer}, ...]`, with each item ID
+exactly once, and settles a whole wait. If a v2-only client answers a retained
+singleton, use the item ID `question`. The v1 method takes one `answer` for
+a singleton wait. Keep the request identity and all parameters stable when
+retrying. Accepted answers retain a scheduling wake across concurrent worker
+completion and capacity changes. An explicit task pause is independent of
+answer receipt.
+
 Hosts advertising `co.grida/session/optional-questions: 1` expire unanswered
-nonblocking questions in the owning turn's settlement commit. Closing or
-skipping an optional card locally lets the person reopen it while the wait is
-pending. Sending `{ "kind": "skipped" }` explicitly resolves a wait.
-A reply accepted before settlement reaches the next model decision as a user
-message wrapped in `<send_user_message_question_reply>` with a JSON array of
-`{questionItemId, question, answer}`. An answer-dependent tool receives its
-answer as the tool result. For either style, the transcript window delivers the
-readable answer in a user text chunk with `questionReply: {waitId, question}`
-in the chunk's window metadata. Quoted markup in ordinary chat stays ordinary
-text. An embedded `run --questions` exits with `input_required` and code `6`
-when an answer is required. An unanswered optional question permits success.
+nonblocking questions in the owning turn's settlement commit. A card
+dismissed locally may reopen while its wait is pending. An answer accepted
+before settlement reaches the next model decision as a correlated user
+contribution. An answer-dependent tool receives its answers as the tool
+result.
+
+A committed batch appears in the transcript window as a plain-language user
+text chunk. Private attached updates also carry this chunk for clients that
+negotiated `co.grida/session/questions-v2`. The first chunk carries
+`questionReplies: [{waitId, id, question, answer, skipped?}, ...]` in its
+negotiated window or update metadata, with `skipped: true` when applicable.
+Retained singleton reply chunks keep their window metadata
+`questionReply: {waitId, question}`. Quoted markup in ordinary chat stays
+ordinary text. An embedded `run --questions` exits with `input_required`,
+code `6`, and the pending question entries when it needs answers. An
+unanswered optional batch permits success.
 
 ### Temporary side chats
 

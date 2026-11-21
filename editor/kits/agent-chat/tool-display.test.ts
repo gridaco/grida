@@ -61,6 +61,20 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("counts the questions in a batch as well as retained single questions", () => {
+    const questions = [
+      { id: "edition", question: "Which edition?" },
+      { id: "theme", question: "Which theme?" },
+    ];
+    expect(
+      toolDisplay.summarize([
+        tool("1", "question", { question: "Which title?" }),
+        tool("2", "question_async", { questions }),
+        runningTool("3", "question", { questions }),
+      ])
+    ).toBe("Asked 3 questions, asking 2 questions");
+  });
+
   it("keeps running and failed work honest in the same ranked action group", () => {
     expect(
       toolDisplay.group([

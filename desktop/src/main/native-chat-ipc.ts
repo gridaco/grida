@@ -41,6 +41,7 @@ import type {
   NativeChatProfileSelection,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatSingleQuestionAnswer,
   NativeChatQueueChange,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
@@ -181,6 +182,7 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "withQuestionBatchPreference"
         | "predictPrompt"
         | "messageActivityCatalog"
         | "archiveCatalog"
@@ -250,6 +252,8 @@ type PermissionReview = {
 
 type Attachment = {
   presented?: boolean;
+  /** The hosted renderer declared batch support on this attachment. */
+  acceptsQuestionBatches?: true;
   permissionReview?: PermissionReview;
   id: string;
   session: NativeChatSession;
@@ -2091,9 +2095,10 @@ export class NativeChatIpc {
   ): Promise<NativeChatRevisionReceipt> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const chat = owner.active.chat;
+    const revise = chat.revise;
     const input = record(value);
     if (
-      !chat.revise ||
+      !revise ||
       !input ||
       Object.keys(input).length !== (input.effort === undefined ? 3 : 4) ||
       !token(input.reviewId) ||
@@ -2101,17 +2106,21 @@ export class NativeChatIpc {
       (input.operatingRegime !== "act" && input.operatingRegime !== "plan")
     )
       throw new Error("native_chat_revision_unavailable");
+    const { reviewId, text, operatingRegime } = input;
     const effort = agentEffort(input.effort);
-    return chat.revise(
-      attachment,
-      attachment.session,
-      {
-        reviewId: input.reviewId,
-        text: input.text,
-        operatingRegime: input.operatingRegime,
-        ...(effort && { effort }),
-      },
-      (expected) => this.revalidateRevision(owner, attachment, expected)
+    return this.admit(owner, attachment, () =>
+      revise.call(
+        chat,
+        attachment,
+        attachment.session,
+        {
+          reviewId,
+          text,
+          operatingRegime,
+          ...(effort && { effort }),
+        },
+        (expected) => this.revalidateRevision(owner, attachment, expected)
+      )
     );
   }
 
@@ -2860,6 +2869,16 @@ export class NativeChatIpc {
       };
   }
 
+  private admit<T>(owner: Owner, attachment: Attachment, action: () => T): T {
+    const { chat } = owner.active;
+    return chat.withQuestionBatchPreference
+      ? chat.withQuestionBatchPreference(
+          attachment.acceptsQuestionBatches === true,
+          action
+        )
+      : action();
+  }
+
   async submit(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -2901,8 +2920,8 @@ export class NativeChatIpc {
       mode === "act"
         ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat
-      .submit(
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submit(
         attachment.session,
         inputId,
         text,
@@ -2915,7 +2934,7 @@ export class NativeChatIpc {
           webSearch
         )
       )
-      .catch((error: unknown) => receiptAfterBrowserChange(error, prior));
+    ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -2930,8 +2949,8 @@ export class NativeChatIpc {
     if (typeof data?.inputId !== "string")
       throw new Error("native_chat_message_context_invalid");
     const { chat } = owner.active;
-    if (!chat.submitMessage)
-      throw new Error("native_chat_message_context_unavailable");
+    const submit = chat.submitMessage;
+    if (!submit) throw new Error("native_chat_message_context_unavailable");
     // Apply the same route and provider choice checks as other submits. A
     // captured retry still reaches the host to verify its accepted context.
     await this.selectionAdmission(
@@ -2942,12 +2961,15 @@ export class NativeChatIpc {
       data.webSearch
     );
     this.revalidate(owner, attachment);
-    const result = await chat.submitMessage(
-      attachment.session,
-      input,
-      data.operatingRegime === "act"
-        ? attachment.editorSurfaces?.selection()
-        : undefined
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(
+        chat,
+        attachment.session,
+        input,
+        data.operatingRegime === "act"
+          ? attachment.editorSurfaces?.selection()
+          : undefined
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2994,8 +3016,8 @@ export class NativeChatIpc {
       mode === "act"
         ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat
-      .enqueue(
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.enqueue(
         attachment.session,
         inputId,
         text,
@@ -3008,7 +3030,7 @@ export class NativeChatIpc {
           webSearch
         )
       )
-      .catch((error: unknown) => receiptAfterBrowserChange(error, prior));
+    ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -3039,22 +3061,26 @@ export class NativeChatIpc {
     );
     if (prior) return prior;
     const { chat } = owner.active;
-    if (!chat.acceptsLibrarySelection || !chat.submitWithLibrarySelection)
+    const submit = chat.submitWithLibrarySelection;
+    if (!chat.acceptsLibrarySelection || !submit)
       throw new Error("native_chat_library_selection_unavailable");
     const mode = operatingRegime(regime);
     const surfaces =
       mode === "act" ? attachment.editorSurfaces?.selection() : undefined;
-    const result = await chat.submitWithLibrarySelection(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        agentEffort(effort),
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId),
-        webSearch
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(
+        chat,
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          agentEffort(effort),
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId),
+          webSearch
+        )
       )
     );
     this.revalidate(owner, attachment);
@@ -3303,9 +3329,8 @@ export class NativeChatIpc {
       "inline"
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitImage(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitImage(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -3338,9 +3363,12 @@ export class NativeChatIpc {
       attachment.session.sideImageInput ??
       (routed || chat.acceptsSelectedImage);
     const transport = chat.supportsSelectedImage ?? chat.acceptsSelectedImage;
-    if (!modelAcceptsImage || !transport || !chat.submitSelectedImage)
+    const submit = chat.submitSelectedImage;
+    if (!modelAcceptsImage || !transport || !submit)
       throw new Error("image_input_unavailable");
-    const result = await chat.submitSelectedImage(attachment.session, input);
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(chat, attachment.session, input)
+    );
     this.revalidate(owner, attachment);
     return result;
   }
@@ -3360,9 +3388,8 @@ export class NativeChatIpc {
       data?.webSearch
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitFile(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitFile(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -3383,9 +3410,8 @@ export class NativeChatIpc {
       data?.webSearch
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitFileReference(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitFileReference(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -3800,11 +3826,10 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const change = queueChange(input);
     const snapshot = requireObservation(attachment, change.observationId);
-    const receipt = await owner.active.chat.editQueue(
-      attachment.session,
-      snapshot,
-      change,
-      () => this.revalidate(owner, attachment)
+    const receipt = await this.admit(owner, attachment, () =>
+      owner.active.chat.editQueue(attachment.session, snapshot, change, () =>
+        this.revalidate(owner, attachment)
+      )
     );
     this.revalidate(owner, attachment);
     return receipt;
@@ -3884,10 +3909,8 @@ export class NativeChatIpc {
       record(request)?.selectionRevision
     );
     if (prior) return prior;
-    const accepted = await owner.active.chat.startGoal(
-      attachment.session,
-      inputId,
-      request
+    const accepted = await this.admit(owner, attachment, () =>
+      owner.active.chat.startGoal(attachment.session, inputId, request)
     );
     this.revalidate(owner, attachment);
     return accepted;
@@ -3999,8 +4022,16 @@ export class NativeChatIpc {
       reviewId: retainReview(attachment.questions, review, sameQuestion),
       style: review.style,
       ...(review.expiresWithTurn && { expiresWithTurn: true }),
-      question: review.question,
-      options: review.options,
+      ...("questions" in review
+        ? {
+            questions: review.questions,
+            // The installed app can load a hosted view with the old singleton card.
+            // Give it display-only text. The review still requires an exact batch.
+            question:
+              "Open this chat in the latest chat view to answer these questions.",
+            options: [],
+          }
+        : { question: review.question, options: review.options }),
     }));
   }
 
@@ -4015,7 +4046,7 @@ export class NativeChatIpc {
       ? attachment.questions.get(reviewId)
       : undefined;
     if (!review) throw new Error("native_chat_question_unavailable");
-    const answer = questionAnswer(input, review.options.length);
+    const answer = questionAnswer(input, review);
     const receipt = await owner.active.chat.answerQuestion(
       attachment.session,
       review,
@@ -4139,7 +4170,8 @@ export class NativeChatIpc {
   subscribe(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    subscriptionId: string
+    subscriptionId: string,
+    acceptsQuestionBatches?: unknown
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     if (
@@ -4204,9 +4236,11 @@ export class NativeChatIpc {
           this.unsubscribeOwned(owner, subscriptionId);
         }
       });
-      if (owner.subscriptions.get(subscriptionId) === subscription)
+      if (owner.subscriptions.get(subscriptionId) === subscription) {
         subscription.stop = stop;
-      else stop();
+        if (acceptsQuestionBatches === true)
+          attachment.acceptsQuestionBatches = true;
+      } else stop();
     } catch (error) {
       this.unsubscribeOwned(owner, subscriptionId);
       throw error;
@@ -4751,9 +4785,19 @@ function sameQuestion(
   left: NativeQuestionReview,
   right: NativeQuestionReview
 ): boolean {
+  if (
+    left.task.requestId !== right.task.requestId ||
+    left.style !== right.style ||
+    left.expiresWithTurn !== right.expiresWithTurn
+  )
+    return false;
+  if ("questions" in left || "questions" in right)
+    return (
+      "questions" in left &&
+      "questions" in right &&
+      JSON.stringify(left.questions) === JSON.stringify(right.questions)
+    );
   return (
-    left.task.requestId === right.task.requestId &&
-    left.style === right.style &&
     left.question === right.question &&
     left.options.length === right.options.length &&
     left.options.every((option, index) => option === right.options[index])
@@ -4762,8 +4806,47 @@ function sameQuestion(
 
 function questionAnswer(
   input: unknown,
-  options: number
+  review: NativeQuestionReview
 ): NativeChatQuestionAnswer {
+  if (!("questions" in review))
+    return singleQuestionAnswer(input, review.options.length);
+
+  const batch = record(input);
+  if (
+    !batch ||
+    batch.kind !== "batch" ||
+    Object.keys(batch).length !== 2 ||
+    !Array.isArray(batch.answers) ||
+    batch.answers.length !== review.questions.length
+  )
+    throw new Error("native_chat_question_answer_invalid");
+
+  const byId = new Map<string, unknown>();
+  for (const value of batch.answers) {
+    const entry = record(value);
+    if (
+      !entry ||
+      Object.keys(entry).length !== 2 ||
+      typeof entry.id !== "string" ||
+      byId.has(entry.id)
+    )
+      throw new Error("native_chat_question_answer_invalid");
+    byId.set(entry.id, entry.answer);
+  }
+
+  return {
+    kind: "batch",
+    answers: review.questions.map(({ id, options }) => ({
+      id,
+      answer: singleQuestionAnswer(byId.get(id), options.length),
+    })),
+  };
+}
+
+function singleQuestionAnswer(
+  input: unknown,
+  options: number
+): NativeChatSingleQuestionAnswer {
   const answer = record(input);
   if (answer) {
     const fields = Object.keys(answer).length;

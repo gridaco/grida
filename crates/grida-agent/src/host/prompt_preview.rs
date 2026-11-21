@@ -185,6 +185,7 @@ pub async fn bake(
                 text: "Preview this prompt.".into(),
             }],
             questions,
+            question_batches: questions,
             operating_regime: Some(regime),
             effort: Some(effort),
             reasoning: None,

@@ -61,6 +61,7 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -211,6 +212,7 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -795,6 +797,7 @@ pub enum QueueEdit {
         replacement: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        question_batches: bool,
     },
     Withdraw {
         input: ChangeId,
@@ -1145,6 +1148,7 @@ impl Host {
                 replacement,
                 parts,
                 questions,
+                question_batches,
             } => {
                 validate_prompt_parts(&parts)?;
                 let original = self.store.input(session.clone(), input.clone()).await?;
@@ -1226,6 +1230,7 @@ impl Host {
                             selection_revision: None,
                             selection_goal: false,
                             questions,
+                            question_batches,
                             allow_wakeups: false,
                             allow_library_selection: false,
                             allow_host_tools,
