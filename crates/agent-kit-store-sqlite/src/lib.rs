@@ -508,6 +508,39 @@ impl SqliteStore {
         .await
     }
 
+    /// Read the selected submission of a turn with exactly one input.
+    /// Observers need only the submission and can leave the journal unloaded.
+    pub async fn sole_turn_submission(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+    ) -> Result<Option<Submission>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT s.id FROM turns t
+                     LEFT JOIN submissions s ON s.session=t.session AND s.turn=t.id
+                     WHERE t.session=?1 AND t.id=?2 LIMIT 2",
+                )
+                .map_err(database_error)?;
+            let mut rows = statement
+                .query(params![session.as_str(), turn.as_str()])
+                .map_err(database_error)?;
+            let id: Option<String> = rows
+                .next()
+                .map_err(database_error)?
+                .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?
+                .get(0)
+                .map_err(database_error)?;
+            if rows.next().map_err(database_error)?.is_some() {
+                return Ok(None);
+            }
+            id.map(|id| Ok(load_input(connection, &session, &ChangeId::new(id)?)?.input))
+                .transpose()
+        })
+        .await
+    }
+
     /// Read a caller-owned view from one committed turn snapshot without a lease.
     /// The projection runs under the store lock and must be a pure in-memory transform.
     pub async fn inspect_turn_with<T: Send + 'static>(

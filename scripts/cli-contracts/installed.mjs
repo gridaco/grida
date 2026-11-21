@@ -571,7 +571,12 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     try {
       const initialized = await service.rpc(1, "initialize", {
         protocolVersion: 1,
-        clientCapabilities: { _meta: { "co.grida/session/snapshot": 1 } },
+        clientCapabilities: {
+          _meta: {
+            "co.grida/session/snapshot": 1,
+            "co.grida/session/transcript-window": 1,
+          },
+        },
       });
       assert.equal(initialized.protocolVersion, 1);
       assert.equal(
@@ -586,6 +591,16 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         cwd: owned,
         mcpServers: [],
       });
+      const transcript = "co.grida/session/transcript-window";
+      const reopened = await service.rpc(28, "session/load", {
+        sessionId,
+        cwd: owned,
+        mcpServers: [],
+        _meta: { [transcript]: { kind: "read", requestId: "captured-model" } },
+      });
+      const [record] = reopened._meta[transcript].turns;
+      assert.equal(record.turnId, accepted.turn_id);
+      assert.equal(record.modelId, "openai/fixture-chat");
       const second = await service.rpc(3, "session/new", {
         cwd: owned,
         mcpServers: [],
@@ -628,6 +643,8 @@ export async function proveInstalled({ binary, launcher, workdir }) {
           sessionId: second.sessionId,
         });
         assert.equal(snapshot.current.inputNeeded, false);
+        assert.equal(snapshot.current.modelId, "openai/fixture-chat");
+        assert.equal(snapshot.latest.modelId, snapshot.current.modelId);
         assert.equal(
           chatRequests.length,
           1,

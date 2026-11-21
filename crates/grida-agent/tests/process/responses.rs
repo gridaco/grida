@@ -898,6 +898,7 @@ mod subscription_history {
                 "provider/routes",
                 "session/selection",
                 "session/permission-mode",
+                "session/transcript-window",
             ],
         )
         .await;
@@ -961,6 +962,18 @@ mod subscription_history {
             .await;
         assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
 
+        let captured = worker
+            .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+            .await;
+        assert_eq!(
+            captured["result"]["current"]["modelId"], "fixture-a",
+            "{captured}"
+        );
+        assert_eq!(
+            captured["result"]["latest"]["modelId"], "fixture-a",
+            "{captured}"
+        );
+
         worker.exchange(first_read.unwrap()).await;
         let settled = worker
             .wait_for_snapshot(session, |view| {
@@ -968,6 +981,7 @@ mod subscription_history {
             })
             .await;
         assert_eq!(settled["latest"]["status"], "succeeded", "{settled}");
+        assert_eq!(settled["latest"]["modelId"], "fixture-b", "{settled}");
         let attempts: Vec<_> = worker
             .requests
             .iter()
@@ -1033,6 +1047,14 @@ mod subscription_history {
                 "Third answer"
             ]
         );
+        let window = "co.grida/session/transcript-window";
+        let page = worker.request("session/load",json!({"cwd":fixture.primary,"sessionId":session,"mcpServers":[],"_meta":{window:{"kind":"read","requestId":"captured-models"}}})).await;
+        let turns = page["result"]["_meta"][window]["turns"].as_array().unwrap();
+        let models: Vec<_> = turns
+            .iter()
+            .map(|turn| turn["modelId"].as_str().unwrap())
+            .collect();
+        assert_eq!(models, ["fixture-a", "fixture-a", "fixture-b"]);
         worker.close().await;
     }
 

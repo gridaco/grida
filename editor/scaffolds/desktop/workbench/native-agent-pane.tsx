@@ -741,7 +741,8 @@ function NativeChatPane({
     state.messages,
     state.turnRecords,
     snapshot?.current,
-    snapshot?.latest
+    snapshot?.latest,
+    state.transcriptGapBefore
   );
   const records = new Map<string, (typeof state.turnRecords)[number]>();
   for (const record of state.turnRecords)
@@ -962,6 +963,7 @@ function NativeChatPane({
                   <NativeTurnActivity
                     key={block.turnId}
                     block={block}
+                    showModelChanges={!controller.fixedSession}
                     approvalReviews={records.get(block.turnId)?.approvalReviews}
                     renderMessage={renderMessage}
                     loadToolImage={controller.readToolImage}

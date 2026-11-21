@@ -3524,8 +3524,10 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
     const contextTokens = time(record.contextTokens);
     const compaction = compactionFact(record.compaction);
     const approvalReviews = approvalReviewFacts(record.approvalReviews);
+    const modelId = optionalIdentity(record.modelId);
     return Object.freeze({
       turnId: identity(record.turnId),
+      ...(modelId !== undefined && { modelId }),
       status: status as NativeChatTurnRecord["status"],
       startedAtMs,
       ...(settledAtMs !== undefined && { settledAtMs }),
@@ -3595,8 +3597,10 @@ function acceptance(
 
 function turn(value: unknown): NativeChatTurn {
   const result = object(value);
+  const modelId = optionalIdentity(result.modelId);
   return Object.freeze({
     turnId: identity(result.turnId),
+    ...(modelId !== undefined && { modelId }),
     epoch: revision(result.epoch),
     journalPosition: revision(result.journalPosition),
     historyPosition: revision(result.historyPosition),

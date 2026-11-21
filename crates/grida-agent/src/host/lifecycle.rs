@@ -687,6 +687,33 @@ mod tests {
             selected.execution().unwrap(),
             birth
         ));
+        let id = input.id.clone();
+        original.store.submit(session.clone(), input).await.unwrap();
+        let revision = original
+            .store
+            .inspect(session.clone())
+            .await
+            .unwrap()
+            .revision;
+        let turn = TurnId::new("legacy-turn").unwrap();
+        let claim = new_claim(session.clone(), turn.clone(), revision, vec![id]).unwrap();
+        let owner = original.store.claim(claim).await.unwrap();
+        assert!(
+            original
+                .captured_turn_model(&session, &turn)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            original
+                .transcript_input_facts(session, &[turn])
+                .await
+                .unwrap()
+                .models
+                .is_empty()
+        );
+        drop(owner);
         original.shutdown().await.unwrap();
         selected.shutdown().await.unwrap();
     }

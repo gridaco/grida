@@ -857,6 +857,17 @@ it.each(["switch chats", "replace the attachment"] as const)(
 it("streams turn activity live and adopts recorded turns from each page", async () => {
   const { bridge, controller, running, updates } = fixture();
   running.add("chat-a");
+  const modelId = "provider/current";
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const observation = await observe(id);
+    const { snapshot } = observation;
+    const current = { ...snapshot.current!, modelId };
+    return {
+      ...observation,
+      snapshot: { ...snapshot, current, latest: current },
+    };
+  };
   const call = (outcome: "running" | "succeeded") =>
     ({
       callId: "call-1",
@@ -868,7 +879,7 @@ it("streams turn activity live and adopts recorded turns from each page", async 
     view: 1,
     older: "older-a",
     messages: [],
-    turns: [],
+    turns: [{ turnId: "turn-chat-a", modelId, status: null, startedAtMs: 3 }],
   };
   const earlier: NativeChatTranscriptPage = {
     view: 1,
@@ -883,7 +894,13 @@ it("streams turn activity live and adopts recorded turns from each page", async 
       },
     ],
     turns: [
-      { turnId: "t0", status: "succeeded", startedAtMs: 1, settledAtMs: 2 },
+      {
+        turnId: "t0",
+        modelId: "provider/previous",
+        status: "succeeded",
+        startedAtMs: 1,
+        settledAtMs: 2,
+      },
     ],
   };
   const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
@@ -891,6 +908,8 @@ it("streams turn activity live and adopts recorded turns from each page", async 
   read.mockResolvedValue(latest);
   bridge.transcriptPage = read;
   await controller.select("chat-a");
+  const snapshot = controller.read().observation?.snapshot;
+  expect(snapshot).toMatchObject({ current: { modelId }, latest: { modelId } });
   const live = updates.get("chat-a")!;
   live({
     kind: "activity",
@@ -931,13 +950,66 @@ it("streams turn activity live and adopts recorded turns from each page", async 
     },
   ]);
   await controller.loadEarlierMessages();
-  expect(controller.read().turnRecords).toEqual(earlier.turns);
+  expect(controller.read().turnRecords).toEqual([
+    ...earlier.turns!,
+    ...latest.turns!,
+  ]);
   expect(controller.read().messages.map(({ messageId }) => messageId)).toEqual([
     "old",
     "work",
   ]);
   controller.disconnect();
 });
+
+it.each([
+  ["b", undefined],
+  ["c", "newest"],
+] as const)(
+  "keeps earlier history and reports a changed page seam when the first recent turn becomes %s",
+  async (recentTurn, transcriptGapBefore) => {
+    const { bridge, controller, running } = fixture();
+    const page = (
+      messageId: string,
+      turnId: string,
+      older: string | null
+    ): NativeChatTranscriptPage => ({
+      view: 1,
+      older,
+      messages: [{ messageId, role: "assistant", text: messageId, turnId }],
+      turns: [
+        {
+          turnId,
+          modelId: `provider/${turnId}`,
+          status: "succeeded",
+          startedAtMs: 1,
+        },
+      ],
+    });
+    const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
+    read
+      .mockResolvedValueOnce(page("original", "b", "boundary-before-b"))
+      .mockResolvedValueOnce(page("earlier", "a", null))
+      .mockResolvedValue(page("newest", recentTurn, "new-boundary"));
+    bridge.transcriptPage = read;
+    try {
+      await controller.select("chat-a");
+      await controller.loadEarlierMessages();
+      expect(controller.read().transcriptGapBefore).toBeUndefined();
+      running.add("chat-a");
+      controller.checkObservation();
+      await vi.waitFor(() => {
+        const state = controller.read();
+        expect(state.messages.map(({ messageId }) => messageId)).toEqual([
+          "earlier",
+          "newest",
+        ]);
+        expect(state.transcriptGapBefore).toBe(transcriptGapBefore);
+      });
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
 
 it("keeps ordinary journal progress on the live stream without rereading the transcript", async () => {
   vi.useFakeTimers();

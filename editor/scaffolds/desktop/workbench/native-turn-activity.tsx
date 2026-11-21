@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { BoxIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { models } from "@grida/ai/catalogue";
+import {
+  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
+  isChatGptSubscriptionModelId,
+} from "@grida/ai-host";
 import type {
   NativeChatMessage,
   NativeChatTurnRecord,
@@ -20,12 +25,14 @@ import { NativeSubagentIdentity } from "./native-subagent-identity";
 export function NativeTurnActivity({
   block,
   renderMessage,
+  showModelChanges = false,
   subagentEvents = [],
   approvalReviews,
   onOpenSubagent,
   loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
+  showModelChanges?: boolean;
   approvalReviews?: NativeChatTurnRecord["approvalReviews"];
   renderMessage: (message: NativeChatMessage) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
@@ -56,6 +63,9 @@ export function NativeTurnActivity({
       }
       className="flex flex-col gap-4"
     >
+      {showModelChanges && block.modelChange && (
+        <ModelChangeDivider {...block.modelChange} />
+      )}
       {block.requests.map(renderMessage)}
       {(turn_activity.showsHeader(block) ||
         (block.finished &&
@@ -136,6 +146,31 @@ export function NativeTurnActivity({
       {block.answers.map(renderMessage)}
     </div>
   );
+}
+
+function ModelChangeDivider({ from, to }: { from: string; to: string }) {
+  const fromLabel = modelLabel(from);
+  const toLabel = modelLabel(to);
+  const sameLabel = fromLabel === toLabel;
+  return (
+    <p className="flex w-full items-center gap-3 px-1 text-center text-xs text-muted-foreground">
+      <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
+      <span className="flex min-w-0 items-center gap-1.5">
+        <BoxIcon aria-hidden className="size-3.5 shrink-0" />
+        <span className="min-w-0 wrap-anywhere">
+          Model changed from {sameLabel ? from : fromLabel} to{" "}
+          {sameLabel ? to : toLabel}.
+        </span>
+      </span>
+      <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
+    </p>
+  );
+}
+
+function modelLabel(id: string): string {
+  if (isChatGptSubscriptionModelId(id))
+    return CHATGPT_SUBSCRIPTION_MODEL_METADATA[id].label;
+  return models.text.modelSpecById(id)?.label ?? id;
 }
 
 function SubagentEventRow({

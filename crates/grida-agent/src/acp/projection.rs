@@ -595,23 +595,21 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
         + usize::from(message_context::has_context(message)) * message_context::MAX_BYTES
 }
 
-/// Recorded outcome and wall-clock interval for a replayed turn.
-/// `goal_start` marks a turn whose input started a goal.
-pub(super) fn turn_facts(
-    turn: &ReplayTurn,
-    goal_start: bool,
-    reviews: &[crate::host::ApprovalReview],
-) -> Value {
+/// Recorded outcome and display facts for a replayed turn.
+pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Value {
     let mut facts = json!({
         "turnId": turn.id,
         "status": turn.status,
         "startedAtMs": turn.started_ms,
         "settledAtMs": turn.settled_ms,
     });
-    if !reviews.is_empty() {
+    if let Some(model) = inputs.models.get(&turn.id) {
+        facts["modelId"] = json!(model);
+    }
+    if let Some(reviews) = inputs.approval_reviews.get(&turn.id) {
         facts["approvalReviews"] = json!(reviews);
     }
-    if goal_start {
+    if inputs.goal_starts.contains(&turn.id) {
         facts["goalStart"] = json!(true);
     }
     if let Some(tokens) = turn.context_tokens {
@@ -920,7 +918,7 @@ pub(crate) fn file_reference_link(
 #[cfg(test)]
 mod compaction_fact_tests {
     use super::*;
-    use agent_kit_core::{Envelope, TurnId};
+    use agent_kit_core::{Envelope, ModelId, TurnId};
     use grida_agent_master::compaction::{CompactionAccount, CompactionFailure, Coverage};
 
     fn account(summary: Option<&str>) -> Envelope {
@@ -965,30 +963,47 @@ mod compaction_fact_tests {
                 "automatic-compact/abc",
                 Some(account(Some("Earlier cart work."))),
             ),
-            false,
-            &[],
+            &TranscriptInputFacts::default(),
         );
         assert_eq!(
             facts["compaction"],
             json!({"summary": "Earlier cart work.", "automatic": true})
         );
-        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false, &[]);
+        let manual = turn_facts(
+            &turn("manual", Some(account(Some("Summary.")))),
+            &TranscriptInputFacts::default(),
+        );
         assert_eq!(manual["compaction"]["automatic"], false);
     }
 
     #[test]
     fn other_turns_carry_no_compaction() {
         assert!(
-            turn_facts(&turn("t", None), false, &[])
+            turn_facts(&turn("t", None), &TranscriptInputFacts::default())
                 .get("compaction")
                 .is_none()
         );
         assert!(
-            turn_facts(&turn("t", Some(account(None))), false, &[])
-                .get("compaction")
-                .is_none(),
+            turn_facts(
+                &turn("t", Some(account(None))),
+                &TranscriptInputFacts::default(),
+            )
+            .get("compaction")
+            .is_none(),
             "a failed compaction has no summary to show"
         );
+    }
+
+    #[test]
+    fn reports_only_the_model_captured_for_this_turn() {
+        let first = turn("first", None);
+        let second = turn("second", None);
+        let mut inputs = TranscriptInputFacts::default();
+        inputs
+            .models
+            .insert(first.id.clone(), ModelId::new("provider/model").unwrap());
+        assert_eq!(turn_facts(&first, &inputs)["modelId"], "provider/model");
+        assert!(turn_facts(&second, &inputs).get("modelId").is_none());
     }
 }
 

@@ -252,6 +252,8 @@ export type NativeChatView = Readonly<{
   progressRevision: number;
   /** Recorded outcome and timing for turns in the displayed messages. */
   turnRecords: readonly NativeChatTurnRecord[];
+  /** First message after an unconfirmed boundary between cached history pages. */
+  transcriptGapBefore?: string;
   /** Older pages exist above the loaded messages. */
   canReadEarlier: boolean;
   /**
@@ -398,6 +400,8 @@ type Scope = {
    * transcript as one scroll; a changed history view discards them.
    */
   earlierPages: NativeChatTranscriptPage[];
+  /** The recent window boundary used to load the newest cached earlier page. */
+  earlierBoundary?: { cursor: string; turnId?: string };
   earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   progressRevision: number;
@@ -2132,6 +2136,7 @@ export class NativeChatController {
       sides: [],
       durable: previous.durable,
       earlierPages: previous.earlierPages,
+      earlierBoundary: previous.earlierBoundary,
       recentWindow: previous.recentWindow,
       live: new Map(),
       progressRevision: 0,
@@ -2374,7 +2379,11 @@ export class NativeChatController {
   ): Promise<void> {
     const retained =
       reattach && sessionId !== null && this.view.selected === sessionId
-        ? { messages: this.view.messages, turnRecords: this.view.turnRecords }
+        ? {
+            messages: this.view.messages,
+            turnRecords: this.view.turnRecords,
+            transcriptGapBefore: this.view.transcriptGapBefore,
+          }
         : undefined;
     if (
       !reattach &&
@@ -2422,6 +2431,7 @@ export class NativeChatController {
       ...(this.fixed && { effort: this.fixed.effort }),
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
+      transcriptGapBefore: retained?.transcriptGapBefore,
       loading: this.remembersSelection || sessionId !== null || !!this.fixed,
     });
     if (this.remembersSelection) {
@@ -5558,6 +5568,12 @@ export class NativeChatController {
         scope.recentWindow !== latest
       )
         throw new Error("history_replay_window_changed");
+      if (!scope.earlierPages.length) {
+        scope.earlierBoundary = {
+          cursor: older,
+          turnId: scope.durable[0]?.turnId,
+        };
+      }
       scope.earlierPages = [page, ...scope.earlierPages];
       this.publishMessages(scope);
     } catch (error) {
@@ -5569,6 +5585,7 @@ export class NativeChatController {
           error.message.includes("history_replay_window_changed")
         ) {
           scope.earlierPages = [];
+          scope.earlierBoundary = undefined;
           scope.replay = true;
           this.publishMessages(scope);
         }
@@ -7436,8 +7453,10 @@ export class NativeChatController {
           page?.messages ??
           (await this.bridge.transcript(attachment.attachmentId));
         if (!this.owns(scope)) return;
-        if (page && scope.recentWindow?.view !== page.view)
+        if (page && scope.recentWindow?.view !== page.view) {
           scope.earlierPages = [];
+          scope.earlierBoundary = undefined;
+        }
         scope.recentWindow = page && {
           view: page.view,
           older: page.older,
@@ -7944,14 +7963,29 @@ export class NativeChatController {
 
   private publishMessages(scope: Scope, repairing = scope.gaps.size > 0): void {
     const pages = scope.earlierPages;
+    const earlier = pages.flatMap((page) => page.messages);
+    const anchor = scope.earlierBoundary;
+    const older = scope.recentWindow?.older;
+    const recentHead = scope.durable[0]?.turnId;
+    // A bounded recent window can advance while older pages retain their
+    // original cursor. Matching cursors or overlapping a turn preserve the
+    // model boundary. A complete recent window already spans all history.
+    const seamUnconfirmed =
+      anchor &&
+      older &&
+      older !== anchor.cursor &&
+      (!recentHead || recentHead !== anchor.turnId);
+    let transcriptGapBefore: string | undefined;
     const seen = new Set<string>();
     const messages = [
-      ...pages.flatMap((page) => page.messages),
+      ...earlier,
       ...scope.durable,
       ...scope.live.values(),
-    ].filter((message) => {
+    ].filter((message, index) => {
       if (seen.has(message.messageId)) return false;
       seen.add(message.messageId);
+      if (seamUnconfirmed && index >= earlier.length)
+        transcriptGapBefore ??= message.messageId;
       return true;
     });
     const turns = new Map<string, NativeChatTurnRecord>();
@@ -7961,6 +7995,7 @@ export class NativeChatController {
       messages,
       progressRevision: scope.progressRevision,
       turnRecords: turns.size ? [...turns.values()] : EMPTY_TURNS,
+      transcriptGapBefore,
       canReadEarlier: !!(pages[0] ?? scope.recentWindow)?.older,
       repairing,
     });

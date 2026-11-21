@@ -94,6 +94,35 @@ async fn acceptance_is_idempotent_and_inspection_is_observational() {
 }
 
 #[tokio::test]
+async fn observes_only_a_turns_single_selected_submission() {
+    for count in 1..=2 {
+        let (_directory, store) = store().await;
+        assert_error(
+            store.sole_turn_submission(session(), turn()).await,
+            ErrorKind::InvalidInput,
+            "turn_missing",
+        );
+        let inputs = [
+            submission("queued-first", "first"),
+            submission("queued-second", "second"),
+        ];
+        for input in &inputs {
+            store.submit(session(), input.clone()).await.unwrap();
+        }
+        let selected = inputs[..count]
+            .iter()
+            .map(|input| input.id.clone())
+            .collect();
+        let owner = claim(&store, "claim-for-observation", selected).await;
+        assert_eq!(
+            store.sole_turn_submission(session(), turn()).await.unwrap(),
+            (count == 1).then(|| inputs[0].clone())
+        );
+        drop(owner);
+    }
+}
+
+#[tokio::test]
 async fn history_contribution_is_conditional_idempotent_and_retained() {
     let (directory, store) = store().await;
     store
@@ -2647,6 +2676,13 @@ async fn unprompted_maintenance_admits_only_before_the_exact_queue_head() {
         panic!("expected maintenance lease")
     };
     assert!(claim.inputs.is_empty());
+    assert!(
+        store
+            .sole_turn_submission(session(), request.turn.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
     let after = store.inspect(session()).await.unwrap();
     assert_eq!(after.queued, before.queued);
     assert_eq!(after.current.unwrap().binding.turn, request.turn);

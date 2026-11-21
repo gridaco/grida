@@ -336,6 +336,13 @@ reports its own `current.disposition` and `current.inputNeeded` in the
 session snapshot. Clients can include the side chats they own when showing a
 parent's activity.
 
+To read the model captured for a main-chat turn, negotiate
+`co.grida/session/snapshot` or `co.grida/session/transcript-window` version 1.
+Read the optional `modelId` on the snapshot's `current` and `latest` turns, or
+on each transcript turn as you page through history. A queued turn keeps the
+model captured when its input was accepted. Older turns may lack that evidence.
+The same extensions are available through `grida agent serve --stdio`.
+
 Clients that negotiate `co.grida/session/initial-title` version 1 can send
 the optional `_meta["co.grida/initialTitle"]` string with a first
 `session/prompt`. Acceptance saves the excerpt for workspace listing.

@@ -22,6 +22,10 @@ or the directory they listed. Expand the command to see its original text
 and result. Other commands use the general command label. A turn that only
 answered, without tools or commentary, shows just its answer.
 
+When consecutive turns have different captured models, a divider names both
+models before the newer turn. It also appears in reopened history once both
+turns are visible.
+
 A turn you stopped shows **You stopped** and keeps its partial work in view. A
 failed turn shows **Failed after …**. A turn whose outcome Grida could not
 confirm shows **Worked for … · result uncertain**; review its partial work

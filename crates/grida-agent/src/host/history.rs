@@ -93,7 +93,8 @@ pub(super) struct PriorContext {
 #[derive(Default)]
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
-    pub(crate) approval_reviews: BTreeMap<TurnId, Vec<super::permissions::ApprovalReview>>,
+    pub(crate) models: BTreeMap<TurnId, ModelId>,
+    pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
     pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
@@ -178,15 +179,19 @@ impl Host {
         let mut facts = TranscriptInputFacts::default();
         for turn in turns {
             let mut automatic_review = false;
-            for input in self
+            let inputs = self
                 .store
                 .turn_submissions(session.clone(), turn.clone())
-                .await?
-            {
+                .await?;
+            let single_input = inputs.len() == 1;
+            for input in inputs {
                 if !is_stored_input(&input.payload) {
                     continue;
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
+                if single_input && let Some(model) = stored.model {
+                    facts.models.insert(turn.clone(), model);
+                }
                 automatic_review |= stored.permission_capture.as_ref().is_some_and(|capture| {
                     capture.mode() == crate::permissions::PermissionMode::ApproveForMe
                 });
@@ -226,6 +231,25 @@ impl Host {
             }
         }
         Ok(facts)
+    }
+
+    /// The foreground model captured with the prompt selected into this turn.
+    /// A main chat turns exactly one selected submission into foreground work.
+    pub(crate) async fn captured_turn_model(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<Option<ModelId>> {
+        let Some(input) = self
+            .store
+            .sole_turn_submission(session.clone(), turn.clone())
+            .await?
+            .filter(|input| is_stored_input(&input.payload))
+        else {
+            return Ok(None);
+        };
+        let stored: StoredPrompt = decode_input(&input)?;
+        Ok(stored.model)
     }
 
     pub(crate) async fn fork_latest(

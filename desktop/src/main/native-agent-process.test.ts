@@ -2865,6 +2865,73 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("projects captured model IDs in the snapshot and reopened transcript pages", async () => {
+    const test = fixture(
+      `
+      if (request.method === '_co.grida/session/snapshot') {
+        const turn = {turnId:'recent-turn', modelId:'provider/model-v2:fast',
+          epoch:1, journalPosition:2, historyPosition:3, controlRevision:0,
+          paused:false, cancelled:false, disposition:'running', status:null};
+        send({id:request.id,result:{sessionId:'chat',sessionRevision:1,queuedInputs:0,
+          queue:[],admissionPaused:false,current:turn,latest:turn}});
+        return;
+      }
+      const capability = '${TRANSCRIPT_WINDOW}';
+      const window = request.params._meta?.[capability];
+      if (request.method !== 'session/load' || !window) throw Error('unexpected request');
+      if (window.kind === 'attach') { send({id:request.id,result:{}}); return; }
+      const turns = window.before
+        ? [
+          {turnId:'legacy-turn',status:'succeeded',startedAtMs:1,settledAtMs:2},
+          {turnId:'earlier-turn',modelId:'provider/model-v1',status:'succeeded',startedAtMs:3,settledAtMs:4},
+        ]
+        : [{turnId:'recent-turn',modelId:'provider/model-v2:fast',status:null,startedAtMs:5}];
+      send({id:request.id,result:{_meta:{[capability]:{
+        requestId:window.requestId,view:1,older:window.before ? null : {anchor:'older'},turns
+      }}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.load("chat");
+      const observation = await chat.observe(session);
+      const recent = {
+        turnId: "recent-turn",
+        modelId: "provider/model-v2:fast",
+      };
+      expect(observation.current).toMatchObject(recent);
+      expect(observation.latest).toMatchObject(recent);
+      const page = await chat.transcriptPage(session);
+      expect(page.turns).toEqual([{ ...recent, status: null, startedAtMs: 5 }]);
+      expect(page.older).not.toBeNull();
+      const earlier = await chat.transcriptPage(session, page.older!);
+      expect(earlier.turns).toEqual([
+        {
+          turnId: "legacy-turn",
+          status: "succeeded",
+          startedAtMs: 1,
+          settledAtMs: 2,
+        },
+        {
+          turnId: "earlier-turn",
+          modelId: "provider/model-v1",
+          status: "succeeded",
+          startedAtMs: 3,
+          settledAtMs: 4,
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it.each([
     { activity: "read", accepted: true },
     { activity: "telepathy", accepted: false },

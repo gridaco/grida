@@ -41,7 +41,7 @@ use agent_client_protocol::{
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{ControlRevision, JournalPosition};
-use agent_kit_core::{BindingId, ChangeId, Fingerprint, SessionId, TurnId};
+use agent_kit_core::{BindingId, ChangeId, Fingerprint, ModelId, SessionId, TurnId};
 use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
@@ -563,6 +563,8 @@ fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> 
 #[serde(rename_all = "camelCase")]
 struct TurnSummary {
     turn_id: TurnId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    model_id: Option<ModelId>,
     epoch: u64,
     journal_position: JournalPosition,
     history_position: HistoryPosition,
@@ -579,6 +581,7 @@ impl From<TurnView> for TurnSummary {
     fn from(turn: TurnView) -> Self {
         Self {
             turn_id: turn.binding.turn,
+            model_id: None,
             epoch: turn.binding.epoch,
             journal_position: turn.position,
             history_position: turn.history_position,
@@ -800,6 +803,26 @@ pub(super) fn handlers(
                         .side_snapshot(&snapshot)
                         .await
                         .map_err(host_error)?;
+                    let mut current = snapshot.current.map(TurnSummary::from);
+                    if let Some(turn) = &mut current {
+                        turn.model_id = snapshot_host
+                            .captured_turn_model(&snapshot.session, &turn.turn_id)
+                            .await
+                            .map_err(host_error)?;
+                    }
+                    let mut latest = snapshot.latest.map(TurnSummary::from);
+                    if let Some(turn) = &mut latest {
+                        turn.model_id = match current
+                            .as_ref()
+                            .filter(|active| active.turn_id == turn.turn_id)
+                        {
+                            Some(active) => active.model_id.clone(),
+                            None => snapshot_host
+                                .captured_turn_model(&snapshot.session, &turn.turn_id)
+                                .await
+                                .map_err(host_error)?,
+                        };
+                    }
                     let previews = require(
                         &snapshot_sessions,
                         input_images::QUEUED,
@@ -821,8 +844,8 @@ pub(super) fn handlers(
                             .collect::<Result<_>>()?,
                         admission_paused: snapshot.admission_paused,
                         idle_queue_resume_available,
-                        current: snapshot.current.map(TurnSummary::from),
-                        latest: snapshot.latest.map(TurnSummary::from),
+                        current,
+                        latest,
                         retry_not_before_ms,
                     })
                 }

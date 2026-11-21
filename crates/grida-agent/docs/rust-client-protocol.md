@@ -461,6 +461,13 @@ visible messages and still have an older cursor. When a cursor's view or its
 active-turn boundary changes, restart from the latest page. Reading starts
 no work. `session/load` without this metadata retains full ACP replay.
 
+For a main chat, the negotiated `_co.grida/session/snapshot` response can
+include `modelId` on each of `current` and `latest`. The transcript window's
+`turns` use the same optional field on every page. It identifies the foreground
+model captured for the input the turn claimed, including inputs accepted into
+the queue. Later chat selections and auxiliary model calls have their own
+scope. The host omits `modelId` when a turn has no captured foreground model.
+
 Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
 `plan` or `act` when submitting, enqueueing, starting a goal, or revising
 history. The host captures the effective choice with the input. Omission uses

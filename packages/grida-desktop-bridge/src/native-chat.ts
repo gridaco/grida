@@ -409,6 +409,8 @@ export type NativeChatStartupResult = Readonly<{
 
 export type NativeChatTurn = Readonly<{
   turnId: string;
+  /** Model captured for the foreground turn, when recorded. */
+  modelId?: string;
   epoch: number;
   journalPosition: number;
   historyPosition: number;
@@ -700,9 +702,11 @@ export type NativeChatMessageAttachment = Readonly<{
   previewId?: string;
 }>;
 
-/** Recorded outcome and wall-clock interval of a turn in a transcript page. */
+/** Recorded facts about a turn in a transcript page. */
 export type NativeChatTurnRecord = Readonly<{
   turnId: string;
+  /** Model captured for the foreground turn, when recorded. */
+  modelId?: string;
   status: NonNullable<NativeChatTurn["status"]> | null;
   /** UTC milliseconds at which the turn started. */
   startedAtMs: number;

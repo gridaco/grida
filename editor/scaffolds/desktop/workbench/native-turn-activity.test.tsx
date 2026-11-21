@@ -6,6 +6,55 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 
 describe("NativeTurnActivity", () => {
+  it.each([
+    {
+      from: "openai/gpt-6.2-astra",
+      to: "openai/gpt-6.2-sol",
+      label: "Model changed from GPT-6.2 Astra to GPT-6.2 Sol.",
+    },
+    {
+      from: "openai/gpt-6.2-sol",
+      to: "local/custom-model",
+      label: "Model changed from GPT-6.2 Sol to local/custom-model.",
+    },
+    {
+      from: "openai/gpt-5.5",
+      to: "gpt-5.5",
+      label: "Model changed from openai/gpt-5.5 to gpt-5.5.",
+    },
+  ])("renders $label before the next request", ({ from, to, label }) => {
+    const html = renderToStaticMarkup(
+      <NativeTurnActivity
+        block={{
+          kind: "turn",
+          turnId: "t",
+          requests: [
+            {
+              messageId: "next",
+              role: "user",
+              text: "Next request",
+              turnId: "t",
+            },
+          ],
+          modelChange: { from, to },
+          finished: false,
+          outcome: null,
+          durationMs: null,
+          work: [],
+          answers: [],
+        }}
+        showModelChanges
+        renderMessage={(message) => (
+          <p key={message.messageId}>{message.text}</p>
+        )}
+      />
+    );
+    expect(html).toContain("lucide-box");
+    expect(html).toContain(label);
+    expect(html).toContain("Next request");
+    expect(html.indexOf(label)).toBeLessThan(html.indexOf("Next request"));
+  });
+
   it("shows a running turn's tool calls with the chat kit's tool cards", () => {
     const messages: NativeChatMessage[] = [
       { messageId: "ask", role: "user", text: "Check the cart.", turnId: "t" },
