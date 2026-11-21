@@ -17,8 +17,10 @@ While a turn runs, its commentary and actions appear as they happen. When it
 finishes, they fold under a header such as **Worked for 1m 12s**, and the
 answer stays visible below it. Select the header to see the work in order.
 Select a line such as “Read files, ran commands” to list each action and its
-outcome. A turn that only answered, without tools or commentary, shows just
-its answer.
+outcome. Recognized shell commands show the file they read, the search query,
+or the directory they listed. Expand the command to see its original text
+and result. Other commands use the general command label. A turn that only
+answered, without tools or commentary, shows just its answer.
 
 A turn you stopped shows **You stopped** and keeps its partial work in view. A
 failed turn shows **Failed after …**. A turn whose outcome Grida could not

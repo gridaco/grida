@@ -15,6 +15,7 @@ import {
 } from "@/lib/desktop/slides-message-context";
 import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
 import { ChatMessageView, type ChatMessageActions } from "./message";
+import { ToolCardContent } from "./tool-card";
 
 const actions = vi.hoisted(
   () =>
@@ -97,6 +98,8 @@ describe("tool call icons", () => {
   it.each([
     { toolName: "workbench_list_tabs", icon: "lucide-monitor" },
     { toolName: "browser_snapshot", icon: "lucide-monitor" },
+    { toolName: "tool_search", icon: "lucide-search" },
+    { toolName: "read_skill", icon: "lucide-book-open" },
     { toolName: "other_tool", icon: "lucide-wrench" },
   ])("renders the icon for $toolName", ({ toolName, icon }) => {
     expect(renderToolCalls(toolName)).toContain(icon);
@@ -125,6 +128,26 @@ describe("tool call icons", () => {
       <ChatMessageView message={{ id: "reply", role: "assistant", parts }} />
     );
   }
+});
+
+it("shows the exit status and multiline output of a failed native command", () => {
+  const entry = native_tool_parts.entry({
+    callId: "failed-command",
+    title: "exec_command",
+    kind: "execute",
+    outcome: "failed",
+    input: { cmd: "cat missing.md" },
+    commandActions: [{ kind: "read", path: "missing.md" }],
+    output: {
+      text: "Wall time: 0.0123 seconds\nProcess exited with code 1\nOutput:\ncat: missing.md: No such file\nCheck the path.\n",
+      truncated: false,
+    },
+  });
+  const html = renderToStaticMarkup(<ToolCardContent entry={entry} />);
+  expect(html).toContain("Process exited with code 1");
+  expect(html).toMatch(
+    /<pre[^>]*>\$ cat missing\.md\n\nWall time:.*\nProcess exited with code 1\nOutput:\ncat: missing\.md: No such file\nCheck the path\./
+  );
 });
 
 describe("user message attachments", () => {

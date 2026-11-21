@@ -27,6 +27,13 @@ export namespace native_tool_parts {
       type: `tool-${name}`,
       toolCallId: call.callId,
       input,
+      ...(call.title === "exec_command" &&
+        call.commandActions?.length && {
+          commandActivity: {
+            actions: call.commandActions,
+            outcome: call.outcome,
+          },
+        }),
     };
     if (call.outcome === "running")
       return { ...base, state: "input-available" } as ToolCallEntry;

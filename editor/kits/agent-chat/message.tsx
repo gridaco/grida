@@ -1040,6 +1040,7 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return FolderTreeIcon;
     case "web_search":
     case "search":
+    case "tool_search":
       return SearchIcon;
     case "pick_references":
       return ImagesIcon;

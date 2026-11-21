@@ -7886,6 +7886,10 @@ export class NativeChatController {
       prior.kind !== update.activity.kind ||
       prior.source !== update.activity.source ||
       prior.outcome !== update.activity.outcome ||
+      !activityPayloadEqual(
+        prior.commandActions,
+        update.activity.commandActions
+      ) ||
       !activityPayloadEqual(prior.input, update.activity.input) ||
       !activityPayloadEqual(prior.output, update.activity.output)
     )

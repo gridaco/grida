@@ -2,7 +2,7 @@
 
 use super::transport::Delivery;
 use super::unavailable;
-use crate::host::{TranscriptInputFacts, message_context};
+use crate::host::{TranscriptInputFacts, command_actions, message_context};
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{
     ContentBlock, ContentChunk, ResourceLink, SessionId, SessionNotification, SessionUpdate,
@@ -688,7 +688,7 @@ pub(super) fn hosted_activity(
 }
 
 /// One tool call as a standard ACP tool-call update plus Grida attribution.
-/// The kind and wording come from the master's classification of the tool.
+/// Command actions describe the shell input while the tool kind and status describe the call.
 pub(super) fn activity_update(
     message: &MessageId,
     call: &ToolCall,
@@ -722,6 +722,9 @@ pub(super) fn activity_update(
     fields.insert("outcome".into(), json!(label));
     if let Some(source) = classified.source {
         fields.insert("source".into(), json!(source));
+    }
+    if let Some(actions) = command_actions::for_call(call) {
+        fields.insert("commandActions".into(), json!(actions));
     }
     let update = AcpToolCall::new(call.id.as_str().to_owned(), call.tool.as_str().to_owned())
         .kind(kind)

@@ -110,6 +110,45 @@ describe("NativeTurnActivity", () => {
     }
   });
 
+  it.each([
+    ["running", "Searching for TODO in src"],
+    ["succeeded", "Searched for TODO in src"],
+    ["failed", "Failed to search for TODO in src"],
+  ] as const)(
+    "renders the shared search action for a %s command",
+    (outcome, label) => {
+      const [block] = turn_activity.group(
+        [
+          {
+            messageId: "work",
+            role: "assistant",
+            text: "",
+            turnId: "turn",
+            activity: [
+              {
+                callId: "search",
+                title: "exec_command",
+                kind: "execute",
+                input: { cmd: "rg TODO src" },
+                commandActions: [
+                  { kind: "search", query: "TODO", path: "src" },
+                ],
+                outcome,
+              },
+            ],
+          },
+        ],
+        [{ turnId: "turn", status: null, startedAtMs: 0 }],
+        { turnId: "turn" }
+      );
+      if (block.kind !== "turn") throw new Error("expected_turn");
+      const html = renderToStaticMarkup(
+        <NativeTurnActivity block={block} renderMessage={() => null} />
+      );
+      expect(html).toContain(label);
+    }
+  );
+
   it("keeps stopped work expanded, places a child stop correctly, and leaves the final answer outside", async () => {
     const fixture = await NativeActivityFixtures.create();
     try {

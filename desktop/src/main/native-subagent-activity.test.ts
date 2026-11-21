@@ -186,6 +186,43 @@ it("keeps child conversation message and tool coordinates in their own turn with
   ).toBe(true);
 });
 
+it("keeps optional command actions on the corresponding child tool call", async () => {
+  const commandActions = [{ kind: "search", query: "TODO" }];
+  const command = {
+    callId: "command",
+    title: "exec_command",
+    kind: "execute",
+    outcome: "succeeded",
+  };
+  const existing = conversation.messages[1].activity![0];
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
+    async () => ({
+      ...conversation,
+      messages: [
+        conversation.messages[0],
+        {
+          ...conversation.messages[1],
+          activity: [
+            { ...command, commandActions },
+            { ...existing, commandActions },
+          ],
+        },
+      ],
+    })
+  );
+  const page = await new NativeSubagentActivity(request).conversation(
+    attachment,
+    parent,
+    childId,
+    undefined,
+    check
+  );
+  expect(page.messages[1].activity).toEqual([
+    { ...command, commandActions },
+    existing,
+  ]);
+});
+
 it("projects bounded status pages and strips internal fields without inspecting each child", async () => {
   const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
     async () => ({

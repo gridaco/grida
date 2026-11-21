@@ -717,6 +717,9 @@ fn project_messages(
                 };
                 let mut item = json!({"callId":call.id,"title":call.tool,"kind":classified.kind,"outcome":outcome,"input":input});
                 if let Some(source) = classified.source { item["source"] = json!(source); }
+                if let Some(actions) = super::command_actions::for_call(call) {
+                    item["commandActions"] = json!(actions);
+                }
                 if let Some(result) = result { item["output"] = tool_output(result); }
                 activity.push(item);
             }

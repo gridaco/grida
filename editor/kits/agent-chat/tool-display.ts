@@ -1,6 +1,7 @@
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { getToolName } from "ai";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
+import type { NativeChatCommandAction } from "@grida/desktop-bridge";
 import { SurfaceToolCall } from "./surface-tool";
 
 const GENERATE_IMAGE = "generate_image";
@@ -13,6 +14,7 @@ export type ToolDisplayAction =
   | "list"
   | "web_search"
   | "search"
+  | "tool_search"
   | "pick_references"
   | "view_image"
   | "generate_image"
@@ -136,6 +138,19 @@ export namespace toolDisplay {
           tone,
         };
 
+      case "tool_search":
+        return {
+          action: "tool_search",
+          title: describeTitle(
+            tone,
+            "Searching tools",
+            "Searched tools",
+            "Failed to search tools"
+          ),
+          detail: stringValue(args.query),
+          tone,
+        };
+
       case chat_vocabulary.TOOL_NAMES.todo_write:
         return {
           action: "plan",
@@ -191,17 +206,7 @@ export namespace toolDisplay {
       }
 
       case chat_vocabulary.TOOL_NAMES.exec_command:
-        return {
-          action: "command",
-          title: describeTitle(
-            tone,
-            "Running command",
-            "Ran command",
-            "Command failed"
-          ),
-          detail: describeCommandDetail(entry),
-          tone,
-        };
+        return describeCommand(entry, tone);
 
       case "question":
       case "question_async":
@@ -218,6 +223,7 @@ export namespace toolDisplay {
         };
 
       case SKILL:
+      case "read_skill":
         return {
           action: "skill",
           title: describeTitle(
@@ -385,6 +391,7 @@ const GROUP_VERBS: Record<
   pick_references: ["picked", "picking", "pick"],
   search: ["searched", "searching", "search"],
   web_search: ["searched", "searching", "search"],
+  tool_search: ["searched", "searching", "search"],
   list: ["listed", "listing", "list"],
   command: ["ran", "running", "run"],
   process: ["used", "using", "use"],
@@ -403,12 +410,23 @@ function pushGroupClause(
   action: ToolDisplayAction,
   verb: string
 ) {
-  if (action === "web_search") {
+  if (
+    action === "web_search" ||
+    action === "tool_search" ||
+    action === "search" ||
+    action === "list"
+  ) {
     const count = counts.get(action);
-    if (count)
-      clauses.push(
-        count === 1 ? `${verb} the web` : `${verb} the web ${count} times`
-      );
+    if (count) {
+      const target =
+        action === "web_search"
+          ? "the web"
+          : action === "tool_search"
+            ? "tools"
+            : "files";
+      const clause = `${verb} ${target}`;
+      clauses.push(count === 1 ? clause : `${clause} ${count} times`);
+    }
   } else if (action === "pick_references")
     pushReferencePickerClause(clauses, counts, verb);
   else if (action === "list_tabs") pushTabsCheckClause(clauses, counts, verb);
@@ -482,6 +500,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "web search";
     case "search":
       return "search";
+    case "tool_search":
+      return "tool search";
     case "pick_references":
       return "reference";
     case "view_image":
@@ -584,6 +604,116 @@ function describeQuestionDetail(entry: ToolCallEntry): string | undefined {
     return stringValue(asRecord(questions[0]).question);
   }
   return `${questions.length} questions`;
+}
+
+function describeCommand(
+  entry: ToolCallEntry,
+  tone: ToolDisplayTone
+): ToolDisplayDescription {
+  const result = asRecord(readToolOutput(entry));
+  const exitCode = numberValue(result.exit_code);
+  if (exitCode !== undefined && exitCode !== 0) tone = "error";
+  const activity = entry.commandActivity;
+  if (!activity?.actions.length || result.process_id !== undefined) {
+    return {
+      action: "command",
+      title: describeTitle(
+        tone,
+        "Running command",
+        "Ran command",
+        "Command failed"
+      ),
+      detail: describeCommandDetail(entry),
+      tone,
+    };
+  }
+
+  const stoppedTitle =
+    activity.outcome === "cancelled"
+      ? "Command stopped"
+      : activity.outcome === "uncertain"
+        ? "Command outcome unconfirmed"
+        : undefined;
+  const actions = activity.actions.map(describeCommandAction);
+  const firstAction = activity.actions[0];
+  const piped = "piped" in firstAction && firstAction.piped === true;
+  if (actions.length === 1 && !piped && !stoppedTitle) {
+    const commandAction = activity.actions[0];
+    const { action, target, intent, running, succeeded } = actions[0];
+    return {
+      action,
+      title: `${describeTitle(tone, running, succeeded, `Failed to ${intent}`)} ${target}`,
+      ...(commandAction.kind === "read" && {
+        target: commandReadTarget(entry, commandAction.path),
+      }),
+      tone,
+    };
+  }
+
+  // A command has one outcome, even when the input contains several actions.
+  // Some of those actions may have been skipped by shell control flow.
+  return {
+    action: "command",
+    title:
+      stoppedTitle ??
+      describeTitle(
+        tone,
+        "Exploring files",
+        piped && actions.length === 1 ? "Ran command" : "Explored files",
+        "Command failed"
+      ),
+    detail: actions
+      .map(({ intent, target }) => `${intent} ${target}`)
+      .join(", "),
+    tone,
+  };
+}
+
+function commandReadTarget(entry: ToolCallEntry, path: string): string {
+  if (path.startsWith("/")) return path;
+  const input = asRecord(readToolInput(entry));
+  const workdir = stringValue(input.workdir);
+  const directory = stringValue(input.directory);
+  return workdir || directory
+    ? `${workdir ?? ""}\0${directory ?? ""}\0${path}`
+    : path;
+}
+
+function describeCommandAction(action: NativeChatCommandAction): {
+  action: "read" | "list" | "search";
+  target: string;
+  intent: string;
+  running: string;
+  succeeded: string;
+} {
+  switch (action.kind) {
+    case "read":
+      return {
+        action: "read",
+        target: shortPath(action.path) ?? action.path,
+        intent: "read",
+        running: "Reading",
+        succeeded: "Read",
+      };
+    case "list_files":
+      return {
+        action: "list",
+        target: action.path ? `files in ${action.path}` : "files",
+        intent: "list",
+        running: "Listing",
+        succeeded: "Listed",
+      };
+    case "search":
+      return {
+        action: "search",
+        target: action.path
+          ? `${action.query} in ${action.path}`
+          : action.query,
+        intent: "search for",
+        running: "Searching for",
+        succeeded: "Searched for",
+      };
+  }
 }
 
 function describeCommandDetail(entry: ToolCallEntry): string | undefined {

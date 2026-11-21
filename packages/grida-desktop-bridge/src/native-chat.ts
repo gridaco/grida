@@ -602,6 +602,12 @@ export type NativeChatActivityOutcome =
   | "cancelled"
   | "uncertain";
 
+/** One display action inferred by the host from an exec_command invocation. */
+export type NativeChatCommandAction =
+  | Readonly<{ kind: "read"; path: string }>
+  | Readonly<{ kind: "list_files"; path?: string; piped?: true }>
+  | Readonly<{ kind: "search"; query: string; path?: string; piped?: true }>;
+
 /** Captured pixels from one successful tool result, retained by the native host. */
 export type NativeChatToolImage = Readonly<{
   /** Main-issued identity for this exact chat, turn, call and result image. */
@@ -623,6 +629,8 @@ export type NativeChatActivity = Readonly<{
   /** The configured integration name, or "provider" for a hosted search. */
   source?: string;
   outcome: NativeChatActivityOutcome;
+  /** Ordered display metadata for recognized commands. Omitted on older hosts. */
+  commandActions?: readonly NativeChatCommandAction[];
   /** The call's arguments for display; long values are shortened. */
   input?: unknown;
   /** The call's result for display, once it has one. */

@@ -702,6 +702,26 @@ before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
 
+For recognized `exec_command` input, the host includes an optional
+`commandActions` array in tool-call attribution under
+`_meta["co.grida/session/updates"]` and
+`_meta["co.grida/session/transcript-window"]`. The same field may appear on
+tool activity in a child conversation. The array lists the following action
+shapes in command order.
+
+- `{kind: "read", path}`
+- `{kind: "list_files", path?, piped?: true}`
+- `{kind: "search", query, path?, piped?: true}`
+
+The host emits 1–16 actions, with each string limited to 1,024 UTF-8 bytes.
+Paths use the operands as written in the command, relative to the command's
+working directory where applicable. The projection uses the original
+arguments. It describes the requested operations, so a compound command can
+list actions that the shell skipped after an earlier error. The `piped` flag
+marks an action whose output goes to a filter. The shell's exit status then
+describes the pipeline and may reflect only the filter. Treat missing or
+unrecognized metadata as a generic command activity.
+
 Negotiated private stdio lifecycle updates use
 `_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
 `turnId` and `waitId` of a registered question on this attached session. Both

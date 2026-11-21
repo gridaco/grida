@@ -6,6 +6,7 @@ mod approval_review;
 mod before_tool;
 mod bundled_skills;
 mod catalog;
+pub(crate) mod command_actions;
 pub(crate) mod compaction;
 mod completion_checks;
 mod delegation;

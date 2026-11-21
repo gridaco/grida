@@ -3040,6 +3040,87 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it("forwards command actions live and on replay while keeping the tool and its outcome", async () => {
+    const actions = [
+      { kind: "read", path: "README.md" },
+      { kind: "list_files", piped: true },
+      { kind: "search", query: "TODO", path: "src" },
+    ];
+    const test = fixture(
+      `
+      if (request.method === 'session/new') {
+        send({id:request.id,result:{sessionId:'chat'}});
+        return;
+      }
+      const capability = ${JSON.stringify(TRANSCRIPT_WINDOW)};
+      const read = request.params._meta?.[capability];
+      if (read?.kind !== 'read') {
+        send({id:request.id,result:{}});
+        return;
+      }
+      const actions = ${JSON.stringify(actions)};
+      const tool = (key, metadata, id, status) => {
+        send({method:'session/update',params:{sessionId:'chat',
+          _meta:{[key]:{turnId:'turn',messageId:'work',activity:'execute',...metadata}},
+          update:{sessionUpdate:'tool_call',toolCallId:id,title:'exec_command',kind:'execute',status,
+            rawInput:{cmd:'cat README.md && rg --files | head && rg TODO src'}}}});
+      };
+      const replay = {requestId:read.requestId,outcome:'failed'};
+      tool('co.grida/session/updates', {outcome:'running',commandActions:actions}, 'command', 'in_progress');
+      tool(capability, {...replay,commandActions:actions}, 'command', 'failed');
+      tool(capability, replay, 'older', 'failed');
+      tool(capability, {...replay,commandActions:[actions[0],{kind:'unknown'}]}, 'unknown', 'failed');
+      tool(capability, {...replay,commandActions:[{kind:'read',path:'é'.repeat(513)}]}, 'oversized', 'failed');
+      tool(capability, {...replay,commandActions:Array(17).fill(actions[0])}, 'long-list', 'failed');
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,
+        turns:[{turnId:'turn',status:'failed',startedAtMs:1000,settledAtMs:4500}]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const live: unknown[] = [];
+      chat.subscribe(session, (update) => live.push(update));
+      const page = await chat.transcriptPage(session);
+      const call = {
+        callId: "command",
+        title: "exec_command",
+        kind: "execute",
+        input: { cmd: "cat README.md && rg --files | head && rg TODO src" },
+      };
+      expect(live).toEqual([
+        {
+          kind: "activity",
+          messageId: "work",
+          turnId: "turn",
+          activity: { ...call, outcome: "running", commandActions: actions },
+        },
+      ]);
+      expect(
+        page.messages.find((entry) => entry.messageId === "work")?.activity
+      ).toEqual([
+        { ...call, outcome: "failed", commandActions: actions },
+        ...["older", "unknown", "oversized", "long-list"].map((callId) => ({
+          ...call,
+          callId,
+          outcome: "failed",
+        })),
+      ]);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        test.close();
+      }
+    }
+  });
+
   it("retains bounded ownership of timed-out requests until the host answers", async () => {
     const test = fixture("");
     let agent: NativeAgentProcess | undefined;

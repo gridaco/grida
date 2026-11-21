@@ -66,6 +66,7 @@ import {
 import { NativeAgentPermissionModes } from "./native-agent-permission-mode";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeFileReference } from "./native-file-reference";
+import { readCommandActions } from "./native-command-actions";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -3418,6 +3419,8 @@ function activity(
   )
     throw invalidResponse();
   const input = toolDetail(update.rawInput);
+  const title = identity(update.title);
+  const commandActions = readCommandActions(title, attribution.commandActions);
   const callId = identity(update.toolCallId);
   const turnId = optionalIdentity(attribution.turnId);
   const output = toolOutput(
@@ -3429,10 +3432,11 @@ function activity(
   );
   return Object.freeze({
     callId,
-    title: identity(update.title),
+    title,
     kind: kind as NativeChatActivity["kind"],
     ...(source !== undefined && { source }),
     outcome: outcome as NativeChatActivity["outcome"],
+    ...(commandActions !== undefined && { commandActions }),
     ...NativeActivityOrder.read(
       NativeActivityOrder.notification(
         metadata,

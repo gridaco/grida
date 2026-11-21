@@ -49,6 +49,9 @@ messages.map((m, i) => (
   Group icons and summary clauses share a ranking by action frequency, with
   the most recently occurring action winning ties. File totals still count
   distinct files; expanding a group keeps its calls in their original order.
+  A shell command with host-supplied actions can show its read, search, or
+  listing target. Each command has one row with the shell command in its
+  details, even when the host reports several actions.
 - **`question` tool** parts → only a passive record in the transcript ("asked you
   …" + the answered summary). The interactive prompt is **session-global**, not a
   transcript card — see below.

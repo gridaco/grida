@@ -233,17 +233,23 @@ function TodoWriteCard({ entry }: { entry: ToolCallEntry }) {
 /** A command, or a later write to the background process it became. */
 function CommandCard({ entry }: { entry: ToolCallEntry }) {
   const input = asRecord(entry.input);
+  // Failed native commands put their process report in the error field.
+  const report =
+    entry.state === "output-error" && entry.errorText?.startsWith("Wall time: ")
+      ? entry.errorText
+      : undefined;
   const output = asRecord(entry.output);
   const command = commandLine(input);
   const exitCode = numberValue(output.exit_code);
   const processId = numberValue(output.process_id);
   const seconds = numberValue(output.wall_time_seconds);
-  const text = str(output.output);
-  const failed = exitCode !== undefined && exitCode !== 0;
+  const text = report ?? str(output.output);
+  const failed = statusTone(entry) === "error";
   return (
     <div className="space-y-1.5">
       <ToolDetail
         entry={entry}
+        showNotice={!report}
         meta={compact([
           exitCode !== undefined ? `exit ${exitCode}` : undefined,
           processId !== undefined
@@ -307,13 +313,15 @@ function ToolDetail({
   detail,
   detailMono,
   meta,
+  showNotice = true,
 }: {
   entry: ToolCallEntry;
   detail?: string;
   detailMono?: boolean;
   meta?: string[];
+  showNotice?: boolean;
 }) {
-  const notice = resultNotice(entry);
+  const notice = showNotice ? resultNotice(entry) : null;
   const tone = statusTone(entry);
   const hasDetail = Boolean(detail);
   const hasMeta = Boolean(meta && meta.length > 0);
