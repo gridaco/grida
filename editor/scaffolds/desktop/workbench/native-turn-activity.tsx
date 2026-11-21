@@ -153,7 +153,7 @@ function ModelChangeDivider({ from, to }: { from: string; to: string }) {
   const toLabel = modelLabel(to);
   const sameLabel = fromLabel === toLabel;
   return (
-    <p className="flex w-full items-center gap-3 px-1 text-center text-xs text-muted-foreground">
+    <p className="flex w-full items-center gap-3 px-1 text-center text-xs text-muted-foreground select-none">
       <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
       <span className="flex min-w-0 items-center gap-1.5">
         <BoxIcon aria-hidden className="size-3.5 shrink-0" />
