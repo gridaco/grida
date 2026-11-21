@@ -177,6 +177,7 @@ export function ChatMessageView({
   edit,
   loadAttachmentPreview,
   loadToolImage,
+  responseFooter,
 }: {
   ref?: Ref<HTMLDivElement>;
   message: ChatMessage;
@@ -189,6 +190,8 @@ export function ChatMessageView({
   loadAttachmentPreview?: AttachmentImagePreview.Loader;
   /** Captured tool-result images, with authority kept separate from user attachments. */
   loadToolImage?: AttachmentImagePreview.Loader;
+  /** Client-supplied display after a final assistant response. */
+  responseFooter?: ReactNode;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
   // `data-compaction` part) renders as a divider with an expandable
@@ -409,6 +412,7 @@ export function ChatMessageView({
           <Shimmer className="text-xs">Thinking</Shimmer>
         )}
       </MessageContent>
+      {responseFooter}
       {/* Copy mirrors the user-bubble affordance but left-aligned under the
           assistant response. Shown only once the turn has settled with real
           text — never over a half-streamed or tool-only (text-less) turn. */}

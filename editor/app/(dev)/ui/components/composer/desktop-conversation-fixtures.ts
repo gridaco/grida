@@ -22,6 +22,7 @@ export namespace DesktopConversationFixtures {
     | "streaming"
     | "paused"
     | "suggested-prompt"
+    | "web-preview"
     | "loading"
     | "reconnect"
     | "approval"
@@ -34,6 +35,7 @@ export namespace DesktopConversationFixtures {
     subagentActivity?: NativeSubagentActivityPage;
     questions?: readonly NativeChatQuestion[];
     streamingMessageId?: string;
+    activeTurnId?: string;
   }>;
 
   /** Fixed display times keep hover actions deterministic between visits. */
@@ -109,6 +111,65 @@ export namespace DesktopConversationFixtures {
     role: "user",
     text: "Draft a handout for the gallery tour.",
     turnId: question.turnId,
+  };
+
+  const previewCases = [
+    {
+      id: "preview-two-urls",
+      request: "Show me both versions of the gallery.",
+      reply:
+        "[Light gallery](http://localhost:4173/light) and [dark gallery](http://localhost:4173/dark) are ready.",
+    },
+    {
+      id: "preview-url-label",
+      request: "Paste the feedback page address.",
+      reply: "[http://localhost:4173/feedback](http://localhost:4173/feedback)",
+    },
+    {
+      id: "preview-unavailable",
+      request: "Where was the archived layout?",
+      reply: "The [archive preview](http://localhost:4173/archive) was here.",
+    },
+    {
+      id: "preview-fx",
+      request: "Where can I review the workflow?",
+      reply: "Open the [workflow viewer](http://127.0.0.1:4174/plan).",
+    },
+    {
+      id: "preview-ready",
+      request: "Show me the gallery preview.",
+      reply: "The [gallery preview](http://localhost:4173/gallery) is ready.",
+    },
+    {
+      id: "preview-running",
+      request: "Can I see the print layout, too?",
+      reply:
+        "The [print preview](http://localhost:4173/print) is ready to review.",
+    },
+  ];
+
+  const webPreview: Example = {
+    id: "web-preview",
+    activeTurnId: "preview-running",
+    messages: previewCases.flatMap(
+      ({ id, request, reply }): NativeChatMessage[] => [
+        { messageId: `${id}-user`, role: "user", text: request, turnId: id },
+        {
+          messageId: `${id}-answer`,
+          role: "assistant",
+          phase: "answer",
+          text: reply,
+          turnId: id,
+        },
+      ]
+    ),
+    records: previewCases.slice(0, -1).map(({ id }, index) => ({
+      turnId: id,
+      status: "succeeded",
+      startedAtMs: startedAtMs - (previewCases.length - 1 - index) * 60_000,
+      settledAtMs:
+        startedAtMs - (previewCases.length - 1 - index) * 60_000 + 5200,
+    })),
   };
 
   const scenarios: readonly Example[] = [
@@ -447,6 +508,7 @@ export namespace DesktopConversationFixtures {
     },
     { id: "streaming", ...partialReply },
     { id: "paused", ...partialReply },
+    webPreview,
     {
       id: "suggested-prompt",
       messages: [

@@ -7,6 +7,9 @@ import ComposerPage from "./page";
 import { DesktopComposerDemo } from "./desktop-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import { ChatResponseCards } from "@/kits/agent-chat";
+import { ResponseCards } from "@/lib/agent-chat/response-cards";
+import type { Browser } from "@/lib/desktop/browser";
 
 // These examples exercise Desktop layout and chat IPC with local fixtures.
 vi.mock("@/app/(library)/library/attachment", () => ({
@@ -49,6 +52,151 @@ async function mountConversationDemo(
 function conversation(container: HTMLElement): HTMLElement {
   return container.querySelector<HTMLElement>('[role="log"]')!;
 }
+
+it("shares the Desktop opener between finished previews and Markdown links", async () => {
+  await mountConversationDemo({ scenario: "web-preview" });
+  const log = page.getByRole("log");
+  const previews = log.getByRole("group", { name: "Web preview" });
+  const openButton = (index: number, host: string) =>
+    previews.nth(index).getByRole("button", {
+      name: `Open web preview at ${host}`,
+      exact: true,
+    });
+  const gallery = openButton(2, "localhost:4173");
+  const request = page.getByText(
+    "Workbench browser requested for http://localhost:4173/gallery",
+    { exact: true }
+  );
+
+  await expect
+    .element(log.getByText("Can I see the print layout, too?"))
+    .toBeVisible();
+  await expect.element(gallery).toBeVisible();
+  await expect.element(previews).toHaveLength(3);
+  const galleryCard = previews.nth(2);
+  expect(galleryCard.element().tagName).toBe("DIV");
+  expect(galleryCard.element().querySelector("button button")).toBeNull();
+  await act(async () => gallery.element().scrollIntoView({ block: "center" }));
+  await expect.element(galleryCard.getByText("Gallery tour")).toBeVisible();
+  await expect
+    .element(galleryCard.getByText("An exhibition guide with three stops."))
+    .toBeVisible();
+  expect(galleryCard.element().textContent).not.toContain("localhost:4173");
+  expect(galleryCard.element().querySelector("img")?.src).toMatch(
+    /^data:image\/png/
+  );
+  expect(request.query()).toBeNull();
+
+  await act(async () => gallery.click());
+  await expect.element(request).toBeVisible();
+
+  const options = galleryCard.getByRole("button", {
+    name: "Web preview open options",
+  });
+  await act(async () => options.click());
+  await act(async () =>
+    page.getByRole("menuitem", { name: "Open in default browser" }).click()
+  );
+  const externalRequest = page.getByText(
+    "System browser requested for http://localhost:4173/gallery",
+    { exact: true }
+  );
+  await expect.element(externalRequest).toBeVisible();
+
+  const clipboard = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue();
+  try {
+    await act(async () => options.click());
+    await act(async () =>
+      page.getByRole("menuitem", { name: "Copy link" }).click()
+    );
+    expect(clipboard).toHaveBeenCalledExactlyOnceWith(
+      "http://localhost:4173/gallery"
+    );
+    await expect.element(externalRequest).toBeVisible();
+  } finally {
+    clipboard.mockRestore();
+  }
+
+  const inline = log.getByRole("link", {
+    name: "Light gallery",
+    exact: true,
+  });
+  await expect
+    .element(inline)
+    .toHaveAttribute("href", "http://localhost:4173/light");
+  await act(async () => inline.click());
+  const inlineRequest = page.getByText(
+    "Workbench browser requested for http://localhost:4173/light",
+    { exact: true }
+  );
+  await expect.element(inlineRequest).toBeVisible();
+
+  const fx = openButton(1, "127.0.0.1:4174");
+  await act(async () => fx.element().scrollIntoView({ block: "center" }));
+  const fxCard = previews.nth(1);
+  await expect.element(fxCard.getByText("FX Viewer")).toBeVisible();
+  await expect
+    .element(fxCard.getByText("Browse workflow plans and runs."))
+    .toBeVisible();
+  expect(fxCard.element().textContent).not.toContain("127.0.0.1:4174");
+  const archive = openButton(0, "localhost:4173");
+  await act(async () => archive.element().scrollIntoView({ block: "center" }));
+  const archiveCard = previews.nth(0);
+  await expect
+    .element(archiveCard.getByText("Web preview", { exact: true }))
+    .toBeVisible();
+  await expect
+    .element(archiveCard.getByText("localhost:4173", { exact: true }))
+    .toBeVisible();
+
+  await act(async () =>
+    page.getByRole("button", { name: "Finish reply" }).click()
+  );
+  await expect.element(previews).toHaveLength(4);
+  const print = openButton(3, "localhost:4173");
+  await act(async () => print.element().scrollIntoView({ block: "center" }));
+  await expect.element(print).toBeEnabled();
+  await expect
+    .element(previews.nth(3).getByText("Print layout"), {
+      timeout: 4000,
+    })
+    .toBeVisible();
+  await expect.element(inlineRequest).toBeVisible();
+});
+
+it("starts a preview on intersection and releases pending work offscreen", async () => {
+  const load = vi.fn<Browser.PreviewLoader>(
+    (_, signal) =>
+      new Promise<null>((resolve) =>
+        signal.addEventListener("abort", () => resolve(null), { once: true })
+      )
+  );
+  const url = "http://127.0.0.1:4174/plan";
+  const container = await mountDemo(
+    <div style={{ height: 100, overflow: "auto" }}>
+      <div style={{ height: 300 }} />
+      <ChatResponseCards
+        cards={ResponseCards.forReply({ text: url })}
+        open={() => true}
+        loadPreview={load}
+      />
+      <div style={{ height: 300 }} />
+    </div>
+  );
+  const scroller = container.firstElementChild as HTMLDivElement;
+  const card = scroller.querySelector('[aria-label="Web preview"]')!;
+  await new Promise(requestAnimationFrame);
+  expect(load).not.toHaveBeenCalled();
+  card.scrollIntoView({ block: "center" });
+  await expect.poll(() => load.mock.calls.length).toBe(1);
+  const [[requested, signal]] = load.mock.calls;
+  expect(requested).toBe(url);
+  expect(signal.aborted).toBe(false);
+  scroller.scrollTop = 0;
+  await expect.poll(() => signal.aborted).toBe(true);
+});
 
 function menuItem(panel: HTMLElement, title: string): HTMLElement {
   return Array.from(

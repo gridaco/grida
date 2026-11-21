@@ -41,6 +41,12 @@ an account, or a model.
   sample messages. Compare ordinary web links and the recognized site icons in
   the draft, the user bubble, and the agent response. Edit a draft link and send
   it to see the result.
+- **Web preview** shows the gallery's title, favicon, and description. Scroll up
+  to see the FX Viewer label, an unavailable preview, and replies with ambiguous
+  local links. Click **Finish reply** to reveal the print preview and see its
+  details arrive after a short delay. Click the card, an inline link, or
+  **Open in default browser** to see the request in the demo controls.
+  **Copy link** copies the card's URL.
 - **Message queue** shows previews, dragging and keyboard reordering,
   editing in the composer, and Steer. **Running turn** controls whether a send
   enters the queue and whether queued messages can be steered.

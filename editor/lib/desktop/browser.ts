@@ -1,8 +1,39 @@
 /** Renderer client for the optional native browser capability. */
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, type WebPreview } from "@grida/desktop-bridge";
 import { getDesktopBridge } from "./bridge";
 
 export namespace Browser {
+  export type OpenIntent = Readonly<{
+    kind: "open-web";
+    url: string;
+    target: "default" | "external";
+  }>;
+
+  /** Returns whether a destination accepted this request. */
+  export type OpenHandler = (intent: OpenIntent) => boolean;
+
+  export type PreviewLoader = (
+    url: string,
+    signal: AbortSignal
+  ) => Promise<WebPreview.Metadata | null>;
+
+  /** Route a deliberate web open from the current Desktop surface. */
+  export function open(
+    intent: OpenIntent,
+    openInWorkbench?: (url: string) => boolean
+  ): boolean {
+    const url = DesktopBrowser.normalizeUrl(intent.url);
+    if (!url) return false;
+    if (intent.target === "default" && openInWorkbench?.(url)) return true;
+
+    const shell = getDesktopBridge()?.shell;
+    if (!shell?.open_external) return false;
+    void shell.open_external(url).catch(() => {
+      console.warn("Couldn’t open the system browser.");
+    });
+    return true;
+  }
+
   export function getBridge(): DesktopBrowser.Bridge | null {
     const bridge = getDesktopBridge();
     return bridge?.caps.native.browser &&

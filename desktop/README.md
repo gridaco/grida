@@ -559,3 +559,12 @@ from the repository root. Both use disposable profiles and a loopback server.
 GRIDA_DESKTOP_TEST_ELECTRON=1 pnpm --dir desktop exec vitest run src/main/browser-host.electron.test.ts
 node desktop/scripts/verify-browser-favicons-chrome.cjs
 ```
+
+Visible chat link cards can request display metadata for a loopback URL.
+Bundled extensions can supply product labels by placing `web-preview.json`
+next to their `extension.json` and declaring an exact named HTML meta match.
+Desktop reads the page once for every shared lookup. It falls back to ordinary
+page metadata when two contributions match. For a custom lookup, add a sibling
+`web-preview.ts` that exports a `resolve` function typed as
+`NonNullable<WebPreviewProvider["resolve"]>`. Desktop calls a matched resolver
+with a bounded same-origin reader and an abort signal.

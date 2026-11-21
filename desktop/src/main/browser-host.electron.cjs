@@ -14,6 +14,7 @@ const {
 const resultPath = process.argv[3];
 const downloadOnly = process.argv[5] === "download";
 const faviconOnly = process.argv[5] === "favicon";
+const previewOnly = process.argv[5] === "preview";
 process.umask(0o077);
 app.commandLine.appendSwitch("use-mock-keychain");
 app.setPath("userData", process.argv[4]);
@@ -211,6 +212,65 @@ async function proveFavicons(
     staleResponseDiscarded: true,
   };
 }
+
+async function provePreviews(event, attachmentId) {
+  const icons = faviconFixture();
+  let sharedRequests = 0;
+  let slowStarted = false;
+  let slowClosed = false;
+  const origin = await serve((request, response) => {
+    if (request.url === "/fx/run") {
+      sharedRequests++;
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html><head>
+        <title>Preview fixture</title>
+        <meta name="description" content="Server-rendered &amp; local">
+        <meta name="application-name" data-grida-fx-viewer="1">
+        <link rel="icon" href="../art/blue.svg" type="image/svg+xml">
+        <script src="/viewer-script.js"></script>
+      </head><body>Viewer fixture</body>`);
+    } else if (request.url === "/slow") {
+      slowStarted = true;
+      response.once("close", () => {
+        slowClosed = true;
+      });
+      response.writeHead(200, { "Content-Type": "text/html" });
+      response.write("<!doctype html><head><title>Slow fixture");
+    } else {
+      icons.handler(request, response);
+    }
+  });
+  const lookup = (id, pathname) =>
+    host.preview(event, { attachmentId, id, url: origin + pathname });
+
+  mark("coalescing web previews");
+  const [first, second] = await Promise.all([
+    lookup("first", "/fx/run"),
+    lookup("second", "/fx/run"),
+  ]);
+  assert.deepEqual(first, second);
+  assert.equal(icons.requests.get("/art/blue.svg"), 1);
+  assert.match(first.favicon.dataUrl, /^data:image\/png;base64,/);
+  const rasterSize = nativeImage
+    .createFromDataURL(first.favicon.dataUrl)
+    .getSize();
+
+  mark("canceling a pending web preview");
+  const pending = lookup("slow", "/slow");
+  await waitFor(() => slowStarted);
+  await host.detach(event, attachmentId);
+  assert.equal(await pending, null);
+  await waitFor(() => slowClosed);
+  return {
+    sharedRequests,
+    title: first.title,
+    description: first.description,
+    productLabel: first.productLabel,
+    rasterSize,
+    scriptRequests: icons.requests.get("/viewer-script.js") ?? 0,
+    detachedReadCanceled: true,
+  };
+}
 app
   .whenReady()
   .then(async () => {
@@ -278,7 +338,7 @@ app
       );
     });
     const window = new BrowserWindow({
-      show: !downloadOnly && !faviconOnly,
+      show: !downloadOnly && !faviconOnly && !previewOnly,
       width: 800,
       height: 600,
       webPreferences: {
@@ -303,10 +363,24 @@ app
     assert.equal(earlyAttached, false);
     window.webContents.off("did-attach-webview", early);
     const downloadConfirmations = [];
+    let webPreview;
+    if (previewOnly) {
+      const directory = path.dirname(process.argv[2]);
+      const { WebPreviewService } = require(
+        path.join(directory, "web-preview.cjs")
+      );
+      const { WebPreviewProviders } = require(
+        path.join(directory, "web-preview-providers.cjs")
+      );
+      webPreview = new WebPreviewService({
+        providers: WebPreviewProviders.bundled(),
+      });
+    }
     host = new DesktopBrowserHost({
       editorOrigin: origin,
       admitWindow: (candidate) => windows.has(candidate),
       workspaceExists: async () => true,
+      webPreview,
       downloads: {
         accept: (event, _item, _source, _parent, _live, confirmDownload) => {
           // Exercise Chromium's will-download and Main's policy without a dialog.
@@ -318,6 +392,14 @@ app
     });
     const event = eventFor(window);
     const { attachmentId } = await host.attach(event, "eac20941e6a410aa");
+    if (previewOnly) {
+      const evidence = await provePreviews(event, attachmentId);
+      fs.writeFileSync(resultPath, JSON.stringify(evidence));
+      host.closeAll();
+      for (const server of servers) server.close();
+      app.exit(0);
+      return;
+    }
     const page = host.create(event, {
       attachmentId,
       url: `${guestOrigin}/page`,

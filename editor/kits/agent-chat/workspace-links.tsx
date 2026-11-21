@@ -3,6 +3,7 @@
 import { createContext, useContext, type ComponentProps } from "react";
 import { defaultRehypePlugins, type StreamdownProps } from "streamdown";
 import { chatWebLinkIcon } from "@/components/chat-web-link";
+import { BrowserOpen } from "@/lib/desktop/browser-open-context";
 
 /**
  * Links in agent replies that point at files in the person's workspace: a
@@ -13,7 +14,8 @@ import { chatWebLinkIcon } from "@/components/chat-web-link";
  * before hardening as links on a reserved, non-routable origin carrying the
  * original path, and renders them as links that open the file in the
  * workspace. The opener validates the path against the workspace; with no
- * opener, the link text is shown without a link. Web links are unchanged.
+ * opener, the link text is shown without a link. Web links use the host's
+ * browser opener when one is supplied.
  */
 export namespace workspace_links {
   /** A reserved origin (`.invalid` never resolves) for marked links. */
@@ -97,10 +99,12 @@ export namespace workspace_links {
     href,
     children,
     className,
+    onClick,
     node: _node,
     ...props
   }: ComponentProps<"a"> & { node?: unknown }) {
     const open = useContext(Opener);
+    const openWeb = useContext(BrowserOpen);
     const target = marked(href);
     const style = "wrap-anywhere font-medium text-primary underline";
     if (target === null) {
@@ -113,6 +117,24 @@ export namespace workspace_links {
           data-chat-web-link={icon}
           rel="noreferrer"
           target="_blank"
+          onClick={
+            openWeb && href
+              ? (event) => {
+                  onClick?.(event);
+                  if (
+                    !event.defaultPrevented &&
+                    event.button === 0 &&
+                    !event.currentTarget.hasAttribute("download") &&
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    openWeb({ kind: "open-web", url: href, target: "default" })
+                  )
+                    event.preventDefault();
+                }
+              : onClick
+          }
         >
           {children}
         </a>

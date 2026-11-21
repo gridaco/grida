@@ -1,3 +1,5 @@
+import type { WebPreview } from "./web-preview";
+
 /**
  * GRIDA-SEC-016 — bounded native browser values and destination validation.
  * DTO validation establishes no caller or guest authority.
@@ -451,6 +453,9 @@ export namespace DesktopBrowser {
     thumbnail?(request: Target): Promise<Thumbnail | null>;
     /** Optional enrichment; stable reads do not emit another page outcome. */
     favicon?(request: Target): Promise<Favicon | null>;
+    /** Optional, document-bound loopback metadata for an on-screen link. */
+    preview?(request: WebPreview.Request): Promise<WebPreview.Metadata | null>;
+    cancelPreview?(request: WebPreview.Cancel): Promise<void>;
     /**
      * Native confirms clearing the app-wide browser profile from an admitted
      * workspace or Settings document, then rechecks its generation. False is

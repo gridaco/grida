@@ -34,7 +34,10 @@ export function NativeTurnActivity({
   block: Extract<turn_activity.Block, { kind: "turn" }>;
   showModelChanges?: boolean;
   approvalReviews?: NativeChatTurnRecord["approvalReviews"];
-  renderMessage: (message: NativeChatMessage) => ReactNode;
+  renderMessage: (
+    message: NativeChatMessage,
+    completedAnswer?: boolean
+  ) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
   onOpenSubagent?: (childId: string, inputId: string) => void;
   loadToolImage?: (previewId: string) => Promise<Blob>;
@@ -66,7 +69,7 @@ export function NativeTurnActivity({
       {showModelChanges && block.modelChange && (
         <ModelChangeDivider {...block.modelChange} />
       )}
-      {block.requests.map(renderMessage)}
+      {block.requests.map((message) => renderMessage(message))}
       {(turn_activity.showsHeader(block) ||
         (block.finished &&
           (subagentEvents.length > 0 || !!approvalReviews?.length))) && (
@@ -143,7 +146,12 @@ export function NativeTurnActivity({
           ))}
         </section>
       )}
-      {block.answers.map(renderMessage)}
+      {block.answers.map((message, index) =>
+        renderMessage(
+          message,
+          block.outcome === "succeeded" && index === block.answers.length - 1
+        )
+      )}
     </div>
   );
 }

@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@app/ui/components/button";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { NativeAgentPane } from "@/scaffolds/desktop/workbench/native-agent-pane";
+import type { Browser } from "@/lib/desktop/browser";
+import {
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
 import type { SubagentPlacement } from "@/scaffolds/desktop/workbench/subagent-placement";
 import { DesktopChatFixture } from "./desktop-chat-fixture";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
@@ -48,6 +53,14 @@ export function DesktopComposerDemo({
     fixture.submission.read
   );
   const question = scenario === "question";
+  const webPreview = scenario === "web-preview";
+  const [openRequest, setOpenRequest] = useState<Browser.OpenIntent | null>(
+    null
+  );
+  const openWeb = useCallback<Browser.OpenHandler>((intent) => {
+    setOpenRequest(intent);
+    return true;
+  }, []);
 
   useEffect(() => {
     if (scenario !== "question" || !streaming) return;
@@ -65,12 +78,36 @@ export function DesktopComposerDemo({
     fixture.resetRequests();
     setFixture(new DesktopChatFixture(scenario, queued));
     setStreaming(scenario === "streaming");
+    setOpenRequest(null);
   };
 
   return (
     <TooltipProvider>
       <div data-testid="desktop-composer-playground" className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {webPreview && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!running}
+                onClick={() => fixture.setRunning(false)}
+              >
+                Finish reply
+              </Button>
+              {openRequest && (
+                <span
+                  role="status"
+                  className="min-w-0 break-all text-muted-foreground"
+                >
+                  {openRequest.target === "external"
+                    ? "System browser requested for"
+                    : "Workbench browser requested for"}{" "}
+                  {openRequest.url}
+                </span>
+              )}
+            </>
+          )}
           {(scenario === "question" || scenario === "streaming") && (
             <label className="flex items-center gap-2">
               <input
@@ -181,29 +218,35 @@ export function DesktopComposerDemo({
               : "flex h-[min(42rem,80vh)] min-h-[36rem] w-full flex-col overflow-hidden rounded-xl border bg-background"
           }
         >
-          <NativeAgentPane
-            key={fixture.sessionId}
-            bridge={fixture.bridge}
-            predictionPreferences={
-              scenario === "suggested-prompt"
-                ? suggestionPreferences
-                : undefined
-            }
-            initialSession={fixture.sessionId}
-            editorSurfaces={
-              scenario === "svg-selection" ? fixture.editorSurfaces : undefined
-            }
-            sideChatPlacement={sideChats}
-            libraryRequestSource={
-              scenario === "library-request"
-                ? fixtures.libraryRequestSource
-                : undefined
-            }
-            subagentPlacement={
-              scenario === "subagents" ? inlineSubagents : undefined
-            }
-            autofocus={false}
-          />
+          <BrowserOpen value={webPreview ? openWeb : null}>
+            <BrowserPreview value={webPreview ? fixtures.loadWebPreview : null}>
+              <NativeAgentPane
+                key={fixture.sessionId}
+                bridge={fixture.bridge}
+                predictionPreferences={
+                  scenario === "suggested-prompt"
+                    ? suggestionPreferences
+                    : undefined
+                }
+                initialSession={fixture.sessionId}
+                editorSurfaces={
+                  scenario === "svg-selection"
+                    ? fixture.editorSurfaces
+                    : undefined
+                }
+                sideChatPlacement={sideChats}
+                libraryRequestSource={
+                  scenario === "library-request"
+                    ? fixtures.libraryRequestSource
+                    : undefined
+                }
+                subagentPlacement={
+                  scenario === "subagents" ? inlineSubagents : undefined
+                }
+                autofocus={false}
+              />
+            </BrowserPreview>
+          </BrowserOpen>
         </div>
       </div>
     </TooltipProvider>

@@ -20,8 +20,8 @@
  * The workbench owns the small amount of cross-pane state: which tabs
  * are open, which is active, and a refresh counter that the file tree pane
  * reads when one pane mutates the filesystem (a save in the editor,
- * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
- * context, no store — because nothing else needs to subscribe.
+ * an mkdir/cp/git-mv from the agent pane). It also supplies its browser opener
+ * to the primary chat and the side chats rendered as tabs.
  *
  * Tabs are files or panels (`workbench-tab.ts`). Each of the agent pane's
  * side chats opens as its own panel tab through `SideChatTabPlacement`,
@@ -84,6 +84,11 @@ import { FileTreePane } from "./file-tree-pane";
 import { EditorPane, WorkspaceExplorerToggleButton } from "./editor-pane";
 import { WorkspaceTitleMenu } from "./workspace-title-menu";
 import { AgentPane } from "./agent-pane";
+import { Browser } from "@/lib/desktop/browser";
+import {
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
 import { WorkspaceUtilities } from "./workspace-utilities";
 import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
@@ -190,6 +195,10 @@ export function WorkspaceWorkbench({
     [workspace.id]
   );
   const { group, browsers } = browserSession;
+  const openWeb = useCallback<Browser.OpenHandler>(
+    (intent) => Browser.open(intent, browsers.openOrFocus),
+    [browsers]
+  );
   const [browserUIOwner] = useState(() => ({}));
   useLayoutEffect(
     () => browserSession.bindUI(browserUIOwner),
@@ -221,6 +230,8 @@ export function WorkspaceWorkbench({
   // tab only when it is a file.
   const activeRelPath = WorkbenchTab.relPath(activeTab);
   const [restoreSettled, setRestoreSettled] = useState(false);
+  const loadWebPreview =
+    restoreSettled && browsers.canLoadPreview() ? browsers.loadPreview : null;
 
   useEffect(() => {
     if (restoreSettled)
@@ -563,13 +574,17 @@ export function WorkspaceWorkbench({
                 </div>
               </TitleBar>
               <div className={`min-h-0 flex-1 ${styles.chatPane}`}>
-                <AgentPane
-                  workspace={workspace}
-                  surfaceHost={surfaceHost}
-                  sideChatPlacement={sideChatPlacement}
-                  subagentPlacement={subagentPlacement}
-                  onProcessesChange={setProcesses}
-                />
+                <BrowserOpen value={openWeb}>
+                  <BrowserPreview value={loadWebPreview}>
+                    <AgentPane
+                      workspace={workspace}
+                      surfaceHost={surfaceHost}
+                      sideChatPlacement={sideChatPlacement}
+                      subagentPlacement={subagentPlacement}
+                      onProcessesChange={setProcesses}
+                    />
+                  </BrowserPreview>
+                </BrowserOpen>
               </div>
             </div>
           </ResizablePanel>
@@ -601,30 +616,38 @@ export function WorkspaceWorkbench({
                     orientation="vertical"
                   >
                     <ResizablePanel data-workbench-decorative-overflow>
-                      <EditorPane
-                        workspace={workspace}
-                        surfaceHost={surfaceHost}
-                        panels={panels}
-                        browsers={browsers}
-                        openTabs={openTabs}
-                        activeTab={activeTab}
-                        dirtyPaths={dirtyPaths}
-                        onTabDirtyChange={onTabDirtyChange}
-                        onSelectTab={activateTab}
-                        onMoveTab={moveTab}
-                        onCloseTab={closeTab}
-                        onReopenClosedTab={reopenClosedTab}
-                        showStart={showStart}
-                        onOpenFileExplorer={openTree}
-                        onCreateCanvas={createCanvas}
-                        treeVisible={showTree}
-                        onToggleTree={toggleTree}
-                        hasBottomPane={utilityView.mounted && utilitiesVisible}
-                        utilitiesVisible={utilitiesVisible}
-                        onToggleUtilities={toggleUtilities}
-                        onSaved={bumpTreeRefresh}
-                        onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-                      />
+                      <BrowserOpen value={openWeb}>
+                        <BrowserPreview value={loadWebPreview}>
+                          <EditorPane
+                            workspace={workspace}
+                            surfaceHost={surfaceHost}
+                            panels={panels}
+                            browsers={browsers}
+                            openTabs={openTabs}
+                            activeTab={activeTab}
+                            dirtyPaths={dirtyPaths}
+                            onTabDirtyChange={onTabDirtyChange}
+                            onSelectTab={activateTab}
+                            onMoveTab={moveTab}
+                            onCloseTab={closeTab}
+                            onReopenClosedTab={reopenClosedTab}
+                            showStart={showStart}
+                            onOpenFileExplorer={openTree}
+                            onCreateCanvas={createCanvas}
+                            treeVisible={showTree}
+                            onToggleTree={toggleTree}
+                            hasBottomPane={
+                              utilityView.mounted && utilitiesVisible
+                            }
+                            utilitiesVisible={utilitiesVisible}
+                            onToggleUtilities={toggleUtilities}
+                            onSaved={bumpTreeRefresh}
+                            onFileTrashed={(rp) =>
+                              handleEntryTrashed(rp, false)
+                            }
+                          />
+                        </BrowserPreview>
+                      </BrowserOpen>
                     </ResizablePanel>
                     {utilityView.mounted && (
                       <>

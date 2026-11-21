@@ -399,6 +399,51 @@ async function fixture(
   };
 }
 
+it("admits preview lookups only for the current workspace attachment and discards a late result on detach", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  let finish!: (value: { title: string }) => void;
+  const lookup = vi.fn<Resolver["lookup"]>(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const clear = vi.fn<Resolver["clear"]>();
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: { lookup, clear },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const peer = await fixture("abcd1234e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "request",
+    url: "http://127.0.0.1:8080/",
+  };
+  await expect(host.preview(peer.event, request)).rejects.toThrow(
+    "browser_attachment_expired"
+  );
+  await expect(
+    host.preview(first.event, { ...request, url: "https://example.com:8080/" })
+  ).rejects.toThrow("browser_preview_invalid");
+  expect(lookup).not.toHaveBeenCalled();
+  const result = host.preview(first.event, request);
+  const signal = lookup.mock.calls[0][2];
+  await expect(host.preview(first.event, request)).resolves.toBeNull();
+  expect(() => host.cancelPreview(peer.event, request)).toThrow(
+    "browser_attachment_expired"
+  );
+  expect(signal.aborted).toBe(false);
+  await host.detach(first.event, request.attachmentId);
+  expect(signal.aborted).toBe(true);
+  expect(clear).toHaveBeenCalledWith(request.attachmentId);
+  finish({ title: "Late title" });
+  await expect(result).resolves.toBeNull();
+  host.closeAll();
+});
+
 it("creates a descriptor then registers only its actual guest with Main-owned session/preferences before website load", async () => {
   const f = await fixture();
   const page = f.descriptor();

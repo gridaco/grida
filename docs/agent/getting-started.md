@@ -85,6 +85,21 @@ reach only the files within the deck.
 
 With **Settings → Personalization → Suggested prompts** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. If you clear the draft before sending, the same suggestion reappears while it still applies to the chat. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
 
+## Open a local web preview
+
+In a Desktop project chat, a finished reply that gives you one local web
+address with a port can show a **Web preview** card. Click the card, **Open**,
+or a web link in the transcript to use the current workbench browser when
+available, with the system browser as the fallback. If that exact address is
+already open in the workbench, Grida switches to its tab. The menu beside **Open**
+offers **Open in default browser** and **Copy link**. If the local server is
+stopped, start it and reload the page.
+
+When the card is visible, Desktop can fill in the page title, description and
+icon. Recognized products such as FX Viewer can also show their name. The
+second line shows the description, or the host and port if no description is
+available. **Open** is available while Desktop reads the preview.
+
 ## Attach an image
 
 Choose **+ → Image**, or drop or paste one PNG, JPEG, WebP or GIF into the

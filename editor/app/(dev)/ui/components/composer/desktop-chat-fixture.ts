@@ -77,11 +77,14 @@ export class DesktopChatFixture {
       scenario === "approval" || scenario === "library-request"
         ? scenario
         : null;
-    this.liveTurnId = this.questions.length
-      ? conversations.question.turnId
-      : `${this.sessionId}-turn`;
+    this.liveTurnId =
+      example.activeTurnId ??
+      (this.questions.length
+        ? conversations.question.turnId
+        : `${this.sessionId}-turn`);
     this.paused = scenario === "paused";
     const activeReply =
+      !!example.activeTurnId ||
       scenario === "streaming" ||
       scenario === "suggested-prompt" ||
       this.paused;
@@ -89,7 +92,7 @@ export class DesktopChatFixture {
       queued || !!this.questions.length || !!this.waitingFor || activeReply;
     this.waiting = queued ? fixtures.queue : [];
     this.messages =
-      activeReply || this.waitingFor
+      (activeReply || this.waitingFor) && !example.activeTurnId
         ? example.messages.map((message) => ({
             ...message,
             turnId: this.liveTurnId,
@@ -98,6 +101,7 @@ export class DesktopChatFixture {
         : example.messages;
     this.records = this.running
       ? [
+          ...(example.activeTurnId ? (example.records ?? []) : []),
           {
             turnId: this.liveTurnId,
             status: null,

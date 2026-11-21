@@ -13,7 +13,9 @@ const require = createRequire(import.meta.url);
 
 const skipElectron = process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1";
 
-async function runBrowserProof(scenario: "browser" | "download" | "favicon") {
+async function runBrowserProof(
+  scenario: "browser" | "download" | "favicon" | "preview"
+) {
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "grida-browser-proof-")
   );
@@ -28,9 +30,17 @@ async function runBrowserProof(scenario: "browser" | "download" | "favicon") {
         outDir: directory,
         emptyOutDir: false,
         lib: {
-          entry: fileURLToPath(new URL("./browser-host.ts", import.meta.url)),
+          entry: Object.fromEntries(
+            (scenario === "preview"
+              ? ["browser-host", "web-preview", "web-preview-providers"]
+              : ["browser-host"]
+            ).map((name) => [
+              name,
+              fileURLToPath(new URL(`./${name}.ts`, import.meta.url)),
+            ])
+          ),
           formats: ["cjs"],
-          fileName: () => "browser-host.cjs",
+          fileName: (_format, name) => `${name}.cjs`,
         },
         rollupOptions: {
           external: [
@@ -131,4 +141,20 @@ it.skipIf(skipElectron)(
     });
   },
   35_000
+);
+
+it.skipIf(skipElectron)(
+  "loads a declared local web preview once and cancels a pending read on workspace detach",
+  async () => {
+    expect(await runBrowserProof("preview")).toEqual({
+      sharedRequests: 1,
+      title: "Preview fixture",
+      description: "Server-rendered & local",
+      productLabel: "FX Viewer",
+      rasterSize: { width: 32, height: 32 },
+      scriptRequests: 0,
+      detachedReadCanceled: true,
+    });
+  },
+  30_000
 );

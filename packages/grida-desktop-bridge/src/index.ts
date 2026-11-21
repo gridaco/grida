@@ -62,6 +62,7 @@ import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
 import type { DesktopFxViewer } from "./fx-viewer";
 export { DesktopBrowser } from "./browser";
+export { WebPreview } from "./web-preview";
 export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";

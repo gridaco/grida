@@ -12,6 +12,8 @@ import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
 import { DesktopBrowserTools } from "./desktop-browser-tools";
 import { FxExtension } from "./fx-extension";
+import { WebPreviewService } from "./web-preview";
+import { WebPreviewProviders } from "./web-preview-providers";
 import type { BrowserHistory } from "./browser-history";
 import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
@@ -171,6 +173,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       : null;
   };
   const browserHost = new DesktopBrowserHost({
+    webPreview: new WebPreviewService({
+      providers: WebPreviewProviders.bundled(),
+    }),
     history: options.browser_history,
     downloads: options.browser_downloads,
     editorOrigin: EDITOR_ORIGIN,
@@ -391,6 +396,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.BROWSER_FAVICON, (event, request: unknown) =>
     browserHost.favicon(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_PREVIEW, (event, request: unknown) =>
+    browserHost.preview(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CANCEL_PREVIEW, (event, request: unknown) =>
+    browserHost.cancelPreview(event, request)
   );
   guarded(IPC_CHANNELS.BROWSER_HISTORY_QUERY, (event, request: unknown) =>
     browserHost.historyQuery(event, request)

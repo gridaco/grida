@@ -623,6 +623,10 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_THUMBNAIL, request),
     favicon: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FAVICON, request),
+    preview: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_PREVIEW, request),
+    cancelPreview: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CANCEL_PREVIEW, request),
     snapshot: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
     detach: async (attachmentId) => {

@@ -1,4 +1,4 @@
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, WebPreview } from "@grida/desktop-bridge";
 import { Browser } from "@/lib/desktop/browser";
 import { BrowserPageControls } from "@/lib/desktop/browser-page-controls";
 import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
@@ -291,21 +291,93 @@ export class WorkspaceBrowserTabs {
       void bridge.detach(attachmentId).catch(() => {});
   }
 
-  open = (url?: string, replaceTab?: string): void => {
-    if (!this.bridge || !this.attachment || !this.state.ready) return;
+  canLoadPreview(): boolean {
+    return !!(
+      this.state.ready &&
+      this.attachment &&
+      this.bridge?.preview &&
+      this.bridge.cancelPreview
+    );
+  }
+
+  loadPreview: Browser.PreviewLoader = async (url, signal) => {
+    const bridge = this.bridge;
+    const attachmentId = this.attachment;
+    const epoch = this.epoch;
+    const normalized = WebPreview.normalizeUrl(url);
+    if (
+      signal.aborted ||
+      !normalized ||
+      !this.state.ready ||
+      !attachmentId ||
+      !bridge?.preview ||
+      !bridge.cancelPreview
+    )
+      return null;
+    const id = crypto.randomUUID();
+    const cancel = () => {
+      void bridge.cancelPreview?.({ attachmentId, id }).catch(() => {});
+    };
+    signal.addEventListener("abort", cancel, { once: true });
+    try {
+      const result = await bridge.preview({
+        attachmentId,
+        id,
+        url: normalized,
+      });
+      return signal.aborted || this.epoch !== epoch
+        ? null
+        : WebPreview.parseMetadata(result);
+    } catch {
+      return null;
+    } finally {
+      signal.removeEventListener("abort", cancel);
+    }
+  };
+
+  /** Open a fresh tab, optionally replacing a workbench tab in place. */
+  open = (url?: string, replaceTab?: string): boolean => {
+    if (!this.bridge || !this.attachment || !this.state.ready) return false;
     const id = this.newId();
     this.entries.set(id, {
       id,
       page: null,
       url: url ?? null,
       error: null,
-      locationRevision: 1,
+      // A blank tab needs address input. A resolved destination can load directly.
+      locationRevision: url === undefined ? 1 : 0,
     });
     this.publish();
     const key = WorkbenchTab.browser(id);
     if (replaceTab) this.group.replace(replaceTab, key);
     this.group.open(key);
     void this.ensurePage(id);
+    return true;
+  };
+
+  /** Select an exact URL in this workbench, or open it in a fresh tab. */
+  openOrFocus = (url: string): boolean => {
+    const destination = DesktopBrowser.normalizeUrl(url);
+    if (!destination || !this.bridge || !this.attachment || !this.state.ready)
+      return false;
+
+    const { active, tabs } = this.group.getSnapshot();
+    let match: string | undefined;
+    for (const key of tabs) {
+      const tab = WorkbenchTab.parse(key);
+      if (tab.kind !== "browser" || this.closing.has(tab.id)) continue;
+      const entry = this.entries.get(tab.id);
+      if (!entry) continue;
+      // A new tab already has a destination before Main creates its page.
+      const address = entry.page ? entry.page.url : entry.url;
+      if (DesktopBrowser.normalizeUrl(address) !== destination) continue;
+      if (key === active) return true;
+      match ??= key;
+    }
+
+    if (!match) return this.open(destination);
+    this.group.activate(match);
+    return true;
   };
 
   controls(id: string): BrowserPageControls.Controller {

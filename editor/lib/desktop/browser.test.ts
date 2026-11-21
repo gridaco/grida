@@ -78,6 +78,81 @@ describe("Browser.address", () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("Browser.open", () => {
+  const intent = {
+    kind: "open-web",
+    url: "http://localhost:4173",
+    target: "default",
+  } as const;
+
+  function exposeExternal() {
+    const openExternal = vi
+      .fn<(url: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    vi.stubGlobal("window", {
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        shell: { open_external: openExternal },
+      },
+    });
+    return openExternal;
+  }
+
+  it("opens a normalized destination in the current workbench by default", () => {
+    const openExternal = exposeExternal();
+    const openInWorkbench = vi
+      .fn<(url: string) => boolean>()
+      .mockReturnValue(true);
+    expect(Browser.open(intent, openInWorkbench)).toBe(true);
+    expect(openInWorkbench).toHaveBeenCalledExactlyOnceWith(
+      "http://localhost:4173/"
+    );
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it("uses the system browser when the workbench cannot take the default request", () => {
+    const openExternal = exposeExternal();
+    expect(Browser.open(intent, () => false)).toBe(true);
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith(
+      "http://localhost:4173/"
+    );
+  });
+
+  it("honors an explicit system browser request", () => {
+    const openExternal = exposeExternal();
+    const openInWorkbench = vi
+      .fn<(url: string) => boolean>()
+      .mockReturnValue(true);
+    expect(
+      Browser.open({ ...intent, target: "external" }, openInWorkbench)
+    ).toBe(true);
+    expect(openInWorkbench).not.toHaveBeenCalled();
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith(
+      "http://localhost:4173/"
+    );
+  });
+
+  it("leaves requests with no destination unhandled and refuses non-web URLs", () => {
+    vi.stubGlobal("window", undefined);
+    expect(Browser.open(intent)).toBe(false);
+
+    const openExternal = exposeExternal();
+    const openInWorkbench = vi
+      .fn<(url: string) => boolean>()
+      .mockReturnValue(true);
+    for (const url of [
+      "localhost:4173",
+      "grida://auth/callback",
+      "file:///tmp/a",
+      "https://user:password@example.com",
+    ])
+      expect(Browser.open({ ...intent, url }, openInWorkbench)).toBe(false);
+    expect(openInWorkbench).not.toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+});
+
 describe("Browser capability negotiation", () => {
   it("accepts only the v4 shared-profile presentation and never exposes old native APIs", () => {
     const expose = (browser: unknown) =>

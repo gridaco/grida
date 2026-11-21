@@ -7,7 +7,7 @@ tags: [browser, tabs, navigation, restore, shortcuts]
 status: untested
 severity: high
 date: 2026-11-17
-updated: 2026-11-18
+updated: 2026-11-22
 automatable: partial
 covered_by:
   - desktop/src/main/browser-host.test.ts
@@ -26,6 +26,8 @@ restart use recorded HTTP(S) addresses without promising form values or history.
 Generated live locations are transient and are not restore/reopen addresses.
 Page-focused application shortcuts address the workbench, while ordinary text
 editing and composition remain website input.
+A new blank tab focuses the address bar. A tab opened at a known URL leaves
+the address bar unfocused until the user selects it or presses Cmd/Ctrl+L.
 A later successful full-document navigation retires an earlier navigation
 error; starting, canceling or failing another load does not claim recovery.
 
@@ -33,7 +35,8 @@ error; starting, canceling or failing another load does not claim recovery.
 
 1. Launch Desktop with chat disabled, open a workspace, and open Browser from
    Quick Start. Verify **New Tab** in the native menu opens Quick Start after a file
-   tab replaces it, then choose **Open Browser**.
+   tab replaces it, then choose **Open Browser**. The blank tab focuses the
+   address bar for typing.
 2. Navigate through two local pages and a same-document history change. Use
    Back, Forward, Reload and Stop. Expected: toolbar state reflects the page's
    actual history and loading state.

@@ -45,6 +45,9 @@ export default function ComposerPage() {
       <Example id="links" title="Links">
         <LinkDemo />
       </Example>
+      <Example id="web-preview" title="Web preview">
+        <DesktopComposerDemo scenario="web-preview" />
+      </Example>
       <Example id="message-queue" title="Message queue">
         <DesktopComposerDemo queued />
       </Example>

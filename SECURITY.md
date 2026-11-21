@@ -4702,6 +4702,14 @@ caller is the actual privileged top-level workbench document.
    PNG data to Main. Cacheable results are held only for the current document.
    Navigation and teardown abort requests and discard late results. The
    workbench loads only the returned image data.
+   A separate optional link-preview operation accepts a loopback HTTP(S) URL
+   with an explicit port from a live workspace attachment. Main uses a bounded
+   credential-free loopback connection and parses inert HTML. Bundled extension
+   declarations can recognize display metadata. Custom providers share the same
+   origin, time and byte limits. Only bounded text and sandbox-decoded raster data
+   reach the workbench. Each attachment owns its subscribers and cached results.
+   Cancellation, attachment retirement and browser reset revoke pending results.
+   A page's self-declared product identity conveys display information only.
    Optional versioned history reads expose only bounded, validated URL/title/
    last-visit snapshots to exact admitted workspace or Settings documents.
    Main records actual successful guest navigations; renderers cannot insert
@@ -4794,6 +4802,8 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   favicon fetching and document-lifetime cache.
 - `desktop/src/main/browser-favicon-decoder.ts` — image-only Chromium
   sandbox and bounded raster output.
+- `desktop/src/main/web-preview.ts` — credential-free loopback metadata reads,
+  provider admission and bounded per-attachment lookup lifetime.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly
   recognized legacy browser cleanup without account/provider partition access.
 - `desktop/src/main/browser-history.ts` and its tests — bounded shared history,

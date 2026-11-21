@@ -37,6 +37,7 @@ import {
 import {
   AgentPromptCard,
   ChatMessageView,
+  ChatResponseCards,
   CompactionNotice,
   PendingTurnIndicator,
   QuestionPrompt,
@@ -51,6 +52,10 @@ import {
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
 import { useDesktopBridge } from "@/lib/desktop/bridge";
+import {
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
 import { PanelIsPresented } from "./workbench-panel-content";
 import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
@@ -80,6 +85,7 @@ import { NativeDisplayedReply } from "./native-displayed-reply";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import { ResponseCards } from "@/lib/agent-chat/response-cards";
 import { NativeMessageRevision } from "./native-message-revision";
 import { NativeSubagentActivityPanel } from "./native-agent-activity";
 import { SubagentPlacement } from "./subagent-placement";
@@ -576,6 +582,8 @@ function NativeChatPane({
   testId?: string;
   subagentsInTabs?: boolean;
 }) {
+  const openWeb = useContext(BrowserOpen);
+  const loadWebPreview = useContext(BrowserPreview);
   // Workspace file links in replies open in the workbench, which validates
   // the path against the workspace before opening a tab.
   const openWorkspaceLink = useMemo(() => {
@@ -792,7 +800,10 @@ function NativeChatPane({
     },
     [replyId, sessionId]
   );
-  const renderMessage = (message: NativeChatMessage) => {
+  const renderMessage = (
+    message: NativeChatMessage,
+    completedAnswer = false
+  ) => {
     if (message.messageId === state.revisionDraft?.messageId)
       return revisionEditor;
     const record = message.turnId ? records.get(message.turnId) : undefined;
@@ -800,12 +811,23 @@ function NativeChatPane({
       record?.goalStart &&
       !!message.turnId &&
       firstRequest.get(message.turnId) === message.messageId;
+    const cards =
+      openWeb && completedAnswer ? ResponseCards.forReply(message) : undefined;
     return (
       <ChatMessageView
         key={message.messageId}
         ref={replyId === message.messageId ? bindReply : undefined}
         loadAttachmentPreview={controller.readAttachmentPreview}
         loadToolImage={controller.readToolImage}
+        responseFooter={
+          openWeb && cards?.length ? (
+            <ChatResponseCards
+              cards={cards}
+              open={openWeb}
+              loadPreview={loadWebPreview ?? undefined}
+            />
+          ) : undefined
+        }
         actions={
           message.role === "user"
             ? {

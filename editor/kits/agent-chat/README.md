@@ -27,6 +27,13 @@ messages.map((m, i) => (
   composer's blue style and destination icons. Grida, GitHub, Figma, Linear,
   Slack, and Notion have their own marks. Google Docs, Sheets, and Drive share
   the Drive mark. Other web links use a globe.
+- **Response cards** → the client supplies a footer for a finished answer.
+  `ResponseCards` derives the display data from the retained answer, and
+  `ChatResponseCards` and Markdown web links issue the same typed browser
+  request. The containing surface supplies the opener and chooses the browser.
+  It may also supply a preview loader. A visible card can show a title,
+  description, icon, and product label, and releases a pending lookup when
+  it leaves view.
 - **User attachments** → a separate row outside the text bubble. Raster images
   show only a natural-aspect, bounded thumbnail that opens fullscreen; their
   filename stays in accessible and download metadata. Videos, ordinary files
