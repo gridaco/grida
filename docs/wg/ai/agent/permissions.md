@@ -84,11 +84,11 @@ denial the model can act on.
 
 ## Sandbox levels
 
-| Level           | Files                                                          | Programs                                      | Network |
-| --------------- | -------------------------------------------------------------- | --------------------------------------------- | ------- |
-| Read-only       | Read within workspace roots.                                   | Run with read-only access to workspace roots. | Off     |
-| Workspace-write | Read and write within workspace roots, except protected paths. | Run with the same access, confined by the OS. | Off     |
-| Full access     | Anywhere the user can.                                         | Unconfined, under the ordinary OS user.       | On      |
+| Level           | Files                                                          | Programs                                                       | Network |
+| --------------- | -------------------------------------------------------------- | -------------------------------------------------------------- | ------- |
+| Read-only       | Read within granted roots.                                     | Run with the host's read scope and private temporary storage.  | Off     |
+| Workspace-write | Read and write within workspace roots, except protected paths. | Run with the host's read and write scopes, confined by the OS. | Off     |
+| Full access     | Anywhere the user can.                                         | Unconfined, under the ordinary OS user.                        | On      |
 
 Full access is a deliberate user grant. The host must identify the affected
 chat and explain that commands can reach user-accessible files, local services
@@ -111,12 +111,10 @@ shared agent directory and cloud credential directories are protected once they
 exist, so a program can initialize a new repository but a later program cannot
 rewrite it. The agent's own configuration directories are protected even before
 they exist, so creating one always needs the person's approval. The host's own
-stores are always protected, with one exception: the host's settings file is
-readable by the agent's file tools, and every write to it is an action that
-asks, whatever the preset or earlier approvals allow, because the file can
-loosen the rules that guard the agent. Programs never reach it. The agent's file tools never write any of these
-names, in any letter case, since a case-insensitive volume resolves `.GIT` to
-`.git`.
+stores stay protected. The host manages settings through a separate
+configuration surface controlled by the person and their trusted client.
+File tools apply the metadata restrictions in any letter case, since a
+case-insensitive volume resolves `.GIT` to `.git`.
 
 ## What a program sees
 
@@ -128,9 +126,9 @@ minus the access the sandbox level withholds:
   variables and every secret it was launched with: the provider credential and
   the bearer tokens of its listeners and tool peers. Provider credentials are
   never placed in the environment by the host.
-- **Reads.** Under read-only and workspace-write it may read anywhere the person
-  can, except the host's own state and credential stores. Toolchains,
-  interpreters and shell startup files therefore work without listing them.
+- **Reads.** In read-only and workspace-write, the host can allow ordinary files
+  readable by the person while protecting its own state and credential stores.
+  A narrower profile limits reads to granted roots and runtime paths.
 - **Writes.** Only within the writable roots allowed by the level, minus
   protected paths, plus private temporary storage. Under workspace-write a
   program may also write the system's shared temporary directory, so files it
@@ -216,15 +214,16 @@ remain recoverable without new model work.
 | Initialize a repository in a project without one     | Runs, confined.                                     |
 | Write inside existing version-control metadata       | Refused by the sandbox; may ask to retry.           |
 | Create the agent's configuration directory           | Refused by the sandbox; may ask to retry.           |
-| Edit the host's settings file with a file tool       | Asks, every time.                                   |
-| Read or write the host's settings file in a program  | Refused by the sandbox.                             |
+| Open the host's settings from a restricted tool      | Refused.                                            |
 | Run a build or test command in the project           | Runs, confined.                                     |
 | A command needs the network                          | Refused by the sandbox; asks to retry with network. |
-| Read or write a path outside the project             | Asks.                                               |
+| Read an ordinary path covered by the disk-read grant | Runs, confined.                                     |
+| Read an outside text file under an exact-file policy | Asks for that file and version.                     |
+| Write a path outside the project                     | Asks.                                               |
 | The person is unavailable and approval mode is never | Refused with a typed denial; the turn continues.    |
 | The host cannot enforce the sandbox on this platform | Commands are refused; file tools still apply L3.    |
 
-The table states the target policy. A host that cannot enforce the requested scope refuses the action. Settings-file edits always ask the person.
+The table states the target policy. A host that cannot enforce the requested scope refuses the action.
 
 ## See also
 

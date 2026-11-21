@@ -1,15 +1,16 @@
 // GRIDA-SEC-004 / GRIDA-SEC-016 — only the exact browser lease can dispatch.
 import { DesktopBrowser } from "@grida/desktop-bridge";
 import type { BrowserAutomationResult } from "./browser-automation";
-import catalog from "./browser-tool-catalog.json";
+import catalog from "../../../extensions/browser/tools.json";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import workbench from "./desktop-workbench-tools.json";
 import { NativeDesktopTools } from "./native-desktop-tools";
 
 /** Browser and browser-aware Workbench definitions for the private carrier. */
 export namespace DesktopBrowserMcp {
   const MAX_BASE64_BYTES = Math.ceil((256 * 1024) / 3) * 4;
   const WORKBENCH_SHOW = "workbench_show";
-  const CLOSE_TAB = "workbench_close_browser_tab";
+  export const closeTabName = workbench.close.name;
   const CLOSE_PAGE = "browser_close";
   const DISPOSITION = "co.grida/disposition";
 
@@ -58,7 +59,7 @@ export namespace DesktopBrowserMcp {
             record(payload.target)?.kind !== "background"
           )
             return project(refused("invalid_arguments"));
-          if (definition.name === CLOSE_TAB) {
+          if (definition.name === closeTabName) {
             if (
               Object.keys(payload).length !== 1 ||
               !DesktopBrowser.isIdentity(payload.tabId)
@@ -164,11 +165,7 @@ export namespace DesktopBrowserMcp {
     const background = variants?.find(
       (target) => target.properties.kind.const === "background"
     );
-    const workbench = variants?.find(
-      (target) => target.properties.kind.const === "workbench"
-    );
-    if (!background || !workbench || !workbench.properties.tabId)
-      throw new Error("invalid_browser_tool_catalog");
+    if (!background) throw new Error("invalid_browser_tool_catalog");
     return [
       {
         ...original,
@@ -182,25 +179,19 @@ export namespace DesktopBrowserMcp {
       },
       {
         ...original,
-        revision: 1,
+        revision: workbench.close.version,
         source: "workbench",
         definition: {
-          ...original.definition,
-          name: CLOSE_TAB,
-          description:
-            "When the user asks to close a visible browser tab, use its exact tab ID from workbench_list_tabs.",
-          inputSchema: {
-            type: "object",
-            properties: { tabId: workbench.properties.tabId },
-            required: ["tabId"],
-            additionalProperties: false,
-          },
+          name: workbench.close.name,
+          description: workbench.close.description,
+          inputSchema: workbench.close.inputSchema,
+          outputSchema: workbench.close.outputSchema,
         },
       },
     ];
   }
 
-  function project(
+  export function project(
     { disposition, data, error, image }: BrowserAutomationResult,
     resultMimeType?: "image/jpeg"
   ): NativeDesktopTools.ToolResult {

@@ -159,8 +159,8 @@ configuration file exists; any other mismatch fails with
 
 Each field descriptor provides its name, human label, meaning, type, units,
 default rule, supported scope, validation, activation rule, and whether the
-caller may change it. The agent sees this bounded description when needed.
-Comments and arbitrary file text never become configuration instructions.
+caller may change it. The inspection operation reports these descriptors to
+the trusted client.
 
 Reset removes the selected override. It uses the same update operation and
 validation path. Unknown keys, unsupported schema versions, and invalid types
@@ -173,20 +173,15 @@ never receives them.
 
 ## Agent edits
 
-The agent changes settings by editing the file itself. The file tools reach
-`config.toml`, and nothing else in its folder, as the directory
-`agent-settings`. A read runs under the turn's file grant and reports whether
-the content is active, pending the next start, or invalid. Every write or edit
-is an exact-action approval request with a fixed ask rule: directory write
-rules, earlier approvals and the automatic reviewer never cover it, and Plan
-offers no writes. The host offers the directory only while its command denials
-cover the file's folder for reading and writing.
+The host keeps `config.toml` in protected storage. People edit the file
+directly or use the managed operations through a trusted ACP client.
 
-The settings owner validates the complete result before publication, refuses
-invalid content unchanged with its diagnostic, and publishes through the same
-writer lock and atomic replacement as managed updates. A manual edit that lands
-first makes the write fail. A saved edit becomes the active snapshot for later
-accepted input; accepted work keeps its capture.
+Earlier accepted inputs can retain access to the exact
+`agent-settings/config.toml` target. The host revalidates that earlier grant
+when resuming or recovering the turn. A retained write or edit still requires
+its exact-action approval. The settings owner validates the complete content,
+detects concurrent edits, publishes atomically, and activates the result for
+later inputs. Accepted work keeps its captured defaults.
 
 Use standard ACP session configuration for advertised selectors whose scope and
 semantics match. Its current select/negotiated-boolean options do not express

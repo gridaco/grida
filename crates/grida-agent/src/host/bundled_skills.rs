@@ -5,7 +5,7 @@
 //! never extends into the application's own locations.
 
 use super::{AdmissionContext, ToolAdmission, ToolDecision, ToolGate, problem};
-use crate::skills::{READ_SKILL, SkillListing, bundled_instructions};
+use crate::skills::{MAX_SELECTOR_BYTES, READ_SKILL, SkillListing};
 use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 pub(super) struct TurnSkills {
     turn: TurnBinding,
-    names: BTreeSet<String>,
+    listing: SkillListing,
     grants: GrantSelection,
     definition: ToolDefinition,
 }
@@ -32,10 +32,17 @@ impl TurnSkills {
     /// The reader for this turn's listed bundled skills, or none when the
     /// listing names no bundled skill.
     pub(super) fn bind(listing: &SkillListing, turn: &TurnBinding) -> Result<Option<Arc<Self>>> {
-        let names: BTreeSet<String> = listing.bundled().map(str::to_owned).collect();
+        let names: BTreeSet<String> = listing.bundled().collect();
         if names.is_empty() {
             return Ok(None);
         }
+        // Historical listings retain their original definition for journal replay.
+        // New packages disclose their member names through extension search.
+        let name_schema = if listing.has_qualified_skills() {
+            json!({"type": "string", "maxLength": MAX_SELECTOR_BYTES, "description": "The listed skill name or extension/skill returned by tool_search."})
+        } else {
+            json!({"type": "string", "enum": &names})
+        };
         let digest = Fingerprint::of(&(&turn.session, &turn.turn, &names))?;
         let binding =
             uuid::Uuid::from_bytes(digest.bytes()[..16].try_into().expect("fingerprint prefix"));
@@ -56,7 +63,7 @@ impl TurnSkills {
                 input: InputFormat::Json(json!({
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "enum": names.iter().collect::<Vec<_>>()}
+                        "name": name_schema
                     },
                     "required": ["name"],
                     "additionalProperties": false
@@ -65,7 +72,7 @@ impl TurnSkills {
                 max_output_bytes: 48 * 1024,
                 recovery: RecoveryKind::Repeatable,
             },
-            names,
+            listing: listing.clone(),
         })))
     }
 
@@ -85,11 +92,7 @@ impl TurnSkills {
 
     fn read(&self, arguments: &ToolArguments) -> Result<String> {
         let name = request(arguments)?.name;
-        if !self.names.contains(&name) {
-            return Err(problem(ErrorKind::InvalidInput, "skill_not_listed"));
-        }
-        bundled_instructions(&name)?
-            .ok_or_else(|| problem(ErrorKind::Unavailable, "skill_unavailable"))
+        self.listing.read_bundled(&name)
     }
 }
 
@@ -166,4 +169,59 @@ fn request(arguments: &ToolArguments) -> Result<Read> {
 
 fn denied() -> agent_kit_core::Error {
     problem(ErrorKind::InvalidInput, "skill_read_scope_mismatch")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_kit_core::{SessionId, TurnId};
+
+    #[test]
+    fn the_initial_reader_hides_package_members_and_replays_the_legacy_enum() {
+        let turn = TurnBinding {
+            session: SessionId::new("session").unwrap(),
+            turn: TurnId::new("turn").unwrap(),
+            epoch: 0,
+        };
+        let tool = |entries| {
+            let listing: SkillListing = serde_json::from_value(json!({"skills":entries})).unwrap();
+            TurnSkills::bind(&listing, &turn).unwrap().unwrap()
+        };
+        let legacy = tool(json!([{"name":"desktop-fx","description":"FX","source":"bundled"}]));
+        let InputFormat::Json(schema) = &legacy.definition.input else {
+            panic!()
+        };
+        assert_eq!(
+            schema["properties"]["name"],
+            json!({"type":"string","enum":["desktop-fx"]})
+        );
+        assert!(
+            legacy
+                .read(&ToolArguments::Json(json!({"name":"desktop-fx"})))
+                .is_ok()
+        );
+
+        let current = tool(json!([
+            {"name":"browser","description":"Browser tools","source":"bundled","extension":"browser"},
+            {"name":"second-member","description":"Second member","source":"bundled","extension":"browser"}
+        ]));
+        let InputFormat::Json(schema) = &current.definition.input else {
+            panic!()
+        };
+        assert!(!schema.to_string().contains("second-member"));
+        assert!(
+            current
+                .read(&ToolArguments::Json(json!({"name":"browser/browser"})))
+                .is_ok()
+        );
+        assert_eq!(
+            current
+                .read(&ToolArguments::Json(
+                    json!({"name":"desktop-fx/desktop-fx"})
+                ))
+                .unwrap_err()
+                .code,
+            "skill_not_listed"
+        );
+    }
 }

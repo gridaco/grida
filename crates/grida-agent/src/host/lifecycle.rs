@@ -570,6 +570,43 @@ mod tests {
         assert_eq!(stored.editor_endpoint.as_ref(), Some(&endpoint));
         assert!(stored.editor_presentation);
         assert!(stored.editor_svg_target.is_none());
+
+        let prepare = |input: &Submission| {
+            host.prepare_input(
+                host.execution().unwrap(),
+                &session,
+                root.path(),
+                input,
+                None,
+                false,
+                InputAuthority::RequireCaptured,
+            )
+            .unwrap()
+            .config
+            .instructions
+        };
+        let captured = stored.editor_instructions.as_deref().unwrap();
+        assert!(captured.contains("Observe the viewer"));
+        let current = prepare(&view.input);
+        assert!(current.contains(captured));
+
+        // Checkpoints fingerprint the entire configuration. Inputs accepted before
+        // Desktop began retaining this text must rebuild their original prompt.
+        let mut legacy: serde_json::Value =
+            serde_json::from_slice(view.input.payload.bytes()).unwrap();
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("editor_instructions");
+        let legacy = Submission {
+            id: view.input.id.clone(),
+            payload: encode(INPUT_SCHEMA, INPUT_VERSION, &legacy).unwrap(),
+        };
+        let old = prepare(&legacy);
+        assert!(
+            old.contains("Treat presentation as optional and verify the artifact independently.")
+        );
+        assert!(!old.contains(captured));
         let _ = host.shutdown().await;
     }
 
@@ -1007,16 +1044,16 @@ impl Host {
             .await?
             .ok_or_else(|| problem(ErrorKind::Unavailable, "input_unavailable"))?;
         let (settings, mut parts) = InputSettings::with_parts(&view.input)?;
+        let mut selected = settings.skills.iter();
         for part in &mut parts {
+            // The snapshot retains explicit selections in input order. Two
+            // packages can contribute the same local name.
             if let PromptPart::Skill { reference } = part
+                && let Some(skill) = selected.next()
                 && reference.uri().is_none()
-                && let Some(selected) = settings
-                    .skills
-                    .iter()
-                    .find(|skill| skill.name == reference.name())
             {
                 *reference =
-                    crate::skills::SkillReference::from_uri(&selected.uri)?.ok_or_else(|| {
+                    crate::skills::SkillReference::from_uri(&skill.uri)?.ok_or_else(|| {
                         problem(ErrorKind::InvalidState, "invalid_captured_skill_reference")
                     })?;
             }

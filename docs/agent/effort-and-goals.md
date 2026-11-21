@@ -14,14 +14,15 @@ in headless and ACP clients. This guide describes Desktop; clients use the
 ## Decide what the agent may do
 
 Type `/plan` and select it, or choose **+ → Plan mode**, to add a **Plan**
-badge. Describe what to investigate and send. The agent reads and proposes
-without changing files or running commands. The badge stays for later
-messages until you remove it (hover it and choose ×) or choose **Plan mode**
-again. Adding the badge starts no work and keeps the rest of your draft.
+badge. Describe what to investigate and send. The agent can run confined
+read-only commands and propose changes for you to review. The badge stays
+for later messages until you remove it (hover it and choose ×) or choose
+**Plan mode** again. Adding the badge starts no work and keeps the rest of
+your draft.
 
-Messages you queue keep the mode they were sent with; a correction steered
-into a running turn follows that turn's mode. Plan does not change the
-agent's access or effort. [Understand agent permissions](./permissions.md)
+Messages you queue keep the mode they were sent with. A correction steered
+into a running turn follows that turn's mode. Plan applies read-only limits
+to the chosen access setting and uses the selected effort. [Understand agent permissions](./permissions.md)
 
 ## Choose how much effort to use
 

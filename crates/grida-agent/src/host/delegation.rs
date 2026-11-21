@@ -84,6 +84,7 @@ pub(super) fn validate_worker_shape(stored: &StoredPrompt) -> Result<()> {
         || stored.editor_tool_catalog.is_some()
         || stored.workbench_tools
         || stored.desktop_context
+        || stored.editor_instructions.is_some()
         || stored.editor_presentation
         || stored.editor_browser_tools
         || stored.editor_svg_target.is_some()
@@ -1061,6 +1062,7 @@ impl Host {
         captured.editor_tool_catalog = None;
         captured.workbench_tools = false;
         captured.desktop_context = false;
+        captured.editor_instructions = None;
         captured.editor_presentation = false;
         captured.editor_browser_tools = false;
         captured.editor_svg_target = None;

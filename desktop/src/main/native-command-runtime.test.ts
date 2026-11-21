@@ -12,7 +12,7 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
       const { root, install, resources, workspace } = await createFixture();
       try {
         const command = await FxExtension.command(resources);
-        expect(command).toMatchObject({ skill: "desktop-fx" });
+        expect(command).toMatchObject({ extension: "desktop-fx" });
         const first = await NativeCommandRuntime.prepare(
           resources,
           workspace,
@@ -27,7 +27,7 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
         );
         expect(first).toEqual(second);
         const directory = first.program!.directory;
-        expect(first.program!.skill).toBe("desktop-fx");
+        expect(first.program!.extension).toBe("desktop-fx");
         expect(first.helper.path.startsWith(install + path.sep)).toBe(false);
         expect(directory.startsWith(install + path.sep)).toBe(false);
         expect(await fs.readdir(directory)).toEqual(["grida-fx"]);

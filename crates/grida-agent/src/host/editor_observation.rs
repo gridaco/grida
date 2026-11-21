@@ -102,6 +102,17 @@ pub(super) fn is_editor_text(part: &PromptPart) -> bool {
     )
 }
 
+// An explicitly selected skill is resolved under the endpoint's captured grants.
+// Only ordinary authored text may accompany it on an attached request.
+pub(super) fn is_text_with_skills(parts: &[PromptPart]) -> bool {
+    parts
+        .iter()
+        .any(|part| matches!(part, PromptPart::Text { text } if !text.trim().is_empty()))
+        && parts
+            .iter()
+            .all(|part| matches!(part, PromptPart::Text { .. } | PromptPart::Skill { .. }))
+}
+
 fn identifier(value: &str) -> bool {
     (1..=64).contains(&value.len())
         && value.as_bytes()[0].is_ascii_lowercase()

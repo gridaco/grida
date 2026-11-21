@@ -46,7 +46,8 @@ export function classify(paths) {
     };
     if (
       cargo.test(file) ||
-      file === "desktop/src/main/browser-tool-catalog.json"
+      /^(extensions|skills)\//.test(file) ||
+      file === "desktop/src/main/desktop-workbench-tools.json"
     )
       select("rust", "conformance", "native", "docs");
     if (rustFixtures.test(file)) select("rust", "conformance", "docs");

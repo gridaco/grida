@@ -82,7 +82,8 @@ export namespace NativeCommandProfiles {
     const runtimeTools = tools.program
       ? {
           paths: [tools.program.directory],
-          skills: { bundledSkills: [tools.program.skill] },
+          // The launch profile admits the package and all its declared skills.
+          skills: { bundledSkills: [tools.program.extension] },
         }
       : { paths: [], skills: {} };
     if (hooks) {

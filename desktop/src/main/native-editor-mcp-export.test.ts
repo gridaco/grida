@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { expect, it, vi } from "vitest";
-import browserToolCatalog from "./browser-tool-catalog.json";
+import browserToolCatalog from "../../../extensions/browser/tools.json";
 import { NativeEditorMcpExport } from "./native-editor-mcp-export";
 import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
 

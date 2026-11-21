@@ -19,11 +19,10 @@ Operations on the scene graph (search, select, diff), specialized
 inserts (make_from_svg, make_from_markdown), canvas exec / lint /
 format, resource lookup.
 
-For tools that apply to **any** agent (filesystem, planning, tool
-discovery, future env basics), see
-[\`tools.md\`](./tools-fundamentals.md) — the fundamental toolset. Fundamentals
-assume a virtual filesystem (or real fs / shell when available) and
-nothing else; canvas tools assume an active editor instance.
+Canvas tools assume an active editor instance. The
+[agent tool contracts](../agent/tools.md) describe operations common to
+many hosts. The [embedded tool proposal](./tools-fundamentals.md) records
+the earlier Web agent's virtual filesystem design.
 
 ## Key principles (canvas-specific)
 

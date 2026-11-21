@@ -84,12 +84,17 @@ decision that no change is needed; the person then chooses what to do next.
 
 ## Enforcement
 
-Plan MUST be unable to change the task's target, and that guarantee MUST NOT
-depend on the model's compliance. The host enforces it at the capability layer:
-commands, file mutation, editor mutation, generation that writes results,
-settings changes, and timers are absent from the turn's offered tools, and the
-host rejects them if requested anyway. Investigation tools run under the
-existing read grants.
+Plan MUST be unable to change the task's target. The host enforces this at
+the capability layer. It withholds file mutation, editor mutation, generation
+that writes results, settings changes, and timers. Investigation runs under
+the existing read grants.
+
+The host MAY offer commands for investigation if it confines them to the
+admitted read scope and limits writes to isolated, disposable scratch space.
+A host can allow ordinary disk reads outside the project under that scope.
+Plan commands run without network access or a way to elevate their grants.
+The host MUST withhold command execution if it cannot establish that scope,
+even when the person's Act grants allow unrestricted execution.
 
 Delegation cannot widen the boundary: work started from a Plan turn receives no
 capability Plan withholds. A Plan turn can observe or stop retained Act work but

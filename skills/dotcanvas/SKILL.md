@@ -3,12 +3,8 @@ name: dotcanvas
 description: Author and edit a Grida `.canvas` board — a `.canvas.json` manifest plus document files (references, generated images, notes) placed on an infinite canvas. Use when working on a `.canvas` bundle or arranging visuals/design work spatially. For a linear deck/presentation, use the `slides` skill instead.
 ---
 
-A `.canvas` is a Grida design **board** — a directory bundle, not a single
-file. You work it like any other files: with `read_file` / `write_file` /
-`edit_file` (no special canvas tool). It is the durable, spatial home for a
-piece of work: reference images, generated outputs, and notes, arranged on an
-infinite canvas. Prefer a `.canvas` board for freeform visual/design work; for
-a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
+A `.canvas` board is a directory bundle that stores references, generated
+outputs, and notes on an infinite canvas. For a linear presentation, use the `slides` skill.
 
 ## Structure
 
@@ -40,46 +36,18 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
   A document with no `layout` is **unplaced** — the host positions it; set a
   `layout` to place it deliberately.
 
-## Working pattern
+## Authoring and validation
 
-- To start, **make the bundle folder first** — a NEW directory whose name ends
-  in `.canvas` (e.g. `poster.canvas/`); a plain folder, or files loose in the
-  workspace root, is NOT a board and won't open. Then `write_file` its
-  `.canvas.json` and each document file INSIDE that folder. To add to an existing
-  board, `read_file` `.canvas.json` first (preserve `version`/`$schema`/`editor`
-  and any unknown fields), then write the FULL updated manifest back.
-- A document's `src` may be a **URL** (a pointable reference — a picked library
-  image, used as-is, no download) OR a **file path inside the bundle**. Both are
-  first-class placed documents.
-- To place a **generated image** (or any produced file) on the board:
-  **materialize it into the bundle, then reference it.** Copy it from your
-  scratch dir into the bundle with the shell — e.g.
-  `cp <scratch>/image-….png <board>.canvas/outputs/hero.png` — then add a
-  document whose `src` is that bundle-relative path. (A `src` can point at any
-  file the host can read, but a file inside the bundle is the durable, portable
-  choice.)
-- To move / resize / reorder, edit the `layout` (and document order) in the
-  manifest. The human can also drag pins directly — re-read `.canvas.json`
-  before editing so you don't clobber their changes (last write per file wins).
-
-## Show the result
-
-- When the workbench offers presentation, use `workbench_show` with a file
-  target for the workspace-rooted bundle directory such as
-  `{"target":{"kind":"file","path":"/poster.canvas"}}`. Discover deferred
-  workbench tools with `tool_search` before invoking them. On an older host that
-  offers `surface_open`, follow that tool's schema.
-- For a new board, show the first renderable checkpoint once the manifest
-  references an existing, valid document with a basic visible composition.
-  Continue building and polishing while the user can watch.
-- Never open an empty bundle or a broken manifest. Open only when the manifest
-  references at least one existing, renderable document. Pass the bundle
-  directory, never its `.canvas.json` manifest.
-- For an existing primary board, open it after reading its manifest and before
-  substantial edits.
-- If the `.canvas` bundle is already mounted as `/` in a dedicated file
-  surface, keep the current view open.
-- Continue artifact work after the reveal request. Show it again only when the
-  user asks or the primary artifact changes.
-- Use `workbench_list_tabs` only when the current tabs matter to the task. On
-  an older host, use `surface_list_open` for this read when offered.
+- Create a directory ending in `.canvas` and place the manifest inside it.
+  The directory is the board. It is renderable when the manifest references
+  an existing, renderable document with a visible composition.
+- A document's `src` can be a URL or a path inside the bundle. To keep a
+  generated image portable, copy it into the bundle and reference its
+  bundle-relative path, for example `outputs/hero.png`.
+- Each pin has its own identity and placement. Several pins can refer to the
+  same SVG source. Identify the selected pin before changing its placement.
+  Editing the SVG affects every pin that shares that file.
+- Move and resize a pin through its `layout`. Use document order and `z` to
+  control stacking. Reread the current manifest before making a change so
+  concurrent edits, such as a user dragging a pin, are preserved. Keep its
+  `version`, `$schema`, `editor`, and unknown fields.

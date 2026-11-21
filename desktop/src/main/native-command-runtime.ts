@@ -10,7 +10,7 @@ import {
 } from "./native-agent-hooks";
 
 type Pin = Awaited<ReturnType<typeof pinExecutable>>;
-type Command = Pin & { skill: string };
+type Command = Pin & { extension: string };
 
 export namespace NativeCommandRuntime {
   // Reuse pinned copies during this launch and own their cleanup exclusively.
@@ -26,7 +26,7 @@ export namespace NativeCommandRuntime {
     command?: Command
   ): Promise<{
     helper: Pin;
-    program?: { directory: string; skill: string };
+    program?: { directory: string; extension: string };
   }> {
     const helper = await pinExecutable(
       path.join(resources, "native-agent", "agent-kit-sandbox-helper")
@@ -87,7 +87,7 @@ export namespace NativeCommandRuntime {
     return {
       helper: { ...helper, path: helperPath },
       ...(command
-        ? { program: { directory: projected, skill: command.skill } }
+        ? { program: { directory: projected, extension: command.extension } }
         : {}),
     };
   }

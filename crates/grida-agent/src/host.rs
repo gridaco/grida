@@ -10,6 +10,7 @@ pub(crate) mod compaction;
 mod completion_checks;
 mod delegation;
 pub(crate) mod deletion;
+mod desktop_instructions;
 mod discovery;
 pub(crate) mod editor_observation;
 mod execution_routes;
@@ -490,8 +491,13 @@ impl DurableSubmission {
 struct StoredPrompt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     initial_instructions: Option<String>,
+    /// Older inputs keep the file and process tools admitted before shell exploration.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    shell_exploration: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     question_instructions: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_instructions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     provider_configuration: Option<Fingerprint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -730,6 +736,7 @@ enum TurnWork {
 }
 
 struct PreparedInput {
+    shell_exploration: bool,
     image_view: crate::file_tools::ImageView,
     subscription_image_input: bool,
     image_tool_results: bool,
@@ -2105,10 +2112,11 @@ impl Host {
                 .permission_capture
                 .as_ref()
                 .map(|capture| {
+                    let binding = claim.lease.binding().clone();
                     (if prepared.worker {
-                        self.bind_worker_permissions(capture, claim.lease.binding().clone())
+                        self.bind_worker_permissions(capture, binding)
                     } else {
-                        self.bind_permissions(capture, claim.lease.binding().clone())
+                        self.bind_permissions(capture, binding)
                     })
                     .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
                 })
@@ -2176,16 +2184,30 @@ impl Host {
             .map(|images| {
                 images.workspace_reference_capture(claim.lease.binding().session.clone(), cwd)
             });
+        if permission_scope.is_some()
+            && prepared.operating_regime.is_act()
+            && (!prepared.subagent || prepared.worker)
+        {
+            let chat = &claim.lease.binding().session;
+            if self.processes.needs_number_floor(chat) {
+                let floor = self.process_number_floor(chat).await?;
+                self.processes.raise_number_floor(chat, floor);
+            }
+        }
         let command = match &permission_scope {
+            Some(permissions) if prepared.shell_exploration => permissions.insert_workspace_tools(
+                &mut inventory,
+                &mut authority.tools,
+                &self.processes,
+                capture_image,
+                capture_reference,
+                prepared.image_view,
+                prepared.operating_regime,
+            )?,
             Some(permissions)
                 if prepared.operating_regime.is_act()
                     && (!prepared.subagent || prepared.worker) =>
             {
-                let chat = &claim.lease.binding().session;
-                if self.processes.needs_number_floor(chat) {
-                    let floor = self.process_number_floor(chat).await?;
-                    self.processes.raise_number_floor(chat, floor);
-                }
                 permissions.insert_with_images(
                     &mut inventory,
                     &mut authority.tools,
@@ -2759,7 +2781,7 @@ impl Host {
         let permission_capture = if child_work {
             None
         } else {
-            self.capture_permissions(session, &id)?
+            self.capture_workspace_permissions(session, &id, operating_regime)?
         };
         let allow_reviewer_primary_read = effort.is_some()
             && permission_capture.is_some()
@@ -2785,6 +2807,8 @@ impl Host {
                         context_id: editor_tool_context_id.clone(),
                         browser: browser_mcp,
                         sources: tool_sources,
+                        workbench_paths: tool_sources
+                            && self.editor_surfaces.workbench_paths_negotiated(),
                     },
                 )
                 .await
@@ -2803,7 +2827,7 @@ impl Host {
             .as_ref()
             .is_some_and(crate::editor_surfaces::DesktopToolCatalog::has_browser_tools)
         {
-            optional_skills.push(crate::skills::BROWSER_SKILL.to_owned());
+            optional_skills.push(crate::skills::BROWSER_EXTENSION.to_owned());
         }
         let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
         let allow_image_reference = allow_library_selection
@@ -2906,8 +2930,10 @@ impl Host {
         )?;
         Ok(Submission {
             id,
-            payload: encode_stored_prompt(&StoredPrompt {
+            payload: StoredPrompt {
                 initial_instructions: Some(grida_agent_master::CORE_INSTRUCTIONS.to_owned()),
+                shell_exploration: !child_work,
+                editor_instructions: None,
                 question_instructions: (questions && !child_work)
                     .then(|| operating_regime.question_instructions().to_owned()),
                 provider_configuration: self
@@ -2973,7 +2999,8 @@ impl Host {
                 } else {
                     self.capture_completion_checks(operating_regime)?
                 },
-            })?,
+            }
+            .encode_for_acceptance()?,
         })
     }
 
@@ -2992,6 +3019,7 @@ impl Host {
         let subscription_image_input;
         let image_tool_results;
         let image_view;
+        let shell_exploration;
         let lifecycle_hooks;
         let spending;
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
@@ -3060,6 +3088,8 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "chat_selection_route_changed"));
                 }
                 image_view = stored.image_view;
+                shell_exploration = stored.shell_exploration
+                    && (stored.subagent.is_none() || stored.worker.is_some());
                 subscription_image_input = stored.subscription_image_input;
                 image_tool_results = stored
                     .image_tool_results
@@ -3172,6 +3202,7 @@ impl Host {
                             || stored.editor_tool_catalog.is_some()
                             || stored.workbench_tools
                             || stored.desktop_context
+                            || stored.editor_instructions.is_some()
                             || stored.editor_presentation
                             || stored.editor_browser_tools
                             || stored.editor_svg_target.is_some()
@@ -3230,38 +3261,7 @@ impl Host {
                     .editor_tool_catalog
                     .as_ref()
                     .is_some_and(crate::editor_surfaces::DesktopToolCatalog::uses_browser_mcp);
-                if stored.editor_browser_tools && stored.editor_tool_catalog.is_none() {
-                    config.instructions.push_str("\n\n");
-                    config
-                        .instructions
-                        .push_str(crate::browser_tools::INSTRUCTIONS);
-                    config.instructions.push_str(if image_tool_results {
-                        " Keep browser captures as image results."
-                    } else {
-                        " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
-                    });
-                } else if stored.editor_browser_tools && !browser_mcp && !image_tool_results {
-                    config
-                        .instructions
-                        .push_str("\n\nThis model connection cannot receive browser captures.");
-                }
-                let presentation = if stored.editor_browser_tools && !browser_mcp {
-                    stored.editor_presentation
-                } else {
-                    stored.editor_tool_catalog.as_ref().map_or(
-                        stored.editor_presentation,
-                        crate::editor_surfaces::DesktopToolCatalog::has_presentation,
-                    )
-                };
-                if presentation {
-                    config.instructions.push_str("\n\n");
-                    use grida_agent_master::presentation;
-                    config.instructions.push_str(if workbench_tools {
-                        presentation::WORKBENCH_INSTRUCTIONS
-                    } else {
-                        presentation::INSTRUCTIONS
-                    });
-                }
+                stored.append_editor_instructions(&mut config.instructions, image_tool_results);
                 if !cancellation_only
                     && stored.editor_svg_target.is_some()
                     && (stored.editor_endpoint.is_none() || stored.allow_wakeups)
@@ -3547,6 +3547,7 @@ impl Host {
             ));
         }
         Ok(PreparedInput {
+            shell_exploration,
             image_view,
             subscription_image_input,
             image_tool_results,
@@ -3798,7 +3799,10 @@ impl Host {
         if editor_endpoint.is_some()
             && (!policy.operating_regime.is_act()
                 || !self.supports_editor_tools()
-                || !request.parts.iter().all(editor_observation::is_editor_text))
+                || !(request.parts.iter().all(editor_observation::is_editor_text)
+                    || (editor_svg_target.is_none()
+                        && context.editor_tool_context_id.is_none()
+                        && editor_observation::is_text_with_skills(&request.parts))))
         {
             return Err(problem(
                 ErrorKind::Unsupported,

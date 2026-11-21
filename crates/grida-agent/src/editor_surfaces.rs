@@ -41,6 +41,7 @@ struct EditorConnectionState {
     tool_source: Option<BindingId>,
     browser_mcp: bool,
     tool_sources: bool,
+    workbench_paths: bool,
 }
 
 struct DesktopConnection {
@@ -58,6 +59,7 @@ pub(crate) struct DesktopCapabilities {
     pub(crate) tools: bool,
     pub(crate) browser_mcp: bool,
     pub(crate) tool_sources: bool,
+    pub(crate) workbench_paths: bool,
 }
 
 pub(crate) struct LegacyToolScope {
@@ -89,6 +91,7 @@ impl EditorSurfaces {
         state.tool_source = tools.as_ref().map(|source| source.id().clone());
         state.browser_mcp = capabilities.browser_mcp;
         state.tool_sources = capabilities.tool_sources;
+        state.workbench_paths = capabilities.workbench_paths;
         state.connection = Some(DesktopConnection {
             client,
             presentation: capabilities.presentation,
@@ -131,6 +134,10 @@ impl EditorSurfaces {
 
     pub(crate) fn tool_sources_negotiated(&self) -> bool {
         self.state.lock().unwrap().tool_sources
+    }
+
+    pub(crate) fn workbench_paths_negotiated(&self) -> bool {
+        self.state.lock().unwrap().workbench_paths
     }
 
     pub(crate) async fn discover_tools(

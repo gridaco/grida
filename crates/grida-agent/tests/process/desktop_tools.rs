@@ -7,6 +7,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 const CAPABILITY: &str = "co.grida/session/desktop-tools";
 const TOOL_CONTEXT: &str = "co.grida/session/editor-tool-context";
 const TOOL_SOURCES: &str = "co.grida/session/desktop-tool-sources";
+const WORKBENCH_PATHS: &str = "co.grida/session/workbench-file-paths";
 const METHOD: &str = "_co.grida/editor/desktop-tools";
 const LEGACY_READ: &str = "_co.grida/editor/surface-list-open";
 const BROWSER: &str = "co.grida/session/browser-tools";
@@ -37,9 +38,15 @@ enum Peer {
     Browser,
     BrowserClose,
     BrowserSvg,
+    WorkbenchPaths,
+    WorkbenchPathsBrowser,
 }
 
 impl Peer {
+    fn workbench_paths(self) -> bool {
+        matches!(self, Self::WorkbenchPaths | Self::WorkbenchPathsBrowser)
+    }
+
     fn has_selection(self) -> bool {
         matches!(
             self,
@@ -61,6 +68,202 @@ async fn queued_inventory_keeps_its_original_endpoint_after_reload() {
 #[tokio::test]
 async fn a_negotiated_but_unavailable_catalog_does_not_enable_legacy_inventory() {
     check(Peer::Unavailable, "submit").await;
+}
+
+#[tokio::test]
+async fn a_shell_path_reveals_a_workbench_bundle_without_waiting_for_display() {
+    check_workbench_paths(Peer::WorkbenchPaths).await;
+}
+
+#[tokio::test]
+async fn the_same_workbench_bundle_and_inventory_contract_works_with_browser() {
+    check_workbench_paths(Peer::WorkbenchPathsBrowser).await;
+}
+
+async fn check_workbench_paths(peer: Peer) {
+    const PATH: &str = "decks/New Slides.canvas";
+    const SHOW_ARGS: &str = r#"{"target":{"kind":"file","path":"./decks/New Slides.canvas"}}"#;
+    let state = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let bundle = workspace.path().join(PATH);
+    std::fs::create_dir_all(&bundle).unwrap();
+    std::fs::write(
+        bundle.join(".canvas.json"),
+        r#"{"editor":"slides","files":["*.svg"],"documents":[{"src":"001.svg","id":"cover"}]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        bundle.join("001.svg"),
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="navy"/><text x="50" y="80" fill="white">Welcome</text></svg>"#,
+    )
+    .unwrap();
+    let browser = peer == Peer::WorkbenchPathsBrowser;
+    let (mut client, session) = start_with_sources(&state, &workspace, peer, true).await;
+    let mut input = json!({
+        "sessionId":session,"inputId":"slides","operatingRegime":"act",
+        "editorEndpointId":ENDPOINT,"editorPresentation":true,
+        "prompt":[{"type":"text","text":"Show my new slides."}]
+    });
+    let mut scope = json!({"sources":true,"workbenchPaths":true,"presentation":true});
+    if browser {
+        input["editorBrowserTools"] = true.into();
+        scope["browser"] = true.into();
+    }
+    let request = client.send("_co.grida/session/submit", input).await;
+    let inventory = json!({
+        "activeTabId":"slide-tab",
+        "tabs":[{"kind":"file","tabId":"slide-tab","path":PATH}],
+        "truncated":false
+    });
+    let mut accepted = false;
+    let mut chunk = None;
+    let mut step = 0;
+    let mut calls = Vec::new();
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == request {
+            assert!(frame["result"].is_object(), "{frame}");
+            accepted = true;
+        }
+        let params = &frame["params"];
+        match frame["method"].as_str() {
+            Some(METHOD) => {
+                assert_eq!(params["sessionId"], session);
+                assert_eq!(params["endpointId"], ENDPOINT);
+                assert_eq!(params["scope"], scope);
+                let message = &params["message"];
+                let id = &message["id"];
+                let result = match message["method"].as_str() {
+                    Some("tools/list") => {
+                        assert!(!accepted);
+                        json!({"jsonrpc":"2.0","id":id,"result":{"resultType":"complete","tools":workbench_paths_descriptors(browser)}})
+                    }
+                    Some("tools/call") => {
+                        let args = &message["params"]["arguments"];
+                        assert_eq!(message["params"]["_meta"]["co.grida/definitionRevision"], 4);
+                        assert_eq!(
+                            message["params"]["_meta"]["co.grida/source"],
+                            json!({"id":"workbench","generation":"fixture-workbench"})
+                        );
+                        let name = message["params"]["name"].as_str().unwrap();
+                        calls.push(name.to_owned());
+                        match name {
+                            SHOW => {
+                                assert_eq!(
+                                    args,
+                                    &serde_json::from_str::<Value>(SHOW_ARGS).unwrap()
+                                );
+                                assert!(bundle.join(".canvas.json").is_file());
+                                // A lost acknowledgement does not block the next step.
+                                json!({"jsonrpc":"2.0","id":"unverified","result":{"resultType":"complete","content":[]}})
+                            }
+                            TABS => {
+                                assert_eq!(args, &json!({}));
+                                json!({"jsonrpc":"2.0","id":id,"result":{
+                                    "resultType":"complete","content":[],"structuredContent":inventory
+                                }})
+                            }
+                            _ => panic!("unexpected Workbench action: {message}"),
+                        }
+                    }
+                    _ => panic!("unexpected Desktop request: {frame}"),
+                };
+                client
+                    .respond(
+                        &frame["id"],
+                        json!({"sessionId":session,"endpointId":ENDPOINT,"message":result}),
+                    )
+                    .await;
+            }
+            Some("_co.grida/provider/exchange") => {
+                let result = match params["action"].as_str() {
+                    Some("open") => {
+                        let body = provider_body(params);
+                        let reply = match step {
+                            0 => {
+                                assert!(body["instructions"].as_str().unwrap().contains(
+                                    "workspace-relative or in-workspace absolute file path"
+                                ));
+                                assert!(offered_tool(&body, SHOW).is_none());
+                                Reply::Tool(
+                                    "tool_search",
+                                    r#"{"query":"workbench","source":"workbench"}"#,
+                                )
+                            }
+                            1 => {
+                                assert!(offered_tool(&body, SHOW).is_some(), "{body}");
+                                assert!(offered_tool(&body, TABS).is_some(), "{body}");
+                                Reply::Tool(SHOW, SHOW_ARGS)
+                            }
+                            2 => {
+                                assert_eq!(tool_outcome(&body, SHOW)["status"], "uncertain");
+                                Reply::Tool(TABS, "{}")
+                            }
+                            3 => {
+                                let result = tool_outcome(&body, TABS);
+                                assert_eq!(result["status"], "succeeded");
+                                assert_eq!(result["structured"], inventory);
+                                Reply::Finished("The slides are ready.")
+                            }
+                            _ => panic!("unexpected inference: {body}"),
+                        };
+                        step += 1;
+                        chunk =
+                            Some(STANDARD.encode(fixture_body(reply, ProviderProtocol::Responses)));
+                        json!({"status":"accepted"})
+                    }
+                    Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                    Some("read") => match chunk.take() {
+                        Some(data) => json!({"status":"chunk","data":data}),
+                        None => json!({"status":"end"}),
+                    },
+                    _ => panic!("unexpected provider exchange: {frame}"),
+                };
+                client.respond(&frame["id"], result).await;
+            }
+            Some("_co.grida/provider/cancel") if step == 4 && accepted => break,
+            Some(method) if method.starts_with("_co.grida/editor/") => {
+                panic!("the Workbench call used a compatibility route: {frame}");
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(calls, [SHOW, TABS]);
+    client.close().await;
+}
+
+fn workbench_paths_descriptors(browser: bool) -> [Value; 2] {
+    let descriptors: Value = serde_json::from_str(include_str!(
+        "../../../../desktop/src/main/desktop-workbench-tools.json"
+    ))
+    .unwrap();
+    ["list", "show"].map(|operation| {
+        let tool = &descriptors[operation];
+        let mut input = tool["inputSchema"].clone();
+        if operation == "show" && !browser {
+            let targets = input["properties"]["target"]["oneOf"]
+                .as_array_mut()
+                .unwrap();
+            targets.retain(|target| target["properties"]["kind"]["const"] != "url");
+            input["properties"]["presentation"] = json!({"const":"reveal"});
+        }
+        let mut wire = json!({
+            "name": tool["name"], "description": tool["description"],
+            "inputSchema": input, "outputSchema": tool["outputSchema"],
+            "_meta": {
+                "co.grida/definitionRevision": tool["version"],
+                "co.grida/source": {
+                    "id":"workbench","generation":"fixture-workbench","description":"Show and list files."
+                }
+            }
+        });
+        if operation == "show" {
+            wire["_meta"]["co.grida/resultDisposition"] = true.into();
+        } else {
+            wire["annotations"] = json!({"readOnlyHint":true});
+        }
+        wire
+    })
 }
 
 #[tokio::test]
@@ -101,6 +304,109 @@ async fn missing_editor_selection_does_not_hide_the_workbench_inventory() {
 #[tokio::test]
 async fn browser_workbench_defers_the_existing_targeted_surface_schema() {
     check(Peer::Browser, "submit").await;
+}
+
+#[tokio::test]
+async fn explicit_browser_skill_requires_a_captured_browser_grant_and_pins_queued_work() {
+    let state = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let (mut client, session) = start_with_sources(&state, &workspace, Peer::Browser, true).await;
+    let mut request = json!({
+        "sessionId": session, "inputId":"chosen-browser", "operatingRegime":"act",
+        "prompt":[{"type":"text","text":"Inspect the page."},
+                  {"type":"resource_link","name":"browser","uri":"grida-skill:browser/browser"}]
+    });
+    let absent = client
+        .request("_co.grida/session/submit", request.clone())
+        .await;
+    assert!(
+        absent["error"]
+            .to_string()
+            .contains("selected_skill_unavailable"),
+        "{absent}"
+    );
+    request["editorEndpointId"] = ENDPOINT.into();
+    request["editorBrowserTools"] = true.into();
+
+    // Negotiation and the client's request alone cannot activate the package.
+    let mut provider_request = None;
+    for grant in [false, true] {
+        let admission = client
+            .send("_co.grida/session/enqueue", request.clone())
+            .await;
+        let mut answered = false;
+        while !answered || (grant && provider_request.is_none()) {
+            let frame = client.read_reply().await;
+            if frame["id"] == admission {
+                if grant {
+                    assert!(frame["result"].is_object(), "{frame}");
+                } else {
+                    assert!(
+                        frame["error"]
+                            .to_string()
+                            .contains("selected_skill_unavailable"),
+                        "{frame}"
+                    );
+                }
+                answered = true;
+                continue;
+            }
+            if frame["method"] == "_co.grida/provider/exchange" {
+                assert!(grant);
+                let params = &frame["params"];
+                assert_eq!(params["action"], "open");
+                let body = provider_body(params);
+                assert!(
+                    body["input"]
+                        .to_string()
+                        .contains("Element references belong to that document.")
+                );
+                assert!(offered_tool(&body, "browser_snapshot").is_none());
+                // Hold the model request while inspecting and retrying the same input.
+                provider_request = Some(frame["id"].clone());
+                continue;
+            }
+            assert_eq!(frame["method"], METHOD, "{frame}");
+            let params = &frame["params"];
+            assert_eq!(params["scope"], json!({"browser":true,"sources":true}));
+            let message = &params["message"];
+            assert_eq!(message["method"], "tools/list");
+            let mut tools = vec![];
+            if grant {
+                let mut browser = browser_descriptor("browser_snapshot", "browser_snapshot");
+                browser["_meta"]["co.grida/source"] = json!({"id":"browser","generation":"browser-v1","description":"Inspect pages."});
+                tools.push(browser);
+            }
+            client.respond(&frame["id"], json!({
+                "sessionId": session, "endpointId": ENDPOINT,
+                "message":{"jsonrpc":"2.0","id":message["id"],"result":{"resultType":"complete","tools":tools}}
+            })).await;
+        }
+    }
+
+    // Idempotent enqueue succeeds without another catalog exchange.
+    let retry = client.request("_co.grida/session/enqueue", request).await;
+    assert!(retry["result"].is_object(), "{retry}");
+    let inspected = client
+        .request(
+            "_co.grida/session/input",
+            json!({"sessionId":session, "inputId":"chosen-browser"}),
+        )
+        .await;
+    let selection = &inspected["result"]["settings"]["skills"][0];
+    assert_eq!(selection["extension"], "browser", "{inspected}");
+    assert_eq!(
+        selection["uri"],
+        format!(
+            "grida-skill:browser/browser@{}",
+            selection["revision"].as_str().unwrap()
+        )
+    );
+    assert_eq!(inspected["result"]["prompt"][1]["uri"], selection["uri"]);
+    client
+        .respond(&provider_request.unwrap(), json!({"status":"unavailable"}))
+        .await;
+    client.close().await;
 }
 
 #[tokio::test]
@@ -534,12 +840,18 @@ async fn start_with_sources(
     if tool_sources {
         initialize["clientCapabilities"]["_meta"][TOOL_SOURCES] = 1.into();
     }
+    if peer.workbench_paths() {
+        initialize["clientCapabilities"]["_meta"][WORKBENCH_PATHS] = 1.into();
+    }
     if peer.has_selection() || peer == Peer::Legacy {
         initialize["clientCapabilities"]["_meta"][TOOL_CONTEXT] = 1.into();
     }
-    let presentation = peer == Peer::Presentation;
+    let presentation = peer == Peer::Presentation || peer.workbench_paths();
     let svg = matches!(peer, Peer::Svg | Peer::SvgLost | Peer::BrowserSvg);
-    let browser = matches!(peer, Peer::Browser | Peer::BrowserClose | Peer::BrowserSvg);
+    let browser = matches!(
+        peer,
+        Peer::Browser | Peer::BrowserClose | Peer::BrowserSvg | Peer::WorkbenchPathsBrowser
+    );
     if presentation {
         initialize["clientCapabilities"]["_meta"]["co.grida/session/editor-surface-open"] =
             1.into();
@@ -549,6 +861,10 @@ async fn start_with_sources(
     }
     if browser {
         initialize["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+        if tool_sources {
+            initialize["clientCapabilities"]["_meta"]["co.grida/session/desktop-browser-mcp"] =
+                1.into();
+        }
     }
     let ready = client.request("initialize", initialize).await;
     let capabilities = &ready["result"]["agentCapabilities"]["_meta"];
@@ -567,6 +883,10 @@ async fn start_with_sources(
     assert_eq!(
         capabilities[TOOL_CONTEXT].as_u64(),
         peer.has_selection().then_some(1)
+    );
+    assert_eq!(
+        capabilities[WORKBENCH_PATHS].as_u64(),
+        peer.workbench_paths().then_some(1)
     );
     let created = client
         .request(
@@ -695,6 +1015,7 @@ async fn check(peer: Peer, admission: &str) {
             (wire_name, r#"{"query":"svg_inspect_selection"}"#, wire_args)
         }
         Peer::Legacy => (wire_name, "{}", wire_args),
+        Peer::WorkbenchPaths | Peer::WorkbenchPathsBrowser => unreachable!(),
     };
     while !accepted || !completed {
         let frame = client.read_frame().await;
@@ -831,6 +1152,12 @@ async fn check(peer: Peer, admission: &str) {
                     Some("open") => {
                         let body = provider_body(params);
                         let tool = |name| offered_tool(&body, name);
+                        let instructions = body["instructions"].as_str().unwrap();
+                        assert_eq!(
+                            instructions.contains("first meaningful renderable checkpoint"),
+                            presentation
+                        );
+                        assert!(!instructions.contains("verified HTTP(S) URL"));
                         if peer.has_selection() {
                             assert!(!body.to_string().contains(SELECTION_CONTEXT));
                             assert!(tool(SVG_REPLACE).is_none());
@@ -904,7 +1231,12 @@ async fn check(peer: Peer, admission: &str) {
                                     assert!(outcome.to_string().contains("svg_selection_stale"));
                                 }
                                 Peer::Presentation => assert_eq!(outcome["status"], "uncertain"),
-                                Peer::Unavailable | Peer::SvgLost => unreachable!(),
+                                Peer::Unavailable
+                                | Peer::SvgLost
+                                | Peer::WorkbenchPaths
+                                | Peer::WorkbenchPathsBrowser => {
+                                    unreachable!()
+                                }
                             }
                             final_request = true;
                             Reply::Finished("Finished checking the workbench.")
@@ -989,6 +1321,32 @@ fn tool_outcome(body: &Value, name: &str) -> Value {
         })
         .unwrap();
     serde_json::from_str(output["output"].as_str().unwrap()).unwrap()
+}
+
+/// Project one of Desktop's shipped Browser descriptors onto its MCP registration.
+pub(super) fn browser_descriptor(wire_name: &str, name: &str) -> Value {
+    let descriptors: Vec<Value> =
+        serde_json::from_str(include_str!("../../../../extensions/browser/tools.json")).unwrap();
+    let descriptor = descriptors
+        .iter()
+        .find(|entry| entry["name"] == wire_name)
+        .unwrap();
+    let description = if name == SHOW {
+        "Ask the attached workbench to show a workspace file, HTTP(S) URL, or exact tab. The workbench chooses the viewer. Window focus requires an explicit request. Use browser_open for background browser work."
+    } else {
+        descriptor["description"].as_str().unwrap()
+    };
+    let mut tool = json!({
+        "name": name, "description": description,
+        "inputSchema":descriptor["inputSchema"], "outputSchema":descriptor["outputSchema"],
+        "annotations":{"readOnlyHint":descriptor["effect"] == "read"},
+        "_meta":{"co.grida/definitionRevision":descriptor["version"],
+            "co.grida/maxInputBytes":40960,"co.grida/maxOutputBytes":458752}
+    });
+    if wire_name == "browser_capture" {
+        tool["_meta"]["co.grida/resultMimeType"] = "image/jpeg".into();
+    }
+    tool
 }
 
 fn descriptor(name: &str) -> Value {

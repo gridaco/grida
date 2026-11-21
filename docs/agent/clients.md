@@ -143,10 +143,15 @@ directories. When `grida-agent run` omits `--cwd`, the profile's primary
 supplies the working directory. Ask for a file in another directory by its
 profile ID, especially when the same relative path exists in both folders.
 
-Set `read: allow` for bounded text reads, directory listings, and literal
-search, or `read: ask` to require approval. Listing a folder in the profile
-does not grant access by itself. A changed profile can block continuation
-of a retained task after restart.
+Set `read: allow` for bounded text reads or `read: ask` to require approval.
+A primary directory with unconditional read command access uses commands to
+list, search, and read files. The launch profile determines whether commands
+can read ordinary files elsewhere on disk. For a narrow read profile, the
+host can provide one separately granted text file as input to a confined
+command. That read takes the directory ID and relative file path and follows
+the directory's approval rule. File-only profiles use file grants for
+bounded reads, directory listings, and literal search. A changed profile can
+block continuation of a retained task after restart.
 
 A trusted native launcher can opt into review for one configured file read.
 Every other action that requires approval still asks. If the review is
@@ -161,9 +166,10 @@ In Desktop, add the **Plan** badge with `/plan` or **+ → Plan mode**.
 [Decide what the agent may do](./effort-and-goals.md#decide-what-the-agent-may-do)
 
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
-The agent can read permitted material and ask enabled questions. Commands,
-working-copy edits, settings changes through agent tools, and timed wake-ups
-are unavailable in Plan.
+The agent can read permitted material and ask enabled questions. A profile
+with a read command grant and native confinement also lets the agent search
+or inspect the project with commands in Plan. Working-copy edits, settings
+changes through agent tools, and timed wake-ups are unavailable in Plan.
 
 To authorize execution, open the same chat with `--mode act` and submit a new
 prompt. Act is the default and still uses your selected permissions. Previously
@@ -440,10 +446,13 @@ the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
 selected directory access and a separate temporary scope. The sandbox blocks
 direct networking. A launcher that enables scoped approvals can admit one
 brokered destination for a finite command after a per-action decision. Explicit
-Full access runs commands with ordinary-user filesystem and network access.
-Plan withholds command tools in every mode. [Choose Full access](./permissions.md#choose-full-access)
+Full access in Act runs commands with ordinary-user filesystem and network
+access. Plan uses the launch profile's read scope. Desktop's default scope
+includes ordinary files outside the project. Plan commands stay confined,
+run offline, end within the call, and can write only to private temporary
+storage. [Choose Full access](./permissions.md#choose-full-access)
 
-A command that is still running after its short wait, such as a development
+An Act command that is still running after its short wait, such as a development
 server or a watcher, stays with the chat as a numbered process. Later turns of
 the same chat read its output, type into it, or interrupt it. Ending a turn,
 stopping it, pausing, waiting for approval and restarting the turn leave the
@@ -648,15 +657,11 @@ parent is up to the client.
 
 ## Set the context input limit
 
-In Grida Desktop, ask the agent to change the context input limit and approve
-the edit, or edit the workspace's `config.toml` and restart Desktop.
-[Change agent settings](./settings.md)
+In Grida Desktop, edit the workspace's `config.toml` while Desktop is closed.
+Reopen the workspace to load the new limit. [Change agent settings](./settings.md)
 
-An ACP client that negotiates the configuration operations can inspect, set,
-reset and reload the limit. Under a permission profile that allows file writes,
-the agent can also edit the host's `config.toml` as the directory
-`agent-settings`; every such write arrives as an ordinary approval request.
-[Agent configuration](../reference/agent-configuration.md#changes-made-by-the-agent)
+A trusted ACP client that negotiates the configuration operations can inspect,
+set, reset, and reload the limit. [Agent configuration](../reference/agent-configuration.md#managed-changes)
 
 ## Attach a PNG to a message
 
@@ -710,9 +715,9 @@ message starts no file read or model request.
 
 A private native client represents a folder with the existing local resource
 link, a canonical file URI and the `inode/directory` media type, omitting size
-and preview. The reference adds no filesystem grant. File tools still need an
-already permitted root; Plan has no command-inspection path, and Act uses the
-existing command scope. Desktop Main validates the actual dropped directory
+and preview. The reference adds no filesystem grant. Plan commands inspect
+folders under their confined read scope. Act uses its existing command scope.
+Desktop Main validates the actual dropped directory
 and refuses protected directories, containing ancestors and canonical aliases.
 An older Desktop host without folder-reference support refuses the drop
 before submission and preserves the draft and current attachment.

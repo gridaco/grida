@@ -703,9 +703,11 @@ reload that revision before relying on the change.
 
 Use repeatable `--skill NAME` options with `run` to select guidance for that
 input. ACP clients can select a versioned reference from the skill catalog.
-Bundled skills are available without project access. On Unix, project skills
-override bundled names when the local run selects its project or the ACP host
-supplies a readable primary root. Project guidance comes from that root's
+Standalone bundled skills are available without project access. The host also
+admits skills from eligible Desktop extensions. A qualified `extension/skill`
+selects a package's own guidance, even with a matching project name. On Unix,
+project skills take precedence for bare names when the local run selects its
+project or the ACP host supplies a readable primary root. Project guidance comes from that root's
 `AGENTS.md`. The accepted input retains the exact versions it used. Later inputs
 resolve the current files, and stale explicit references require reselection.
 
@@ -799,12 +801,28 @@ receipt and returns bounded PNG bytes. A later crop can replace that working
 copy. The earlier result stays recorded and its preview is unavailable if the
 bytes are missing or have changed. Reopening a result never starts new work.
 
-The native library also provides the read-only `read_file`, `list_files`, and
-`search_text` adapters for macOS and Linux. They use the turn's selected
-directory and recheck current grants and protected roots before opening a
-target and before returning results. Reads accept bounded UTF-8 text files.
-Listings cover direct children, and search matches a case-sensitive literal
-within a selected subtree. A truncated result covers only part of the request.
+On macOS and Linux, new turns with an unconditional read command grant for
+the primary directory use `exec_command` to list, search, and read workspace
+files. Plan requires native confinement. Act can use `write_file` and
+`edit_file` under the selected directory's write grant.
+
+Desktop's default profile enables `command.diskRead` for ordinary shell reads
+outside the project. A narrow read profile can use `exec_command.input_file`
+for a separately granted file. The host validates the source and applies its
+existing approval rules before supplying bounded UTF-8 bytes. See
+[Run commands as chat processes](#run-commands-as-chat-processes).
+
+`read_file` provides bounded UTF-8 reads for profiles that lack an unconditional
+read command grant for the primary directory, for example when `read` is
+`allow` and `commandRead` is `ask`. File-only profiles and scoped reviewers
+can also use `list_files` for direct children and `search_text` for
+case-sensitive literals. The observed-file Goal verifier uses the complete
+result of `read_file`. Retained inputs keep their captured tool inventory,
+including `read_scoped_file` where it was offered.
+
+File adapters recheck the selected directory, current grants and protected
+roots before opening a target and before returning results. A truncated result
+covers only part of the request.
 The adapters refuse symlinks, multiply linked files, special files, and
 cross-device paths. Linux requires kernel support for `openat2` and also
 refuses nested mounts. Cancellation and deadlines stop new filesystem work and
@@ -869,13 +887,16 @@ advancement.
 
 The trusted launcher may enable `allowApproveForMe` to offer
 `approve_for_me` on the private permission-mode endpoint. The filesystem and
-command authorities have separate opt-ins. `allowExternalFileRead` permits a
-request to read one ordinary file via `read_file`, directory `external-file`,
-and a path relative to `/`. `allowCommandNetwork` permits a finite,
-noninteractive `exec_command` to request one supported TCP destination with
-`network: {"host": "example.org", "port": 443}`. The host binds the decision
-to that invocation and rechecks the captured authority at dispatch. A broader
-retry after a sandbox refusal needs a fresh decision.
+command authorities have separate opt-ins. In a narrow read profile,
+`allowExternalFileRead` permits a request to read one ordinary file. Select
+the `external-file` directory and supply a path relative to `/`. Shell-enabled
+turns pass those arguments as `exec_command.input_file`. Standalone file
+readers use the same directory. Approval is for that invocation and file
+version. `allowCommandNetwork`
+separately permits a finite, noninteractive `exec_command` to request one
+supported TCP destination with `network: {"host": "example.org", "port": 443}`.
+The host rechecks the captured authority at dispatch. A broader retry after a
+sandbox refusal needs a fresh decision.
 
 A supervisor can pass `--allow-scoped-approvals` alongside
 `--permission-profile` to offer these choices while keeping its existing
@@ -905,11 +926,12 @@ relinquishes protected-path and credential-file isolation. The approved command
 environment still excludes host-managed secrets. It gains no elevated OS
 privileges, automatic reviewer or managed proxy/destination guarantee.
 
-File tools keep the project primary and additionally accept directory
-`filesystem` with paths relative to `/`, without the leading slash. They retain
-normal format, size, symlink, hard-link and device checks; commands can use
-ordinary OS paths. The host's reviewed hooks remain confined, and Plan still
-withholds command and mutation tools.
+File mutation tools keep the project primary and additionally accept
+directory `filesystem` with paths relative to `/`, without the leading slash.
+They retain normal format, size, symlink, hard-link and device checks.
+Commands can use ordinary OS paths. The host's reviewed hooks remain confined. In Plan,
+the host runs eligible commands in a read-only scope even if the chat has
+selected Full access.
 
 The supervisor negotiates `co.grida/session/permission-mode` version 1 on
 private stdio. Inspection and update create no model work. A mode change is
@@ -921,6 +943,16 @@ See the [client protocol](./docs/rust-client-protocol.md#per-chat-permission-mod
 
 ### Run commands as chat processes
 
+A Plan turn with a read command grant and a confined backend offers
+`exec_command` for finite inspection. Ordinary Plan commands follow the
+launch profile's `command.diskRead` setting. With disk reads enabled, the
+sandbox permits ordinary user-readable paths outside the project while
+protecting the configured exclusions. With disk reads disabled, it allows
+the selected read root and runtime paths. Plan commands stay confined,
+offline, and noninteractive, and can write only in private scratch. These
+limits apply even when the chat selects Full access. File-only primary
+directories and scoped reviews can use native file reads, listing, and search.
+
 With command rules, Act turns offer two tools. `exec_command` takes `cmd`,
 optional absolute `workdir` (default: the selected directory's root), `tty`,
 `yield_time_ms` (default 10000, 250 to 30000) and `max_output_tokens` (default
@@ -929,10 +961,35 @@ optional absolute `workdir` (default: the selected directory's root), `tty`,
 where the shell is the profile environment's `SHELL` when that is an absolute
 path to an executable `sh`, `bash`, `zsh` or `dash`, and `/bin/sh` otherwise.
 It is never a login or interactive shell. The environment follows the profile.
-With `tty` the command gets a pseudo-terminal; otherwise stdin is closed and
-stdout and stderr share one stream. On macOS, `/bin/sh` reads
-`/private/var/select/sh`; a profile without disk read should list
-`/private/var/select` in `runtimePaths`.
+With `tty` the command gets a pseudo-terminal. Ordinary pipe commands start
+with stdin closed and return stdout and stderr in one stream. On macOS,
+`/bin/sh` reads `/private/var/select/sh`. A profile without disk read should
+list `/private/var/select` in `runtimePaths`.
+
+An eligible narrow read profile can pass one separately granted file as
+command input. For example, this reads a file in the named `reference`
+directory through stdin.
+
+```json
+{
+  "cmd": "/bin/cat",
+  "access": "read",
+  "input_file": {
+    "directory": "reference",
+    "path": "manifest.txt"
+  }
+}
+```
+
+A new turn can use this option under a narrow read profile with an independent
+named-directory grant or exact-file approval through `external-file`. The path
+is relative to that scope. Desktop's disk-read profile uses plain commands for
+ordinary files. The host supplies the file's bounded UTF-8 bytes on
+stdin and runs a finite, offline command in the confined primary directory.
+This invocation permits read access, private scratch, and bounded output.
+Omit `workdir`, the command-level `directory`, `tty`, `yield_time_ms`, and
+`network`. The host uses `/bin/sh` and keeps custody of the source file.
+The command's output remains subject to its normal budget.
 
 The call collects output until the wait ends or the command ends. A command
 that ends within the wait reports its exit and is not kept. One still running

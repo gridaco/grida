@@ -319,6 +319,8 @@ async fn serve_connection(
                         let browser_mcp_offered = desktop_tools_offered && browser_offered && offered(browser_mcp);
                         let tool_sources = crate::editor_surfaces::mcp::TOOL_SOURCES_CAPABILITY;
                         let tool_sources_offered = desktop_tools_offered && offered(tool_sources);
+                        let workbench_paths = crate::editor_surfaces::mcp::WORKBENCH_PATHS_CAPABILITY;
+                        let workbench_paths_offered = tool_sources_offered && offered(workbench_paths);
                         if let Err(error) = initialized_host.editor_surfaces.attach(
                             connection.clone(),
                             crate::editor_surfaces::DesktopCapabilities {
@@ -328,6 +330,7 @@ async fn serve_connection(
                                 tools: desktop_tools_offered,
                                 browser_mcp: browser_mcp_offered,
                                 tool_sources: tool_sources_offered,
+                                workbench_paths: workbench_paths_offered,
                             },
                         ) {
                             return responder.respond_with_error(host_error(error));
@@ -347,6 +350,9 @@ async fn serve_connection(
                         }
                         if tool_sources_offered {
                             advertised.insert(tool_sources.into(), 1.into());
+                        }
+                        if workbench_paths_offered {
+                            advertised.insert(workbench_paths.into(), 1.into());
                         }
                         advertised.insert(capability.into(), 1.into());
                         if presentation {
@@ -379,6 +385,7 @@ async fn serve_connection(
                             crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
                             crate::editor_surfaces::mcp::BROWSER_CAPABILITY,
                             crate::editor_surfaces::mcp::TOOL_SOURCES_CAPABILITY,
+                            crate::editor_surfaces::mcp::WORKBENCH_PATHS_CAPABILITY,
                             crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,

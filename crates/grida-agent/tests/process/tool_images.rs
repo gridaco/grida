@@ -683,40 +683,22 @@ async fn browser_capture(shared: bool, qualified: bool) {
 }
 
 fn browser_desktop_catalog(qualified: bool) -> Vec<Value> {
-    let descriptors: Vec<Value> = serde_json::from_str(include_str!(
-        "../../../../desktop/src/main/browser-tool-catalog.json"
-    ))
-    .unwrap();
-    let names = if qualified {
-        vec![("browser_capture", FIXTURE_CAPTURE)]
+    let mut capture = crate::desktop_tools::browser_descriptor(
+        "browser_capture",
+        if qualified {
+            FIXTURE_CAPTURE
+        } else {
+            "browser_capture"
+        },
+    );
+    if qualified {
+        capture["_meta"]["co.grida/source"] = json!({"id":"fixture-pixels","generation":"fixture-capture","description":"Capture bounded pixels from a fixture."});
+        capture["_meta"]["co.grida/resultDisposition"] = true.into();
+        vec![capture]
     } else {
         vec![
-            ("surface_open", "workbench_show"),
-            ("browser_capture", "browser_capture"),
+            crate::desktop_tools::browser_descriptor("surface_open", "workbench_show"),
+            capture,
         ]
-    };
-    names.into_iter().map(|(stored, name)| {
-        let descriptor = descriptors
-            .iter()
-            .find(|entry| entry["name"] == stored)
-            .unwrap();
-        let mut meta = json!({"co.grida/definitionRevision":descriptor["version"],
-                "co.grida/maxInputBytes":40960,"co.grida/maxOutputBytes":458752});
-        if stored == "browser_capture" {
-            meta["co.grida/resultMimeType"] = "image/jpeg".into();
-        }
-        if qualified {
-            meta["co.grida/source"] = json!({"id":"fixture-pixels","generation":"fixture-capture", "description":"Capture bounded pixels from a fixture."});
-            meta["co.grida/resultDisposition"] = true.into();
-        }
-            let description = if name == "workbench_show" {
-                "Ask the attached workbench to show a workspace file, HTTP(S) URL, or exact tab. The workbench chooses the viewer. Window focus requires an explicit request. Use browser_open for background browser work."
-            } else {
-                descriptor["description"].as_str().unwrap()
-            };
-            json!({"name":name,"description":description,
-                "inputSchema":descriptor["inputSchema"],"outputSchema":descriptor["outputSchema"],
-                "annotations":{"readOnlyHint":descriptor["effect"] == "read"},"_meta":meta})
-    })
-    .collect()
+    }
 }

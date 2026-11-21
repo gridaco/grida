@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { expect, it, onTestFinished, vi } from "vitest";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeEditorSurfaceEndpoints,
+  type NativeEditorSurfaceDelivery,
   type NativeEditorSvgSelectionDelivery,
 } from "./native-editor-surfaces";
 
@@ -421,6 +425,11 @@ it("keeps same-named tools isolated to the exact registered source generation", 
     description: "Find sources.",
     tools: [{ definition, revision: 3, invoke: runSecond }],
   };
+  for (const id of ["browser", "desktop-fx", "workbench"]) {
+    expect(() => lease.registerToolSource({ ...first, id })).toThrow(
+      "native_desktop_tool_source_invalid"
+    );
+  }
   const firstLease = lease.registerToolSource(first);
   lease.registerToolSource({
     id: "too-many-tools",
@@ -638,3 +647,369 @@ it("keeps same-named tools isolated to the exact registered source generation", 
     "editor_surface_endpoint_unavailable"
   );
 });
+
+it.each([false, true])(
+  "uses the current workbench frame and workspace paths with Browser granted=%s",
+  async (browserGranted) => {
+    const workspace = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-workbench-tool-"))
+    );
+    onTestFinished(() => fs.rm(workspace, { recursive: true, force: true }));
+    const artifact = "Presentations/Talk.canvas";
+    const bundle = path.join(workspace, artifact);
+    await fs.mkdir(bundle, { recursive: true });
+    await fs.writeFile(
+      path.join(bundle, ".canvas.json"),
+      JSON.stringify({
+        version: "1",
+        editor: "slides",
+        documents: [{ id: "intro", src: "001.svg" }],
+      })
+    );
+    await fs.writeFile(
+      path.join(bundle, "001.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'
+    );
+    const endpoints = new NativeEditorSurfaceEndpoints(workspace);
+    const deliver = vi.fn<NativeEditorSurfaceDelivery>();
+    let browserReady = true;
+    const invoke = vi.fn<DesktopBrowserToolLease["invoke"]>(async () => ({
+      disposition: "not_dispatched",
+      error: "unexpected_operation",
+    }));
+    const showBrowser = vi.fn<
+      NonNullable<DesktopBrowserToolLease["workbench"]>["show"]
+    >((target) =>
+      browserReady
+        ? {
+            disposition: "dispatched_verified",
+            data: { tabId: target.kind === "tab" ? target.tabId : "new" },
+          }
+        : { disposition: "not_dispatched", error: "owner_revoked" }
+    );
+    const browser: DesktopBrowserToolLease = {
+      ready: () => browserReady,
+      invoke,
+      workbench: {
+        tabs: () =>
+          browserReady
+            ? {
+                activeTabId: null,
+                tabs: [
+                  {
+                    kind: "browser",
+                    tabId: "visible",
+                    url: "https://example.com",
+                    title: "Example",
+                    state: "ready",
+                  },
+                ],
+              }
+            : null,
+        show: showBrowser,
+        focus: () => browserReady,
+      },
+      close: () => {},
+    };
+    const sessionId = "chat";
+    const lease = endpoints.register(
+      sessionId,
+      { active: `/${artifact}`, open: [`/${artifact}`], truncated: false },
+      () => {},
+      deliver,
+      17,
+      undefined,
+      browser
+    );
+    const { editorEndpointId: endpointId } = lease.selection();
+    const request = (message: object, id = randomUUID()) => ({
+      sessionId,
+      endpointId,
+      scope: {
+        sources: true,
+        workbenchPaths: true,
+        presentation: true,
+        ...(browserGranted && { browser: true }),
+      },
+      message: { jsonrpc: "2.0", id, ...message },
+      expiresAtMs: Date.now() + 5000,
+      timeoutMs: 5000,
+    });
+    const run = (value: ReturnType<typeof request>) =>
+      endpoints.desktopTools(
+        value,
+        new AbortController().signal,
+        browserGranted,
+        true,
+        true
+      );
+    const guard = (
+      reply: NonNullable<Awaited<ReturnType<typeof run>>>,
+      value: ReturnType<typeof request>
+    ) =>
+      endpoints.desktopToolsReplyGuard(
+        reply,
+        value,
+        browserGranted,
+        true,
+        true
+      );
+
+    const listRequest = request({ method: "tools/list" });
+    const tools = await run(listRequest);
+    expect(tools?.message).toMatchObject({
+      result: {
+        tools: expect.arrayContaining(
+          ["workbench_list_tabs", "workbench_show"].map((name) =>
+            expect.objectContaining({
+              name,
+              _meta: expect.objectContaining({
+                "co.grida/source": {
+                  id: "workbench",
+                  generation: expect.any(String),
+                  description: expect.any(String),
+                },
+                "co.grida/definitionRevision": 4,
+              }),
+            })
+          )
+        ),
+      },
+    });
+    const workbench = NativeDesktopTools.listedSources(tools!.message).find(
+      ({ id }) => id === "workbench"
+    );
+    const call = (
+      name: string,
+      args: object,
+      id?: ReturnType<typeof randomUUID>
+    ) =>
+      request(
+        {
+          method: "tools/call",
+          params: {
+            name,
+            arguments: args,
+            _meta: {
+              "co.grida/source": workbench,
+              "co.grida/definitionRevision": 4,
+            },
+          },
+        },
+        id
+      );
+    const list = call("workbench_list_tabs", {});
+    const show = (path: string, id?: ReturnType<typeof randomUUID>) =>
+      call("workbench_show", { target: { kind: "file", path } }, id);
+    const visible = await run(list);
+    const file = { kind: "file", path: artifact, tabId: expect.any(String) };
+    const browserTab = expect.objectContaining({
+      kind: "browser",
+      tabId: "visible",
+    });
+    expect(visible?.message).toMatchObject({
+      result: {
+        structuredContent: {
+          activeTabId: expect.any(String),
+          tabs: browserGranted ? [file, browserTab] : [file],
+          truncated: false,
+        },
+      },
+    });
+
+    const reply = {
+      result: {
+        structuredContent: {
+          disposition: "dispatched_verified",
+          path: artifact,
+          requested: true,
+        },
+      },
+    };
+    const operation = randomUUID();
+    const absoluteRequest = show(bundle, operation);
+    const dispatched = await run(absoluteRequest);
+    expect(dispatched).toMatchObject({ message: reply });
+    await expect(run(show(`./${artifact}`, operation))).resolves.toMatchObject({
+      message: reply,
+    });
+    expect(deliver).toHaveBeenCalledExactlyOnceWith({
+      path: `/${artifact}`,
+      revision: 17,
+      expiresAtMs: expect.any(Number),
+    });
+    expect(invoke).not.toHaveBeenCalled();
+    expect(showBrowser).not.toHaveBeenCalled();
+    await expect(
+      run(
+        call("workbench_show", {
+          target: { kind: "url", url: "https://example.com" },
+        })
+      )
+    ).resolves.toMatchObject({
+      message: {
+        result: browserGranted
+          ? {
+              isError: false,
+              structuredContent: {
+                disposition: "dispatched_verified",
+                tabId: "new",
+              },
+            }
+          : {
+              isError: true,
+              structuredContent: {
+                disposition: "not_dispatched",
+                error: "owner_revoked",
+              },
+            },
+      },
+    });
+    expect(showBrowser).toHaveBeenCalledTimes(Number(browserGranted));
+    await expect(run(show("Presentations"))).resolves.toMatchObject({
+      message: { result: { structuredContent: { error: "target_missing" } } },
+    });
+    await expect(run(show("missing.svg"))).resolves.toMatchObject({
+      message: { result: { structuredContent: { error: "target_missing" } } },
+    });
+    await fs.symlink(os.tmpdir(), path.join(workspace, "escaped"));
+    await expect(run(show("escaped"))).resolves.toMatchObject({
+      message: {
+        result: { structuredContent: { error: "invalid_surface_path" } },
+      },
+    });
+    await expect(
+      run(
+        call("workbench_show", {
+          target: { kind: "file", path: artifact },
+          presentation: null,
+        })
+      )
+    ).resolves.toMatchObject({
+      message: {
+        result: { structuredContent: { error: "invalid_arguments" } },
+      },
+    });
+    expect(deliver).toHaveBeenCalledTimes(1);
+
+    const beforeRevocation = guard(visible!, list);
+    const fileReceipt = guard(dispatched!, absoluteRequest);
+    const catalog = guard(tools!, listRequest);
+    browserReady = false;
+    expect(fileReceipt()).toBeUndefined();
+    const unverified = expect.objectContaining({
+      error: { code: -32603, message: "Editor reply unverified" },
+    });
+    expect(beforeRevocation()?.message).toEqual(
+      browserGranted ? unverified : undefined
+    );
+    const remainingCatalog = catalog()?.message ?? tools?.message;
+    expect(remainingCatalog).toMatchObject({
+      result: {
+        tools: expect.arrayContaining([
+          expect.objectContaining({ name: "workbench_list_tabs" }),
+          expect.objectContaining({ name: "workbench_show" }),
+        ]),
+      },
+    });
+    expect(JSON.stringify(remainingCatalog)).not.toContain(
+      "workbench_close_browser_tab"
+    );
+    await expect(
+      run(call("workbench_show", { target: { kind: "tab", tabId: "visible" } }))
+    ).resolves.toMatchObject({
+      message: {
+        result: {
+          isError: true,
+          structuredContent: {
+            disposition: "not_dispatched",
+            error: browserGranted ? "owner_revoked" : "target_missing",
+          },
+        },
+      },
+    });
+    await expect(
+      run(
+        call("workbench_show", {
+          target: { kind: "file", path: artifact },
+          presentation: "focus",
+        })
+      )
+    ).resolves.toMatchObject({
+      message: { result: { structuredContent: { error: "owner_revoked" } } },
+    });
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect((await run(list))?.message).toMatchObject({
+      result: { structuredContent: { tabs: [file] } },
+    });
+    await expect(run(show(artifact))).resolves.toMatchObject({
+      message: reply,
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+
+    function activeTabId(reply: Awaited<ReturnType<typeof run>>) {
+      const message = reply?.message;
+      if (!message || !("result" in message))
+        throw new Error("Expected workbench inventory");
+      const data = message.result.structuredContent as
+        | { activeTabId?: unknown }
+        | undefined;
+      if (typeof data?.activeTabId !== "string")
+        throw new Error("Expected an active file tab");
+      return data.activeTabId;
+    }
+
+    const first = activeTabId(visible);
+    lease.update({ active: null, open: [], truncated: false }, 18);
+    lease.update(
+      { active: `/${artifact}`, open: [`/${artifact}`], truncated: false },
+      19
+    );
+    const next = activeTabId(await run(list));
+    expect(next).not.toEqual(first);
+    const tab = (tabId: string) =>
+      call("workbench_show", { target: { kind: "tab", tabId } });
+    await expect(run(tab(first))).resolves.toMatchObject({
+      message: {
+        result: { structuredContent: { disposition: "not_dispatched" } },
+      },
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+    await expect(run(tab(next))).resolves.toMatchObject({
+      message: reply,
+    });
+    expect(deliver.mock.lastCall?.[0]).toMatchObject({
+      path: `/${artifact}`,
+      revision: 19,
+    });
+
+    const entry = await fs.lstat(bundle);
+    const lookup = Promise.withResolvers<typeof entry>();
+    const entered = Promise.withResolvers<void>();
+    const lstat = vi.spyOn(fs, "lstat").mockImplementationOnce(() => {
+      entered.resolve();
+      return lookup.promise;
+    });
+    try {
+      const opening = run(show(artifact));
+      await entered.promise;
+      lease.update({ active: null, open: [], truncated: false }, 20);
+      lookup.resolve(entry);
+      await expect(opening).resolves.toMatchObject({
+        message: {
+          result: {
+            structuredContent: {
+              disposition: "not_dispatched",
+              error: "editor_surface_endpoint_unavailable",
+            },
+          },
+        },
+      });
+      expect(deliver).toHaveBeenCalledTimes(3);
+    } finally {
+      lookup.resolve(entry);
+      lstat.mockRestore();
+    }
+    lease.close();
+  }
+);

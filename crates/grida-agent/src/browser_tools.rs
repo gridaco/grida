@@ -81,9 +81,15 @@ const IMAGE_LOCATOR: &str = "browser-result-jpeg:";
 const OWNER_CALL_TIME: Duration = Duration::from_secs(8);
 const RESPONSE_MARGIN: Duration = Duration::from_millis(150);
 
-pub(crate) const INSTRUCTIONS: &str = r#"For new browser work, use browser_open to open a background page. Copy its entire target object, {"kind":"background","pageId":"…"}, into subsequent calls. Pass its readiness object to browser_wait with condition {"kind":"ready","state":"load"}. Then use browser_snapshot with that target to get the current documentId and element refs. The snapshot's documentId identifies the loaded document. To click, use browser_action with the same target, the current documentId, and {"kind":"click","ref":"…"} as the action. Copy the snapshot node's ref field. Check the page again after an action. Close background pages you no longer need with browser_close and their target object.
+pub(crate) fn append_legacy_browser_guidance(instructions: &mut String, retained: bool) {
+    instructions.push_str(r#"For new browser work, use browser_open to open a background page. Copy its entire target object, {"kind":"background","pageId":"…"}, into subsequent calls. Pass its readiness object to browser_wait with condition {"kind":"ready","state":"load"}. Then use browser_snapshot with that target to get the current documentId and element refs. The snapshot's documentId identifies the loaded document. To click, use browser_action with the same target, the current documentId, and {"kind":"click","ref":"…"} as the action. Copy the snapshot node's ref field. Check the page again after an action. Close background pages you no longer need with browser_close and their target object.
 
-For an already open tab, use surface_list_open to get its exact tab ID and use {"kind":"workbench","tabId":"…"} as the browser target. Use surface_open for explicit presentation. A page stays with its original owner. Evaluation can change the page. After an unknown action outcome, observe the same target before retrying."#;
+For an already open tab, use surface_list_open to get its exact tab ID and use {"kind":"workbench","tabId":"…"} as the browser target."#);
+    if retained {
+        instructions.push_str(" Use surface_open for explicit presentation.");
+    }
+    instructions.push_str(" A page stays with its original owner. Evaluation can change the page. After an unknown action outcome, observe the same target before retrying.");
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -98,7 +104,7 @@ struct BrowserToolDescriptor {
 
 // The Desktop browser feature owns these schemas. Both legacy transports
 // continue to bind calls to their existing browser owner under that catalog.
-const CATALOG: &str = include_str!("../../../desktop/src/main/browser-tool-catalog.json");
+const CATALOG: &str = include_str!("../../../extensions/browser/tools.json");
 
 fn parse_catalog(source: &str) -> Option<Vec<BrowserToolDescriptor>> {
     let catalog: Vec<BrowserToolDescriptor> = serde_json::from_str(source).ok()?;

@@ -68,6 +68,35 @@ Discovery describes availability and grants no access by itself. Focus and
 selection changes update editor-context data. Context payloads and document
 references follow their owning capability's schema.
 
+New workspace turns with an unconditional read command grant in the primary
+directory use `exec_command` to find, search, and read workspace files. In Act,
+`write_file` and `edit_file` use the named-directory write grants.
+
+The optional `exec_command.input_file` supplies one bounded UTF-8 file as
+stdin to a finite, offline, read-only command at the primary root. It uses an
+explicit directory ID and relative path. It is offered for eligible narrow
+read profiles under an independent named-directory or exact-file grant.
+A disk-read profile reads ordinary files through plain commands. An
+outside-project approval binds the file identity and version. The source
+stays with the host. The invocation disallows a network request, terminal,
+background yield, workspace writes, `workdir`, and a command-level directory.
+
+Host configuration stays protected on new turns. Manually edit the source
+or use a trusted client's negotiated configuration operations. Accepted
+inputs with the earlier settings grant retain its original approval rules.
+
+Profiles without an unconditional primary read command grant may offer bounded
+file tools. Scoped reviews can use them, and observed-file verification profiles
+retain `read_file` for their recorded-byte evidence. Accepted inputs keep their
+original tools through queueing and recovery, including earlier
+`read_scoped_file` calls. Existing chat data keeps its format.
+
+A Plan command requires a read command grant and a confined backend. Its read
+scope follows the captured launch profile's disk-read posture. It can write
+only to private scratch and runs offline and noninteractively. These limits
+apply even under Full access. Previously accepted inputs keep their recorded
+read policy.
+
 The MCP export selects its capability names explicitly at startup and obtains
 one grant per selected name. Discovery and dispatch use that same collection.
 Registering another capability with the host does not expose it through MCP.
@@ -90,13 +119,13 @@ An invocation addressed to one endpoint cannot silently move to its replacement
 or to whichever tab is now active. Late replies retain their original call and
 endpoint identity.
 
-For workspace chat, `surface_list_open` reads the captured workbench's active
-file and open files when invoked. The workbench owns the observations. Main
-authorizes the attached frame and publishes a bounded view of workspace-relative
-paths over private stdio. Rust retains the binding with the accepted Act input
-and validates each reply before projecting it as a tool result. An empty
-workbench returns an empty view. A detached or replaced workbench is unavailable.
-An unverified reply supplies no editor data. The binding grants no filesystem
+For workspace chat, `workbench_list_tabs` reads the current view of the
+captured workbench. Main authorizes the attached frame and publishes a
+bounded inventory with the active tab ID and workspace-relative file
+paths. A live Browser lease can contribute visible browser tabs. An empty
+workbench returns an empty view. A detached or replaced workbench is
+unavailable. Rust retains the binding with the accepted Act input and
+validates each reply before projecting it. The binding grants no filesystem
 access or document mutation.
 
 Desktop Main registers eligible operations with their source identity,
@@ -106,6 +135,22 @@ definitions with accepted input. Source replacement retires the previous
 generation even when the replacement has identical definitions. Revoking
 one source leaves other grants available on the same endpoint. Main checks
 the captured source, generation and definition revision before invocation.
+
+Desktop packages declare their stable ID, summary and local skill names in
+`extensions/<id>/extension.json`. Only declared
+`skills/<name>/SKILL.md` documents are compiled into the package's skill
+catalog. A package may declare zero or more skills. Its source ID remains
+reserved even if it contributes no tools. Its README is developer
+documentation. Standalone bundled instructions live under the repository's
+`skills/`. Both kinds of instructions follow the same skill contract.
+
+Browser's tool definitions live beside its manifest and apply to the native
+binding and the Desktop MCP producer. Browser guidance enters the accepted
+catalog with the Browser tool grant. FX guidance enters through the verified
+bundled-command launch profile. The feature defines its readiness conditions.
+The product master supplies shared Desktop presentation instructions when the
+host has captured a compatible presentation grant.
+
 Native discovery first presents one bounded summary per extension. A query
 spanning several extensions returns
 their summaries so the model can choose a source. A source-specific query or
@@ -127,27 +172,25 @@ the frame withdraws the view for the lifetime of the export. Losing the private
 stdio connection closes the listener.
 
 When the same workbench offers presentation, `workbench_show` asks that exact
-frame to show a workspace artifact as a file target. The workbench chooses
-the viewer. Main binds the request to a call identity
-and the frame's last published view. The editor validates the target and
-checks the view again before changing tabs. A dispatch receipt confirms Main
+frame to show a workspace artifact as a file target. Main resolves the
+workspace-relative or in-workspace absolute path against the captured
+workspace. It binds the reveal to a call identity and the frame's published
+view regardless of Browser readiness. The editor checks that view and the
+artifact's eligibility before changing tabs, then chooses the viewer. A dispatch receipt confirms Main
 accepted the send to the captured frame. Observed display requires separate
 evidence. An unconfirmed dispatch remains in the turn's account and leaves
 the model free to continue work. Reopening a chat never replays presentation.
 
-A negotiated browser endpoint adds versioned workbench reflection and the
-browser catalog. The existing tool host captures the endpoint in Act and
-preserves it throughout the accepted input. Main owns page admission,
-document and viewport guards, and the actual guest. Background pages remain
-within their creating scope, and workbench calls use the exact authorized
-tab. `browser_close` and scope cleanup retire owned background pages.
-`workbench_close_browser_tab` requests closure of a visible browser tab.
-Browser and browser-enabled Workbench calls use the negotiated private MCP
-carrier with the captured Browser lease. The same Browser operation definitions
-and lease dispatcher serve the opt-in external profile, whose wire names and
-schemas remain stable. Older accepted turns keep their captured definitions
-and dispatch contract. Observations from a revoked or replaced endpoint are
-discarded.
+The built-in Workbench source owns tab inventory and presentation. A
+negotiated Browser endpoint adds visible browser targets and a separate
+Browser catalog over the same private MCP carrier. The tool host preserves
+the captured endpoint throughout the accepted Act input. Main owns page
+admission, document and viewport guards, and the guest.
+`workbench_close_browser_tab` requests closure of an exact visible browser
+tab. `browser_close` and scope cleanup retire background pages within their
+creating scope. The opt-in external profile keeps its existing wire names and
+schemas. Older accepted inputs keep their captured definitions and dispatch
+contract. Revoked or replaced endpoints supply no observations.
 
 Both paths use bounded MCP JPEG image content. Native chat validates the
 image and, when the model connection accepts tool images, prepares it as

@@ -50,7 +50,22 @@ for (const [name, paths, expected] of [
   ],
   [
     "embedded Desktop browser tool catalog",
-    ["desktop/src/main/browser-tool-catalog.json"],
+    ["extensions/browser/tools.json"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "embedded Desktop Workbench tool catalog",
+    ["desktop/src/main/desktop-workbench-tools.json"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "extension-owned skill",
+    ["extensions/desktop-fx/skills/desktop-fx/SKILL.md"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "standalone skill",
+    ["skills/svg/SKILL.md"],
     ["rust", "conformance", "native", "docs"],
   ],
   [

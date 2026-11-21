@@ -89,7 +89,7 @@ checks. The tool-host contract separates those responsibilities.
 1. This doc.
 2. [agent/components.md](../agent/components.md#integration-capabilities-and-bounds).
 3. [agent/tools.md](../agent/tools.md) and [agent/components.md / storage and recovery](../agent/components.md#storage-and-recovery).
-4. [tools-fundamentals.md](./tools-fundamentals.md).
+4. [Native tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md).
 5. [desktop/process-model.md](../../desktop/process-model.md).
 6. [GRIDA-SEC-004](https://github.com/gridaco/grida/blob/main/SECURITY.md#grida-sec-004--desktop-daemon-trust-boundary).
 

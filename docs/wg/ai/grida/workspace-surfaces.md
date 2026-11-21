@@ -51,10 +51,9 @@ tool's type system. The surface capability remains artifact-agnostic:
 - the workspace may continue to contain supporting files and other
   artifact kinds.
 
-The workspace-rooted path identifies the artifact and the workbench chooses
-its viewer. The leading `/` denotes the current workspace root. The agent
-chooses the target within the current workbench and can ask to show it or
-inspect it through the relevant tools.
+A filesystem path identifies the artifact and the workbench chooses its
+viewer. A relative path starts at the workspace root. An absolute path
+uses the host filesystem and must resolve inside that workspace.
 
 ## Workbench tools
 
@@ -69,12 +68,11 @@ workbench also accepts an HTTP(S) `url` to open a browser tab and a `tab` ID
 to show an existing tab. The hosted router resolves registered Grida `/_/`
 links in the browser. Window focus is an explicit choice when available.
 
-The workbench resolves a file target only when it:
-
-- already exists;
-- is inside the current workspace;
-- is a file or a recognized bundle directory;
-- is identified by its workspace-rooted `path`, such as `/poster.canvas`.
+A file target names an existing file or recognized bundle directory inside
+the captured workspace. For example, `design/Poster.canvas`,
+`./design/Poster.canvas`, and the artifact's full filesystem path can
+identify the same bundle. The workspace boundary applies even when a
+command can read files elsewhere.
 
 Opening an artifact that is already open
 activates the existing surface instead of creating a duplicate.
@@ -97,10 +95,11 @@ Showing a target does not:
 ### `workbench_list_tabs`
 
 `workbench_list_tabs` reads the current open tabs and selection within the
-captured workbench. A file-only workbench reports the active and open paths.
-A browser-enabled workbench also reports exact tab IDs for visible browser
-operations. Access to contents follows separate permissions. A file can be
-shown by path without a prior listing.
+captured workbench. The inventory identifies the active tab and supplies
+workspace-relative paths for file tabs. When Browser is available, the same
+inventory includes visible browser tabs and their exact identities. A file
+can be shown by path without a prior listing. Access to contents follows
+separate permissions.
 
 ### `workbench_close_browser_tab`
 

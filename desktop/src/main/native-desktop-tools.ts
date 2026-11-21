@@ -3,6 +3,8 @@ export namespace NativeDesktopTools {
   export const capability = "co.grida/session/desktop-tools";
   export const browserCapability = "co.grida/session/desktop-browser-mcp";
   export const sourcesCapability = "co.grida/session/desktop-tool-sources";
+  export const workbenchPathsCapability =
+    "co.grida/session/workbench-file-paths";
   export const method = "_co.grida/editor/desktop-tools";
 
   const DEFINITION_REVISION = "co.grida/definitionRevision";
@@ -201,6 +203,12 @@ export namespace NativeDesktopTools {
     if (request?.method !== "tools/call") return;
     const name = record(request.params)?.name;
     return typeof name === "string" ? name : undefined;
+  }
+
+  export function toolArguments(value: unknown) {
+    const request = parseRequest(value);
+    if (request?.method === "tools/call")
+      return record(record(request.params)?.arguments);
   }
 
   export function toolSource(value: unknown): SourceBinding | undefined {

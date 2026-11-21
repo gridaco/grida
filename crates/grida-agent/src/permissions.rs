@@ -4,13 +4,13 @@ use crate::command::{CommandAccess, CommandLimits, CommandSupervisor, ReviewedCo
 use crate::configuration::Configuration;
 use crate::file_tools::{
     CAPTURE_IMAGE_REFERENCE, EXTERNAL_FILE_DIRECTORY, FileAuthority, FileTools, ImageCapture,
-    PROTECTED_METADATA, PROTECTED_WHEN_MISSING, SETTINGS_DIRECTORY, SETTINGS_PATH, SettingsAccess,
-    VIEW_IMAGE, read_request, write_request,
+    PROTECTED_METADATA, PROTECTED_WHEN_MISSING, READ_SCOPED_FILE, SETTINGS_DIRECTORY,
+    SETTINGS_PATH, SettingsAccess, VIEW_IMAGE, read_request, write_request,
 };
 use crate::goal_verification::ReadVerification;
 use crate::processes::{
-    AuthorizedProcess, EXEC_COMMAND, ExecArguments, ProcessScope, ProcessSessions, ProcessTools,
-    SESSION_LIFETIME, WRITE_STDIN,
+    AuthorizedProcess, CommandFileInput, CommandToolMode, EXEC_COMMAND, ExecArguments,
+    ProcessScope, ProcessSessions, ProcessTools, SESSION_LIFETIME, ScopedCommandInput, WRITE_STDIN,
 };
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
@@ -30,6 +30,7 @@ use agent_kit_sandbox::{
     TrustedExecutable, UnconfinedScope,
 };
 use agent_kit_store_sqlite::SqliteStore;
+use grida_agent_master::OperatingRegime;
 use grida_agent_master::approval_review::ReadProfile;
 use grida_agent_master::hooks::CheckMode;
 use grida_agent_master::lifecycle_hooks::{HookEvent, LifecycleHook, LifecycleHooks};
@@ -38,6 +39,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
+
+mod command_input;
 
 pub(crate) const REQUEST: &str = "grida.agent.approval";
 const ANSWER: &str = "grida.agent.approval.answer";
@@ -163,6 +166,18 @@ pub struct PermissionCapture {
     external_file_read: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     command_network: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    plan: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    shell_text_reads: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    command_file_input: bool,
+    /// Earlier Plan inputs keep the more restrictive command read policy they accepted.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    broad_command_reads: bool,
+    /// Earlier accepted inputs can finish with their original config tools.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    client_managed_settings: bool,
 }
 
 impl PermissionCapture {
@@ -696,6 +711,11 @@ impl PermissionProfile {
             mode: PermissionMode::Restricted,
             external_file_read: self.allow_external_file_read,
             command_network: self.command_network_home.is_some(),
+            plan: false,
+            shell_text_reads: false,
+            command_file_input: false,
+            broad_command_reads: false,
+            client_managed_settings: false,
         }
     }
 
@@ -718,7 +738,86 @@ impl PermissionProfile {
             external_file_read: self.allow_external_file_read && mode != PermissionMode::FullAccess,
             command_network: self.command_network_home.is_some()
                 && mode != PermissionMode::FullAccess,
+            plan: false,
+            shell_text_reads: false,
+            command_file_input: false,
+            broad_command_reads: false,
+            client_managed_settings: false,
         })
+    }
+
+    pub(crate) fn capture_plan(
+        &self,
+        scope: ScopeId,
+        mode: PermissionMode,
+    ) -> Result<PermissionCapture> {
+        let mut capture = self.capture_mode(scope, mode)?;
+        capture.plan = true;
+        capture.command_network = false;
+        capture.context = self.mode_context(PermissionMode::Restricted, capture.external_file_read);
+        Ok(capture)
+    }
+
+    pub(crate) fn capture_workspace(
+        &self,
+        scope: ScopeId,
+        mode: PermissionMode,
+        regime: OperatingRegime,
+    ) -> Result<PermissionCapture> {
+        let mut capture = if regime.is_act() {
+            self.capture_mode(scope, mode)?
+        } else {
+            self.capture_plan(scope, mode)?
+        };
+        capture.client_managed_settings = true;
+        // File verification consumes the exact native read receipt.
+        capture.shell_text_reads = self.goal_read_verifications.is_empty()
+            && ((!capture.plan && mode == PermissionMode::FullAccess)
+                || self
+                    .workspace
+                    .primary()
+                    .and_then(|id| self.directories.get(id))
+                    .is_some_and(|rule| {
+                        rule.command_read == AccessRule::Allow && self.shell_covers_text_read(rule)
+                    }));
+        capture.command_file_input = capture.shell_text_reads
+            && (capture.plan || capture.mode != PermissionMode::FullAccess);
+        capture.broad_command_reads = !self.hooks_only
+            && self
+                .command
+                .as_ref()
+                .is_some_and(|command| command.disk_read);
+        if capture.broad_command_reads && capture.shell_text_reads {
+            capture.external_file_read = false;
+        }
+        capture.context = self.captured_context(&capture);
+        Ok(capture)
+    }
+
+    fn shell_covers_text_read(&self, rule: &DirectoryAccess) -> bool {
+        self.command.is_some()
+            && !self.hooks_only
+            && match rule.command_read {
+                AccessRule::Allow => true,
+                AccessRule::Ask => rule.read != AccessRule::Allow,
+                AccessRule::Deny => false,
+            }
+    }
+
+    fn captured_context(&self, capture: &PermissionCapture) -> String {
+        let mode = if capture.plan {
+            PermissionMode::Restricted
+        } else {
+            capture.mode
+        };
+        let mut context = self.mode_context(
+            mode,
+            capture.external_file_read && !capture.shell_text_reads,
+        );
+        if capture.broad_command_reads {
+            context.push_str("\nThe command's read scope includes ordinary files outside the project. Use plain exec_command for reads it already has permission to perform. Protected paths keep their restrictions.");
+        }
+        context
     }
 
     pub(crate) fn recapture(
@@ -734,15 +833,14 @@ impl PermissionProfile {
     }
 
     pub(crate) fn validate_capture(&self, capture: &PermissionCapture) -> Result<Fingerprint> {
-        if capture.profile != self.identity
-            || capture.context != self.mode_context(capture.mode, capture.external_file_read)
-        {
+        if capture.profile != self.identity || capture.context != self.captured_context(capture) {
             return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
         }
         if !self.supports_mode(capture.mode)
             || (capture.command_network
                 && (self.command_network_home.is_none()
-                    || capture.mode == PermissionMode::FullAccess))
+                    || capture.mode == PermissionMode::FullAccess
+                    || capture.plan))
             || (capture.external_file_read
                 && (!self.allow_external_file_read || capture.mode == PermissionMode::FullAccess))
         {
@@ -778,6 +876,11 @@ impl PermissionProfile {
             mode: PermissionMode::Restricted,
             external_file_read: false,
             command_network: false,
+            plan: false,
+            shell_text_reads: false,
+            command_file_input: false,
+            broad_command_reads: false,
+            client_managed_settings: false,
         })
     }
 
@@ -790,6 +893,11 @@ impl PermissionProfile {
             || capture.mode != PermissionMode::Restricted
             || capture.external_file_read
             || capture.command_network
+            || capture.plan
+            || capture.shell_text_reads
+            || capture.command_file_input
+            || capture.broad_command_reads
+            || capture.client_managed_settings
             || !self.allows_primary_review()
         {
             return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
@@ -879,7 +987,19 @@ impl PermissionProfile {
                 Fingerprint::of(&(
                     session,
                     turn,
-                    if capture.mode == PermissionMode::FullAccess {
+                    if capture.plan {
+                        let policy = if capture.broad_command_reads {
+                            "read-only-plan-profile-reads-v1"
+                        } else {
+                            "read-only-plan-v1"
+                        };
+                        Fingerprint::of(&(
+                            capture.profile,
+                            policy,
+                            capture.mode,
+                            capture.external_file_read,
+                        ))?
+                    } else if capture.mode == PermissionMode::FullAccess {
                         Fingerprint::of(&(capture.profile, "full-access-v1"))?
                     } else if capture.command_network {
                         Fingerprint::of(&(
@@ -907,7 +1027,7 @@ impl PermissionProfile {
             scope: capture.scope.clone(),
         };
         Ok(Arc::new(TurnPermissions {
-            profile: if capture.mode == PermissionMode::FullAccess {
+            profile: if !capture.plan && capture.mode == PermissionMode::FullAccess {
                 self.full_access_profile()?
             } else {
                 self.clone()
@@ -920,10 +1040,18 @@ impl PermissionProfile {
                 && !primary_review
                 && capture.mode == PermissionMode::ApproveForMe,
             allow_command_network: allow_review && !primary_review && capture.command_network,
+            plan: capture.plan,
+            shell_text_reads: capture.shell_text_reads,
+            command_file_input: capture.command_file_input,
+            broad_command_reads: capture.broad_command_reads,
+            client_managed_settings: capture.client_managed_settings,
             allow_external_file_read: allow_review && !primary_review && capture.external_file_read,
             primary_review,
-            settings: settings
-                .filter(|_| !primary_review && capture.mode != PermissionMode::FullAccess),
+            settings: settings.filter(|_| {
+                !capture.client_managed_settings
+                    && !primary_review
+                    && capture.mode != PermissionMode::FullAccess
+            }),
             files: GrantSelection {
                 authority: authority.clone(),
                 grants: vec![GrantId::new("workspace-file-read")?],
@@ -936,7 +1064,10 @@ impl PermissionProfile {
                 authority,
                 grants: vec![GrantId::new("workspace-process-input")?],
             },
-            state: Arc::default(),
+            state: Arc::new(Mutex::new(PermissionState {
+                read_only: capture.plan,
+                ..Default::default()
+            })),
         }))
     }
 
@@ -1216,6 +1347,11 @@ fn encode_approval_answer(
 #[derive(Clone)]
 pub struct TurnPermissions {
     allow_command_network: bool,
+    plan: bool,
+    shell_text_reads: bool,
+    command_file_input: bool,
+    broad_command_reads: bool,
+    client_managed_settings: bool,
     profile: Arc<PermissionProfile>,
     selection: (SessionId, TurnId),
     binding: Arc<OnceLock<TurnBinding>>,
@@ -1248,6 +1384,12 @@ struct Ready {
     command_capture: Option<Fingerprint>,
     approval: Option<WaitId>,
     active: Option<CancellationToken>,
+}
+
+impl Ready {
+    fn feeds_command(&self) -> bool {
+        self.command_capture.is_some() && matches!(self.request.effect, ApprovalEffect::Read { .. })
+    }
 }
 
 impl TurnPermissions {
@@ -1373,7 +1515,7 @@ impl TurnPermissions {
         if !allow_writes {
             self.state()?.read_only = true;
         }
-        self.insert_file_tools_with_images(inventory, grants, capture_image, None, image_view)
+        self.insert_file_tools_with_images(inventory, grants, capture_image, None, image_view, true)
     }
 
     fn insert_file_tools_with_images(
@@ -1383,6 +1525,7 @@ impl TurnPermissions {
         capture_image: Option<Arc<ImageCapture>>,
         capture_reference: Option<Arc<ImageCapture>>,
         image_view: crate::file_tools::ImageView,
+        include_discovery: bool,
     ) -> Result<()> {
         let (capture_image, capture_reference) = if self.primary_review {
             (None, None)
@@ -1395,28 +1538,18 @@ impl TurnPermissions {
             .values()
             .any(|rule| rule.read != AccessRule::Deny)
         {
-            let owner = self.clone();
-            let mut files = FileTools::with_authority(
-                self.profile.workspace.clone(),
-                Arc::new(move |invocation| owner.file_authority(invocation)),
-                capture_image,
-                capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
-            )?
-            .with_image_view(image_view)
-            .with_full_access(self.profile.unconfined);
-            if self.settings.is_some() {
-                let owner = self.clone();
-                files = files.with_settings(Arc::new(move |invocation| {
-                    owner.settings_authority(invocation)
-                }));
-            }
-            if self.allow_external_file_read {
-                let owner = self.clone();
-                files = files.with_external_file(Arc::new(move |invocation| {
-                    owner.external_file_authority(invocation)
-                }));
-            }
-            let files = Arc::new(files);
+            let files = self.bound_file_tools(capture_image, capture_reference, image_view)?;
+            let scoped_read = if !self.command_file_input
+                && self.shell_text_reads
+                && (self.settings.is_some()
+                    || self.allow_external_file_read
+                    || self.profile.directories.values().any(|rule| {
+                        rule.read != AccessRule::Deny && !self.profile.shell_covers_text_read(rule)
+                    })) {
+                Some(files.scoped_read_adapter()?)
+            } else {
+                None
+            };
             let writes = !self.primary_review
                 && !self.state()?.read_only
                 && self
@@ -1432,6 +1565,12 @@ impl TurnPermissions {
             for tool in files
                 .adapters()?
                 .into_iter()
+                .filter(|tool| match tool.definition().id.as_str() {
+                    "list_files" | "search_text" => include_discovery,
+                    "read_file" => !self.shell_text_reads,
+                    _ => true,
+                })
+                .chain(scoped_read)
                 .chain(write_tools)
                 .chain(files.view_adapter()?)
                 .chain(files.reference_adapter()?)
@@ -1441,6 +1580,66 @@ impl TurnPermissions {
             }
         }
         Ok(())
+    }
+
+    fn bound_file_tools(
+        self: &Arc<Self>,
+        capture_image: Option<Arc<ImageCapture>>,
+        capture_reference: Option<Arc<ImageCapture>>,
+        image_view: crate::file_tools::ImageView,
+    ) -> Result<Arc<FileTools>> {
+        let owner = self.clone();
+        let mut files = FileTools::with_authority(
+            self.profile.workspace.clone(),
+            Arc::new(move |invocation| owner.file_authority(invocation)),
+            capture_image,
+            capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
+        )?
+        .with_image_view(image_view)
+        .with_full_access(self.profile.unconfined);
+        if self.settings.is_some() {
+            let owner = self.clone();
+            files = files.with_settings(Arc::new(move |invocation| {
+                owner.settings_authority(invocation)
+            }));
+        }
+        if self.allow_external_file_read {
+            let owner = self.clone();
+            files = files.with_external_file(Arc::new(move |invocation| {
+                owner.external_file_authority(invocation)
+            }));
+        }
+        Ok(Arc::new(files))
+    }
+
+    fn has_separately_granted_file_reads(&self) -> bool {
+        self.settings.is_some()
+            || self.allow_external_file_read
+            || self.profile.directories.values().any(|rule| {
+                (rule.read == AccessRule::Allow
+                    || (self.allow_review && rule.read == AccessRule::Ask))
+                    && !self.profile.shell_covers_text_read(rule)
+            })
+    }
+
+    fn command_file_input(&self) -> CommandFileInput {
+        if !self.command_file_input {
+            CommandFileInput::None
+        } else if self.broad_command_reads {
+            if self.settings.is_some() {
+                CommandFileInput::Settings
+            } else {
+                CommandFileInput::None
+            }
+        } else if self.has_separately_granted_file_reads() {
+            if self.client_managed_settings {
+                CommandFileInput::ScopedFiles
+            } else {
+                CommandFileInput::Scoped
+            }
+        } else {
+            CommandFileInput::None
+        }
     }
 
     /// Offer the file tools and, when the profile allows model commands,
@@ -1477,7 +1676,58 @@ impl TurnPermissions {
             capture_image,
             capture_reference,
             image_view,
+            true,
         )?;
+        self.insert_command_tools(inventory, grants, processes)
+    }
+
+    /// Compose the current workspace inventory. Profiles explicitly issued
+    /// without command access keep their bounded file discovery tools.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn insert_workspace_tools(
+        self: &Arc<Self>,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+        processes: &Arc<ProcessSessions>,
+        capture_image: Option<Arc<ImageCapture>>,
+        capture_reference: Option<Arc<ImageCapture>>,
+        image_view: crate::file_tools::ImageView,
+        regime: OperatingRegime,
+    ) -> Result<Option<Arc<CommandSupervisor>>> {
+        if self.primary_review || self.plan != (regime == OperatingRegime::Plan) {
+            return Err(denied());
+        }
+        self.insert_file_tools_with_images(
+            inventory,
+            grants,
+            capture_image,
+            capture_reference,
+            image_view,
+            !self.primary_supports_shell(),
+        )?;
+        self.insert_command_tools(inventory, grants, processes)
+    }
+
+    fn primary_supports_shell(&self) -> bool {
+        self.profile.command.is_some()
+            && !self.profile.hooks_only
+            && self
+                .profile
+                .workspace
+                .primary()
+                .and_then(|id| self.profile.directories.get(id))
+                .is_some_and(|rule| {
+                    rule.command_read != AccessRule::Deny
+                        || rule.command_read_write != AccessRule::Deny
+                })
+    }
+
+    fn insert_command_tools(
+        self: &Arc<Self>,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+        processes: &Arc<ProcessSessions>,
+    ) -> Result<Option<Arc<CommandSupervisor>>> {
         if self.primary_review {
             return Ok(None);
         }
@@ -1486,7 +1736,8 @@ impl TurnPermissions {
         };
         let model_commands = !self.profile.hooks_only
             && self.profile.directories.values().any(|rule| {
-                rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
+                rule.command_read != AccessRule::Deny
+                    || (!self.plan && rule.command_read_write != AccessRule::Deny)
             });
         if model_commands {
             let owner = self.clone();
@@ -1495,15 +1746,24 @@ impl TurnPermissions {
                 command.limits,
                 processes.clone(),
                 self.selection.0.clone(),
-                self.profile.unconfined,
-                self.allow_command_network,
+                if self.plan {
+                    CommandToolMode::Plan
+                } else {
+                    CommandToolMode::Act {
+                        unconfined: self.profile.unconfined,
+                        allow_network: self.allow_command_network,
+                    }
+                },
+                self.command_file_input(),
                 Arc::new(move |invocation| owner.process_authority(invocation)),
             )?;
             let [exec, write] = tools.tools();
             grants.insert(exec.definition().id.clone(), self.commands.clone());
-            grants.insert(write.definition().id.clone(), self.processes.clone());
             inventory.insert(exec)?;
-            inventory.insert(write)?;
+            if !self.plan {
+                grants.insert(write.definition().id.clone(), self.processes.clone());
+                inventory.insert(write)?;
+            }
         }
         let checks = self.profile.completion_hook.is_some()
             || self.profile.before_tool_hook.is_some()
@@ -1522,11 +1782,10 @@ impl TurnPermissions {
         }
         let mut state = self.state()?;
         state.revoked.insert(directory.clone());
-        for ready in state
-            .ready
-            .values()
-            .filter(|ready| &ready.request.directory == directory)
-        {
+        for ready in state.ready.values().filter(|ready| {
+            &ready.request.directory == directory
+                || (ready.feeds_command() && self.profile.workspace.primary() == Some(directory))
+        }) {
             if let Some(active) = &ready.active {
                 active.cancel();
             }
@@ -1574,10 +1833,11 @@ impl TurnPermissions {
                     .command
                     .as_ref()
                     .ok_or_else(command_unavailable)?;
-                let input = ExecArguments::parse(
+                let input = ExecArguments::parse_workspace(
                     invocation.arguments(),
                     command.limits.max_input_bytes,
-                    true,
+                    self.plan,
+                    self.command_file_input(),
                 )?;
                 let directory = self.captured_directory(input.directory.as_ref())?;
                 let access = input.access.ok_or_else(denied)?;
@@ -1591,7 +1851,9 @@ impl TurnPermissions {
                     CommandAccess::Read => rules.command_read,
                     CommandAccess::ReadWrite => rules.command_read_write,
                 };
-                if rule == AccessRule::Deny {
+                if rule == AccessRule::Deny
+                    || (input.input_file.is_some() && rule != AccessRule::Allow)
+                {
                     return Err(denied());
                 }
                 let rule = if input.network.is_some() {
@@ -1602,7 +1864,9 @@ impl TurnPermissions {
                 } else {
                     rule
                 };
-                let finite = input.network.is_some()
+                let finite = self.plan
+                    || input.input_file.is_some()
+                    || input.network.is_some()
                     || (self.approve_for_me && rule == AccessRule::Ask && input.supports_finite());
                 let spec = input.spec(directory.root(), &command.environment, finite);
                 let cwd = spec.cwd.clone();
@@ -1613,11 +1877,12 @@ impl TurnPermissions {
                 } else {
                     None
                 };
-                let scope = self.profile.process_scope(
-                    self.commands.clone(),
-                    directory.root().to_owned(),
-                    access,
-                )?;
+                let root = directory.root().to_owned();
+                let scope = if input.input_file.is_some() {
+                    self.command_input_scope(root)?
+                } else {
+                    self.model_command_scope(root, access)?
+                };
                 let process = scope
                     .prepare(&command.sandbox, spec)
                     .map_err(|error| problem(error.kind, "command_preparation_refused"))?;
@@ -1629,6 +1894,10 @@ impl TurnPermissions {
                 }
                 #[cfg(not(unix))]
                 validate_working_root(&process, directory)?;
+                let capture = process.capture_fingerprint()?;
+                if let Some(source) = &input.input_file {
+                    return self.capture_command_input(admission, source, capture);
+                }
                 let effect = ApprovalEffect::Command {
                     access,
                     command: input.cmd.clone(),
@@ -1647,13 +1916,18 @@ impl TurnPermissions {
                     environment_names: command.environment.keys().cloned().collect(),
                     network: input.network.clone(),
                 };
-                let capture = process.capture_fingerprint()?;
                 (directory, effect, Some(capture), rule)
             }
-            "read_file" | "list_files" | "search_text" | VIEW_IMAGE | CAPTURE_IMAGE_REFERENCE
+            "read_file"
+            | READ_SCOPED_FILE
+            | "list_files"
+            | "search_text"
+            | VIEW_IMAGE
+            | CAPTURE_IMAGE_REFERENCE
                 if admission.grants == self.files =>
             {
                 let request = read_request(invocation)?;
+                let scoped_read = invocation.definition().id.as_str() == READ_SCOPED_FILE;
                 if self.allow_external_file_read
                     && let Some(directory) = &request.directory
                     && directory.as_str() == EXTERNAL_FILE_DIRECTORY
@@ -1663,7 +1937,10 @@ impl TurnPermissions {
                     }
                     if self.primary_review
                         || !self.allow_review
-                        || invocation.definition().id.as_str() != "read_file"
+                        || !matches!(
+                            invocation.definition().id.as_str(),
+                            "read_file" | READ_SCOPED_FILE
+                        )
                     {
                         return Err(denied());
                     }
@@ -1680,7 +1957,9 @@ impl TurnPermissions {
                                 directory: directory.clone(),
                                 root: PathBuf::from("/"),
                                 effect: ApprovalEffect::Read {
-                                    tool: invocation.definition().id.clone(),
+                                    // Approvals identify this same bounded read action even
+                                    // when offered with the narrower tool schema.
+                                    tool: ToolId::new("read_file")?,
                                     relative_path: path,
                                     query: None,
                                 },
@@ -1698,16 +1977,24 @@ impl TurnPermissions {
                 {
                     return Err(denied());
                 }
-                let rule = self
+                let rules = self
                     .profile
                     .directories
                     .get(&directory.spec().id)
-                    .map_or(AccessRule::Deny, |rule| rule.read);
-                if rule == AccessRule::Deny || (self.primary_review && rule != AccessRule::Allow) {
+                    .ok_or_else(denied)?;
+                let rule = rules.read;
+                if rule == AccessRule::Deny
+                    || (self.primary_review && rule != AccessRule::Allow)
+                    || (scoped_read && self.profile.shell_covers_text_read(rules))
+                {
                     return Err(denied());
                 }
                 let effect = ApprovalEffect::Read {
-                    tool: invocation.definition().id.clone(),
+                    tool: if scoped_read {
+                        ToolId::new("read_file")?
+                    } else {
+                        invocation.definition().id.clone()
+                    },
                     relative_path: request.path.unwrap_or_default(),
                     query: request.query,
                 };
@@ -1779,9 +2066,12 @@ impl TurnPermissions {
         let tool = invocation.definition().id.as_str();
         let (request, write) = match tool {
             "write_file" | "edit_file" => (write_request(invocation)?, true),
-            "read_file" | "list_files" | "search_text" | VIEW_IMAGE | CAPTURE_IMAGE_REFERENCE => {
-                (read_request(invocation)?, false)
-            }
+            "read_file"
+            | READ_SCOPED_FILE
+            | "list_files"
+            | "search_text"
+            | VIEW_IMAGE
+            | CAPTURE_IMAGE_REFERENCE => (read_request(invocation)?, false),
             _ => return Ok(None),
         };
         if request
@@ -1792,7 +2082,7 @@ impl TurnPermissions {
             return Ok(None);
         }
         if admission.grants != self.files
-            || (tool != "read_file" && !write)
+            || (!matches!(tool, "read_file" | READ_SCOPED_FILE) && !write)
             || request.path.as_deref() != Some(Path::new(SETTINGS_PATH))
         {
             return Err(denied());
@@ -1809,7 +2099,7 @@ impl TurnPermissions {
             (effect, AccessRule::Ask)
         } else {
             let effect = ApprovalEffect::Read {
-                tool: invocation.definition().id.clone(),
+                tool: ToolId::new("read_file")?,
                 relative_path,
                 query: None,
             };
@@ -1899,7 +2189,7 @@ impl TurnPermissions {
     }
 
     fn external_file_authority(&self, invocation: &Invocation) -> Result<std::fs::File> {
-        let (path, approved) = {
+        let (path, approved, command) = {
             let state = self.state()?;
             let ready = current(&state, invocation.id(), invocation.fingerprint())?;
             let ApprovalEffect::Read {
@@ -1918,9 +2208,18 @@ impl TurnPermissions {
             {
                 return Err(denied());
             }
-            (relative_path.clone(), ready.request.scope)
+            (
+                relative_path.clone(),
+                ready.request.scope,
+                ready.command_capture,
+            )
         };
         let (file, current_scope) = self.open_external_file(&path)?;
+        let current_scope = if let Some(command) = command {
+            Self::command_input_fingerprint(current_scope, command)?
+        } else {
+            current_scope
+        };
         if approved != current_scope {
             return Err(problem(ErrorKind::Conflict, "permission_action_changed"));
         }
@@ -1954,6 +2253,22 @@ impl TurnPermissions {
         })
     }
 
+    fn model_command_scope(&self, root: PathBuf, access: CommandAccess) -> Result<ProcessScope> {
+        if self.plan {
+            if access != CommandAccess::Read || self.profile.unconfined {
+                return Err(denied());
+            }
+            let mut scope = self
+                .profile
+                .command_scope(self.commands.clone(), root, access)?;
+            scope.disk_read &= self.broad_command_reads;
+            Ok(ProcessScope::Confined(scope))
+        } else {
+            self.profile
+                .process_scope(self.commands.clone(), root, access)
+        }
+    }
+
     fn process_authority(self: &Arc<Self>, invocation: &Invocation) -> Result<AuthorizedProcess> {
         if self.profile.hooks_only {
             return Err(denied());
@@ -1962,14 +2277,25 @@ impl TurnPermissions {
         let operation = invocation.id().clone();
         let action = invocation.fingerprint();
         let ready = current(&state, &operation, action)?;
-        let ApprovalEffect::Command { access, finite, .. } = ready.request.effect else {
+        if ready.feeds_command() {
+            drop(state);
+            return self.command_file_authority(invocation);
+        }
+        let ApprovalEffect::Command {
+            access,
+            finite,
+            network,
+            terminal,
+            ..
+        } = &ready.request.effect
+        else {
             return Err(denied());
         };
-        let scope = self.profile.process_scope(
-            self.commands.clone(),
-            ready.request.root.clone(),
-            access,
-        )?;
+        if self.plan && (!finite || network.is_some() || *terminal) {
+            return Err(denied());
+        }
+        let finite = *finite;
+        let scope = self.model_command_scope(ready.request.root.clone(), *access)?;
         let expected = ready.command_capture.ok_or_else(command_unavailable)?;
         let environment = self
             .profile
@@ -1988,7 +2314,7 @@ impl TurnPermissions {
                 let mut state = finite_owner.state()?;
                 current(&state, &finite_operation, action)?;
                 let ready = state.ready.get_mut(&finite_operation).ok_or_else(denied)?;
-                if ready.active.is_some() || ready.approval.is_none() {
+                if ready.active.is_some() || (!finite_owner.plan && ready.approval.is_none()) {
                     return Err(denied());
                 }
                 let running = match (&ready.request.effect, launch) {
@@ -2058,6 +2384,7 @@ impl ToolGate for TurnPermissions {
                 let tool = admission.invocation.definition().id.as_str();
                 if self.profile.hooks_only
                     || self.primary_review
+                    || self.plan
                     || tool != WRITE_STDIN
                     || admission.operation != *admission.invocation.id()
                 {
@@ -2119,7 +2446,11 @@ impl AuthorityValidator for TurnPermissions {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
             if request.selection == self.processes {
-                if self.profile.hooks_only || self.primary_review || self.binding.get().is_none() {
+                if self.profile.hooks_only
+                    || self.primary_review
+                    || self.plan
+                    || self.binding.get().is_none()
+                {
                     return Err(denied());
                 }
                 return Ok(());
@@ -2128,6 +2459,7 @@ impl AuthorityValidator for TurnPermissions {
                 let state = self.state()?;
                 let ready = current(&state, &request.operation, request.action)?;
                 let selection = match ready.request.effect {
+                    ApprovalEffect::Read { .. } if ready.feeds_command() => &self.commands,
                     ApprovalEffect::Read { .. } | ApprovalEffect::Write { .. } => &self.files,
                     ApprovalEffect::Command { .. } => &self.commands,
                 };
@@ -2327,6 +2659,7 @@ mod full_access_tests {
         let restricted = profile.capture(scope.clone());
         let value = serde_json::to_value(&restricted).unwrap();
         assert!(value.get("mode").is_none());
+        assert!(value.get("plan").is_none());
         let old: PermissionCapture = serde_json::from_value(value).unwrap();
         assert_eq!(old, restricted);
         assert!(
@@ -2355,6 +2688,47 @@ mod full_access_tests {
             "permission_mode_unavailable"
         );
         profile.validate_capture(&restricted).unwrap();
+    }
+
+    #[test]
+    fn plan_captures_narrow_full_access_and_preserve_the_scope_on_recapture() {
+        let root = tempfile::tempdir().unwrap();
+        let mut profile = profile(&root.path().canonicalize().unwrap());
+        // Exercise capture identity without a platform executor.
+        profile.allow_full_access = true;
+        let profile = Arc::new(profile);
+        let capture = profile
+            .capture_plan(ScopeId::new("input").unwrap(), PermissionMode::FullAccess)
+            .unwrap();
+        assert!(capture.plan);
+        assert!(!capture.command_network);
+        assert!(!capture.external_file_read);
+        assert!(!capture.context.contains("Internet access is available"));
+        let next = ScopeId::new("continuation").unwrap();
+        assert_eq!(
+            profile.recapture(&capture, next.clone()).unwrap(),
+            profile
+                .capture_plan(next, PermissionMode::FullAccess)
+                .unwrap()
+        );
+        let turn = profile
+            .prepare_scope(
+                &capture,
+                (
+                    &SessionId::new("chat").unwrap(),
+                    &TurnId::new("turn").unwrap(),
+                ),
+                Arc::new(SqliteStore::open_in_memory().unwrap()),
+                true,
+                false,
+                None,
+            )
+            .unwrap();
+        assert!(Arc::ptr_eq(&profile, &turn.profile));
+        assert!(turn.state().unwrap().read_only);
+        let mut broadened = capture;
+        broadened.command_network = true;
+        assert!(profile.validate_capture(&broadened).is_err());
     }
 
     #[test]

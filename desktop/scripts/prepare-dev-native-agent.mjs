@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import fx from "../src/fx-extension.json" with { type: "json" };
+import fx from "../../extensions/desktop-fx/extension.json" with { type: "json" };
 import { stageNativeAgent } from "./native-agent-package.mjs";
 
 import { stageBundledPrograms } from "./bundled-programs.mjs";

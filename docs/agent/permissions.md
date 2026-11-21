@@ -21,17 +21,19 @@ ask “Run the tests and fix what fails.” The composer shows the current mode.
 - Desktop reads your login shell's environment from your home folder so
   commands can find your usual tools. If shell startup stalls, Desktop uses
   its own environment and opens chat.
-- Commands can read elsewhere on your computer, except Grida's own data and
-  saved credentials. They can write only in the project and the system's
-  temporary folder. Ordinary commands have no direct internet access.
+- In Desktop's default profile, Act and Plan commands can read elsewhere on
+  your computer, except protected locations such as Grida's own data and
+  saved credentials. Act commands can write to the project and temporary
+  storage. Ordinary commands have no direct internet access.
 - Existing version-control and agent settings folders, such as `.git`, stay
   read-only. The agent can start a new repository but cannot commit to an
   existing one, so run commits yourself.
-- With the **Plan** badge on, the agent only reads and asks questions; it
-  does not run commands or change files.
-- The agent's own settings file is the exception to working without asking:
-  it can read the file, but every change to it asks for your approval, and
-  commands cannot reach it. [Change agent settings](./settings.md#ask-the-agent)
+- With the **Plan** badge on, the agent can investigate with confined
+  commands and ask questions. Each command finishes within its call, runs
+  offline, and can write only to private temporary storage.
+- The workspace's agent settings file stays in protected storage. Edit the
+  file while Desktop is closed to change the context limit for future
+  messages. [Change agent settings](./settings.md#edit-the-file-yourself)
 
 ## Choose who reviews extra access
 
@@ -46,12 +48,11 @@ A choice is saved for that chat and applies to messages accepted after the
 change. If Auto becomes unavailable for a chat, the chat switches to
 **Ask for approval**. Select **Auto** again when it becomes available.
 
-For example, ask the agent to read a particular text file outside the project
-and include its absolute path. The file tool can request one read of that
-file and may return its contents to the chat’s model. A replacement file needs
-a fresh decision. Protected locations,
-symbolic links and hard-linked files cannot use this route. Editing the
-agent's settings still requires your own approval.
+Reading an ordinary file outside the project uses Desktop's existing disk-read
+grant. A narrower launch profile can separately allow a request for one
+outside file. That approval covers the exact file and verified version.
+Replacing or changing the file requires a fresh decision. The one-file
+route excludes protected locations, symbolic links, and hard-linked files.
 
 On supported macOS and Linux builds a finite command may also request a connection to
 one public hostname and port. For example, name the HTTPS URL when asking
@@ -94,7 +95,9 @@ requires a turn with Full access.
 
 Choose **Auto** or **Ask for approval** to restore sandboxed access for
 subsequent work.
-**Plan** continues to withhold commands and file changes in every mode.
+**Plan** uses the launch profile's read scope and keeps commands confined,
+offline, and read-only apart from private temporary storage. This applies
+even when the chat selects **Full access**.
 Process output, cancellation and cleanup reporting remain available in Full
 access, but an unconfined program can escape normal process-group cleanup;
 Grida does not promise isolation from hostile same-user code.

@@ -1,0 +1,5 @@
+{
+  "id": "browser",
+  "description": "Open background pages and inspect, navigate, or interact with an exact authorized web page.",
+  "skills": ["browser"]
+}

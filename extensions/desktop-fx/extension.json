@@ -1,7 +1,9 @@
 {
+  "id": "desktop-fx",
+  "description": "Plan and run Grida FX workflows, adapt examples, and inspect saved runs.",
+  "skills": ["desktop-fx"],
   "package": "@grida/fx",
   "command": "grida-fx",
-  "skill": "desktop-fx",
   "resourceDirectory": "bundled-programs",
   "licenseFile": "FX-LICENSE",
   "versionFile": "fx-version",

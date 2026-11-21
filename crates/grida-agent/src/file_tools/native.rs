@@ -70,7 +70,7 @@ impl FileTools {
         if let Some(open) = &self.external_file
             && directory.is_some_and(|id| id.as_str() == EXTERNAL_FILE_DIRECTORY)
         {
-            if !matches!(operation, Operation::Read) {
+            if !matches!(operation, Operation::Read | Operation::ReadScoped) {
                 return Err(problem(ErrorKind::Unavailable, "permission_denied"));
             }
             let mut file = open(&budget.invocation)?;
@@ -81,7 +81,7 @@ impl FileTools {
             return Ok(outcome);
         }
         let outcome = match operation {
-            Operation::Read => {
+            Operation::Read | Operation::ReadScoped => {
                 let mut file = self.open(directory, path, Kind::File, budget)?;
                 read_text(&mut file, budget)
             }

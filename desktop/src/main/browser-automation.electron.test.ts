@@ -87,7 +87,7 @@ async function registerPackagedPlan(
       name: "tool_search",
       arguments: { query: "plan an FX workflow", source: "desktop-fx" },
     },
-    { name: "read_skill", arguments: { name: "desktop-fx" } },
+    { name: "read_skill", arguments: { name: "desktop-fx/desktop-fx" } },
     {
       name: "exec_command",
       arguments: {
@@ -146,6 +146,14 @@ async function registerPackagedPlan(
     await chat.close();
   }
   expect(requests).toHaveLength(commands.length + 1);
+  for (const owner of ["browser", "desktop-fx"]) {
+    const readme = await fs.readFile(
+      new URL(`../../../extensions/${owner}/README.md`, import.meta.url),
+      "utf8"
+    );
+    const [heading] = readme.split("\n");
+    expect(JSON.stringify(requests)).not.toContain(heading);
+  }
   for (const [index, operation] of commands.entries())
     expect(requests[index].tools.map(({ name }) => name)).toContain(
       operation.name
@@ -164,7 +172,11 @@ async function registerPackagedPlan(
       return result;
     });
   expect(search.structured.matches).toEqual([
-    expect.objectContaining({ kind: "skill", name: "desktop-fx" }),
+    expect.objectContaining({
+      kind: "skill",
+      source: "desktop-fx",
+      name: "desktop-fx/desktop-fx",
+    }),
   ]);
   expect(JSON.stringify(skill)).toContain(
     "grida-fx plan <workflow> --check --register --json"

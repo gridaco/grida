@@ -22,7 +22,12 @@ type Source<Scope> = {
 export class NativeDesktopToolSources<Scope> {
   private readonly sources = new Map<string, Source<Scope>>();
 
+  constructor(private readonly bundledIds: ReadonlySet<string>) {}
+
   register({ id, description, tools }: DesktopToolSource): { close(): void } {
+    // A skill-only package owns its ID even when it contributes no tools.
+    if (this.bundledIds.has(id))
+      throw new Error("native_desktop_tool_source_invalid");
     const named = tools.map((tool) => {
       const name = `desktop_${id.replaceAll("-", "_")}__${tool.definition.name}`;
       return {

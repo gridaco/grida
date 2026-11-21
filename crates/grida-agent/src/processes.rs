@@ -16,8 +16,8 @@ mod tools;
 
 pub use tools::ProcessTools;
 pub(crate) use tools::{
-    AuthorizedProcess, EXEC_COMMAND, ExecArguments, FiniteCommand, FiniteLaunch, ProcessScope,
-    SpawnFiniteCommand, WRITE_STDIN,
+    AuthorizedProcess, CommandFileInput, CommandToolMode, EXEC_COMMAND, ExecArguments,
+    FiniteCommand, FiniteLaunch, ProcessScope, ScopedCommandInput, SpawnFiniteCommand, WRITE_STDIN,
 };
 
 use crate::command::{cleanup_verified, summarize};

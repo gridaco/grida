@@ -1,9 +1,9 @@
 ---
 name: desktop-fx
-description: Work with Grida FX in a Desktop workspace. Adapt workflow examples, plan and run asset workflows, inspect saved runs, and present results.
+description: Work with Grida FX in a Desktop workspace. Adapt workflow examples, plan and run asset workflows, inspect saved runs, and resolve their viewer URLs.
 ---
 
-Desktop puts the bundled `grida-fx` executable on the command tool's `PATH`.
+Desktop puts its bundled `grida-fx` executable on `PATH`.
 The Grida CLI exposes the same engine as `grida fx`. Where the docs say
 `grida fx plan`, run `grida-fx plan` in Desktop with the same arguments.
 Check that `command -v grida-fx` resolves in the first directory on `PATH`,
@@ -29,7 +29,7 @@ Downloads and live provider calls require Full access. Confirm the user's route
 and spending ceiling or subscription use before live generation. Use
 `grida-fx doctor` to check provider setup.
 
-## Present an authored workflow's plan or saved run
+## Register a plan or saved run
 
 When a viewer is useful, use `grida-fx plan <workflow> --check --register --json`
 or `grida-fx inspect <run> --register --json`. Registration returns the entry's
@@ -38,17 +38,9 @@ relative `route`. Resolve it against the running service URL returned by
 When the user wants the viewer started, run `grida-fx start --json` in the
 project with Full access and retain its foreground process.
 
-When the workbench offers URL presentation, use `workbench_show` with
-`{"target":{"kind":"url","url":"<viewer URL>"}}`. Discover deferred workbench
-and browser tools with `tool_search` before invoking them. On an older host,
-use `surface_open` if its offered schema accepts a URL.
-
-Pass the returned tab ID to `browser_snapshot` as a workbench target. If the
-tab ID is missing, find it with `workbench_list_tabs`, or with
-`surface_list_open` if an older host offers browser tab inventory. Use
-`browser_evaluate` with the current document ID to read the viewer's context.
-Verify the subject and selection before using its presentation API or telling
-the user what appeared.
+A registered route identifies a plan or saved run on that project's current
+service. Verify the viewer's subject and selection before using its presentation
+API. A restarted service or a different project requires a fresh binding.
 
 ## Single image
 

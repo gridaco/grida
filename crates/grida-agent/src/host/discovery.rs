@@ -9,7 +9,7 @@ use crate::tool_host::{
 use agent_kit_core::inference::ToolOffer;
 use agent_kit_core::turn::TurnBinding;
 use agent_kit_core::{BindingId, BoxFuture, Error, ErrorKind, Result, ToolId};
-use grida_agent_master::discovery::{Catalog, SkillSource, TOOL, ToolSource};
+use grida_agent_master::discovery::{Catalog, Extension, SkillSource, TOOL, ToolSource};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -35,9 +35,13 @@ pub(super) fn bind(
     let skills = skills
         .into_iter()
         .flat_map(SkillListing::extension_skills)
-        .map(|(name, description)| SkillSource {
-            name: name.into(),
-            description: description.into(),
+        .map(|skill| SkillSource {
+            name: skill.name.into(),
+            description: skill.description.into(),
+            extension: skill.owner.map(|owner| Extension {
+                name: owner.into(),
+                description: skill.summary.unwrap_or(skill.description).into(),
+            }),
         })
         .collect::<Vec<_>>();
     if offers.is_empty() && skills.is_empty() {

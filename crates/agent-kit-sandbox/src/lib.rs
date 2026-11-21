@@ -525,6 +525,31 @@ impl PreparedProcess {
         }
     }
 
+    /// Supply bytes authorized by the host after capture, then run the exact
+    /// prepared command to completion. The caller binds the input to its own
+    /// admission barrier because these bytes are outside the capture fingerprint.
+    ///
+    /// Requires offline confinement, no broad filesystem read or write grant,
+    /// and initially empty fixed stdin. The fixed input limit and the usual
+    /// launch checks still apply. Private temporary storage stays available.
+    pub fn spawn_with_input(
+        self,
+        input: Vec<u8>,
+        cancellation: CancellationToken,
+    ) -> Result<RunningProcess> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            Ok(RunningProcess {
+                native: self.native.spawn_with_input(input, cancellation)?,
+            })
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (input, cancellation);
+            Err(unavailable())
+        }
+    }
+
     /// Run one finite, confined command with access to the host's
     /// SOCKS5 broker. The socket's real location must be under a mandatory
     /// read/write denial. Seatbelt grants only that socket. Bubblewrap exposes

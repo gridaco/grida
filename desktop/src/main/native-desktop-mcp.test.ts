@@ -419,7 +419,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         },
         {
           status: "succeeded",
-          structured: { active: "/poster.svg", open: ["/poster.svg"] },
+          structured: {
+            activeTabId: expect.any(String),
+            tabs: [
+              { kind: "file", tabId: expect.any(String), path: "poster.svg" },
+            ],
+            truncated: false,
+          },
         },
       ]);
       expect(bodies.at(-1)).toContain("Exact local result");

@@ -351,10 +351,16 @@ async fn default_denies_network_and_outside_writes_full_access_allows_both_and_c
             assert_eq!(result["structured"]["backend"], "unconfined", "{result}");
             Reply::Finished("Observed the unconfined result.")
         })),
-        tool(
-            "read_file",
-            json!({"directory":"filesystem","path":outside.strip_prefix("/").unwrap()}),
-        ),
+        Reply::Choose(Box::new({
+            let outside = outside.clone();
+            move |request| {
+                assert!(!offered(request, "read_file"));
+                tool(
+                    "exec_command",
+                    json!({"access":"read","cmd":format!("/bin/cat '{}'", outside.display())}),
+                )
+            }
+        })),
         Reply::Choose(Box::new(|request| {
             let result = last_tool(request);
             assert_eq!(result["status"], "succeeded", "{result}");
@@ -725,44 +731,78 @@ async fn model_created_worker_inherits_full_access_for_its_exact_assignment() {
 }
 
 #[tokio::test]
-#[ignore = "requires the current native helper"]
-async fn full_access_does_not_enable_mutation_or_command_tools_in_plan() {
+#[ignore = "requires the current native helper and OS confinement"]
+async fn full_access_plan_uses_a_confined_read_only_shell() {
     let fixture = fixture(true);
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["initialPermissionMode"] = json!("full_access");
+    profile["directories"][0]["commandRead"] = json!("allow");
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
-    let endpoint = Endpoint::start(vec![Reply::Choose(Box::new(|request| {
-        assert!(offered(request, "read_file"));
-        for tool in [
-            "exec_command",
-            "write_stdin",
-            "write_file",
-            "edit_file",
-            "spawn_agent",
-        ] {
-            assert!(!offered(request, tool), "Plan offered {tool}");
-        }
-        Reply::Finished("The investigation requires no mutation.")
-    }))])
+    fs::write(fixture.primary.join("note"), "permitted plan input").unwrap();
+
+    let endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            assert!(offered(request, "exec_command"));
+            for tool in [
+                "read_file",
+                "list_files",
+                "search_text",
+                "write_stdin",
+                "write_file",
+                "edit_file",
+                "spawn_agent",
+            ] {
+                assert!(!offered(request, tool), "Plan offered {tool}");
+            }
+            tool(
+                "exec_command",
+                json!({
+                    "cmd":"if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > ../extra/plan-outside) 2>/dev/null; then exit 43; fi; /bin/cat note",
+                }),
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            let result = last_tool(request);
+            #[cfg(target_os = "macos")]
+            assert_eq!(result["structured"]["backend"], "seatbelt", "{result}");
+            #[cfg(target_os = "linux")]
+            assert_eq!(result["structured"]["backend"], "bubblewrap", "{result}");
+            assert_eq!(result["structured"]["completion"]["code"], 0, "{result}");
+            assert!(
+                result.to_string().contains("permitted plan input"),
+                "{result}"
+            );
+            Reply::Finished("The investigation requires no mutation.")
+        })),
+    ])
     .await;
-    let output = fixture
-        .process(&endpoint.url, "run")
-        .args([
-            "--mode",
-            "plan",
-            "--prompt",
-            "Inspect the available resources.",
-        ])
-        .arg("--cwd")
-        .arg(&fixture.primary)
-        .output()
-        .await
-        .unwrap();
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args([
+                "--mode",
+                "plan",
+                "--prompt",
+                "Inspect the available resources.",
+            ])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    assert_eq!(
+        fs::read_to_string(fixture.primary.join("note")).unwrap(),
+        "permitted plan input"
+    );
+    assert!(!fixture.extra.join("plan-outside").exists());
     endpoint.done().await;
 }
 

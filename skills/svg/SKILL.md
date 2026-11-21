@@ -1,51 +1,24 @@
 ---
 name: svg
-description: Author and edit `.svg` files in a Grida editor session. Inspect an attached SVG selection and apply supported editor edits. Use when creating or modifying an SVG document.
+description: Author and edit SVG documents, preserve their geometry and styling, and interpret SVG selections.
 ---
 
-When you operate on `.svg` files inside a Grida editor session:
+A standalone SVG is renderable when it parses, has the intended dimensions
+or viewBox, and contains a meaningful visible composition. Validate the SVG
+after each structural change. When it belongs to a `.canvas` board or slides
+deck, it is a document inside the bundle. The manifest identifies which SVGs
+belong to that board or deck.
 
-- Writes are reflected on the canvas instantly _if_ the human is currently
-  viewing that document. Treat the canvas as a live render of what you wrote.
-- You may create and edit non-SVG files (e.g. `/notes/draft.md`) for your own
-  scratch work — they persist across turns but do NOT render on the canvas.
-- On `edit_file` reason="parse_error", your output broke the SVG. Re-read and
-  fix.
+## Working with a selection
 
-## Work with the user's selection
-
-- When the user refers to their SVG selection, use `tool_search` to find
-  `svg_inspect_selection`. Its paths and point ordinals describe the captured
-  live editor revision. Follow `nextCursor` when the full selection matters.
-- For an object selection, pass the inspected revision to
-  `svg_set_selection_opacity` with a value from 0 to 1. The editor applies one
-  undoable change. Tell the user when the result still needs to be saved.
-- When the live tools offer text read and replace, use the revision returned by
-  `svg_read_selected_text`. If a tool reports a stale selection, ask the user
-  to select the targets again and send a new message.
-
-## Show the result
-
-- When the workbench offers presentation, use `workbench_show` with a
-  workspace file target such as `{"target":{"kind":"file","path":"/poster.svg"}}`.
-  Discover deferred workbench tools with `tool_search` before invoking them.
-  On an older host that offers `surface_open`, follow that tool's schema.
-- For a new standalone SVG, write a meaningful valid first frame with the
-  intended dimensions and basic visible composition. Show it at that
-  checkpoint, then continue adding and refining details while the user can
-  watch.
-- Never open an empty or invalid SVG. For an existing primary SVG, open it
-  before substantial edits.
-- Open a standalone SVG by its file path. When the SVG belongs to a `.canvas`
-  board or deck, the board/deck skill owns presentation: open the `.canvas`
-  bundle directory once its manifest references a valid document, never the
-  internal SVG or `.canvas.json` manifest.
-- If the standalone SVG or `.canvas` bundle is already mounted at the
-  dedicated file surface's root, keep the current view open.
-- Continue artifact work after the reveal request. Show it again only when the
-  user asks or the primary artifact changes.
-- Use `workbench_list_tabs` only when the current tabs matter to the task. On
-  an older host, use `surface_list_open` for this read when offered.
+- Interpret element paths and point ordinals against the editor revision in
+  which the selection was captured. For edits to selected text or objects,
+  use the matching revision. If the selection has changed, ask for a fresh
+  selection. An editor edit may be undoable and still need saving.
+- A board can have multiple pins referencing the same SVG. The pin's ID and
+  placement identify a particular instance. Change the source file for an
+  element-level edit and account for the other instances using that file.
+- SVG opacity ranges from 0 (transparent) to 1 (opaque).
 
 ## SVG style
 

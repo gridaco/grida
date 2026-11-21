@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
 import { ProtectedRoots } from "@grida/daemon/server";
-import definition from "../fx-extension.json";
+import definition from "../../../extensions/desktop-fx/extension.json";
 import type { DesktopBrowserTools } from "./desktop-browser-tools";
 import { FxViewer } from "./fx-viewer";
 import { FxWorkspaceFiles } from "./fx-workspace-files";
@@ -100,7 +100,7 @@ export class FxExtension {
       const version = (await fs.readFile(versionPath, "utf8")).trim();
       if (!/^\d+\.\d+\.\d+$/.test(version))
         throw new Error("bundled_program_version_invalid");
-      return { ...pin, version, skill: definition.skill };
+      return { ...pin, version, extension: definition.id };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
       throw error;

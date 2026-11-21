@@ -346,10 +346,11 @@ impl Host {
         self
     }
 
-    pub(super) fn capture_permissions(
+    pub(super) fn capture_workspace_permissions(
         &self,
         session: &SessionView,
         input: &ChangeId,
+        regime: grida_agent_master::OperatingRegime,
     ) -> Result<Option<PermissionCapture>> {
         let Some(profile) = &self.permissions else {
             return Ok(None);
@@ -357,9 +358,10 @@ impl Host {
         if !profile.matches_primary(&session_configuration(session)?.cwd) {
             return Ok(None);
         }
-        Ok(Some(profile.capture_mode(
+        Ok(Some(profile.capture_workspace(
             ScopeId::new(input.as_str())?,
             self.selected_permission_mode(session)?,
+            regime,
         )?))
     }
 

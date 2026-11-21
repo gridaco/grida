@@ -36,11 +36,11 @@ canonical location. The folder chip shows no size or media preview. Staging
 does not list entries, copy bytes, archive contents, register a workspace or
 grant access. The same one-attachment limit applies to files and folders.
 
-File tools can inspect the referenced folder only within their existing
-permitted roots. Referencing an outside folder does not grant recursive read
-access. Plan cannot inspect it with commands; Act keeps its existing command
-rights. Protected directories and ancestors containing them are refused,
-including through symbolic links. A queued or saved message retains the
+File tools and commands can inspect the referenced folder within their
+existing scope. Plan commands stay within their confined read scope. A
+reference to an outside folder grants no recursive read or command access.
+Protected directories and ancestors containing them are refused, including
+through symbolic links. A queued or saved message retains the
 folder reference, and reopening it starts no inspection or model request.
 Older Desktop builds without the directory-reference capability refuse the
 drop before effects, preserving the draft and any existing attachment.
@@ -77,13 +77,14 @@ drop before effects, preserving the draft and any existing attachment.
    - Expected: one folder chip with its name, no byte size and no media
      preview. No directory entries or contents are staged in the chat.
 2. Send a request to list or search that subfolder.
-   - Expected: permitted project file tools can inspect it using its path.
-     The folder is not copied into chat storage or opened as another project.
-3. Drop a folder outside the project, select Plan and ask to inspect it.
-   - Expected: the reference identifies the folder, but file tools cannot use
-     it to escape their granted roots and command tools are unavailable.
-     Repeat in Act: command access follows the existing profile, with no new
-     permission granted by the attachment.
+   - Expected: the agent can inspect it using its path and existing
+     permissions. The folder is not copied into chat storage or opened as
+     another project.
+3. Drop a folder outside the project and outside any granted read scope.
+   Select Plan and ask to inspect it.
+   - Expected: the reference identifies the folder. A file tool or command
+     cannot use the attachment to escape its existing read scope. Repeat in
+     Act and verify that commands follow the existing profile.
 4. Queue a folder-reference message while a turn is running, then reopen the
    chat and restart Desktop before the queued message runs.
    - Expected: the single accepted reference retains the same path and folder

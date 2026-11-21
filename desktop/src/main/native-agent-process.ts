@@ -181,7 +181,7 @@ export class NativeAgentProcess {
     number | string,
     AbortController
   >();
-  private readonly editorEndpoints = new NativeEditorSurfaceEndpoints();
+  private readonly editorEndpoints: NativeEditorSurfaceEndpoints;
   private readonly buffer = Buffer.allocUnsafe(FRAME_LIMIT);
   private readonly decoder = new TextDecoder("utf-8", { fatal: true });
   private readonly exited: Promise<{
@@ -246,6 +246,7 @@ export class NativeAgentProcess {
   private editorBrowserMcp = false;
   private editorTools = false;
   private editorToolSources = false;
+  private editorWorkbenchPaths = false;
   private editorContext = false;
   private editorToolContext = false;
   private messageContext = false;
@@ -274,8 +275,10 @@ export class NativeAgentProcess {
     private readonly imagePlacement?: NativeImagePlacement,
     private readonly reviewImageReference?: ImageReferenceReview,
     private readonly gatewayJobBilling?: NativeAgentLaunch["gatewayJobBilling"],
-    private readonly providerRoutes?: NativeProviderRoutes
+    private readonly providerRoutes?: NativeProviderRoutes,
+    workspaceRoot?: string
   ) {
+    this.editorEndpoints = new NativeEditorSurfaceEndpoints(workspaceRoot);
     if (permissions) {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
@@ -795,7 +798,8 @@ export class NativeAgentProcess {
       imagePlacement,
       reviewImageReference,
       options.gatewayJobBilling,
-      providerRoutes
+      providerRoutes,
+      options.workspace?.primary.path
     );
     try {
       const response = object(
@@ -850,6 +854,9 @@ export class NativeAgentProcess {
                   [NativeDesktopTools.capability]: 1,
                   [NativeDesktopTools.browserCapability]: 1,
                   [NativeDesktopTools.sourcesCapability]: 1,
+                  ...(options.workspace && {
+                    [NativeDesktopTools.workbenchPathsCapability]: 1,
+                  }),
                   [NativeEditorSurfaceEndpoints.toolContextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
@@ -1035,6 +1042,10 @@ export class NativeAgentProcess {
       processOwner.editorToolSources =
         processOwner.editorTools &&
         advertised?.[NativeDesktopTools.sourcesCapability] === 1;
+      processOwner.editorWorkbenchPaths =
+        processOwner.editorToolSources &&
+        options.workspace !== undefined &&
+        advertised?.[NativeDesktopTools.workbenchPathsCapability] === 1;
       processOwner.editorToolContext =
         processOwner.editorTools &&
         advertised?.[NativeEditorSurfaceEndpoints.toolContextCapability] === 1;
@@ -1641,20 +1652,23 @@ export class NativeAgentProcess {
                 message.params,
                 signal,
                 this.editorBrowserMcp,
-                this.editorToolSources
+                this.editorToolSources,
+                this.editorWorkbenchPaths
               ),
             () =>
               this.editorEndpoints.desktopToolsBusy(
                 message.params,
                 this.editorBrowserMcp,
-                this.editorToolSources
+                this.editorToolSources,
+                this.editorWorkbenchPaths
               ),
             (reply) =>
               this.editorEndpoints.desktopToolsReplyGuard(
                 reply,
                 message.params,
                 this.editorBrowserMcp,
-                this.editorToolSources
+                this.editorToolSources,
+                this.editorWorkbenchPaths
               )
           );
           return;

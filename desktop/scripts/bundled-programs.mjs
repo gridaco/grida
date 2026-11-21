@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import definition from "../src/fx-extension.json" with { type: "json" };
+import definition from "../../extensions/desktop-fx/extension.json" with { type: "json" };
 import { readExecutable } from "./native-agent-package.mjs";
 
 const require = createRequire(import.meta.url);

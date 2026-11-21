@@ -27,6 +27,31 @@ pub struct ToolSource {
 pub struct SkillSource {
     pub name: String,
     pub description: String,
+    /// Older accepted listings identified a skill's extension by the skill name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extension: Option<Extension>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Extension {
+    pub name: String,
+    pub description: String,
+}
+
+impl SkillSource {
+    fn summary(&self) -> (&str, &str) {
+        match &self.extension {
+            Some(extension) => (&extension.name, &extension.description),
+            None => (&self.name, &self.description),
+        }
+    }
+
+    fn read_name(&self) -> String {
+        match &self.extension {
+            Some(extension) => format!("{}/{}", extension.name, self.name),
+            None => self.name.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -58,6 +83,8 @@ enum Match {
     Skill {
         name: String,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
     },
 }
 
@@ -70,7 +97,8 @@ impl Match {
     fn source(&self) -> &str {
         match self {
             Self::Tool { source, .. } => source,
-            Self::Extension { name, .. } | Self::Skill { name, .. } => name,
+            Self::Skill { name, source, .. } => source.as_deref().unwrap_or(name),
+            Self::Extension { name, .. } => name,
         }
     }
 }
@@ -128,39 +156,53 @@ impl Catalog {
                             source: source.name.clone(),
                             name: tool.id.clone(),
                             revision: tool.version,
-                            description: tool
-                                .description
-                                .chars()
-                                .take(MAX_SOURCE_DESCRIPTION)
-                                .collect(),
+                            description: preview(&tool.description),
                         },
                     ));
                 }
             }
         }
         for skill in &self.skills {
-            if request.includes(&skill.name) {
-                let exact = request.matches_name(&skill.name);
-                let relevance = named_score(&query, &skill.name, &skill.description);
-                if exact || relevance > 0 {
-                    matches.push((
-                        (exact, relevance),
-                        skill.name.as_str(),
-                        Match::Skill {
-                            name: skill.name.clone(),
-                            description: skill
-                                .description
-                                .chars()
-                                .take(MAX_SOURCE_DESCRIPTION)
-                                .collect(),
-                        },
-                    ));
-                }
+            let (source, summary) = skill.summary();
+            if !request.includes(source) {
+                continue;
+            }
+            let name = skill.read_name();
+            // A request for the whole package should also find its siblings
+            // when a skill happens to share the package name.
+            let package_query = request.source.is_some()
+                && skill.extension.is_some()
+                && request.matches_name(source);
+            let exact = request.matches_name(&name)
+                || (!package_query && request.matches_name(&skill.name));
+            let relevance = named_score(&query, &skill.name, &skill.description)
+                .max(score(&query, &[source, summary]));
+            if exact || relevance > 0 {
+                matches.push((
+                    (exact, relevance),
+                    skill.name.as_str(),
+                    Match::Skill {
+                        name,
+                        description: preview(&skill.description),
+                        source: skill
+                            .extension
+                            .as_ref()
+                            .map(|extension| extension.name.clone()),
+                    },
+                ));
             }
         }
-        matches.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(right.1)));
-        let exact = matches.first().is_some_and(|((exact, _), _, _)| *exact);
-        if !exact && request.source.is_none() {
+        matches.sort_by(|left, right| {
+            right
+                .0
+                .cmp(&left.0)
+                .then_with(|| left.1.cmp(right.1))
+                .then_with(|| left.2.source().cmp(right.2.source()))
+        });
+        if matches.first().is_some_and(|((exact, _), _, _)| *exact) {
+            matches.retain(|((exact, _), _, _)| *exact);
+        }
+        if request.source.is_none() {
             let sources: BTreeSet<_> = matches.iter().map(|(_, _, entry)| entry.source()).collect();
             if sources.len() > 1 {
                 let summaries = self.summaries();
@@ -169,10 +211,7 @@ impl Catalog {
                 let mut sources: Vec<_> = sources
                     .into_iter()
                     .map(|name| {
-                        let description: String = summaries[name]
-                            .chars()
-                            .take(MAX_SOURCE_DESCRIPTION)
-                            .collect();
+                        let description = preview(summaries[name]);
                         let score = named_score(&query, name, &description);
                         (name, description, score)
                     })
@@ -193,7 +232,6 @@ impl Catalog {
         outcome(
             matches
                 .into_iter()
-                .take_while(|((matched, _), _, _)| *matched == exact)
                 .take(MAX_RESULTS)
                 .map(|(_, _, entry)| entry)
                 .collect(),
@@ -209,7 +247,7 @@ impl Catalog {
             instructions.push_str(" Available extensions:");
         }
         for (name, description) in summaries {
-            let description: String = description.chars().take(MAX_SOURCE_DESCRIPTION).collect();
+            let description = preview(description);
             instructions.push_str(&format!("\n- {name}: {description}"));
         }
         instructions
@@ -218,7 +256,7 @@ impl Catalog {
     fn summaries(&self) -> BTreeMap<&str, &str> {
         self.skills
             .iter()
-            .map(|source| (source.name.as_str(), source.description.as_str()))
+            .map(SkillSource::summary)
             .chain(
                 self.tools
                     .iter()
@@ -272,6 +310,22 @@ impl Catalog {
             }
         }
     }
+}
+
+// A control character can expand to six bytes in JSON. Render each preview
+// on one line so five full matches stay within the tool's reply budget.
+fn preview(description: &str) -> String {
+    description
+        .chars()
+        .take(MAX_SOURCE_DESCRIPTION)
+        .map(|c| {
+            if c.is_control() || matches!(c, '\u{2028}' | '\u{2029}') {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 fn outcome(matches: Vec<Match>) -> ToolOutcome {
@@ -362,8 +416,91 @@ mod tests {
             vec![SkillSource {
                 name: "desktop-fx".into(),
                 description: "Plan and run FX workflows.".into(),
+                extension: None,
             }],
         )
+    }
+
+    #[test]
+    fn duplicate_skill_names_are_discovered_under_their_own_extensions() {
+        let alpha = "Inspect a design document.";
+        let beta = "Inspect a web page.";
+        let catalog = Catalog::new(
+            vec![ToolSource {
+                name: "alpha".into(),
+                description: alpha.into(),
+                offers: vec![offer("alpha_inventory", "List document layers.")],
+            }],
+            [
+                ("alpha", alpha, "inspect", "Inspect document layers."),
+                ("alpha", alpha, "alpha", "Use the design document workflow."),
+                ("beta", beta, "inspect", "Inspect page structure."),
+            ]
+            .into_iter()
+            .map(|(owner, summary, name, description)| SkillSource {
+                extension: Some(Extension {
+                    name: owner.into(),
+                    description: summary.into(),
+                }),
+                name: name.into(),
+                description: description.into(),
+            })
+            .collect(),
+        );
+
+        assert_eq!(
+            catalog.instructions().lines().skip(1).collect::<Vec<_>>(),
+            [
+                "- alpha: Inspect a design document.",
+                "- beta: Inspect a web page."
+            ],
+        );
+        let ambiguous = catalog
+            .search(&json!({"query":"inspect"}))
+            .structured
+            .unwrap();
+        assert_eq!(
+            ambiguous["matches"],
+            json!([
+                {"kind":"extension","name":"alpha","description":"Inspect a design document."},
+                {"kind":"extension","name":"beta","description":"Inspect a web page."},
+            ])
+        );
+        let selected = catalog
+            .search(&json!({"query":"alpha","source":"alpha"}))
+            .structured
+            .unwrap();
+        let names: BTreeSet<_> = selected["matches"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            BTreeSet::from(["alpha_inventory", "alpha/alpha", "alpha/inspect"])
+        );
+        let qualified = catalog
+            .search(&json!({"query":"beta/inspect"}))
+            .structured
+            .unwrap();
+        assert_eq!(qualified["matches"].as_array().unwrap().len(), 1);
+        assert_eq!(qualified["matches"][0]["name"], "beta/inspect");
+        for (source, expected) in [
+            ("alpha", "Inspect document layers."),
+            ("beta", "Inspect page structure."),
+        ] {
+            let result = catalog
+                .search(&json!({"source":source, "query":"inspect"}))
+                .structured
+                .unwrap();
+            let matches = result["matches"].as_array().unwrap();
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0]["kind"], "skill");
+            assert_eq!(matches[0]["source"], source);
+            assert_eq!(matches[0]["name"], format!("{source}/inspect"));
+            assert_eq!(matches[0]["description"], expected);
+        }
     }
 
     #[test]
@@ -378,10 +515,12 @@ mod tests {
                 SkillSource {
                     name: "desktop-fx".into(),
                     description: "界".repeat(MAX_SOURCE_DESCRIPTION + 1),
+                    extension: None,
                 },
                 SkillSource {
                     name: "browser".into(),
                     description: "Read browser workflow instructions.".into(),
+                    extension: None,
                 },
             ],
         );
@@ -398,36 +537,59 @@ mod tests {
 
     #[test]
     fn chooses_a_source_before_revealing_its_operations_or_skill() {
-        for count in [1, 12] {
-            let catalog = Catalog::new(
-                vec![ToolSource {
-                    name: "zeta".into(),
-                    description: "Inspect status.".into(),
-                    offers: (0..count)
-                        .map(|index| offer(&format!("inspect_status_{index}"), "Inspect status."))
-                        .collect(),
-                }],
-                vec![SkillSource {
-                    name: "alpha".into(),
-                    description: "Inspect status.".into(),
-                }],
-            );
-            let outcome = catalog.search(&json!({"query": "inspect status"}));
-            let outcome = outcome.structured.unwrap();
-            assert_eq!(outcome["matches"][0]["kind"], "extension");
-            assert_eq!(outcome["matches"][0]["name"], "alpha");
-            assert_eq!(outcome["matches"][1]["kind"], "extension");
-            assert_eq!(outcome["matches"][1]["name"], "zeta");
-            let tool = catalog.search(&json!({"query": "inspect status", "source": "zeta"}));
-            assert_eq!(tool.structured.unwrap()["matches"][0]["kind"], "tool");
-            let skill = catalog.search(&json!({"query": "inspect status", "source": "alpha"}));
-            assert_eq!(skill.structured.unwrap()["matches"][0]["kind"], "skill");
+        for (tool_owner, skill_owner) in [("alpha", "zeta"), ("zeta", "alpha")] {
+            for count in [1, 12] {
+                let summary = "Inspect status.";
+                let catalog = Catalog::new(
+                    vec![ToolSource {
+                        name: tool_owner.into(),
+                        description: summary.into(),
+                        offers: (0..count)
+                            .map(|index| offer(&format!("inspect_status_{index}"), summary))
+                            .collect(),
+                    }],
+                    vec![SkillSource {
+                        name: "inspect".into(),
+                        description: summary.into(),
+                        extension: Some(Extension {
+                            name: skill_owner.into(),
+                            description: summary.into(),
+                        }),
+                    }],
+                );
+                let search = |source: Option<&str>| {
+                    let mut query = json!({"query": "inspect status"});
+                    if let Some(source) = source {
+                        query["source"] = json!(source);
+                    }
+                    catalog.search(&query).structured.unwrap()["matches"].clone()
+                };
+                assert_eq!(
+                    search(None),
+                    json!([
+                        {"kind": "extension", "name": "alpha", "description": summary},
+                        {"kind": "extension", "name": "zeta", "description": summary},
+                    ])
+                );
+                assert_eq!(search(Some(tool_owner))[0]["kind"], "tool");
+                assert_eq!(
+                    search(Some(skill_owner))[0]["name"],
+                    format!("{skill_owner}/inspect")
+                );
+            }
         }
     }
 
     #[test]
     fn searches_tool_and_skill_sources_without_inventing_a_skill_tool() {
         let catalog = catalog();
+        // Accepted tool searches fingerprint this serialized catalog.
+        assert_eq!(
+            serde_json::to_value(&catalog).unwrap()["skills"],
+            json!([
+                {"name":"desktop-fx","description":"Plan and run FX workflows."}
+            ])
+        );
         let inventory = catalog.search(&json!({"query": "list open workbench tabs"}));
         assert_eq!(
             inventory.structured.unwrap()["matches"][0]["name"],
@@ -466,6 +628,36 @@ mod tests {
         let matches = structured["matches"].as_array().unwrap();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0]["name"], "browser_snapshot");
+    }
+
+    #[test]
+    fn five_tool_previews_fit_the_search_result_budget() {
+        let source = "s".repeat(64);
+        let catalog = Catalog::new(
+            vec![ToolSource {
+                name: source.clone(),
+                description: "Inspect documents.".into(),
+                offers: (0..MAX_RESULTS)
+                    .map(|i| {
+                        let mut tool = offer(
+                            &format!("{}{i}", "t".repeat(63)),
+                            &"\u{0001}".repeat(MAX_SOURCE_DESCRIPTION),
+                        );
+                        tool.version = u32::MAX;
+                        tool
+                    })
+                    .collect(),
+            }],
+            vec![],
+        );
+        let found = catalog.search(&json!({"query":"inspect","source":source}));
+        let wire =
+            serde_json::to_vec(&(&found.content, &found.structured, &found.receipt)).unwrap();
+        assert!(
+            wire.len() <= Catalog::definition().unwrap().max_output_bytes,
+            "{}",
+            wire.len()
+        );
     }
 
     #[test]

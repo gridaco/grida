@@ -13,9 +13,28 @@ pub const WORKBENCH_SHOW: &str = "workbench_show";
 pub const DESKTOP_CONTEXT: &str = "You are working in Grida Desktop.";
 pub const PRINCIPAL: &str = "live-editor";
 pub const TARGETED_VERSION: u32 = 3;
+pub const WORKBENCH_PATHS_VERSION: u32 = 4;
 pub const MAX_PATH_BYTES: usize = 4096;
-pub const INSTRUCTIONS: &str = "When producing or editing a primary artifact, request surface_open at the first meaningful renderable checkpoint so the user can follow the work. Keep working after the request. Open the existing primary artifact before substantial edits when it is not already visible. Reopen it only when the user asks or the primary artifact changes. Treat presentation as optional and verify the artifact independently.";
-pub const WORKBENCH_INSTRUCTIONS: &str = "When producing or editing a primary artifact, request workbench_show with its workspace file target at the first meaningful renderable checkpoint so the user can follow the work. The workbench chooses the viewer. Keep working after the request. Show the existing primary artifact before substantial edits when it is not already visible. Show it again only when the user asks or the primary artifact changes. Treat presentation as optional and verify the artifact independently.";
+
+/// Shared artifact presentation policy, applied only with a captured presentation grant.
+pub fn append_instructions(
+    instructions: &mut String,
+    workbench: bool,
+    viewer_urls: bool,
+    workbench_paths: bool,
+) {
+    instructions.push_str("\n\nWhen producing a primary artifact, request ");
+    instructions.push_str(if workbench { WORKBENCH_SHOW } else { OPEN });
+    instructions.push_str(" at the first meaningful renderable checkpoint. Use the workspace path of the file or the bundle directory. The workbench chooses the viewer.");
+    if workbench_paths {
+        instructions.push_str(r#" Pass the workspace-relative or in-workspace absolute file path directly, for example {"target":{"kind":"file","path":"decks/Launch.canvas"}}. Use tool_search to find the Workbench tool when needed."#);
+    }
+    if viewer_urls {
+        instructions
+            .push_str(" For an artifact served by a running viewer, use its verified HTTP(S) URL.");
+    }
+    instructions.push_str(" For an existing primary artifact, reveal it before substantial edits if it is not already visible. Respect requests to keep it closed. Preserve focus unless the user asks to switch windows. Keep working after the request and verify the artifact independently. A receipt confirms the request was sent. Observe the viewer before claiming what appeared. Reveal it again only when the user asks or the primary artifact changes.");
+}
 
 pub fn definition() -> Result<ToolDefinition> {
     Ok(ToolDefinition {
@@ -88,6 +107,7 @@ fn is_file_reveal(invocation: &Invocation) -> bool {
                 && typed_reveal()
         }
         (OPEN | WORKBENCH_SHOW, TARGETED_VERSION) => typed_reveal(),
+        (WORKBENCH_SHOW, WORKBENCH_PATHS_VERSION) => typed_reveal(),
         _ => false,
     }
 }
@@ -248,7 +268,14 @@ mod tests {
         let new_file_only = workbench_show_definition().unwrap();
         let mut new_targeted = new_file_only.clone();
         new_targeted.version = TARGETED_VERSION;
-        for definition in [retained_targeted, new_file_only, new_targeted] {
+        let mut workbench_paths = new_targeted.clone();
+        workbench_paths.version = WORKBENCH_PATHS_VERSION;
+        for definition in [
+            retained_targeted,
+            new_file_only,
+            new_targeted,
+            workbench_paths,
+        ] {
             let grant = GrantId::new(definition.id.as_str()).unwrap();
             for (arguments, auxiliary) in &cases {
                 operation.record.input = invocation(definition.clone(), &id, arguments.clone());

@@ -139,12 +139,10 @@ attaches a reference with the folder's name, location and type. Its card has
 no total size or media preview. Attaching it does not copy, list or archive
 its contents.
 
-The agent uses its existing permissions to inspect the folder. Within an
-already permitted project, its file tools can list or search it. A reference
-to another folder does not extend those tools' access. Plan cannot run a
-command to inspect it; Act keeps the command access already allowed for that
-chat. Grida's private folders, folders containing that private data, and
-filesystem aliases to either cannot be attached.
+The agent uses its existing permissions to inspect the folder. In Plan it
+can run confined commands to find or search files within its read scope.
+A folder reference grants no additional access. Grida refuses attachments of its
+private folders, folders containing that private data, and aliases to either.
 [Understand agent permissions](./permissions.md)
 
 The folder reference stays with a queued or saved message. Reopening the chat

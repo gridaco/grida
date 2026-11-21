@@ -34,6 +34,18 @@ type Publication = {
   activeRevision: number;
 };
 
+export type BrowserWorkbenchTarget =
+  | Readonly<{ kind: "url"; url: string }>
+  | Readonly<{ kind: "tab"; tabId: string }>;
+
+export type BrowserWorkbenchTab = Readonly<{
+  tabId: string;
+  kind: "browser";
+  title: string | null;
+  url: string | null;
+  state: "failed" | "ready" | "pending";
+}>;
+
 export type DesktopBrowserToolLease = Readonly<{
   ready(): boolean;
   invoke(
@@ -42,6 +54,17 @@ export type DesktopBrowserToolLease = Readonly<{
     signal: AbortSignal,
     expiresAtMs?: number
   ): Promise<BrowserAutomationResult>;
+  workbench?: Readonly<{
+    tabs(): Readonly<{
+      activeTabId: string | null;
+      tabs: BrowserWorkbenchTab[];
+    }> | null;
+    show(
+      target: BrowserWorkbenchTarget,
+      focus: boolean
+    ): BrowserAutomationResult;
+    focus(): boolean;
+  }>;
   close(): void;
 }>;
 
@@ -224,6 +247,18 @@ export class DesktopBrowserTools {
     const scope: BrowserAutomationScope = { id, sender, frame, live };
     return {
       ready: live,
+      workbench: {
+        tabs: () => (live() ? this.browserTabs(scope) : null),
+        show: (target, focus) => {
+          if (!live()) return refused("owner_revoked");
+          try {
+            return this.showBrowserTarget(scope, target, focus);
+          } catch {
+            return { disposition: "unknown", error: "outcome_unknown" };
+          }
+        },
+        focus: () => this.focusWorkbench(scope),
+      },
       invoke: async (operation, args, signal, expiresAtMs) => {
         if (
           signal.aborted ||
@@ -260,32 +295,18 @@ export class DesktopBrowserTools {
     if (!request || Object.keys(request).length !== 0)
       return refused("invalid_arguments");
     const publication = this.workbenches.get(scope.sender)!;
-    const pages = this.browser
-      .automationWorkbenchPages(scope)
-      .map((page) => page.snapshot());
+    const pages = this.browserTabs(scope);
     const tabs = [
       ...publication.files.open.map((path) => ({
         tabId: publication.fileIds.get(path)!,
         kind: "file",
         path,
       })),
-      ...pages.map((page) => ({
-        tabId: page.id,
-        kind: "browser",
-        title: page.title,
-        url: page.url,
-        state: page.failure
-          ? "failed"
-          : page.mounted && !page.loading && page.url
-            ? "ready"
-            : "pending",
-      })),
+      ...pages.tabs,
     ];
     const activeTabId = publication.files.active
       ? (publication.fileIds.get(publication.files.active) ?? null)
-      : pages.some((page) => page.id === publication.activePageId)
-        ? publication.activePageId
-        : null;
+      : pages.activeTabId;
     const active = tabs.find((tab) => tab.tabId === activeTabId);
     let truncated = publication.files.truncated;
     let bytes = 0;
@@ -306,6 +327,64 @@ export class DesktopBrowserTools {
       disposition: "not_dispatched",
       data: { activeTabId, tabs: open, truncated },
     };
+  }
+
+  private browserTabs(scope: BrowserAutomationScope) {
+    const pages = this.browser
+      .automationWorkbenchPages(scope)
+      .map((page) => page.snapshot());
+    const { activePageId } = this.workbenches.get(scope.sender)!;
+    return {
+      activeTabId: pages.some((page) => page.id === activePageId)
+        ? activePageId
+        : null,
+      tabs: pages.map<BrowserWorkbenchTab>((page) => ({
+        tabId: page.id,
+        kind: "browser",
+        title: page.title,
+        url: page.url,
+        state: page.failure
+          ? "failed"
+          : page.mounted && !page.loading && page.url
+            ? "ready"
+            : "pending",
+      })),
+    };
+  }
+
+  private showBrowserTarget(
+    scope: BrowserAutomationScope,
+    target: BrowserWorkbenchTarget,
+    focus: boolean
+  ): BrowserAutomationResult {
+    if (target.kind === "url") {
+      const url = DesktopBrowser.normalizeUrl(target.url);
+      if (!url) return refused("invalid_arguments");
+      const page = this.browser.openWorkbenchAutomationPage(scope, url);
+      const readiness = this.pages.registerOpen(scope, page);
+      const tabId = page.snapshot().id;
+      if (focus)
+        this.browser.presentWorkbenchAutomationPage(scope, tabId, true);
+      return requested({ tabId, readiness });
+    }
+    if (
+      !this.browser.presentWorkbenchAutomationPage(scope, target.tabId, focus)
+    )
+      return refused("target_missing");
+    return requested({ tabId: target.tabId });
+  }
+
+  private focusWorkbench(scope: BrowserAutomationScope): boolean {
+    if (!scope.live()) return false;
+    try {
+      const window = BrowserWindow.fromWebContents(scope.sender);
+      if (!window) return false;
+      window.show();
+      window.focus();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private open(
@@ -331,16 +410,12 @@ export class DesktopBrowserTools {
     )
       return refused("invalid_arguments");
     const focus = presentation === "focus";
-    if (target.kind === "url") {
-      const url = DesktopBrowser.normalizeUrl(target.url);
-      if (!url) return refused("invalid_arguments");
-      const page = this.browser.openWorkbenchAutomationPage(scope, url);
-      const readiness = this.pages.registerOpen(scope, page);
-      const tabId = page.snapshot().id;
-      if (focus)
-        this.browser.presentWorkbenchAutomationPage(scope, tabId, true);
-      return requested({ tabId, readiness });
-    }
+    if (target.kind === "url" && typeof target.url === "string")
+      return this.showBrowserTarget(
+        scope,
+        { kind: "url", url: target.url },
+        focus
+      );
     const publication = this.workbenches.get(scope.sender)!;
     let path: string;
     let tabId: string | undefined;
@@ -353,11 +428,8 @@ export class DesktopBrowserTools {
     ) {
       tabId = target.tabId;
       const file = [...publication.fileIds].find(([, id]) => id === tabId);
-      if (!file) {
-        if (!this.browser.presentWorkbenchAutomationPage(scope, tabId, focus))
-          return refused("target_missing");
-        return requested({ tabId });
-      }
+      if (!file)
+        return this.showBrowserTarget(scope, { kind: "tab", tabId }, focus);
       path = file[0];
     } else return refused("invalid_arguments");
     if (signal.aborted || expiresAtMs <= Date.now()) return refused("canceled");
@@ -366,15 +438,7 @@ export class DesktopBrowserTools {
       path,
       expiresAtMs: Math.min(expiresAtMs, Date.now() + 2000),
     });
-    if (focus) {
-      try {
-        const window = BrowserWindow.fromWebContents(scope.sender);
-        window?.show();
-        window?.focus();
-      } catch {
-        // File dispatch was accepted by the captured frame already.
-      }
-    }
+    if (focus) this.focusWorkbench(scope);
     return requested(tabId ? { tabId } : {});
   }
 }

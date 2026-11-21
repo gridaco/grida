@@ -11,14 +11,13 @@ The native host reads `config.toml` from its selected state directory. The file
 holds user defaults for that host. Each accepted input retains the defaults
 that applied when it was accepted.
 
-| Surface                                             | `config.toml`                                                                                              | Changes by the agent                                                  | Managed operations          |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------- |
-| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `chats/workspaces/` in Desktop's application data folder | File edits; every write asks for your approval                        | Not offered                 |
-| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                           | File edits under a write-capable permission profile; every write asks | Not offered                 |
-| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                            | As for `run`                                                          | Available after negotiation |
+| Surface                                             | `config.toml`                                                                                              | How to change it                                                                      |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `chats/workspaces/` in Desktop's application data folder | Edit the file while Desktop is closed.                                                |
+| Source-built `grida-agent run`                      | In the `--state-dir` you choose                                                                            | Edit the file before starting the host.                                               |
+| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                            | Edit and reload the file, or use a managed configuration operation after negotiation. |
 
-In Desktop, ask the agent to change a setting, or edit the file while Desktop is
-closed. Desktop has no settings control. [Change agent settings](../agent/settings.md)
+[Change agent settings](../agent/settings.md)
 
 For an ACP client, start the host with your own state directory, for example
 `grida-agent serve --stdio --state-dir /absolute/path/to/agent-state` plus
@@ -106,20 +105,12 @@ Inspection distinguishes the current file revision from the active settings
 snapshot. They can differ after a manual edit awaiting reload or a rejected
 reload.
 
-## Changes made by the agent
+## Earlier accepted work
 
-The agent reads and edits `config.toml` with its ordinary file tools, as the
-directory `agent-settings`; that directory holds only this file. A read runs
-without asking and reports whether the content is active, waiting for the next
-start, or invalid. Every `write_file` or `edit_file` on it is an approval request
-for that exact change, answered like any other file approval. It is asked even
-where the agent may write the project without asking, an earlier approval does
-not cover the next change, Plan offers no writes, and automatic review never
-answers it. Commands the agent runs can neither read nor write the file.
-
-The host validates the complete result before saving it. Invalid content is
-refused with its diagnostic and leaves the file and the active settings
-unchanged. A saved change applies to inputs accepted afterwards.
+The host protects its settings file on new turns. A queued or paused turn
+that already captured access to `agent-settings/config.toml` keeps the
+earlier grant and exact-action approval requirements through recovery.
+A setting change still takes effect for later accepted inputs.
 
 ## Managed changes
 

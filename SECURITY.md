@@ -601,10 +601,14 @@ command runs as `<shell> -c <cmd>` in the user's named POSIX shell: the
 captured environment's `SHELL` only when it is an absolute path to an
 executable `sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`. The call
 supplies the command line, an optional working directory and a terminal
-choice; it supplies no environment values or stdin. A command still running
-when its wait ends is kept by its chat in the host's process store. Turn end,
-cancellation, pause and approval waits leave it running; it ends when the
-model or a person stops it, it is evicted for a newer process (64 per chat),
+choice. The host owns the process environment and stdin. A separately
+granted file can supply bounded stdin to a finite read-only command through
+[`input_file`](crates/grida-agent/src/permissions/command_input.rs). The
+host checks the file grant and prepares the command under the primary
+workspace scope. A command still running when its wait ends is kept by its
+chat in the host's process store. Turn end, cancellation, pause and approval
+waits leave it running; it ends when the model or a person stops it, it is
+evicted for a newer process (64 per chat),
 its chat is deleted, or the host shuts down. Kept processes run under a
 24-hour scope. A changed composer permission choice applies to later inputs.
 Processes keep their launch posture. Within a compatible turn, the launch
@@ -649,33 +653,28 @@ created beneath it. Version-control and agent metadata names are refused as
 the first component. Content goes to an exclusive temporary file in the same
 folder and is renamed into place; an edit also confirms the file is unchanged
 since it was read. Desktop grants the Default preset's write rule only for the
-selected project folder and registers no additional folders, so its file
-tools stay inside the project, apart from the settings file below, and no
-folder can be granted on request. Desktop
-supplies programs its captured login-shell environment, minus app variables.
+selected project folder and registers no additional folders. Its file
+mutations stay inside the project, and a request cannot add a folder grant.
+Desktop supplies programs its captured login-shell environment, minus app
+variables.
 Preparation refusals share one tool response regardless of path existence.
 
-**Agent settings file.** The host's own state stays protected, with one
-carve-out: the file tools reach the host's settings file, `config.toml` in its
-configuration folder (Desktop: the workspace's folder under `chats/workspaces/`;
-headless: the state directory), as directory `agent-settings`. Nothing else
-in that folder is reachable: list, search, image and other paths are refused,
-and a launch profile cannot name a folder `agent-settings`. Under restricted access, a read runs under
-the turn's file grant. Every write or edit is an approval request bound to that
-exact action; the fixed ask rule ignores the folder rules, so neither the
-Default preset's project write rule nor an earlier approval covers it, Plan
-withholds it, and the automatic reviewer answers reads only. The host offers
-the carve-out only while its command denials cover that folder for read and
-write, so a command can neither read nor change the file the file tools
-approve. The settings owner, not the workspace walker, performs the write: it
-validates the complete result first, refuses invalid content unchanged with
-its diagnostic, publishes owner-only content atomically under the writer lock,
-refuses a concurrent manual edit, and activates the result for later accepted
-input; accepted work keeps its capture. Desktop Main admits a write review
-only for `config.toml` under the canonical settings folder it launched.
-The schema accepts only `schema_version` and `context.max_input_tokens`, so an
-approved write cannot add grants, protected paths, credentials, commands or
-egress.
+**Agent settings file.** The configuration owner loads `config.toml` from
+protected storage. A person can edit the file or use a trusted client's
+negotiated configuration operations. A launch profile reserves the
+`agent-settings` directory ID for earlier accepted work.
+
+An earlier accepted input can retain its exact settings grant through queueing,
+pause, and recovery. The host rechecks that grant and that command denials
+protect the folder. The grant covers only `agent-settings/config.toml`. An
+earlier accepted write or edit still asks the person for that exact action.
+The host validates the complete content, detects concurrent edits, and
+publishes valid owner-only content atomically under the writer lock. Desktop
+Main admits a retained write review only for `config.toml` in the canonical
+settings folder it launched. A saved change applies to later inputs. Accepted
+work keeps its captured defaults. The schema accepts only `schema_version`
+and `context.max_input_tokens`.
+
 The adapter retains supervision after the runtime cancels an invocation. The
 host's cleanup barrier reports pending or unverified command identities before
 the host releases resources that depend on cleanup. Same-process reconciliation
@@ -964,7 +963,7 @@ pixels through this reader, with no additional filesystem or model grant.
   Build output custody stays with the packaging owner. Launch-time trust and
   helper identity remain enforced by the native host.
 - [Bundled command staging](desktop/scripts/bundled-programs.mjs) checks the
-  exact platform package in the [FX declaration](desktop/src/fx-extension.json)
+  exact platform package in the [FX declaration](extensions/desktop-fx/extension.json)
   and copies the executable into app resources before signing. The
   [Desktop FX owner](desktop/src/main/fx-extension.ts) verifies that installed
   resource before using it. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
@@ -1244,9 +1243,8 @@ pixels through this reader, with no additional filesystem or model grant.
   token belongs to the current attachment. An unverified reply keeps both
   request identities and the exact replacement text and mode for retry.
   Desktop negotiates no configuration operation and has no settings control
-  or send-time settings permission. A change to the workspace's agent
-  settings file is an ordinary file write (see the agent settings file
-  above), and Main admits a write review only for that exact file.
+  or send-time settings permission. Main continues to validate an exact
+  settings-file write review for earlier accepted work.
   The [workspace configuration owner](crates/grida-agent/src/configuration.rs)
   admits shared defaults only for a private supervising launch bound to the
   exact workspace state root and generation. It serializes source and active
@@ -1335,15 +1333,16 @@ pixels through this reader, with no additional filesystem or model grant.
   validates the correlated reply, bound path, and original deadline before
   accepting it. The transcript marker carries no token and the external
   inventory has no grant.
-- [Live presentation](desktop/src/main/desktop-artifact-presentation.ts)
-  requires a separately issued grant and a
-  subscription from the exact attached workbench. Main dispatches a bounded
-  workspace-relative path to the authorized frame. Its receipt identifies the
-  chat, endpoint, and call. The editor validates the target and the original
-  view before activation. A repeated call can recover its receipt without a
-  second send. An unconfirmed dispatch stays in the turn's evidence. The
-  master permits continuation only for the exact trusted presentation
-  definition and turn grant.
+- [Workbench presentation](desktop/src/main/desktop-workbench-tools.ts) and
+  the [earlier binding](desktop/src/main/desktop-artifact-presentation.ts)
+  require a separately issued grant and a subscription from the exact attached
+  workbench. Main resolves modern file targets within the captured workspace
+  and checks the published view after validation. It sends a bounded internal
+  path to the authorized frame. The editor verifies the target and the original
+  view before activation. A repeated dispatch recovers the recorded receipt
+  without another send. An unconfirmed dispatch stays in the turn's evidence.
+  The master permits continuation only for an exact trusted file reveal under
+  the captured turn grant.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery
@@ -1423,7 +1422,7 @@ pixels through this reader, with no additional filesystem or model grant.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each
   automatic claim on the captured goal revision, allowance and original
   settings. It revalidates current authority before dispatch. A generated
-  turn receives no new access; a settings file write asks like any other.
+  turn receives no new access.
   For a manual goal, an explicit idle Resume records authority for one further
   work turn. The existing claim atomically consumes that authority under the
   captured goal revision and allowance; replaying the control cannot create
@@ -1818,7 +1817,32 @@ Today:
   selected workspace identity and canonical root in a private directory.
   [Fixtures](desktop/src/main/native-chat-store.test.ts) exercise refused
   state, credential overlap and workspace isolation with real native processes.
-- The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation tools under the existing read grants and keeps command, working-copy mutation, settings changes and timer tools out of the turn inventory. The durable input captures the regime. Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained Act work and refuses to resume it. [Process tests](crates/grida-agent/tests/process/operating_regime.rs) cover captured authority through queue edit, restart and separate Act submission.
+- The [native workspace inventory](crates/grida-agent/src/permissions.rs)
+  offers commands for ordinary text reads in a primary directory with
+  unconditional read command authority. A command with `input_file` can
+  receive one bounded UTF-8 file as stdin in an eligible narrow read profile.
+  This uses an independent named-directory or exact-file grant. The host
+  requires an explicit directory and relative path. The default disk-read
+  profile uses ordinary command scope for disk reads. An outside-project
+  approval binds the file identity and version. The source stays with the host.
+  The command runs in finite, offline, read-only confinement at the primary
+  root. Its authority permits private scratch and withholds terminal input,
+  background yield, and workspace writes. A retained input keeps the original
+  tool inventory and permission capture.
+- The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation
+  tools under the existing read grants and withholds working-copy mutation,
+  settings changes and timers. A Plan command requires the captured read
+  command grant and a [confined execution scope](crates/grida-agent/src/permissions.rs).
+  It follows the launch profile's captured disk-read posture and keeps the
+  profile's protected-path exclusions. It writes only to private scratch and
+  runs without network or elevation. The host applies that boundary under
+  Full access as well. The durable input captures the regime and read policy.
+  Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained
+  Act work and refuses to resume it.
+  [Regime process tests](crates/grida-agent/tests/process/operating_regime.rs)
+  cover queue edit, restart and separate Act submission.
+  [Command process tests](crates/grida-agent/tests/process/approvals.rs)
+  cover Plan command admission and confinement.
 - The native [turn summary](crates/grida-agent/src/acp/extensions/summaries.rs) requires a negotiated capability and an attached chat. It reads the exact settled turn and projects bounded plain text, tool disposition counts, unresolved counts, check statuses, whether independent review findings were collected, and provider-reported token subtotals in a fixed set of categories. Raw operations, arguments, child identities, provider state, and attempt-level usage attribution stay in the host.
 - [Native goal host](crates/grida-agent/src/host/goals.rs) binds goal tools to the exact session, reserved turn, and goal revision. The tools read captured goal metadata or record a proposal. Their grant cannot authorize workspace, command, or provider operations. Explicit goal acceptance retains the selected permissions and uses the ordinary queue and turn owner.
 - An Ultra Goal draws its review share from the existing Goal reservation.
@@ -2101,8 +2125,9 @@ Today:
 - Bundled skills are compiled into the native host, so no file exists for the
   agent's file tools to read and none is extracted or granted. The
   [bundled skill reader](crates/grida-agent/src/host/bundled_skills.rs)
-  returns that fixed text only for a bundled name in the turn's captured skill
-  listing, takes no path, reads no filesystem and has no effects. [Tool
+  resolves a bundled skill only inside the turn's captured listing. For a new
+  extension member it checks the captured owner, local name and document revision.
+  The lookup reads compiled text and accepts no filesystem path. [Tool
   authority](crates/grida-agent/src/host/permissions.rs) checks its turn-bound
   grant independently from workspace permissions, and project skills in the
   same listing are read with the ordinary file tools under the existing
@@ -2827,7 +2852,10 @@ context.
 1. **Name validation before any path is built** — the
    [native catalog](crates/grida-agent/src/skills.rs) rejects any skill name
    that is not lowercase ASCII letters, digits and `-` starting with a letter,
-   so `..`, absolute paths, and path separators never become a skill name.
+   so `..`, absolute paths, and path separators never become a filesystem skill
+   name. A qualified extension selector consists of two individually validated
+   identifiers. The host resolves it exclusively against compiled package
+   declarations and never passes it to a workspace directory.
 2. **Native project authority** — a local one-shot invocation pins its
    explicit project root. ACP discovers project guidance only inside the
    primary root of a host-supplied profile with read access already allowed.
@@ -4213,9 +4241,9 @@ durable or discard unrelated OAuth records.
    adds fixed denials for host state, the profile file, and credential homes.
    File tools also deny installed executables, and confined commands cannot
    write them. A session working directory only selects an exact matching
-   profile. Chat input and model-editable configuration confer no grants; the
-   approval-gated agent settings file (GRIDA-SEC-004) stays outside every
-   restricted command scope and accepts only reviewed defaults. Explicit Full
+   profile. Chat input and workspace content confer no grants. The protected
+   agent settings file (GRIDA-SEC-004) stays outside every restricted
+   command scope and accepts only reviewed defaults. Explicit Full
    access relinquishes these command and file-tool exclusions; ordinary-user
    unconfined code may reach readable credential files and mutate application
    state. It does not receive keys automatically through the provider bridge.
@@ -4313,6 +4341,7 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
   [native permission admission](crates/grida-agent/src/permissions.rs),
+  [scoped command file input](crates/grida-agent/src/permissions/command_input.rs),
   [native permission tests](crates/grida-agent/tests/permissions.rs),
   [native file adapters](crates/grida-agent/src/file_tools.rs),
   [native file opens](crates/grida-agent/src/file_tools/native.rs),
@@ -4739,6 +4768,9 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   admitted target and document checks, typed operations and bounded captures.
 - `desktop/src/main/desktop-browser-mcp.ts` — dispatch scoped to the captured
   lease, bounded image results and reply revocation on the private MCP carrier.
+- `desktop/src/main/desktop-workbench-tools.ts` and
+  `desktop/src/main/native-editor-surfaces.ts` — exact captured workspace and
+  view, with Browser observations and browser-tab actions gated by their lease.
 - `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
   document correlation, bounded FX observations, independent file authorization
   and workspace-relative resolution results.

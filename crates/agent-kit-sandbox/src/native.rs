@@ -976,6 +976,32 @@ impl Prepared {
         process::spawn(self, cancellation, process::Supervision::Finite(None))
     }
 
+    pub(super) fn spawn_with_input(
+        mut self,
+        input: Vec<u8>,
+        cancellation: CancellationToken,
+    ) -> Result<Running> {
+        if input.len() > MAX_INPUT {
+            return Err(refused(ErrorKind::LimitExceeded, "sandbox_process_limit"));
+        }
+        if self.support.backend == Backend::Unconfined
+            || self.process.is_none()
+            || self.disk_read
+            || self.broker_socket.is_some()
+            || !self.stdin.is_empty()
+            || self.locations.iter().any(|location| {
+                location.access == Access::Write && location.bound.path() != self.temporary.path()
+            })
+        {
+            return Err(refused(
+                ErrorKind::InvalidInput,
+                "sandbox_scoped_input_requires_read_only_pipes",
+            ));
+        }
+        self.stdin = input;
+        self.spawn(cancellation)
+    }
+
     pub(super) fn spawn_session(
         mut self,
         options: SessionOptions,

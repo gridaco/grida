@@ -744,16 +744,26 @@ had its end read. Its `_meta["co.grida/session/processes"]` holds the complete
 `processes` list. After missed live updates the host sends the current list.
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
-the prompt. Skill references use `grida-skill:<name>@<revision>`. The catalog
-returns metadata and omits local paths and bodies. A stale or unavailable
-selection rejects the new input before inference. Use a new submission or
+the prompt. Standalone and project skills use `grida-skill:<name>@<revision>`.
+An extension skill uses `grida-skill:<extension>/<name>@<revision>`. Use the
+URI returned by the catalog to select that revision. A client can also name an
+extension skill before it has a turn-specific catalog. For example,
+`grida-skill:browser/browser` alongside authored text selects the Browser
+skill only if the attached Act turn captures a Browser grant. Acceptance pins
+the resolved revision, and input inspection returns its complete URI. A bare
+ACP skill URI still requires a revision. The catalog returns metadata and omits
+local paths and bodies. A stale or unavailable selection rejects the input
+before inference. Use a new submission or
 queued replacement to change skills for accepted work. Steering keeps the
 active turn's captured guidance.
 
-Bundled skills are available to every session. Project discovery reads only
-the explicitly readable primary root supplied by the host. It checks
-`.agents/skills` before `.claude/skills`, followed by bundled skills, and uses
-the first available definition for each name. An accepted input retains its
+Standalone bundled skills are available to every session. Project discovery
+reads only the explicitly readable primary root supplied by the host. A bare
+name looks in `.agents/skills` before `.claude/skills` and standalone bundled
+skills. Extension entries carry their own identity through selection and read.
+A qualified name selects an eligible owner directly. A bare name shared by
+multiple extensions needs qualification when no project or standalone entry
+resolves it. An accepted input retains its
 chosen skill bodies and any root `AGENTS.md` guidance. The `input` operation
 reports selected skill versions and the project instruction revision when
 present. These sources supply model context without changing tool permissions.
@@ -1427,18 +1437,21 @@ user message may carry `editorToolContext: true` in the transcript metadata
 to indicate a capture was attached. The marker contains no capture identity
 or payload. Unsupported peers omit the new fields.
 
-The modern catalog supplies the file inventory, selected SVG operations and
-the exact file presentation operation where granted. New accepted inputs
-record the model-facing workbench contract. `workbench_list_tabs` lists the
-attached workbench and `workbench_show` accepts a typed target. The file-only
-binding maps a `file` target to the existing private path request. The browser
-binding also accepts `url` and `tab` targets and supplies
-`workbench_close_browser_tab` for a visible web tab. The model-facing
-`browser_close` handles background pages. The external MCP catalogs retain
-their existing schemas. Older accepted inputs retain their original names,
-schema revisions and grants. Peers without the Browser companion capability
-use the existing Browser route below for newly accepted Browser-enabled
-inputs.
+Peers that negotiate Desktop tool sources can also negotiate
+`co.grida/session/workbench-file-paths` version 1. The host sends
+`scope.workbenchPaths: true` for that catalog and retains the field with
+the definitions for invocation. The scope always requires negotiated
+sources. Absent this field, the earlier Workbench path and inventory
+contracts apply. The external MCP catalogs use their own existing schemas.
+
+`workbench_list_tabs` returns one bounded inventory with the active tab ID,
+tab descriptors, and truncation. File descriptors carry workspace-relative
+paths. `workbench_show` accepts a typed target. A file target may use a
+workspace-relative or in-workspace absolute filesystem path. Browser
+availability adds visible browser targets and
+`workbench_close_browser_tab`. The model-facing `browser_close` handles
+background pages. Previously accepted inputs retain their names,
+schema revisions, and grants.
 
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1895,9 +1908,10 @@ The `co.grida/config/*` operations are client features: a person's own tooling
 inspects, sets, resets and reloads defaults through them. Configuration
 inspection reports `exact_input_counting` for the selected provider profile.
 The flag describes a supported counting route. Each prepared request must
-still return an exact count before an explicit limit can be used. The agent
-changes settings only by editing the settings file, which asks for approval
-like any other write ([agent edits](./rust-config.md#agent-edits)).
+still return an exact count before an explicit limit can be used. Clients can
+also reload a revision written by a person. Accepted inputs from earlier
+hosts may retain settings-file authority through recovery.
+[Agent configuration](./rust-config.md#agent-edits)
 
 ## Compatibility acceptance
 

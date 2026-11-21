@@ -23,7 +23,7 @@ use rmcp::model::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
@@ -31,6 +31,7 @@ pub(crate) const CAPABILITY: &str = "co.grida/session/desktop-tools";
 pub(crate) const TOOL_CONTEXT_CAPABILITY: &str = "co.grida/session/editor-tool-context";
 pub(crate) const BROWSER_CAPABILITY: &str = "co.grida/session/desktop-browser-mcp";
 pub(crate) const TOOL_SOURCES_CAPABILITY: &str = "co.grida/session/desktop-tool-sources";
+pub(crate) const WORKBENCH_PATHS_CAPABILITY: &str = "co.grida/session/workbench-file-paths";
 const REVISION: &str = "co.grida/definitionRevision";
 const TOOL_SOURCE: &str = "co.grida/source";
 const TRUNCATED: &str = "co.grida/truncated";
@@ -64,6 +65,8 @@ pub(crate) struct Scope {
     pub(crate) browser: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) sources: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) workbench_paths: bool,
 }
 
 impl Scope {
@@ -73,6 +76,7 @@ impl Scope {
             && self.context_id.is_none()
             && !self.browser
             && !self.sources
+            && !self.workbench_paths
     }
 }
 
@@ -257,6 +261,17 @@ struct ToolSource {
     description: String,
 }
 
+/// The stable owner used by Desktop tool registrations and qualified skill links.
+pub(crate) fn valid_source_id(id: &str) -> bool {
+    id.len() <= 64
+        && id.split('-').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        })
+}
+
 impl QualifiedTool {
     fn from_wire(tool: &Tool) -> Option<Self> {
         let meta = tool.meta.as_ref()?;
@@ -266,13 +281,7 @@ impl QualifiedTool {
             Some(value) if value.as_bool() == Some(true) => true,
             _ => return None,
         };
-        if source.id.len() > 64
-            || source.id.split('-').any(|segment| {
-                segment.is_empty()
-                    || !segment
-                        .bytes()
-                        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-            })
+        if !valid_source_id(&source.id)
             || source.generation.is_empty()
             || source.generation.len() > 128
             || !source.generation.bytes().all(|byte| {
@@ -327,6 +336,10 @@ impl Catalog {
 
     pub(crate) fn uses_tool_sources(&self) -> bool {
         self.scope.sources
+    }
+
+    pub(crate) fn uses_workbench_paths(&self) -> bool {
+        self.scope.workbench_paths
     }
 
     pub(crate) fn has_image_results(&self) -> bool {
@@ -419,10 +432,18 @@ impl Catalog {
         if let Some(file) = &mut file_presentation {
             file.id = ToolId::new(presentation::WORKBENCH_SHOW).ok()?;
         }
-        let targeted_presentation = (scope.presentation && scope.browser)
+        let targeted_presentation = (scope.presentation && scope.browser && !scope.workbench_paths)
             .then(|| crate::browser_tools::definition(presentation::WORKBENCH_SHOW, true))
             .transpose()
             .ok()?;
+        let workbench = if scope.workbench_paths {
+            if !scope.sources {
+                return None;
+            }
+            Some(workbench_definitions()?)
+        } else {
+            None
+        };
         let mut registered = RegisteredTools::default();
         for tool in list.tools {
             let qualified = if scope.sources {
@@ -450,6 +471,52 @@ impl Catalog {
                         continue;
                     }
                     definition.effect = CapabilityEffect::Presentation;
+                }
+                presentation::WORKBENCH_SHOW if let Some(workbench) = workbench => {
+                    if !scope.presentation
+                        || !workbench_source
+                        || definition.effect != CapabilityEffect::Mutation
+                        || jpeg
+                        || qualified
+                            .as_ref()
+                            .is_none_or(|tool| !tool.result_disposition)
+                    {
+                        continue;
+                    }
+                    definition.effect = CapabilityEffect::Presentation;
+                    let expected = if scope.browser {
+                        &workbench.show
+                    } else {
+                        &workbench.show_file_or_tab
+                    };
+                    if expected != &definition {
+                        continue;
+                    }
+                }
+                super::WORKBENCH_LIST_TABS if let Some(workbench) = workbench => {
+                    if !workbench_source
+                        || jpeg
+                        || qualified
+                            .as_ref()
+                            .is_some_and(|tool| tool.result_disposition)
+                        || workbench.list != definition
+                    {
+                        continue;
+                    }
+                }
+                crate::browser_tools::WORKBENCH_CLOSE_BROWSER_TAB
+                    if let Some(workbench) = workbench =>
+                {
+                    if !scope.browser
+                        || !workbench_source
+                        || jpeg
+                        || qualified
+                            .as_ref()
+                            .is_none_or(|tool| !tool.result_disposition)
+                        || workbench.close != definition
+                    {
+                        continue;
+                    }
                 }
                 presentation::WORKBENCH_SHOW if scope.browser => {
                     if !workbench_source || definition.effect != CapabilityEffect::Mutation || jpeg
@@ -527,15 +594,13 @@ impl Catalog {
                 let wire_name = definition.tool.id.clone();
                 let name = exposed_name(wire_name.as_str(), workbench);
                 let mut definition = definition.clone();
-                let reveal_file = workbench
-                    && !self.scope.browser
+                let legacy_file_catalog =
+                    workbench && !self.scope.workbench_paths && !self.scope.browser;
+                let reveal_file = legacy_file_catalog
                     && name == presentation::WORKBENCH_SHOW;
                 if reveal_file {
                     definition.tool = presentation::workbench_show_definition()?;
-                } else if workbench
-                    && !self.scope.browser
-                    && name == super::WORKBENCH_LIST_TABS
-                {
+                } else if legacy_file_catalog && name == super::WORKBENCH_LIST_TABS {
                     definition.tool.id = ToolId::new(name)?;
                     definition.tool.description =
                         "List file tabs in the attached workbench and report its active file. Paths are relative to the workspace root and have a leading slash.".into();
@@ -568,6 +633,82 @@ fn exposed_name(name: &str, workbench: bool) -> &str {
         (presentation::OPEN, true) => presentation::WORKBENCH_SHOW,
         _ => name,
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkbenchDescriptor {
+    name: String,
+    description: String,
+    input_schema: Value,
+    output_schema: Value,
+    version: u32,
+    effect: CapabilityEffect,
+}
+
+impl WorkbenchDescriptor {
+    fn into_definition(self) -> Option<CapabilityDefinition> {
+        Some(CapabilityDefinition {
+            tool: ToolDefinition {
+                id: ToolId::new(self.name).ok()?,
+                description: self.description,
+                input: InputFormat::Json(self.input_schema),
+                version: self.version,
+                max_input_bytes: MAX_TOOL_BYTES,
+                max_output_bytes: MAX_TOOL_BYTES,
+                recovery: RecoveryKind::Unavailable,
+            },
+            output_schema: self.output_schema,
+            effect: self.effect,
+        })
+    }
+}
+
+struct WorkbenchDefinitions {
+    list: CapabilityDefinition,
+    show: CapabilityDefinition,
+    show_file_or_tab: CapabilityDefinition,
+    close: CapabilityDefinition,
+}
+
+fn workbench_definitions() -> Option<&'static WorkbenchDefinitions> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Catalog {
+        list: WorkbenchDescriptor,
+        show: WorkbenchDescriptor,
+        close: WorkbenchDescriptor,
+    }
+
+    static DEFINITIONS: OnceLock<Option<WorkbenchDefinitions>> = OnceLock::new();
+    DEFINITIONS
+        .get_or_init(|| {
+            let catalog: Catalog = serde_json::from_str(include_str!(
+                "../../../../desktop/src/main/desktop-workbench-tools.json"
+            ))
+            .ok()?;
+            let list = catalog.list.into_definition()?;
+            let show = catalog.show.into_definition()?;
+            let mut close = catalog.close.into_definition()?;
+            // Closing a visible tab still uses the existing Browser dispatch.
+            close.tool.max_input_bytes = crate::browser_tools::MAX_INPUT_BYTES;
+            close.tool.max_output_bytes = crate::browser_tools::MAX_REPLY_BYTES;
+            let mut show_file_or_tab = show.clone();
+            let InputFormat::Json(schema) = &mut show_file_or_tab.tool.input else {
+                return None;
+            };
+            schema["properties"]["target"]["oneOf"]
+                .as_array_mut()?
+                .retain(|target| target["properties"]["kind"]["const"] != "url");
+            schema["properties"]["presentation"] = serde_json::json!({"const": "reveal"});
+            Some(WorkbenchDefinitions {
+                list,
+                show,
+                show_file_or_tab,
+                close,
+            })
+        })
+        .as_ref()
 }
 
 /// The trusted Desktop adapter declares a versioned definition. Its read hint
@@ -1054,6 +1195,96 @@ mod tests {
             host.grant(&typed.id).unwrap().describe().unwrap().tool,
             typed
         );
+    }
+
+    #[test]
+    fn workbench_paths_show_requires_the_exact_definition_and_source() {
+        let workbench = workbench_definitions().unwrap();
+        let scope = Scope {
+            sources: true,
+            presentation: true,
+            workbench_paths: true,
+            ..Scope::default()
+        };
+        let to_wire = |definition: &CapabilityDefinition| {
+            let InputFormat::Json(schema) = &definition.tool.input else {
+                panic!("expected a JSON schema");
+            };
+            json!({
+                "name":definition.tool.id.as_str(),
+                "description":definition.tool.description,
+                "inputSchema":schema,
+                "outputSchema":definition.output_schema,
+                "_meta":{
+                    REVISION:definition.tool.version,
+                    RESULT_DISPOSITION:true,
+                    TOOL_SOURCE:{"id":"workbench","generation":"fixture","description":"Show a workspace artifact."}
+                }
+            })
+        };
+        let file = to_wire(&workbench.show_file_or_tab);
+        assert_eq!(
+            file["_meta"][REVISION],
+            presentation::WORKBENCH_PATHS_VERSION
+        );
+        let registered = Catalog::definitions(list_reply(vec![file.clone()]), &scope).unwrap();
+        assert_eq!(
+            registered.definitions.as_slice(),
+            std::slice::from_ref(&workbench.show_file_or_tab)
+        );
+
+        let mut wrong_source = file.clone();
+        wrong_source["_meta"][TOOL_SOURCE]["id"] = json!("another-extension");
+        let mut old_revision = file.clone();
+        old_revision["_meta"][REVISION] = json!(2);
+        let mut wrong_output = file.clone();
+        wrong_output["outputSchema"] = json!({"type":"object"});
+        let mut missing_receipt = file.clone();
+        missing_receipt["_meta"]
+            .as_object_mut()
+            .unwrap()
+            .remove(RESULT_DISPOSITION);
+        for definition in [
+            wrong_source,
+            old_revision,
+            wrong_output,
+            missing_receipt,
+            to_wire(&workbench.show),
+        ] {
+            let registered = Catalog::definitions(list_reply(vec![definition]), &scope).unwrap();
+            assert!(registered.definitions.is_empty());
+        }
+        let mut close = to_wire(&workbench.close);
+        close["_meta"][INPUT_BYTES] = json!(crate::browser_tools::MAX_INPUT_BYTES);
+        close["_meta"][OUTPUT_BYTES] = json!(crate::browser_tools::MAX_REPLY_BYTES);
+        let denied = Catalog::definitions(list_reply(vec![close.clone()]), &scope).unwrap();
+        assert!(denied.definitions.is_empty());
+        let registered = Catalog::definitions(
+            list_reply(vec![close]),
+            &Scope {
+                browser: true,
+                ..scope.clone()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            registered.definitions,
+            [crate::browser_tools::definition(
+                crate::browser_tools::WORKBENCH_CLOSE_BROWSER_TAB,
+                true,
+            )
+            .unwrap()]
+        );
+
+        let denied = Catalog::definitions(
+            list_reply(vec![file]),
+            &Scope {
+                presentation: false,
+                ..scope
+            },
+        )
+        .unwrap();
+        assert!(denied.definitions.is_empty());
     }
 
     #[tokio::test]

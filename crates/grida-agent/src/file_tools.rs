@@ -82,6 +82,7 @@ pub(crate) struct SettingsAccess {
     pub configuration: Arc<crate::configuration::Configuration>,
     pub write: bool,
 }
+pub(crate) const READ_SCOPED_FILE: &str = "read_scoped_file";
 pub(crate) const VIEW_IMAGE: &str = "view_image";
 pub(crate) const CAPTURE_IMAGE_REFERENCE: &str = "capture_image_reference";
 pub(crate) const WORKSPACE_IMAGE_REFERENCE_SCHEMA: &str = "grida.agent.workspace-image-reference";
@@ -170,6 +171,53 @@ impl FileTools {
         ])
     }
 
+    /// Read a single separately authorized file into a finite command's private stdin.
+    pub(crate) fn command_input(
+        &self,
+        invocation: Invocation,
+        directory: BindingId,
+        path: PathBuf,
+        cancellation: CancellationToken,
+    ) -> Result<Vec<u8>> {
+        let budget = Budget {
+            output: MAX_OUTPUT_BYTES,
+            deadline: Instant::now() + TIME_LIMIT,
+            cancellation,
+            invocation,
+        };
+        budget.check()?;
+        let outcome = self.execute(
+            Operation::ReadScoped,
+            Request {
+                directory: Some(directory),
+                path: Some(path),
+                query: None,
+                content: None,
+                old_string: None,
+                new_string: None,
+                replace_all: None,
+            },
+            &budget,
+        )?;
+        budget.check()?;
+        if outcome.status == OutcomeStatus::Succeeded
+            && !outcome.truncated
+            && let Some(agent_kit_core::messages::ResultContent::Text(text)) =
+                outcome.content.into_iter().next()
+        {
+            return Ok(text.into_bytes());
+        }
+        Err(problem(ErrorKind::Unavailable, "command_input_unavailable"))
+    }
+
+    /// A bounded text read for named grants outside the turn's shell read scope.
+    pub(crate) fn scoped_read_adapter(self: &Arc<Self>) -> Result<Arc<dyn Tool>> {
+        Ok(Arc::new(FileTool::new(
+            self.clone(),
+            Operation::ReadScoped,
+        )?))
+    }
+
     /// Text writes and edits. The host offers them only with a write rule.
     pub(crate) fn write_adapters(self: &Arc<Self>) -> Result<[Arc<dyn Tool>; 2]> {
         Ok([
@@ -202,6 +250,7 @@ impl FileTools {
 #[derive(Clone, Copy)]
 enum Operation {
     Read,
+    ReadScoped,
     View,
     CaptureReference,
     List,
@@ -230,6 +279,11 @@ impl FileTool {
                 "read_file",
                 "Read one bounded UTF-8 text file. Use a relative path and an optional directory ID. The turn's primary directory is the default. Symlinks and binary files are refused.",
                 vec!["path"],
+            ),
+            Operation::ReadScoped => (
+                READ_SCOPED_FILE,
+                "Read one bounded UTF-8 text file in a separately granted scope that the shell cannot cover. Provide an explicit directory ID and a relative path. Use the shell to read ordinary workspace files. Symlinks and binary files are refused.",
+                vec!["directory", "path"],
             ),
             Operation::View => (
                 VIEW_IMAGE,
@@ -302,15 +356,18 @@ impl FileTool {
                 )
             }
         };
-        let description = if scope.settings.is_some()
+        let mut description = description.to_owned();
+        if scope.settings.is_some()
             && matches!(
                 operation,
-                Operation::Read | Operation::Write | Operation::Edit
-            ) {
-            format!("{description}{SETTINGS_NOTE}")
-        } else {
-            description.into()
-        };
+                Operation::Read | Operation::ReadScoped | Operation::Write | Operation::Edit
+            )
+        {
+            description.push_str(SETTINGS_NOTE);
+        }
+        if scope.external_file.is_some() && matches!(operation, Operation::ReadScoped) {
+            description.push_str(" To request a file outside the project, use directory \"external-file\" and its absolute path without the leading slash. Each read requires its own approval.");
+        }
         let image_view = scope.image_view;
         Ok(Self {
             scope,
@@ -441,6 +498,7 @@ pub(crate) fn write_request(invocation: &Invocation) -> Result<Request> {
 pub(crate) fn read_request(invocation: &Invocation) -> Result<Request> {
     let operation = match invocation.definition().id.as_str() {
         "read_file" => Operation::Read,
+        READ_SCOPED_FILE => Operation::ReadScoped,
         VIEW_IMAGE => Operation::View,
         CAPTURE_IMAGE_REFERENCE => Operation::CaptureReference,
         "list_files" => Operation::List,
@@ -473,6 +531,8 @@ impl Operation {
         }
         match (self, request.path.as_deref(), request.query.as_deref()) {
             (Self::Read | Self::View, Some(path), None) if !path.as_os_str().is_empty() => {}
+            (Self::ReadScoped, Some(path), None)
+                if request.directory.is_some() && !path.as_os_str().is_empty() => {}
             (Self::CaptureReference, Some(path), None)
                 if request.directory.is_none()
                     && path.to_str().is_some_and(workspace_reference_path) => {}
@@ -599,6 +659,27 @@ pub(crate) use native::{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scoped_read_requires_an_explicit_directory_and_relative_file_path() {
+        let scoped = |input| Operation::ReadScoped.parse(&ToolArguments::Json(input));
+        assert!(scoped(json!({"directory": "chosen", "path": "child/file.txt"})).is_ok());
+        for input in [
+            json!({"path": "file.txt"}),
+            json!({"directory": null, "path": "file.txt"}),
+            json!({"directory": "chosen"}),
+            json!({"directory": "chosen", "path": ""}),
+            json!({"directory": "chosen", "path": "/file.txt"}),
+            json!({"directory": "chosen", "path": "../file.txt"}),
+        ] {
+            assert!(scoped(input.clone()).is_err(), "{input}");
+        }
+        assert!(
+            Operation::Read
+                .parse(&ToolArguments::Json(json!({"path": "file.txt"})))
+                .is_ok()
+        );
+    }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[test]

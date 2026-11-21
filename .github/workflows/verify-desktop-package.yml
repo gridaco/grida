@@ -15,6 +15,7 @@ on:
       - "Cargo.toml"
       - "rust-toolchain.toml"
       - "skills/**"
+      - "extensions/**"
       - "scripts/cli-release/native*.mjs"
       - "packages/grida-ai-host/**"
       - "packages/grida-ai/**"
