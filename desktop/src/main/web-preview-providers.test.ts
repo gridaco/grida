@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WebPreviewProviderRegistry } from "./web-preview-provider";
 import { WebPreviewProviders } from "./web-preview-providers";
 
 const fixture = {
@@ -7,6 +8,34 @@ const fixture = {
 };
 
 describe("WebPreviewProviders", () => {
+  it("recognizes one exact provider marker without any network or default providers", () => {
+    const registry = new WebPreviewProviderRegistry();
+    const matchingTag = [
+      { name: "name", value: "application-name" },
+      { name: "data-example", value: "1" },
+    ];
+    expect(registry.match([matchingTag])).toBeUndefined();
+    const provider = { id: "example", ...fixture };
+    const remove = registry.register(provider);
+    expect(registry.match([matchingTag])).toBe(provider);
+    expect(
+      registry.match([matchingTag.slice(0, 1), matchingTag.slice(1)])
+    ).toBeUndefined();
+    expect(
+      registry.match([[matchingTag[0]!, { name: "data-example", value: "2" }]])
+    ).toBeUndefined();
+
+    const removeAmbiguous = registry.register({ ...provider, id: "ambiguous" });
+    expect(registry.match([matchingTag])).toBeUndefined();
+    removeAmbiguous();
+    expect(registry.match([matchingTag])).toBe(provider);
+    remove();
+    expect(registry.match([matchingTag])).toBeUndefined();
+    registry.register(provider);
+    expect(remove()).toBe(false);
+    expect(registry.match([matchingTag])).toBe(provider);
+  });
+
   it("loads the FX contribution by its sibling manifest", () => {
     expect(WebPreviewProviders.bundled()).toContainEqual({
       id: "desktop-fx",

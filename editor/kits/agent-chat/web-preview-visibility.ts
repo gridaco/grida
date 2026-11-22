@@ -1,6 +1,3 @@
-import type { WebPreview } from "@grida/desktop-bridge";
-import type { Browser } from "@/lib/desktop/browser";
-
 type Watch = {
   observer: IntersectionObserver;
   cards: Map<Element, (visible: boolean) => void>;
@@ -8,12 +5,10 @@ type Watch = {
 
 const watches = new WeakMap<Document, Watch>();
 
-/** One viewport observer per document, with a lookup per visible card. */
+/** One viewport observer per document. Visibility signals interest in a preview. */
 export function observeWebPreview(
   target: Element,
-  url: string,
-  load: Browser.PreviewLoader,
-  publish: (metadata: WebPreview.Metadata | null) => void
+  request: () => () => void
 ): () => void {
   const document = target.ownerDocument;
   const Observer = document.defaultView?.IntersectionObserver;
@@ -29,40 +24,23 @@ export function observeWebPreview(
     watches.set(document, watch);
   }
   const { observer, cards } = watch;
-  let pending: AbortController | undefined;
-  let watching = true;
-  let inView = false;
-  const stop = () => {
-    if (!watching) return;
-    watching = false;
+  let release: (() => void) | undefined;
+  cards.set(target, (visible) => {
+    if (visible) {
+      release ??= request();
+    } else {
+      release?.();
+      release = undefined;
+    }
+  });
+  observer.observe(target);
+  return () => {
     observer.unobserve(target);
     cards.delete(target);
-    pending?.abort();
+    release?.();
     if (!cards.size) {
       observer.disconnect();
       watches.delete(document);
     }
   };
-  cards.set(target, (visible) => {
-    if (inView === visible) return;
-    inView = visible;
-    if (!inView) {
-      pending?.abort();
-      pending = undefined;
-      return;
-    }
-    const request = new AbortController();
-    pending = request;
-    void Promise.resolve()
-      .then(() => (request.signal.aborted ? null : load(url, request.signal)))
-      .catch(() => null)
-      .then((metadata) => {
-        if (!request.signal.aborted) {
-          pending = undefined;
-          publish(metadata);
-        }
-      });
-  });
-  observer.observe(target);
-  return stop;
 }

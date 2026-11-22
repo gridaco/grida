@@ -42,13 +42,21 @@ an account, or a model.
 - **Links** uses the production composer and transcript components with local
   sample messages. Compare ordinary web links and the recognized site icons in
   the draft, the user bubble, and the agent response. Edit a draft link and send
-  it to see the result.
+  it to see the result. Hover **Grida docs** for a favicon and preview image,
+  **CSS Grid guide** for a text preview, or **Linear** for the domain-only
+  fallback.
 - **Web preview** shows the gallery's title, favicon, and description. Scroll up
-  to see the FX Viewer label, an unavailable preview, and replies with ambiguous
-  local links. Click **Finish reply** to reveal the print preview and see its
-  details arrive after a short delay. Click the card, an inline link, or
-  **Open in default browser** to see the request in the demo controls.
+  and hover **workflow viewer** to see the FX Viewer label shared with its
+  response card. The transcript also includes an unavailable preview and replies
+  with ambiguous local links. Click **Finish reply** to reveal the print
+  preview and see its details arrive after a short delay. Click the card, an
+  inline link, or **Open in default browser** to see the request in the demo
+  controls.
   **Copy link** copies the card's URL.
+- **Web preview refresh** shows two cards for the same local address. Start
+  the sample server and hover **workflow viewer** to update both cards and
+  the inline favicon from one check. Stop the server and hover again to see
+  the shared fallback.
 - **Message queue** shows previews, dragging and keyboard reordering,
   editing in the composer, and Steer. **Running turn** controls whether a send
   enters the queue and whether queued messages can be steered.

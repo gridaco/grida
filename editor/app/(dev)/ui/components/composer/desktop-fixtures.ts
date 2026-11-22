@@ -2,15 +2,18 @@ import type {
   NativeChatMessageAttachment,
   NativeChatQueueItem,
   NativeChatProfileCatalog,
+  WebPreview,
 } from "@grida/desktop-bridge";
 import type { ComposerCatalog } from "@/kits/composer";
 import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
-import type { Browser } from "@/lib/desktop/browser";
 
 /** Deterministic local examples; no native bridge, account or inference required. */
 export namespace DesktopComposerFixtures {
-  export const loadWebPreview: Browser.PreviewLoader = async (href, signal) => {
+  export async function loadWebPreview(
+    href: string,
+    signal: AbortSignal
+  ): Promise<WebPreview.Metadata | null> {
     switch (new URL(href).pathname) {
       case "/gallery":
         return {
@@ -45,7 +48,7 @@ export namespace DesktopComposerFixtures {
       default:
         return null;
     }
-  };
+  }
 
   export const imageUrl = "/images/abstract-placeholder.jpg";
   export const image: NativeChatMessageAttachment = {

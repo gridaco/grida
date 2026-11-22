@@ -4728,11 +4728,26 @@ caller is the actual privileged top-level workbench document.
    A separate optional link-preview operation accepts a loopback HTTP(S) URL
    with an explicit port from a live workspace attachment. Main uses a bounded
    credential-free loopback connection and parses inert HTML. Bundled extension
-   declarations can recognize display metadata. Custom providers share the same
-   origin, time and byte limits. Only bounded text and sandbox-decoded raster data
+   declarations can recognize display metadata in both preview operations.
+   Optional provider resolvers can request one bounded read on the same loopback
+   origin through Main, within the preview's time and byte limits.
+   Only bounded text and sandbox-decoded raster data
    reach the workbench. Each attachment owns its subscribers and cached results.
    Cancellation, attachment retirement and browser reset revoke pending results.
+   Completed previews may report missing metadata, while canceled or skipped
+   requests publish no lookup result. Cache freshness stays inside Main.
    A page's self-declared product identity conveys display information only.
+   A distinct optional public-link operation shares workspace ownership and
+   cancellation. Main only opens credential-free HTTP(S) connections on the
+   standard ports. It checks DNS results for globally routable addresses and
+   pins the checked address while keeping TLS hostname verification. Each
+   redirect undergoes the same checks. Requests are bounded by time, response
+   size and concurrency. Main parses inert HTML for display text and may read
+   one site icon and one declared Open Graph image. Cross-origin image
+   destinations and every redirect receive the same public-address checks.
+   The image-only sandbox turns bounded sources into bounded raster bytes.
+   Only those bytes and display text reach the workbench. Public cache entries
+   have a separate namespace and expire in memory with the workspace attachment.
    Optional versioned history reads expose only bounded, validated URL/title/
    last-visit snapshots to exact admitted workspace or Settings documents.
    Main records actual successful guest navigations; renderers cannot insert
@@ -4825,8 +4840,12 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   favicon fetching and document-lifetime cache.
 - `desktop/src/main/browser-favicon-decoder.ts` — image-only Chromium
   sandbox and bounded raster output.
-- `desktop/src/main/web-preview.ts` — credential-free loopback metadata reads,
-  provider admission and bounded per-attachment lookup lifetime.
+- `desktop/src/main/web-preview.ts` — bounded credential-free metadata and
+  image reads, provider admission and bounded per-attachment lookup lifetime.
+- `desktop/src/main/web-preview-provider.ts` — exact and unambiguous matching
+  of provider declarations against page metadata, for display only.
+- `desktop/src/main/public-link-preview.ts` and its tests — verified public
+  destinations and pinned, credential-free transport for public link previews.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly
   recognized legacy browser cleanup without account/provider partition access.
 - `desktop/src/main/browser-history.ts` and its tests — bounded shared history,

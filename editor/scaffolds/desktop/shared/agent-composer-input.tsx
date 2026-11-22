@@ -20,6 +20,7 @@
 
 import {
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -41,6 +42,10 @@ import {
 import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
+import {
+  BrowserOpen,
+  handleBrowserLinkClick,
+} from "@/lib/desktop/browser-open-context";
 import { AgentComposerEditSession } from "./agent-composer-edit-session";
 import { EditorSelectionIndicator } from "@/kits/agent-chat/editor-selection-indicator";
 import { Button } from "@app/ui/components/button";
@@ -253,6 +258,7 @@ function AgentComposerInner({
 }: Omit<AgentComposerInputProps, "catalog">) {
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
+  const openLink = useContext(BrowserOpen);
   const { readDocument, restoreDocument } = composer;
   const [editSession] = useState(() => new AgentComposerEditSession());
   // Restore this chat's unsent draft once the editor exists, then keep every
@@ -715,6 +721,7 @@ function AgentComposerInner({
       )}
       <ComposerContent
         scrollFade
+        onLinkClick={(event) => handleBrowserLinkClick(event, openLink)}
         onKeyDownCapture={(event) => {
           // ProseMirror prevents Escape even when there is no completion open.
           if (event.key === "Escape") confirmEscape(event);

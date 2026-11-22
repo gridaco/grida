@@ -236,24 +236,57 @@ async function provePreviews(event, attachmentId) {
       });
       response.writeHead(200, { "Content-Type": "text/html" });
       response.write("<!doctype html><head><title>Slow fixture");
+    } else if (request.url === "/offline") {
+      response.writeHead(503).end();
     } else {
       icons.handler(request, response);
     }
   });
   const lookup = (id, pathname) =>
-    host.preview(event, { attachmentId, id, url: origin + pathname });
+    host.preview(event, {
+      attachmentId,
+      id,
+      url: origin + pathname,
+      result: true,
+    });
 
   mark("coalescing web previews");
   const [first, second] = await Promise.all([
-    lookup("first", "/fx/run"),
-    lookup("second", "/fx/run"),
+    lookup("first", "/fx/run#first"),
+    lookup("second", "/fx/run#second"),
   ]);
   assert.deepEqual(first, second);
+  const metadata = first.metadata;
   assert.equal(icons.requests.get("/art/blue.svg"), 1);
-  assert.match(first.favicon.dataUrl, /^data:image\/png;base64,/);
+  assert.match(metadata.favicon.dataUrl, /^data:image\/png;base64,/);
   const rasterSize = nativeImage
-    .createFromDataURL(first.favicon.dataUrl)
+    .createFromDataURL(metadata.favicon.dataUrl)
     .getSize();
+
+  mark("rasterizing a public preview banner in the image-only sandbox");
+  const { BrowserFaviconDecoder } = require(
+    path.join(path.dirname(process.argv[2]), "browser-favicon-decoder.cjs")
+  );
+  const decoder = new BrowserFaviconDecoder();
+  const width = 1200;
+  const height = 630;
+  const input = nativeImage.createFromBitmap(
+    Buffer.alloc(width * height * 4, 255),
+    { width, height }
+  );
+  let bannerSize;
+  try {
+    const banner = await decoder.decodeLinkImage(
+      input.toDataURL(),
+      AbortSignal.timeout(1700)
+    );
+    assert.match(banner?.dataUrl ?? "", /^data:image\/jpeg;base64,/);
+    bannerSize = nativeImage.createFromDataURL(banner.dataUrl).getSize();
+  } finally {
+    decoder.close();
+  }
+
+  assert.deepEqual(await lookup("offline", "/offline"), { metadata: null });
 
   mark("canceling a pending web preview");
   const pending = lookup("slow", "/slow");
@@ -263,11 +296,13 @@ async function provePreviews(event, attachmentId) {
   await waitFor(() => slowClosed);
   return {
     sharedRequests,
-    title: first.title,
-    description: first.description,
-    productLabel: first.productLabel,
+    title: metadata.title,
+    description: metadata.description,
+    productLabel: metadata.productLabel,
     rasterSize,
+    bannerSize,
     scriptRequests: icons.requests.get("/viewer-script.js") ?? 0,
+    completedMiss: true,
     detachedReadCanceled: true,
   };
 }

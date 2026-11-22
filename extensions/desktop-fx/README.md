@@ -6,8 +6,9 @@ version in its package manifest. Its [command registration](../../desktop/src/ma
 checks the installed program before admitting the package to a workspace.
 
 The [web preview contribution](web-preview.json) labels pages that publish the
-versioned FX Viewer HTML marker. Workspace and command verification in the
-Desktop adapter governs native FX actions.
+versioned FX Viewer HTML marker. Desktop Main registers the bundled contribution
+for display in local response cards and link hover previews. Workspace and
+command verification in the Desktop adapter governs native FX actions.
 
 The [packaged integration test](../../desktop/src/main/browser-automation.electron.test.ts)
 uses the bundled command to register a local plan and verifies its viewer in

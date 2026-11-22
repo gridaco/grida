@@ -173,7 +173,8 @@ export class DesktopBrowserHost {
       history?: BrowserHistory;
       downloads?: BrowserDownloads;
       decodeFavicon?: BrowserFaviconDecoder["decode"];
-      webPreview?: Pick<WebPreviewService, "lookup" | "clear">;
+      webPreview?: Pick<WebPreviewService, "lookup" | "clear"> &
+        Partial<Pick<WebPreviewService, "lookupPublicLink" | "lookupResult">>;
     }
   ) {
     options.history?.subscribe((change) => this.#publishHistory(change));
@@ -883,59 +884,124 @@ export class DesktopBrowserHost {
   async preview(
     event: IpcMainInvokeEvent,
     raw: unknown
-  ): Promise<WebPreview.Metadata | null> {
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
+    return this.#readPreview(
+      event,
+      raw,
+      "loopback",
+      async (owner, url, signal) => {
+        const page = [...owner.pages.values()].find(
+          (candidate) =>
+            candidate.state.url === url &&
+            !candidate.state.loading &&
+            !candidate.state.failure &&
+            candidate.guest &&
+            !candidate.guest.isDestroyed() &&
+            candidate.guest.getURL() === url
+        );
+        const title =
+          page?.guest &&
+          this.#text(page.guest.getTitle(), WebPreview.MAX_TITLE_BYTES);
+        const favicon = page?.favicon.get();
+        const observed =
+          title || favicon
+            ? { ...(title && { title }), ...(favicon && { favicon }) }
+            : undefined;
+        return WebPreview.parseMetadata(
+          await this.options.webPreview?.lookup(
+            owner.attachmentId!,
+            url,
+            signal,
+            observed
+          )
+        );
+      }
+    );
+  }
+
+  async previewPublicLink(
+    event: IpcMainInvokeEvent,
+    raw: unknown
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
+    return this.#readPreview(event, raw, "public", async (owner, url, signal) =>
+      WebPreview.parseMetadata(
+        await this.options.webPreview?.lookupPublicLink?.(
+          owner.attachmentId!,
+          url,
+          signal
+        )
+      )
+    );
+  }
+
+  async #readPreview(
+    event: IpcMainInvokeEvent,
+    raw: unknown,
+    kind: WebPreview.Kind,
+    read: (
+      owner: Owner,
+      url: string,
+      signal: AbortSignal
+    ) => Promise<WebPreview.Metadata | null>
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
     const request = this.#record(raw);
     const owner = this.#attached(event, request.attachmentId);
-    const service = this.options.webPreview;
-    const url = WebPreview.normalizeUrl(request.url);
+    const url =
+      kind === "public"
+        ? WebPreview.normalizePublicUrl(request.url)
+        : WebPreview.normalizeUrl(request.url);
     const id = request.id;
-    if (!url || !DesktopBrowser.isIdentity(id))
+    if (
+      !url ||
+      !DesktopBrowser.isIdentity(id) ||
+      (request.result !== undefined && request.result !== true)
+    )
       throw new Error("browser_preview_invalid");
-    if (!service || this.#clearing || !this.#live(owner)) return null;
+    if (!this.options.webPreview || this.#clearing || !this.#live(owner))
+      return null;
 
     const requests = (owner.previews ??= new Map());
-    if (requests.size >= 32 || requests.has(id)) return null;
+    const key = `${kind}:${id}`;
+    if (requests.size >= 32 || requests.has(key)) return null;
     const controller = new AbortController();
-    requests.set(id, controller);
-    const scope = owner.attachmentId!;
-    const page = [...owner.pages.values()].find(
-      (candidate) =>
-        candidate.state.url === url &&
-        !candidate.state.loading &&
-        !candidate.state.failure &&
-        candidate.guest &&
-        !candidate.guest.isDestroyed() &&
-        candidate.guest.getURL() === url
-    );
-    const title =
-      page?.guest &&
-      this.#text(page.guest.getTitle(), WebPreview.MAX_TITLE_BYTES);
-    const favicon = page?.favicon.get();
-    const observed =
-      title || favicon
-        ? { ...(title && { title }), ...(favicon && { favicon }) }
-        : undefined;
+    requests.set(key, controller);
     try {
-      const result = await service.lookup(
-        scope,
-        url,
-        controller.signal,
-        observed
-      );
+      const result = request.result
+        ? WebPreview.parseResult(
+            await this.options.webPreview.lookupResult?.(
+              kind,
+              owner.attachmentId!,
+              url,
+              controller.signal
+            )
+          )
+        : await read(owner, url, controller.signal);
       return controller.signal.aborted || !this.#live(owner) || this.#clearing
         ? null
-        : WebPreview.parseMetadata(result);
+        : result;
     } finally {
-      requests.delete(id);
+      requests.delete(key);
     }
   }
 
   cancelPreview(event: IpcMainInvokeEvent, raw: unknown): void {
+    this.#cancelPreview(event, raw, "loopback");
+  }
+
+  cancelPublicLinkPreview(event: IpcMainInvokeEvent, raw: unknown): void {
+    this.#cancelPreview(event, raw, "public");
+  }
+
+  #cancelPreview(
+    event: IpcMainInvokeEvent,
+    raw: unknown,
+    kind: "loopback" | "public"
+  ): void {
     const request = this.#record(raw);
     const owner = this.#attached(event, request.attachmentId);
     if (!DesktopBrowser.isIdentity(request.id))
       throw new Error("browser_preview_invalid");
-    owner.previews?.get(request.id)?.abort();
+    owner.previews?.get(`${kind}:${request.id}`)?.abort();
   }
 
   async historyQuery(

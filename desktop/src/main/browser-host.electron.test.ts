@@ -32,7 +32,12 @@ async function runBrowserProof(
         lib: {
           entry: Object.fromEntries(
             (scenario === "preview"
-              ? ["browser-host", "web-preview", "web-preview-providers"]
+              ? [
+                  "browser-host",
+                  "web-preview",
+                  "web-preview-providers",
+                  "browser-favicon-decoder",
+                ]
               : ["browser-host"]
             ).map((name) => [
               name,
@@ -144,7 +149,7 @@ it.skipIf(skipElectron)(
 );
 
 it.skipIf(skipElectron)(
-  "loads a declared local web preview once and cancels a pending read on workspace detach",
+  "rasterizes preview images, coalesces local previews, and cancels reads on detach",
   async () => {
     expect(await runBrowserProof("preview")).toEqual({
       sharedRequests: 1,
@@ -152,7 +157,9 @@ it.skipIf(skipElectron)(
       description: "Server-rendered & local",
       productLabel: "FX Viewer",
       rasterSize: { width: 32, height: 32 },
+      bannerSize: { width: 640, height: 336 },
       scriptRequests: 0,
+      completedMiss: true,
       detachedReadCanceled: true,
     });
   },

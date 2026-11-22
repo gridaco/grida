@@ -20,7 +20,7 @@ describe("ResponseCards.forReply", () => {
     expect(ResponseCards.forReply({ text })).toEqual([
       {
         kind: "web-preview",
-        action: { kind: "open-web", url: target, target: "default" },
+        url: target,
       },
     ]);
   });
@@ -56,7 +56,7 @@ describe("ResponseCards.forReply", () => {
       expect(ResponseCards.forReply(revised)).toEqual([
         {
           kind: "web-preview",
-          action: { kind: "open-web", url: `${url}updated`, target: "default" },
+          url: `${url}updated`,
         },
       ]);
       expect(parse).toHaveBeenCalledTimes(3);

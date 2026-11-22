@@ -27,11 +27,16 @@ messages.map((m, i) => (
   composer's blue style and destination icons. Grida, GitHub, Figma, Linear,
   Slack, and Notion have their own marks. Google Docs, Sheets, and Drive share
   the Drive mark. Other web links use a globe.
+  When the containing surface supplies a page preview service, hovering a web
+  or local link opens a card that can show its favicon, image, title,
+  description, and product label. The domain and **Open** action are available
+  immediately. Inline links use the favicon from the shared page snapshot
+  when available. A surface can omit the service to render ordinary links.
 - **Response cards** → the client supplies a footer for a finished answer.
-  `ResponseCards` derives the display data from the retained answer, and
-  `ChatResponseCards` and Markdown web links issue the same typed browser
-  request. The containing surface supplies the opener and chooses the browser.
-  It may also supply a preview loader. A visible card can show a title,
+  `ResponseCards` derives the display data from the retained answer. The
+  containing surface supplies the opener for cards, Markdown web links, and
+  reference links.
+  It may also supply the same page preview service. A visible card can show a title,
   description, icon, and product label, and releases a pending lookup when
   it leaves view.
 - **User attachments** → a separate row outside the text bubble. Raster images

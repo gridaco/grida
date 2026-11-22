@@ -4,7 +4,8 @@ import { createServer, type RequestListener, type Server } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
 import { WebPreview } from "@grida/desktop-bridge";
 import type { BrowserFaviconDecoder } from "./browser-favicon-decoder";
-import { WebPreviewService, type WebPreviewProvider } from "./web-preview";
+import { WebPreviewService } from "./web-preview";
+import type { WebPreviewProvider } from "./web-preview-provider";
 
 const servers: Server[] = [];
 const services: WebPreviewService[] = [];
@@ -220,8 +221,18 @@ it("shares a lookup until its last reader leaves and reuses negative results", a
   const previews = service();
   const first = new AbortController();
   const second = new AbortController();
-  const a = previews.lookup("same", origin + "/slow", first.signal);
-  const b = previews.lookup("same", origin + "/slow", second.signal);
+  const a = previews.lookupResult(
+    "loopback",
+    "same",
+    origin + "/slow",
+    first.signal
+  );
+  const b = previews.lookupResult(
+    "loopback",
+    "same",
+    origin + "/slow",
+    second.signal
+  );
   await vi.waitFor(() => expect(received).toEqual(["/slow"]));
   first.abort();
   expect(await a).toBeNull();
@@ -230,12 +241,78 @@ it("shares a lookup until its last reader leaves and reuses negative results", a
   expect(await b).toBeNull();
   await vi.waitFor(() => expect(closed).toHaveBeenCalledTimes(1));
   expect(
-    await previews.lookup("same", origin + "/offline", defaultSignal)
-  ).toBeNull();
+    await previews.lookupResult(
+      "loopback",
+      "same",
+      origin + "/offline",
+      defaultSignal
+    )
+  ).toEqual({ metadata: null });
   expect(
-    await previews.lookup("same", origin + "/offline", defaultSignal)
-  ).toBeNull();
+    await previews.lookupResult(
+      "loopback",
+      "same",
+      origin + "/offline",
+      defaultSignal
+    )
+  ).toEqual({ metadata: null });
   expect(received).toEqual(["/slow", "/offline"]);
+});
+
+it("checks local previews on demand after a short hit or miss window", async () => {
+  let title: string | null = null;
+  const requests: string[] = [];
+  const origin = await serve((request, response) => {
+    if (request.url === "/favicon.ico") {
+      response.writeHead(404).end();
+      return;
+    }
+    requests.push(request.url!);
+    if (title === null) response.writeHead(503).end();
+    else
+      response
+        .writeHead(200, { "Content-Type": "text/html" })
+        .end(`<title>${title}</title>`);
+  });
+  const previews = service();
+  const read = (path: string) =>
+    previews.lookupResult("loopback", "same", origin + path, defaultSignal);
+  let now = 0;
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+  try {
+    await expect(read("/viewer?plan=a#first")).resolves.toEqual({
+      metadata: null,
+    });
+    title = "Reopened viewer";
+    now = 999;
+    await expect(read("/viewer?plan=a#second")).resolves.toEqual({
+      metadata: null,
+    });
+    expect(requests).toEqual(["/viewer?plan=a"]);
+
+    now = 1_000;
+    await expect(read("/viewer?plan=a#third")).resolves.toEqual({
+      metadata: { title: "Reopened viewer" },
+    });
+    title = null;
+    now = 2_999;
+    await expect(read("/viewer?plan=a")).resolves.toEqual({
+      metadata: { title: "Reopened viewer" },
+    });
+    expect(requests).toEqual(["/viewer?plan=a", "/viewer?plan=a"]);
+    await expect(read("/viewer?plan=b")).resolves.toEqual({ metadata: null });
+
+    now = 3_000;
+    await expect(read("/viewer?plan=a")).resolves.toEqual({ metadata: null });
+    expect(requests).toEqual([
+      "/viewer?plan=a",
+      "/viewer?plan=a",
+      "/viewer?plan=b",
+      "/viewer?plan=a",
+    ]);
+  } finally {
+    clock.mockRestore();
+  }
 });
 
 it("uses two workers and clears only the retiring attachment's work", async () => {

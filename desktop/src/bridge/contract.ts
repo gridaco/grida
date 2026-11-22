@@ -44,6 +44,9 @@ export const IPC_CHANNELS = {
   BROWSER_FAVICON: "grida:browser:favicon",
   BROWSER_PREVIEW: "grida:browser:preview",
   BROWSER_CANCEL_PREVIEW: "grida:browser:cancel-preview",
+  BROWSER_PREVIEW_PUBLIC_LINK: "grida:browser:preview-public-link",
+  BROWSER_CANCEL_PUBLIC_LINK_PREVIEW:
+    "grida:browser:cancel-public-link-preview",
   BROWSER_HISTORY_QUERY: "grida:browser:history-query",
   BROWSER_HISTORY_REMOVE: "grida:browser:history-remove",
   BROWSER_HISTORY_CHANGED: "grida:browser:history-changed",

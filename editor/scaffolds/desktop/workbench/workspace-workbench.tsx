@@ -195,8 +195,8 @@ export function WorkspaceWorkbench({
     [workspace.id]
   );
   const { group, browsers } = browserSession;
-  const openWeb = useCallback<Browser.OpenHandler>(
-    (intent) => Browser.open(intent, browsers.openOrFocus),
+  const openWeb = useMemo(
+    () => Browser.opener(browsers.openOrFocus),
     [browsers]
   );
   const [browserUIOwner] = useState(() => ({}));
@@ -230,8 +230,8 @@ export function WorkspaceWorkbench({
   // tab only when it is a file.
   const activeRelPath = WorkbenchTab.relPath(activeTab);
   const [restoreSettled, setRestoreSettled] = useState(false);
-  const loadWebPreview =
-    restoreSettled && browsers.canLoadPreview() ? browsers.loadPreview : null;
+  const previews =
+    restoreSettled && browsers.canLoadPreview() ? browsers.previews : null;
 
   useEffect(() => {
     if (restoreSettled)
@@ -573,7 +573,7 @@ export function WorkspaceWorkbench({
               </TitleBar>
               <div className={`min-h-0 flex-1 ${styles.chatPane}`}>
                 <BrowserOpen value={openWeb}>
-                  <BrowserPreview value={loadWebPreview}>
+                  <BrowserPreview value={previews}>
                     <AgentPane
                       workspace={workspace}
                       surfaceHost={surfaceHost}
@@ -615,7 +615,7 @@ export function WorkspaceWorkbench({
                   >
                     <ResizablePanel data-workbench-decorative-overflow>
                       <BrowserOpen value={openWeb}>
-                        <BrowserPreview value={loadWebPreview}>
+                        <BrowserPreview value={previews}>
                           <EditorPane
                             workspace={workspace}
                             surfaceHost={surfaceHost}

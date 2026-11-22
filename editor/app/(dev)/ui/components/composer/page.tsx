@@ -8,6 +8,7 @@ import { DictateDemo } from "./dictate-demo";
 import { ComposerKitDemo } from "./kit-demo";
 import { LinkDemo } from "./link-demo";
 import { LongPasteDemo } from "./long-paste-demo";
+import { PreviewRefreshDemo } from "./preview-refresh-demo";
 
 export default function ComposerPage() {
   return (
@@ -51,6 +52,9 @@ export default function ComposerPage() {
       </Example>
       <Example id="web-preview" title="Web preview">
         <DesktopComposerDemo scenario="web-preview" />
+      </Example>
+      <Example id="web-preview-refresh" title="Web preview refresh">
+        <PreviewRefreshDemo />
       </Example>
       <Example id="message-queue" title="Message queue">
         <DesktopComposerDemo queued />

@@ -1,6 +1,7 @@
 import { DesktopBrowser, WebPreview } from "@grida/desktop-bridge";
 import { Browser } from "@/lib/desktop/browser";
 import { BrowserPageControls } from "@/lib/desktop/browser-page-controls";
+import { PagePreviews } from "@/lib/desktop/page-previews";
 import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
 import type { BrowserGuestMounts } from "./browser-guest-mounts";
@@ -40,6 +41,9 @@ export namespace WorkspaceBrowserTabs {
 export class WorkspaceBrowserTabs {
   /** The document owner supplies presentation; subscriptions never own guests. */
   mounts: BrowserGuestMounts | null = null;
+  readonly previews = new PagePreviews.Controller((url, signal) =>
+    this.loadPreview(url, signal)
+  );
   private bridge: DesktopBrowser.Bridge | null = null;
   private attachment: string | null = null;
   private revision = 0;
@@ -275,6 +279,7 @@ export class WorkspaceBrowserTabs {
 
   stop(): void {
     this.epoch++;
+    this.previews.clear();
     for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
     const bridge = this.bridge;
     const attachmentId = this.attachment;
@@ -292,48 +297,79 @@ export class WorkspaceBrowserTabs {
   }
 
   canLoadPreview(): boolean {
+    const bridge = this.bridge;
     return !!(
       this.state.ready &&
       this.attachment &&
-      this.bridge?.preview &&
-      this.bridge.cancelPreview
+      (((bridge?.lookupPreview || bridge?.preview) && bridge.cancelPreview) ||
+        ((bridge?.lookupPreview || bridge?.previewPublicLink) &&
+          bridge.cancelPublicLinkPreview))
     );
   }
 
-  loadPreview: Browser.PreviewLoader = async (url, signal) => {
+  loadPreview: PagePreviews.Lookup = async (url, signal) => {
+    const local = WebPreview.normalizeUrl(url);
+    const destination = local ?? WebPreview.normalizePublicUrl(url);
+    const bridge = this.bridge;
+    const cancel = local
+      ? bridge?.cancelPreview
+      : bridge?.cancelPublicLinkPreview;
+    const lookup = bridge?.lookupPreview;
+    if (lookup) {
+      const kind = local ? "loopback" : "public";
+      return WebPreview.parseResult(
+        await this.requestPreview(
+          destination,
+          signal,
+          (request) => lookup.call(bridge, kind, request),
+          cancel
+        )
+      );
+    }
+    const metadata = WebPreview.parseMetadata(
+      await this.requestPreview(
+        destination,
+        signal,
+        local ? bridge?.preview : bridge?.previewPublicLink,
+        cancel
+      )
+    );
+    return metadata ? { metadata } : null;
+  };
+
+  private async requestPreview(
+    url: string | null,
+    signal: AbortSignal,
+    read?: (request: WebPreview.Request) => Promise<unknown>,
+    cancel?: (request: WebPreview.Cancel) => Promise<void>
+  ): Promise<unknown> {
     const bridge = this.bridge;
     const attachmentId = this.attachment;
     const epoch = this.epoch;
-    const normalized = WebPreview.normalizeUrl(url);
     if (
       signal.aborted ||
-      !normalized ||
+      !url ||
       !this.state.ready ||
       !attachmentId ||
-      !bridge?.preview ||
-      !bridge.cancelPreview
+      !bridge ||
+      !read ||
+      !cancel
     )
       return null;
     const id = crypto.randomUUID();
-    const cancel = () => {
-      void bridge.cancelPreview?.({ attachmentId, id }).catch(() => {});
+    const onAbort = () => {
+      void cancel.call(bridge, { attachmentId, id }).catch(() => {});
     };
-    signal.addEventListener("abort", cancel, { once: true });
+    signal.addEventListener("abort", onAbort, { once: true });
     try {
-      const result = await bridge.preview({
-        attachmentId,
-        id,
-        url: normalized,
-      });
-      return signal.aborted || this.epoch !== epoch
-        ? null
-        : WebPreview.parseMetadata(result);
+      const result = await read.call(bridge, { attachmentId, id, url });
+      return signal.aborted || this.epoch !== epoch ? null : result;
     } catch {
       return null;
     } finally {
-      signal.removeEventListener("abort", cancel);
+      signal.removeEventListener("abort", onAbort);
     }
-  };
+  }
 
   /** Open a fresh tab, optionally replacing a workbench tab in place. */
   open = (url?: string, replaceTab?: string): boolean => {

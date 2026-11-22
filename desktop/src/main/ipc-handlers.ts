@@ -403,6 +403,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.BROWSER_CANCEL_PREVIEW, (event, request: unknown) =>
     browserHost.cancelPreview(event, request)
   );
+  guarded(IPC_CHANNELS.BROWSER_PREVIEW_PUBLIC_LINK, (event, request: unknown) =>
+    browserHost.previewPublicLink(event, request)
+  );
+  guarded(
+    IPC_CHANNELS.BROWSER_CANCEL_PUBLIC_LINK_PREVIEW,
+    (event, request: unknown) =>
+      browserHost.cancelPublicLinkPreview(event, request)
+  );
   guarded(IPC_CHANNELS.BROWSER_HISTORY_QUERY, (event, request: unknown) =>
     browserHost.historyQuery(event, request)
   );

@@ -3,7 +3,12 @@
 import { createContext, useContext, type ComponentProps } from "react";
 import { defaultRehypePlugins, type StreamdownProps } from "streamdown";
 import { chatWebLinkIcon } from "@/components/chat-web-link";
-import { BrowserOpen } from "@/lib/desktop/browser-open-context";
+import {
+  BrowserOpen,
+  handleBrowserLinkClick,
+  usePagePreview,
+} from "@/lib/desktop/browser-open-context";
+import { LinkPreviewCard } from "./link-preview-card";
 
 /**
  * Links in agent replies that point at files in the person's workspace: a
@@ -106,10 +111,14 @@ export namespace workspace_links {
     const open = useContext(Opener);
     const openWeb = useContext(BrowserOpen);
     const target = marked(href);
+    const isDownload = props.download != null && props.download !== false;
+    const preview = usePagePreview(
+      target === null && !isDownload ? href : undefined
+    );
     const style = "wrap-anywhere font-medium text-primary underline";
     if (target === null) {
       const icon = chatWebLinkIcon(href);
-      return (
+      const link = (
         <a
           {...props}
           href={href}
@@ -121,23 +130,26 @@ export namespace workspace_links {
             openWeb && href
               ? (event) => {
                   onClick?.(event);
-                  if (
-                    !event.defaultPrevented &&
-                    event.button === 0 &&
-                    !event.currentTarget.hasAttribute("download") &&
-                    !event.metaKey &&
-                    !event.ctrlKey &&
-                    !event.shiftKey &&
-                    !event.altKey &&
-                    openWeb({ kind: "open-web", url: href, target: "default" })
-                  )
-                    event.preventDefault();
+                  handleBrowserLinkClick(event, openWeb);
                 }
               : onClick
           }
         >
           {children}
         </a>
+      );
+      return href && icon && preview ? (
+        <LinkPreviewCard
+          key={href}
+          url={href}
+          icon={icon}
+          openLink={openWeb}
+          preview={preview}
+        >
+          {link}
+        </LinkPreviewCard>
+      ) : (
+        link
       );
     }
     if (!open) return <span>{children}</span>;

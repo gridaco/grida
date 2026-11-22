@@ -42,6 +42,20 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
+`browser.preview()` and `browser.previewPublicLink()` return the same
+`WebPreview.Metadata` shape to a live workspace attachment. Fields are
+optional and can include a title, description, favicon, Open Graph image, and
+declared product label. Each operation has its own cancellation method and is
+optional on older hosts. The favicon and image contain display-only raster
+data URLs. The image is JPEG, up to 640 pixels per edge and 128 KiB of decoded
+bytes. Unavailable metadata resolves to `null`. Loopback previews require a
+non-default HTTP(S) port. Public previews use the standard HTTP(S) ports and
+drop URL fragments. The optional `browser.lookupPreview(kind, request)`
+operation reuses those same lanes and cancellation methods. It returns
+`{ metadata }` for a completed lookup, including `{ metadata: null }` when
+the page has no preview metadata. A top-level `null` means no result was
+published. Main owns destination checks, caching, and request lifetime.
+
 `providers.set_endpoint()` is the explicit Connect/Save consent action for the
 displayed destination on new hosts. Detect the optional `endpoint_authorization`
 and `update_endpoint_models` methods before relying on this behavior. Consent

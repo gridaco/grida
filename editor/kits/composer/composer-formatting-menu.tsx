@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type MouseEventHandler,
 } from "react";
 import { ComposerTiptap, composerLinkDestination } from "./composer-tiptap";
 
@@ -66,9 +67,11 @@ function FormatButton({
 export function ComposerFormattingMenu({
   editor,
   disabled,
+  onLinkClick,
 }: {
   editor: Editor;
   disabled: boolean;
+  onLinkClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
@@ -248,7 +251,12 @@ export function ComposerFormattingMenu({
         ) : linkHref ? (
           <>
             <Button size="xs" variant="ghost" asChild>
-              <a href={linkHref} target="_blank" rel="noopener noreferrer">
+              <a
+                href={linkHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onLinkClick}
+              >
                 <ExternalLinkIcon />
                 Open link
               </a>

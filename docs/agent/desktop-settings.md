@@ -11,18 +11,18 @@ Open Settings from the application menu, or press **Command+,** on macOS.
 Settings opens in its own window; opening it again focuses that window.
 Select a category in its sidebar:
 
-| Category        | What it contains                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| Account         | Your Grida account and sign-out action.                                                          |
-| Appearance      | Light, Dark or System theme, remembered on this device.                                          |
-| Personalization | Suggested prompts and web search.                                                                |
-| Browser         | [Downloads, site permissions, shared history and browser cleanup](../editor/desktop/browser.md). |
-| Credits         | Your Grida AI credit information.                                                                |
-| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                     |
-| Media Providers | Connections for image, video, audio and 3D generation.                                           |
-| Hooks           | Global hook definitions, configuration diagnostics and command trust review.                     |
-| Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                |
-| About           | Desktop version and platform information.                                                        |
+| Category        | What it contains                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Account         | Your Grida account and sign-out action.                                                                      |
+| Appearance      | Light, Dark or System theme, remembered on this device.                                                      |
+| Personalization | Suggested prompts and web search.                                                                            |
+| Browser         | [Link destinations, downloads, site permissions, history and browser cleanup](../editor/desktop/browser.md). |
+| Credits         | Your Grida AI credit information.                                                                            |
+| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                                 |
+| Media Providers | Connections for image, video, audio and 3D generation.                                                       |
+| Hooks           | Global hook definitions, configuration diagnostics and command trust review.                                 |
+| Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                            |
+| About           | Desktop version and platform information.                                                                    |
 
 ## Personalization
 

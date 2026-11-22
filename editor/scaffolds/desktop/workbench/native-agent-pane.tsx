@@ -53,10 +53,7 @@ import {
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
 import { useDesktopBridge } from "@/lib/desktop/bridge";
-import {
-  BrowserOpen,
-  BrowserPreview,
-} from "@/lib/desktop/browser-open-context";
+import { BrowserOpen } from "@/lib/desktop/browser-open-context";
 import { PanelIsPresented } from "./workbench-panel-content";
 import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
@@ -611,7 +608,6 @@ function NativeChatPane({
   subagentsInTabs?: boolean;
 }) {
   const openWeb = useContext(BrowserOpen);
-  const loadWebPreview = useContext(BrowserPreview);
   // Workspace file links in replies open in the workbench, which validates
   // the path against the workspace before opening a tab.
   const openWorkspaceLink = useMemo(() => {
@@ -879,11 +875,7 @@ function NativeChatPane({
         loadToolImage={controller.readToolImage}
         responseFooter={
           openWeb && cards?.length ? (
-            <ChatResponseCards
-              cards={cards}
-              open={openWeb}
-              loadPreview={loadWebPreview ?? undefined}
-            />
+            <ChatResponseCards cards={cards} open={openWeb} />
           ) : undefined
         }
         actions={

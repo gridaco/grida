@@ -1,32 +1,32 @@
-/** GRIDA-SEC-016 — display-only metadata from explicitly addressed loopback pages. */
+/** GRIDA-SEC-016 — bounded display-only metadata in the loopback and public preview lanes. */
 import { get as httpGet, type IncomingMessage } from "node:http";
 import { get as httpsGet } from "node:https";
 import { parse, type DefaultTreeAdapterTypes } from "parse5";
 import { DesktopBrowser, WebPreview } from "@grida/desktop-bridge";
 import { BrowserFaviconDecoder } from "./browser-favicon-decoder";
+import {
+  PublicLinkPreviewBusy,
+  publicLinkRedirect,
+  requestPublicLink,
+} from "./public-link-preview";
+import {
+  WebPreviewProviderRegistry,
+  type WebPreviewProvider,
+} from "./web-preview-provider";
 
 type Element = DefaultTreeAdapterTypes.Element;
 type Display = Pick<WebPreview.Metadata, "title" | "description">;
-type Result = WebPreview.Metadata | null;
+type Metadata = WebPreview.Metadata | null;
+type Result = WebPreview.Result | null;
 const HTML_BYTES = 64 * 1024;
 const ICON_MIME_TYPES = ["image/svg+xml", ...DesktopBrowser.FAVICON_MIME_TYPES];
-
-export type WebPreviewProviderContext = Readonly<{
-  url: string;
-  signal: AbortSignal;
-  metadata: WebPreview.Metadata;
-  /** One bounded GET to a path on the page's origin. */
-  read(path: string): Promise<string | null>;
-}>;
-
-export type WebPreviewProvider = Readonly<{
-  id: string;
-  match: { meta: string; attributes: Readonly<Record<string, string>> };
-  productLabel: string;
-  resolve?(context: WebPreviewProviderContext): Promise<Display | null>;
-}>;
+const FRESHNESS_MS = {
+  public: { hit: 3_600_000, miss: 5_000 },
+  loopback: { hit: 2_000, miss: 1_000 },
+} as const;
 
 type Pending = {
+  kind: WebPreview.Kind;
   scope: string;
   url: string;
   started: boolean;
@@ -121,20 +121,31 @@ async function read(
   signal: AbortSignal,
   budget: number,
   accept: (type: string) => boolean,
-  prefix = false
+  prefix = false,
+  kind: WebPreview.Kind = "loopback"
 ): Promise<{ url: string; type: string; bytes: Buffer } | null> {
   // Verify at the request boundary as well as at the call site.
-  const first = WebPreview.normalizeUrl(destination);
+  const publicLink = kind === "public";
+  const first = publicLink
+    ? WebPreview.normalizePublicUrl(destination)
+    : WebPreview.normalizeUrl(destination);
   if (!first) return null;
   const origin = new URL(first).origin;
   let url = first;
   try {
     for (let redirects = 0; redirects <= 2; redirects++) {
-      const response = await request(new URL(url), signal);
+      const response = await (publicLink ? requestPublicLink : request)(
+        new URL(url),
+        signal
+      );
       try {
         if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
           const location = response.headers.location;
-          const next = location && sameOrigin(location, url, origin);
+          const next =
+            location &&
+            (publicLink
+              ? publicLinkRedirect(location, url)
+              : sameOrigin(location, url, origin));
           if (!next) return null;
           url = next;
           continue;
@@ -165,7 +176,9 @@ async function read(
         response.destroy();
       }
     }
-  } catch {
+  } catch (error) {
+    // Missing optional assets leave the page metadata usable.
+    if (prefix && error instanceof PublicLinkPreviewBusy) throw error;
     // Servers can be unavailable or stop responding mid-stream.
   }
   return null;
@@ -190,35 +203,35 @@ function attribute(node: Element | undefined, key: string): string | undefined {
 }
 
 export class WebPreviewService {
-  readonly #providers = new Map<string, WebPreviewProvider>();
+  readonly #providers: WebPreviewProviderRegistry;
   readonly #pending = new Map<string, Pending>();
   readonly #cache = new Map<
     string,
-    { scope: string; until: number; value: Result; iconSkipped: boolean }
+    { scope: string; until: number; value: Metadata; iconSkipped: boolean }
   >();
   readonly #decoder = new BrowserFaviconDecoder();
   readonly #decode: BrowserFaviconDecoder["decode"];
+  readonly #decodeLinkImage: BrowserFaviconDecoder["decodeLinkImage"];
   #active = 0;
 
   constructor(
     options: {
       providers?: readonly WebPreviewProvider[];
       decode?: BrowserFaviconDecoder["decode"];
+      decodeLinkImage?: BrowserFaviconDecoder["decodeLinkImage"];
     } = {}
   ) {
     this.#decode = options.decode ?? this.#decoder.decode;
-    for (const provider of options.providers ?? []) this.register(provider);
+    this.#decodeLinkImage =
+      options.decodeLinkImage ?? this.#decoder.decodeLinkImage;
+    this.#providers = new WebPreviewProviderRegistry(options.providers);
   }
 
   register(provider: WebPreviewProvider): () => void {
-    if (this.#providers.has(provider.id))
-      throw new Error(`Duplicate web preview provider: ${provider.id}`);
-    this.#providers.set(provider.id, provider);
+    const remove = this.#providers.register(provider);
     this.clear();
     return () => {
-      if (this.#providers.get(provider.id) !== provider) return;
-      this.#providers.delete(provider.id);
-      this.clear();
+      if (remove()) this.clear();
     };
   }
 
@@ -226,26 +239,59 @@ export class WebPreviewService {
     scope: string,
     input: unknown,
     signal: AbortSignal,
-    observed?: Result
+    observed?: WebPreview.Metadata | null
+  ): Promise<WebPreview.Metadata | null> {
+    const result = await this.lookupResult(
+      "loopback",
+      scope,
+      input,
+      signal,
+      observed
+    );
+    return result?.metadata ?? null;
+  }
+
+  async lookupPublicLink(
+    scope: string,
+    input: unknown,
+    signal: AbortSignal
+  ): Promise<WebPreview.Metadata | null> {
+    const result = await this.lookupResult("public", scope, input, signal);
+    return result?.metadata ?? null;
+  }
+
+  async lookupResult(
+    kind: WebPreview.Kind,
+    scope: string,
+    input: unknown,
+    signal: AbortSignal,
+    observed?: Metadata
   ): Promise<Result> {
-    const url = WebPreview.normalizeUrl(input);
-    if (!url || signal.aborted) return null;
-    const key = JSON.stringify([scope, url]);
+    const normalized =
+      kind === "loopback"
+        ? WebPreview.normalizeUrl(input)
+        : WebPreview.normalizePublicUrl(input);
+    if (!normalized || signal.aborted) return null;
+    const destination = new URL(normalized);
+    destination.hash = "";
+    const url = destination.href;
+    const key = JSON.stringify([kind, scope, url]);
     const { title, favicon } = observed ?? {};
-    const overlay = (value: Result): Result =>
+    const overlay = (value: Metadata): Metadata =>
       title || favicon
         ? { ...value, ...(title && { title }), ...(favicon && { favicon }) }
         : value;
     const cached = this.#cache.get(key);
     if (cached && cached.until > Date.now() && (!cached.iconSkipped || favicon))
-      return overlay(cached.value);
+      return { metadata: overlay(cached.value) };
     this.#cache.delete(key);
 
     let pending = this.#pending.get(key);
     if (!pending) {
-      if (this.#pending.size >= 32) return overlay(null);
+      if (this.#pending.size >= 32) return null;
       const { promise, resolve } = Promise.withResolvers<Result>();
       pending = {
+        kind,
         scope,
         url,
         readers: 0,
@@ -274,7 +320,11 @@ export class WebPreviewService {
       void shared.result.then((value) => {
         if (signal.aborted) return;
         release();
-        resolve(shared.controller.signal.aborted ? null : overlay(value));
+        resolve(
+          shared.controller.signal.aborted || value === null
+            ? null
+            : { metadata: overlay(value.metadata) }
+        );
       });
       this.#pump();
     });
@@ -303,27 +353,34 @@ export class WebPreviewService {
       pending.started = true;
       this.#active++;
       void this.#resolve(pending)
-        .catch(() => null)
-        .then((value) => {
+        .then(
+          (metadata): Result => ({ metadata }),
+          (): Result => null
+        )
+        .then((result) => {
           this.#active--;
           if (this.#pending.get(key) === pending) {
             this.#pending.delete(key);
-            if (this.#cache.size >= 64)
-              this.#cache.delete(this.#cache.keys().next().value!);
-            this.#cache.set(key, {
-              scope: pending.scope,
-              until: Date.now() + (value ? 60_000 : 5_000),
-              value,
-              iconSkipped: pending.iconSkipped ?? false,
-            });
-            pending.resolve(value);
+            if (result) {
+              const { metadata } = result;
+              const ttl = FRESHNESS_MS[pending.kind][metadata ? "hit" : "miss"];
+              if (this.#cache.size >= 64)
+                this.#cache.delete(this.#cache.keys().next().value!);
+              this.#cache.set(key, {
+                scope: pending.scope,
+                until: Date.now() + ttl,
+                value: metadata,
+                iconSkipped: pending.iconSkipped ?? false,
+              });
+            }
+            pending.resolve(result);
           }
           this.#pump();
         });
     }
   }
 
-  async #resolve(pending: Pending): Promise<Result> {
+  async #resolve(pending: Pending): Promise<Metadata> {
     const signal = AbortSignal.any([
       pending.controller.signal,
       AbortSignal.timeout(1700),
@@ -333,7 +390,8 @@ export class WebPreviewService {
       signal,
       HTML_BYTES,
       (type) => type === "text/html",
-      true
+      true,
+      pending.kind
     );
     if (!page || signal.aborted) return null;
     const head = htmlHead(page.bytes.toString("utf8"));
@@ -342,26 +400,40 @@ export class WebPreviewService {
     const description = meta.find(
       (node) => attribute(node, "name")?.toLowerCase() === "description"
     );
-    const metadata = display(
+    const standard = display(
       title?.childNodes
         .map((child) => ("value" in child ? child.value : ""))
         .join(""),
       attribute(description, "content")
     );
-    const matches = [...this.#providers.values()].filter((provider) =>
-      meta.some(
-        (node) =>
-          attribute(node, "name") === provider.match.meta &&
-          Object.entries(provider.match.attributes).every(
-            ([key, value]) => attribute(node, key) === value
+    const publicLink = pending.kind === "public";
+    const og = (name: string) =>
+      attribute(
+        meta.find(
+          (node) => attribute(node, "property")?.toLowerCase() === name
+        ),
+        "content"
+      );
+    const metadata = publicLink
+      ? { ...standard, ...display(og("og:title"), og("og:description")) }
+      : standard;
+    const imageUrl = publicLink
+      ? [og("og:image"), og("og:image:url"), og("og:image:secure_url")]
+          .map(
+            (value) =>
+              value?.trim() && publicLinkRedirect(value.trim(), page.url)
           )
-      )
-    );
-    const provider = matches.length === 1 ? matches[0] : undefined;
+          .find((value) => Boolean(value))
+      : undefined;
+    const provider = this.#providers.match(meta.map((node) => node.attrs));
     pending.iconSkipped = pending.hasIcon;
-    const [favicon, details] = await Promise.all([
-      pending.iconSkipped ? null : this.#favicon(page.url, head, signal),
-      provider?.resolve
+    const [favicon, image, details] = await Promise.all([
+      pending.iconSkipped
+        ? null
+        : this.#favicon(page.url, head, signal, pending.kind),
+      imageUrl ? this.#linkImage(imageUrl, signal) : null,
+      // Additional provider reads belong to the bounded loopback policy.
+      !publicLink && provider?.resolve
         ? this.#details(provider, page.url, metadata, signal)
         : null,
     ]);
@@ -369,13 +441,13 @@ export class WebPreviewService {
       provider?.resolve && !details ? undefined : provider?.productLabel,
       WebPreview.MAX_PRODUCT_LABEL
     );
-    const result = {
+    return WebPreview.parseMetadata({
       ...metadata,
       ...details,
-      ...(favicon && { favicon }),
-      ...(productLabel && { productLabel }),
-    };
-    return Object.keys(result).length ? result : null;
+      favicon,
+      image,
+      productLabel,
+    });
   }
 
   async #details(
@@ -422,7 +494,39 @@ export class WebPreviewService {
     }
   }
 
-  async #favicon(url: string, head: Element[], signal: AbortSignal) {
+  async #linkImage(url: string, signal: AbortSignal) {
+    const response = await read(
+      url,
+      signal,
+      DesktopBrowser.MAX_LINK_IMAGE_SOURCE_BYTES,
+      (type) =>
+        DesktopBrowser.LINK_IMAGE_SOURCE_MIME_TYPES.some(
+          (mime) => mime === type
+        ),
+      false,
+      "public"
+    );
+    if (
+      !response ||
+      signal.aborted ||
+      !DesktopBrowser.isBoundedLinkImageSource(
+        response.type,
+        response.bytes.toString("latin1")
+      )
+    )
+      return null;
+    return this.#decodeLinkImage(
+      `data:${response.type};base64,${response.bytes.toString("base64")}`,
+      signal
+    ).catch(() => null);
+  }
+
+  async #favicon(
+    url: string,
+    head: Element[],
+    signal: AbortSignal,
+    kind: WebPreview.Kind = "loopback"
+  ) {
     const origin = new URL(url).origin;
     const base = attribute(
       head.find(
@@ -433,7 +537,11 @@ export class WebPreviewService {
     );
     let iconBase = url;
     try {
-      if (base) iconBase = new URL(base, url).href;
+      if (base)
+        iconBase =
+          kind === "public"
+            ? (publicLinkRedirect(base, url) ?? url)
+            : new URL(base, url).href;
     } catch {
       // An invalid base leaves relative links relative to the page.
     }
@@ -453,7 +561,10 @@ export class WebPreviewService {
         (type && !ICON_MIME_TYPES.includes(type))
       )
         continue;
-      link = sameOrigin(href, iconBase, origin);
+      link =
+        kind === "public"
+          ? publicLinkRedirect(href, iconBase)
+          : sameOrigin(href, iconBase, origin);
       if (!link) continue;
       hint = type;
       break;
@@ -466,7 +577,9 @@ export class WebPreviewService {
       (type) =>
         !type ||
         type === "application/octet-stream" ||
-        ICON_MIME_TYPES.includes(type)
+        ICON_MIME_TYPES.includes(type),
+      false,
+      kind
     );
     if (!response || signal.aborted || !response.bytes.length) return null;
     const base64 = response.bytes.toString("base64");

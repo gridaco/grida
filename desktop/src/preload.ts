@@ -627,6 +627,23 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_PREVIEW, request),
     cancelPreview: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CANCEL_PREVIEW, request),
+    previewPublicLink: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_PREVIEW_PUBLIC_LINK, request),
+    cancelPublicLinkPreview: (request) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.BROWSER_CANCEL_PUBLIC_LINK_PREVIEW,
+        request
+      ),
+    lookupPreview: async (kind, request) => {
+      if (kind !== "loopback" && kind !== "public")
+        throw new Error("browser_preview_invalid");
+      return ipcRenderer.invoke(
+        kind === "loopback"
+          ? IPC_CHANNELS.BROWSER_PREVIEW
+          : IPC_CHANNELS.BROWSER_PREVIEW_PUBLIC_LINK,
+        { ...request, result: true }
+      );
+    },
     snapshot: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
     detach: async (attachmentId) => {

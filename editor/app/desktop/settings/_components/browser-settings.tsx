@@ -3,9 +3,101 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { HistoryIcon, Loader2, XIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
+import { Label } from "@app/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@app/ui/components/select";
 import { Browser } from "@/lib/desktop/browser";
 import { BrowserHistory } from "@/lib/desktop/browser-history";
+import { BrowserLinkPreferences } from "@/lib/desktop/browser-link-preferences";
 import { SettingsBrowser } from "@/lib/desktop/settings-browser";
+
+const LINK_DESTINATION_SETTINGS = [
+  {
+    kind: "web",
+    label: "Open web links in",
+    description: "Website links from a workspace.",
+  },
+  {
+    kind: "local",
+    label: "Open local links in",
+    description: "Local development links, such as localhost.",
+  },
+] as const;
+
+function BrowserLinkOpeningSettings() {
+  const preferences = useSyncExternalStore(
+    BrowserLinkPreferences.subscribe,
+    BrowserLinkPreferences.read,
+    () => BrowserLinkPreferences.defaults
+  );
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  function setDestination(
+    kind: keyof BrowserLinkPreferences.Snapshot,
+    destination: string
+  ) {
+    if (destination !== "grida" && destination !== "system") return;
+    try {
+      BrowserLinkPreferences.set(kind, destination);
+      setSaveFailed(false);
+    } catch {
+      setSaveFailed(true);
+    }
+  }
+
+  return (
+    <section aria-label="Link opening" className="divide-y rounded-xl border">
+      {LINK_DESTINATION_SETTINGS.map(({ kind, label, description }) => {
+        const id = `browser-link-destination-${kind}`;
+        return (
+          <div
+            key={kind}
+            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
+          >
+            <div className="min-w-44 flex-1">
+              <Label htmlFor={id} className="leading-normal">
+                {label}
+              </Label>
+              <p
+                id={`${id}-description`}
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                {description}
+              </p>
+            </div>
+            <Select
+              value={preferences[kind]}
+              onValueChange={(destination) => setDestination(kind, destination)}
+            >
+              <SelectTrigger
+                id={id}
+                aria-describedby={`${id}-description`}
+                size="sm"
+                className="w-40 shrink-0"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" align="end">
+                <SelectItem value="grida">Grida</SelectItem>
+                <SelectItem value="system">Default browser</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })}
+      {saveFailed && (
+        <p role="alert" className="px-4 py-3 text-sm text-destructive">
+          Couldn’t save where links open. Try again.
+        </p>
+      )}
+    </section>
+  );
+}
 
 export function BrowserSettings() {
   const [controller] = useState(
@@ -44,9 +136,10 @@ export function BrowserSettings() {
       <header>
         <h2 className="text-lg font-semibold tracking-tight">Browser</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage website data for the built-in browser.
+          Choose where links open and manage website data.
         </p>
       </header>
+      <BrowserLinkOpeningSettings />
       {state.managementSupported && (
         <div className="divide-y rounded-xl border">
           <section className="space-y-4 px-4 py-4" aria-label="Downloads">

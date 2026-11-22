@@ -8,6 +8,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   createContext,
   type HTMLAttributes,
+  type MouseEventHandler,
   type PropsWithChildren,
   type RefObject,
   useContext,
@@ -236,6 +237,7 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
+  onLinkClick,
   suggestion,
   onDraftChange,
   onTransfer,
@@ -254,6 +256,8 @@ export function ComposerContent({
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /** Optional handler for the formatting menu's Open link action. */
+  onLinkClick?: MouseEventHandler<HTMLAnchorElement>;
   /** Faint text outside the document. Only plain Tab accepts the full text. */
   suggestion?: { text: string; take(text: string): boolean };
   /** Synchronous document and composition changes, including edits within one render. */
@@ -528,6 +532,7 @@ export function ComposerContent({
           <ComposerFormattingMenu
             editor={editor}
             disabled={readOnly || !!snapshot.trigger}
+            onLinkClick={onLinkClick}
           />
         </div>
       )}

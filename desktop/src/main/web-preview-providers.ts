@@ -1,5 +1,5 @@
 import { WebPreview } from "@grida/desktop-bridge";
-import type { WebPreviewProvider } from "./web-preview";
+import type { WebPreviewProvider } from "./web-preview-provider";
 
 const declarations = import.meta.glob<unknown>(
   "../../../extensions/*/web-preview.json",

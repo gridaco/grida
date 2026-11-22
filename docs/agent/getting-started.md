@@ -86,17 +86,30 @@ With **Settings → Personalization → Suggested prompts** enabled, a follow-up
 ## Open a local web preview
 
 In a Desktop project chat, a finished reply that gives you one local web
-address with a port can show a **Web preview** card. Click the card, **Open**,
-or a web link in the transcript to use the current workbench browser when
-available, with the system browser as the fallback. If that exact address is
-already open in the workbench, Grida switches to its tab. The menu beside **Open**
-offers **Open in default browser** and **Copy link**. If the local server is
-stopped, start it and reload the page.
+address with a port can show a **Web preview** card. Click the card or **Open**
+to use your local-link preference in **Settings → Browser**. If you use
+Grida and that exact address is already open in the workbench, Grida switches
+to its tab. The menu beside **Open** offers **Open in default browser** and
+**Copy link**. If the local server is stopped, start it and reload the page.
 
 When the card is visible, Desktop can fill in the page title, description and
 icon. Recognized products such as FX Viewer can also show their name. The
 second line shows the description, or the host and port if no description is
-available. **Open** is available while Desktop reads the preview.
+available. Hover over the local link in the reply to see its preview and
+product label when available. Cards and inline links for the same address
+share preview details. If you stop or restart a local server, hover the link
+again or bring a card into view to recheck it. **Open** is available while
+Desktop reads the preview.
+
+## Preview a public link
+
+Hover over a public link in a Desktop project chat to see its domain and
+**Open** action. After a short delay, the card can show the page title,
+description, favicon, and preview image when available. It can also label a
+recognized product such as FX Viewer. Desktop requests the metadata and images
+before you open the link. Both the link and **Open**
+follow your web-link preference in **Settings → Browser**, even if the
+preview is unavailable.
 
 ## Attach an image
 

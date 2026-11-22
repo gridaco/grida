@@ -7,7 +7,7 @@ import type {
   WebContents,
   WebPreferences,
 } from "electron";
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, type WebPreview } from "@grida/desktop-bridge";
 
 const historyDirectories: string[] = [];
 
@@ -441,6 +441,110 @@ it("admits preview lookups only for the current workspace attachment and discard
   expect(clear).toHaveBeenCalledWith(request.attachmentId);
   finish({ title: "Late title" });
   await expect(result).resolves.toBeNull();
+  host.closeAll();
+});
+
+it("leases public preview reads separately and cancels them with their owning workspace", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  const publicLink = Promise.withResolvers<WebPreview.LinkMetadata | null>();
+  const lookupPublicLink = vi.fn<NonNullable<Resolver["lookupPublicLink"]>>(
+    () => publicLink.promise
+  );
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: {
+      lookup: vi.fn<Resolver["lookup"]>().mockResolvedValue(null),
+      lookupPublicLink,
+      clear: vi.fn<Resolver["clear"]>(),
+    },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const peer = await fixture("abcd1234e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "request",
+    url: "https://example.com/#section",
+  };
+  await expect(host.previewPublicLink(peer.event, request)).rejects.toThrow(
+    "browser_attachment_expired"
+  );
+  await expect(
+    host.previewPublicLink(first.event, {
+      ...request,
+      url: "http://localhost:8080/",
+    })
+  ).rejects.toThrow("browser_preview_invalid");
+  expect(lookupPublicLink).not.toHaveBeenCalled();
+  const pending = host.previewPublicLink(first.event, request);
+  expect(lookupPublicLink).toHaveBeenCalledWith(
+    request.attachmentId,
+    "https://example.com/",
+    expect.any(AbortSignal)
+  );
+  const signal = lookupPublicLink.mock.calls[0]![2];
+  host.cancelPreview(first.event, request);
+  expect(signal.aborted).toBe(false);
+  expect(() => host.cancelPublicLinkPreview(peer.event, request)).toThrow(
+    "browser_attachment_expired"
+  );
+  host.cancelPublicLinkPreview(first.event, request);
+  expect(signal.aborted).toBe(true);
+  publicLink.resolve({ title: "Late result" });
+  await expect(pending).resolves.toBeNull();
+  host.closeAll();
+});
+
+it("offers completed preview outcomes through the existing attachment-scoped operations", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  type LookupResult = NonNullable<Resolver["lookupResult"]>;
+  const lookupResult = vi.fn<LookupResult>();
+  lookupResult
+    .mockResolvedValueOnce({ metadata: null })
+    .mockResolvedValueOnce({ metadata: { title: "Public page" } })
+    .mockResolvedValueOnce(null);
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: {
+      lookup: vi
+        .fn<Resolver["lookup"]>()
+        .mockResolvedValue({ title: "Legacy" }),
+      lookupResult,
+      clear: vi.fn<Resolver["clear"]>(),
+    },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "preview",
+    url: "http://127.0.0.1:8080/",
+  };
+  await expect(host.preview(first.event, request)).resolves.toEqual({
+    title: "Legacy",
+  });
+  await expect(
+    host.preview(first.event, { ...request, result: true })
+  ).resolves.toEqual({ metadata: null });
+  await expect(
+    host.previewPublicLink(first.event, {
+      ...request,
+      url: "https://example.com/#section",
+      result: true,
+    })
+  ).resolves.toEqual({ metadata: { title: "Public page" } });
+  await expect(
+    host.preview(first.event, { ...request, result: true })
+  ).resolves.toBeNull();
+  expect(
+    lookupResult.mock.calls.map(([kind, owner, url]) => [kind, owner, url])
+  ).toEqual([
+    ["loopback", request.attachmentId, request.url],
+    ["public", request.attachmentId, "https://example.com/"],
+    ["loopback", request.attachmentId, request.url],
+  ]);
   host.closeAll();
 });
 

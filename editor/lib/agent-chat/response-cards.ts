@@ -1,11 +1,10 @@
 import { WebPreview } from "@grida/desktop-bridge";
-import type { Browser } from "@/lib/desktop/browser";
 
 /** Presentation derived from an immutable, completed assistant reply. */
 export namespace ResponseCards {
   export type Card = Readonly<{
     kind: "web-preview";
-    action: Browser.OpenIntent;
+    url: string;
   }>;
 
   type Reply = Readonly<{ text: string }>;
@@ -55,11 +54,6 @@ export namespace ResponseCards {
       href = normalized;
     }
 
-    return href
-      ? {
-          kind: "web-preview",
-          action: { kind: "open-web", url: href, target: "default" },
-        }
-      : null;
+    return href ? { kind: "web-preview", url: href } : null;
   }
 }

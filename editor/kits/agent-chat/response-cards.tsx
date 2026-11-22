@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+"use client";
+
+import { useEffect, useRef } from "react";
 import {
   ChevronDownIcon,
   CopyIcon,
@@ -12,34 +14,31 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
-import type { WebPreview } from "@grida/desktop-bridge";
 import { toast } from "sonner";
 import type { ResponseCards } from "@/lib/agent-chat/response-cards";
 import type { Browser } from "@/lib/desktop/browser";
+import {
+  usePagePreview,
+  usePagePreviewSnapshot,
+} from "@/lib/desktop/browser-open-context";
 import { observeWebPreview } from "./web-preview-visibility";
+import { PreviewFavicon } from "./preview-favicon";
+
+const previewIconClassName = "size-6 shrink-0 text-blue-500 dark:text-blue-400";
 
 export function ChatResponseCards({
   cards,
   open,
-  loadPreview,
 }: {
   cards: readonly ResponseCards.Card[];
   open: Browser.OpenHandler;
-  loadPreview?: Browser.PreviewLoader;
 }) {
   return (
     <div className="flex flex-col gap-2">
       {cards.map((card) => {
         switch (card.kind) {
           case "web-preview":
-            return (
-              <WebPreviewCard
-                key={card.action.url}
-                action={card.action}
-                open={open}
-                loadPreview={loadPreview}
-              />
-            );
+            return <WebPreviewCard key={card.url} url={card.url} open={open} />;
         }
       })}
     </div>
@@ -47,32 +46,23 @@ export function ChatResponseCards({
 }
 
 function WebPreviewCard({
-  action,
+  url,
   open,
-  loadPreview,
 }: {
-  action: Browser.OpenIntent;
+  url: string;
   open: Browser.OpenHandler;
-  loadPreview?: Browser.PreviewLoader;
 }) {
   const target = useRef<HTMLDivElement>(null);
-  const [result, setResult] = useState<{
-    loader: Browser.PreviewLoader;
-    metadata: WebPreview.Metadata | null;
-  } | null>(null);
-  const [failedIcon, setFailedIcon] = useState<string | null>(null);
-  const { url } = action;
+  const preview = usePagePreview(url);
+  const { metadata } = usePagePreviewSnapshot(preview);
   const host = new URL(url).host;
   useEffect(() => {
-    if (!target.current || !loadPreview) return;
-    return observeWebPreview(target.current, url, loadPreview, (metadata) =>
-      setResult({ loader: loadPreview, metadata })
-    );
-  }, [url, loadPreview]);
-  const metadata = result?.loader === loadPreview ? result?.metadata : null;
+    if (!target.current || !preview) return;
+    return observeWebPreview(target.current, preview.request);
+  }, [preview]);
   const title = metadata?.title || metadata?.productLabel || "Web preview";
   const product = metadata?.productLabel;
-  const icon = metadata?.favicon?.dataUrl;
+  const openPage = () => open(url);
   return (
     <div
       ref={target}
@@ -80,22 +70,11 @@ function WebPreviewCard({
       aria-label="Web preview"
       className="group/preview relative isolate flex min-w-0 cursor-pointer select-none items-center gap-3 rounded-lg border bg-card px-4 py-3 text-card-foreground transition-colors hover:bg-accent/40"
     >
-      {icon && icon !== failedIcon ? (
-        // eslint-disable-next-line @next/next/no-img-element -- bounded native raster data URI
-        <img
-          src={icon}
-          alt=""
-          width={24}
-          height={24}
-          className="size-6 shrink-0 object-contain"
-          onError={() => setFailedIcon(icon)}
-        />
-      ) : (
-        <GlobeIcon
-          className="size-6 shrink-0 text-blue-500 dark:text-blue-400"
-          aria-hidden="true"
-        />
-      )}
+      <PreviewFavicon
+        metadata={metadata}
+        className={previewIconClassName}
+        fallback={<GlobeIcon className={previewIconClassName} aria-hidden />}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-sm font-medium">{title}</span>
@@ -105,27 +84,34 @@ function WebPreviewCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="min-w-0 truncate">
+        <div className="text-xs text-muted-foreground">
+          <span className="block truncate group-hover/preview:sr-only">
             {metadata?.description || host}
           </span>
           <span
             aria-hidden="true"
-            className="hidden shrink-0 group-hover/preview:block"
+            className="hidden truncate group-hover/preview:block"
           >
             Open preview
           </span>
         </div>
       </div>
-      <div className="flex shrink-0">
-        {/* Open covers the card surface, with the menu trigger above it. */}
+      <button
+        type="button"
+        aria-hidden="true"
+        tabIndex={-1}
+        className="absolute inset-0 cursor-pointer rounded-lg"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={openPage}
+      />
+      <div className="relative z-10 flex shrink-0">
         <Button
           type="button"
           variant="outline"
           size="xs"
-          className="cursor-pointer rounded-r-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+          className="cursor-pointer rounded-r-none"
           aria-label={`Open web preview at ${host}`}
-          onClick={() => open(action)}
+          onClick={openPage}
         >
           Open
         </Button>
@@ -135,16 +121,14 @@ function WebPreviewCard({
               type="button"
               variant="outline"
               size="icon-xs"
-              className="relative z-10 cursor-pointer rounded-l-none border-l-0"
+              className="cursor-pointer rounded-l-none border-l-0"
               aria-label="Web preview open options"
             >
               <ChevronDownIcon />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onSelect={() => open({ ...action, target: "external" })}
-            >
+            <DropdownMenuItem onSelect={() => open(url, "system")}>
               <ExternalLinkIcon />
               Open in default browser
             </DropdownMenuItem>

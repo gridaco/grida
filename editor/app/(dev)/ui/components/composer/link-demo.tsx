@@ -5,7 +5,10 @@ import { Button } from "@app/ui/components/button";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { ChatMessageView, type ChatMessage } from "@/kits/agent-chat";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import { BrowserPreview } from "@/lib/desktop/browser-open-context";
+import { PagePreviews } from "@/lib/desktop/page-previews";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import type { WebPreview } from "@grida/desktop-bridge";
 
 const catalog = { commands: [], mentions: [] };
 const links = [
@@ -38,6 +41,50 @@ const links = [
 const references = links
   .map(({ label, href }) => `[${label}](${href})`)
   .join(", ");
+const linkPreviews = new Map<string, WebPreview.Metadata>([
+  [
+    links[0].href,
+    {
+      title: "CSS Grid layout",
+      description: "Learn to arrange content in rows and columns with CSS.",
+    },
+  ],
+  [
+    "https://grida.co/docs",
+    {
+      title: "Grida documentation",
+      description: "Guides and references for Grida’s design tools.",
+      // The demo uses local artwork so both slots work without Electron.
+      favicon: { dataUrl: "/logos/grida-favicon.png" },
+      image: { dataUrl: "/www/2026-10/wind-garden-repaint/preview.webp" },
+    },
+  ],
+  [
+    "https://github.com/gridaco/grida",
+    {
+      title: "gridaco/grida",
+      description: "Grida’s open-source design tools.",
+    },
+  ],
+]);
+
+function loadLinkPreview(
+  href: string,
+  signal: AbortSignal
+): Promise<WebPreview.Metadata | null> {
+  if (signal.aborted) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", cancel);
+      resolve(linkPreviews.get(href) ?? null);
+    }, 850);
+    const cancel = () => {
+      window.clearTimeout(timer);
+      resolve(null);
+    };
+    signal.addEventListener("abort", cancel, { once: true });
+  });
+}
 const messages: ChatMessage[] = [
   {
     id: "links-user",
@@ -90,7 +137,8 @@ export function LinkDemo() {
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Click a draft link to edit it. Send the draft to compare it with the
-          links in the transcript.
+          links in the transcript. Hover Grida docs for the image preview, CSS
+          Grid guide for a text preview, or Linear for the fallback.
         </p>
         <Button
           size="sm"
@@ -108,13 +156,21 @@ export function LinkDemo() {
 function LinkExample() {
   const [draft] = useState(createDraft);
   const [transcript, setTranscript] = useState(messages);
+  const [previews] = useState(
+    () =>
+      new PagePreviews.Controller(async (href, signal) => ({
+        metadata: await loadLinkPreview(href, signal),
+      }))
+  );
 
   return (
     <TooltipProvider>
       <div className="space-y-6 rounded-xl border bg-background p-4">
-        {transcript.map((message) => (
-          <ChatMessageView key={message.id} message={message} />
-        ))}
+        <BrowserPreview value={previews}>
+          {transcript.map((message) => (
+            <ChatMessageView key={message.id} message={message} />
+          ))}
+        </BrowserPreview>
         <AgentComposerInput
           catalog={catalog}
           draft={draft}

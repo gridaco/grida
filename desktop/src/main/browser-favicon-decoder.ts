@@ -1,6 +1,6 @@
-/** GRIDA-SEC-016 — untrusted icons decode only in an image-only sandbox. */
+/** GRIDA-SEC-016 — untrusted images decode only in an image-only sandbox. */
 import { WebContentsView } from "electron";
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, type WebPreview } from "@grida/desktop-bridge";
 
 const page =
   "data:text/html;charset=utf-8," +
@@ -9,23 +9,38 @@ const page =
   );
 
 // Executed in the dedicated sandbox. This function must be self-contained.
-async function rasterize(source: string): Promise<string> {
+async function rasterize(
+  source: string,
+  bannerEdge: number,
+  sourceEdge: number
+): Promise<string> {
+  const icon = bannerEdge === 0;
   const image = new Image(32, 32);
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error("invalid icon"));
+    image.onerror = () => reject(new Error("invalid preview image"));
     image.src = source;
   });
   const width = image.naturalWidth;
   const height = image.naturalHeight;
-  if (!width || !height || width > 1024 || height > 1024)
-    throw new Error("invalid icon dimensions");
+  if (!width || !height || width > sourceEdge || height > sourceEdge)
+    throw new Error("invalid preview image dimensions");
   const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d")!;
+  if (!icon) {
+    const scale = Math.min(1, bannerEdge / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.8);
+  }
   canvas.width = canvas.height = 32;
   const scale = Math.min(32 / width, 32 / height);
   const w = width * scale;
   const h = height * scale;
-  canvas.getContext("2d")!.drawImage(image, (32 - w) / 2, (32 - h) / 2, w, h);
+  context.drawImage(image, (32 - w) / 2, (32 - h) / 2, w, h);
   return canvas.toDataURL("image/png");
 }
 
@@ -37,13 +52,30 @@ export class BrowserFaviconDecoder {
     source: string,
     signal: AbortSignal
   ): Promise<DesktopBrowser.Favicon | null> => {
-    const task = this.#tail.then(() => this.#decode(source, signal));
+    return this.#queue(source, signal, 0).then((dataUrl) =>
+      DesktopBrowser.parseFavicon({ dataUrl })
+    );
+  };
+
+  decodeLinkImage = (
+    source: string,
+    signal: AbortSignal
+  ): Promise<WebPreview.LinkImage | null> => {
+    return this.#queue(source, signal, DesktopBrowser.MAX_LINK_IMAGE_EDGE).then(
+      (dataUrl) => DesktopBrowser.parseLinkImage({ dataUrl })
+    );
+  };
+
+  #queue(source: string, signal: AbortSignal, bannerEdge: number) {
+    const task = this.#tail.then(() =>
+      this.#decode(source, signal, bannerEdge)
+    );
     this.#tail = task.then(
       () => undefined,
       () => undefined
     );
     return task;
-  };
+  }
 
   close(): void {
     const contents = this.#renderer?.view.webContents;
@@ -54,8 +86,9 @@ export class BrowserFaviconDecoder {
 
   async #decode(
     source: string,
-    signal: AbortSignal
-  ): Promise<DesktopBrowser.Favicon | null> {
+    signal: AbortSignal,
+    bannerEdge: number
+  ): Promise<unknown> {
     if (signal.aborted) return null;
     if (!this.#renderer || this.#renderer.view.webContents.isDestroyed()) {
       const view = new WebContentsView({
@@ -91,11 +124,11 @@ export class BrowserFaviconDecoder {
           signal.aborted
             ? null
             : contents.executeJavaScript(
-                `(${rasterize.toString()})(${JSON.stringify(source)})`
+                `(${rasterize.toString()})(${JSON.stringify(source)}, ${bannerEdge}, ${bannerEdge ? DesktopBrowser.MAX_LINK_IMAGE_SOURCE_EDGE : 1024})`
               )
         ),
       ]);
-      return signal.aborted ? null : DesktopBrowser.parseFavicon({ dataUrl });
+      return signal.aborted ? null : dataUrl;
     } catch {
       if (
         !signal.aborted &&

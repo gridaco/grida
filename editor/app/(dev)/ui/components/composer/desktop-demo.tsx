@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Button } from "@app/ui/components/button";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { NativeAgentPane } from "@/scaffolds/desktop/workbench/native-agent-pane";
 import type { Browser } from "@/lib/desktop/browser";
+import { PagePreviews } from "@/lib/desktop/page-previews";
 import {
   BrowserOpen,
   BrowserPreview,
@@ -59,11 +66,19 @@ export function DesktopComposerDemo({
   );
   const question = scenario === "question";
   const webPreview = scenario === "web-preview";
-  const [openRequest, setOpenRequest] = useState<Browser.OpenIntent | null>(
-    null
+  const previews = useMemo(
+    () =>
+      new PagePreviews.Controller(async (href, signal) => ({
+        metadata: await fixtures.loadWebPreview(href, signal),
+      })),
+    [fixture]
   );
-  const openWeb = useCallback<Browser.OpenHandler>((intent) => {
-    setOpenRequest(intent);
+  const [openRequest, setOpenRequest] = useState<{
+    url: string;
+    destination?: Browser.OpenDestination;
+  } | null>(null);
+  const openWeb = useCallback<Browser.OpenHandler>((url, destination) => {
+    setOpenRequest({ url, destination });
     return true;
   }, []);
 
@@ -105,7 +120,7 @@ export function DesktopComposerDemo({
                   role="status"
                   className="min-w-0 break-all text-muted-foreground"
                 >
-                  {openRequest.target === "external"
+                  {openRequest.destination === "system"
                     ? "System browser requested for"
                     : "Workbench browser requested for"}{" "}
                   {openRequest.url}
@@ -234,7 +249,7 @@ export function DesktopComposerDemo({
           }
         >
           <BrowserOpen value={webPreview ? openWeb : null}>
-            <BrowserPreview value={webPreview ? fixtures.loadWebPreview : null}>
+            <BrowserPreview value={webPreview ? previews : null}>
               <NativeAgentPane
                 key={fixture.sessionId}
                 bridge={fixture.bridge}

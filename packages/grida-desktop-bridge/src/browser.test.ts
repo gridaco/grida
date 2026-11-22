@@ -1,6 +1,6 @@
 // GRIDA-SEC-016 — bounded native browser contract and destination pins.
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { DesktopBrowser, DESKTOP_BRIDGE_PROTOCOL } from "./index";
+import { DesktopBrowser, DESKTOP_BRIDGE_PROTOCOL, WebPreview } from "./index";
 import type { DesktopBridge, DesktopNativeCapabilities } from "./index";
 
 const page = (
@@ -846,6 +846,78 @@ const thumbnail = (
   dataUrl: `data:image/jpeg;base64,${bytes.toString("base64")}`,
   width,
   height,
+});
+
+it("distinguishes a completed preview miss from the absence of a result", () => {
+  expect(WebPreview.parseResult({ metadata: null })).toEqual({
+    metadata: null,
+  });
+  expect(WebPreview.parseResult({ metadata: { title: "Preview" } })).toEqual({
+    metadata: { title: "Preview" },
+  });
+  expect(WebPreview.parseResult(null)).toBeNull();
+  expect(WebPreview.parseResult({ metadata: {} })).toBeNull();
+  expect(WebPreview.parseResult({ title: "Legacy preview" })).toBeNull();
+});
+
+it("validates each page preview image and product label independently at the bridge", () => {
+  const { dataUrl } = thumbnail();
+  const favicon = { dataUrl };
+  const image = { dataUrl };
+  const title = "A page";
+  expect(WebPreview.parseLinkMetadata({ title, image, favicon })).toEqual({
+    title,
+    image,
+    favicon,
+  });
+  expect(WebPreview.parseLinkMetadata({ image })).toEqual({ image });
+  for (const malformed of [
+    { dataUrl: "https://images.example.com/banner.jpg" },
+    { dataUrl: dataUrl.replace("image/jpeg", "image/svg+xml") },
+    { dataUrl, url: "https://images.example.com/banner.jpg" },
+    { dataUrl: `data:image/jpeg;base64,${"A".repeat(176_000)}` },
+  ]) {
+    expect(
+      WebPreview.parseLinkMetadata({ title, image: malformed, favicon })
+    ).toEqual({ title, favicon });
+  }
+  const resized = Buffer.from(solidJpeg);
+  resized.writeUInt16BE(641, resized.indexOf(Buffer.from([0xff, 0xc0])) + 7);
+  expect(
+    WebPreview.parseLinkMetadata({
+      image: { dataUrl: thumbnail(resized).dataUrl },
+    })
+  ).toBeNull();
+  expect(
+    WebPreview.parseMetadata({ title, image, productLabel: "FX Viewer" })
+  ).toEqual({ title, image, productLabel: "FX Viewer" });
+  expect(WebPreview.parseMetadata({ productLabel: "FX Viewer" })).toEqual({
+    productLabel: "FX Viewer",
+  });
+  expect(
+    WebPreview.parseLinkMetadata({ title, productLabel: "Invalid\u0000label" })
+  ).toEqual({ title });
+});
+
+it("enforces declared banner format and source dimensions before decode", () => {
+  const source = solidJpeg.toString("latin1");
+  expect(DesktopBrowser.isBoundedLinkImageSource("image/jpeg", source)).toBe(
+    true
+  );
+  expect(DesktopBrowser.isBoundedLinkImageSource("image/png", source)).toBe(
+    false
+  );
+  const oversized = Buffer.from(solidJpeg);
+  oversized.writeUInt16BE(
+    DesktopBrowser.MAX_LINK_IMAGE_SOURCE_EDGE + 1,
+    oversized.indexOf(Buffer.from([0xff, 0xc0])) + 7
+  );
+  expect(
+    DesktopBrowser.isBoundedLinkImageSource(
+      "image/jpeg",
+      oversized.toString("latin1")
+    )
+  ).toBe(false);
 });
 
 // Generated solid-color rasters; no website assets or personal data.

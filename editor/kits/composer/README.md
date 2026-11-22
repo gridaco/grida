@@ -80,7 +80,8 @@ function ComposerBox() {
 - Select text to add a link or apply bold or italic. Press a link to open it,
   edit its text, or change its destination. Cmd/Ctrl+K opens the destination
   field for the selection. Web links use the same color and destination icons
-  in the draft and the transcript.
+  in the draft and the transcript. A host can give `ComposerContent` an
+  `onLinkClick` handler to route the formatting menu's **Open link** action.
 - Markdown shortcuts include lists, block quotes, bold, italic, code, and
   explicit links such as `[label](https://example.com)`.
 - Enter submits the draft. Shift+Enter starts a paragraph or adds a list item.

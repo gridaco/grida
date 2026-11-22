@@ -27,7 +27,10 @@ class BrowserHost implements DesktopBrowser.Bridge {
   thumbnail?: NonNullable<DesktopBrowser.Bridge["thumbnail"]>;
   favicon?: NonNullable<DesktopBrowser.Bridge["favicon"]>;
   preview?: DesktopBrowser.Bridge["preview"];
+  lookupPreview?: DesktopBrowser.Bridge["lookupPreview"];
   cancelPreview?: DesktopBrowser.Bridge["cancelPreview"];
+  previewPublicLink?: DesktopBrowser.Bridge["previewPublicLink"];
+  cancelPublicLinkPreview?: DesktopBrowser.Bridge["cancelPublicLinkPreview"];
   revision = 0;
   pages = new Map<string, DesktopBrowser.Page>();
   listeners = new Set<(event: DesktopBrowser.Event) => void>();
@@ -195,7 +198,57 @@ describe("WorkspaceBrowserTabs", () => {
 
     const current = tabs.loadPreview(url, new AbortController().signal);
     complete({ productLabel: "FX Viewer" });
-    await expect(current).resolves.toEqual({ productLabel: "FX Viewer" });
+    await expect(current).resolves.toEqual({
+      metadata: { productLabel: "FX Viewer" },
+    });
+    tabs.stop();
+  });
+
+  it("routes public previews through their own cancellable capability", async () => {
+    const { tabs, storage, host } = setup();
+    const signal = new AbortController().signal;
+    const url = "https://example.com/guide#intro";
+    await tabs.start(storage, async () => []);
+    expect(tabs.canLoadPreview()).toBe(false);
+    await expect(tabs.loadPreview(url, signal)).resolves.toBeNull();
+
+    const pending = Promise.withResolvers<WebPreview.Result | null>();
+    host.lookupPreview = vi.fn<
+      NonNullable<DesktopBrowser.Bridge["lookupPreview"]>
+    >(() => pending.promise);
+    host.cancelPublicLinkPreview = vi.fn<
+      NonNullable<DesktopBrowser.Bridge["cancelPublicLinkPreview"]>
+    >(async () => {});
+    expect(tabs.canLoadPreview()).toBe(true);
+    await expect(
+      tabs.loadPreview("http://localhost:3000", signal)
+    ).resolves.toBeNull();
+    expect(host.lookupPreview).not.toHaveBeenCalled();
+
+    const request = new AbortController();
+    const result = tabs.loadPreview(url, request.signal);
+    const [, { id }] = vi.mocked(host.lookupPreview).mock.calls[0];
+    expect(host.lookupPreview).toHaveBeenCalledExactlyOnceWith("public", {
+      id,
+      attachmentId: "owner",
+      url: "https://example.com/guide",
+    });
+    request.abort();
+    expect(host.cancelPublicLinkPreview).toHaveBeenCalledExactlyOnceWith({
+      id,
+      attachmentId: "owner",
+    });
+    pending.resolve({
+      metadata: { title: "Plan guide", productLabel: "FX Viewer" },
+    });
+    await expect(result).resolves.toBeNull();
+    await expect(tabs.loadPreview(url, signal)).resolves.toEqual({
+      metadata: { title: "Plan guide", productLabel: "FX Viewer" },
+    });
+    vi.mocked(host.lookupPreview).mockResolvedValueOnce({ metadata: null });
+    await expect(tabs.loadPreview(url, signal)).resolves.toEqual({
+      metadata: null,
+    });
     tabs.stop();
   });
 

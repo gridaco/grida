@@ -5,11 +5,22 @@ import { page, userEvent } from "vitest/browser";
 import { DesktopConversationFixtures } from "./desktop-conversation-fixtures";
 import ComposerPage from "./page";
 import { DesktopComposerDemo } from "./desktop-demo";
+import { LinkDemo } from "./link-demo";
+import { PreviewRefreshDemo } from "./preview-refresh-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
-import { ChatResponseCards } from "@/kits/agent-chat";
+import { BrowserSettings } from "@/app/desktop/settings/_components/browser-settings";
+import { ChatResponseCards, workspace_links } from "@/kits/agent-chat";
 import { ResponseCards } from "@/lib/agent-chat/response-cards";
-import type { Browser } from "@/lib/desktop/browser";
+import { Browser } from "@/lib/desktop/browser";
+import { BrowserLinkPreferences } from "@/lib/desktop/browser-link-preferences";
+import {
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
+import { PagePreviews } from "@/lib/desktop/page-previews";
+import { DESKTOP_BRIDGE_PROTOCOL } from "@grida/desktop-bridge";
+import "@/components/chat-web-link.css";
 
 // These examples exercise Desktop layout and chat IPC with local fixtures.
 vi.mock("@/app/(library)/library/attachment", () => ({
@@ -52,6 +63,142 @@ async function mountConversationDemo(
 function conversation(container: HTMLElement): HTMLElement {
   return container.querySelector<HTMLElement>('[role="log"]')!;
 }
+
+it("previews public transcript links with optional images and a fallback", async () => {
+  const openLink = vi.fn<Browser.OpenHandler>(() => true);
+  await mountDemo(
+    <BrowserOpen value={openLink}>
+      <LinkDemo />
+    </BrowserOpen>
+  );
+  const card = page.getByRole("dialog", { name: "Link preview", exact: true });
+  const images = () => Array.from(card.query()?.querySelectorAll("img") ?? []);
+  const guide = page
+    .getByRole("link", { name: "CSS Grid guide", exact: true })
+    .first();
+  const grida = page
+    .getByRole("link", { name: "Grida docs", exact: true })
+    .first();
+  const linear = page
+    .getByRole("link", { name: "Linear", exact: true })
+    .first();
+  await expect.element(card).not.toBeInTheDocument();
+  await act(async () => guide.hover());
+  await expect.element(card).toBeVisible();
+  await expect.element(card).toHaveAttribute("aria-busy", "true");
+  await expect.element(card.getByText("CSS Grid layout")).toBeVisible();
+  await expect.element(card.getByRole("link", { name: /open/i })).toBeVisible();
+  expect(images()).toHaveLength(0);
+
+  await act(async () => grida.hover());
+  await expect.element(card.getByText("Grida documentation")).toBeVisible();
+  await expect
+    .poll(() => images().map((image) => image.naturalWidth))
+    .toEqual([64, 1280]);
+
+  await act(async () => page.getByRole("button", { name: "Reset" }).hover());
+  await expect.element(card).not.toBeInTheDocument();
+  await act(async () => linear.hover());
+  await expect
+    .element(card.getByText("linear.app", { exact: true }))
+    .toBeVisible();
+  await expect.element(card).not.toHaveAttribute("aria-busy", "true");
+  await expect
+    .element(card.getByText("Grida documentation"))
+    .not.toBeInTheDocument();
+  expect(images()).toHaveLength(0);
+  await act(async () => {
+    (linear.element() as HTMLAnchorElement).focus();
+    await userEvent.keyboard("{ArrowDown}");
+  });
+  await expect
+    .element(card.getByRole("link", { name: "Open linear.app" }))
+    .toHaveFocus();
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await expect.element(card).not.toBeInTheDocument();
+  await expect.element(linear).toHaveFocus();
+  expect(openLink).not.toHaveBeenCalled();
+
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect
+    .element(card.getByRole("link", { name: "Open linear.app" }))
+    .toHaveFocus();
+  await act(async () => userEvent.keyboard("{Enter}"));
+  expect(openLink).toHaveBeenCalledExactlyOnceWith(
+    "https://linear.app/docs/editor"
+  );
+  await expect.element(card).not.toBeInTheDocument();
+});
+
+it("uses the independent Browser settings for composer and workspace link opens", async () => {
+  const openSystem = vi
+    .fn<(url: string) => Promise<void>>()
+    .mockResolvedValue();
+  const openInWorkbench = vi
+    .fn<(url: string) => boolean>()
+    .mockReturnValue(true);
+  vi.stubGlobal("grida", {
+    protocol: DESKTOP_BRIDGE_PROTOCOL,
+    caps: { native: { browser: false } },
+    shell: { open_external: openSystem },
+  });
+  const previous = BrowserLinkPreferences.read();
+  const localUrl = "http://localhost:4173/sample#section";
+  const webUrl = "https://grida.co/docs";
+  try {
+    BrowserLinkPreferences.set("web", "grida");
+    BrowserLinkPreferences.set("local", "grida");
+    const container = await mountDemo(
+      <>
+        <BrowserSettings />
+        <BrowserOpen value={Browser.opener(openInWorkbench)}>
+          <workspace_links.Link href={localUrl}>
+            Local preview
+          </workspace_links.Link>
+          <LinkDemo />
+        </BrowserOpen>
+      </>
+    );
+    const web = page.getByRole("combobox", { name: "Open web links in" });
+    const local = page.getByRole("combobox", { name: "Open local links in" });
+    const defaultBrowser = page.getByRole("option", {
+      name: "Default browser",
+    });
+    await expect.element(web).toHaveTextContent("Grida");
+    await expect.element(local).toHaveTextContent("Grida");
+    await act(async () => web.click());
+    await act(async () => defaultBrowser.click());
+    await expect.element(web).toHaveTextContent("Default browser");
+    await expect.element(local).toHaveTextContent("Grida");
+
+    const draftLink = container.querySelector<HTMLAnchorElement>(
+      `[data-composer-editor] a[href="${webUrl}"]`
+    )!;
+    await act(async () => userEvent.click(draftLink));
+    const actions = page.getByRole("group", { name: "Link actions" });
+    await act(async () =>
+      actions.getByRole("link", { name: "Open link" }).click()
+    );
+    expect(openSystem).toHaveBeenCalledExactlyOnceWith(webUrl);
+    expect(openInWorkbench).not.toHaveBeenCalled();
+
+    const localLink = page.getByRole("link", { name: "Local preview" });
+    await act(async () => localLink.click());
+    expect(openInWorkbench).toHaveBeenCalledExactlyOnceWith(localUrl);
+    await act(async () => local.click());
+    await act(async () => defaultBrowser.click());
+    await expect.element(local).toHaveTextContent("Default browser");
+    await act(async () => localLink.click());
+    expect(openInWorkbench).toHaveBeenCalledTimes(1);
+    expect(openSystem.mock.calls).toEqual([[webUrl], [localUrl]]);
+  } finally {
+    act(() => {
+      BrowserLinkPreferences.set("web", previous.web);
+      BrowserLinkPreferences.set("local", previous.local);
+    });
+    vi.unstubAllGlobals();
+  }
+});
 
 it("shows both compaction states when the playground opens", async () => {
   await mountDemo(<ComposerPage />);
@@ -183,6 +330,19 @@ it("shares the Desktop opener between finished previews and Markdown links", asy
     .element(fxCard.getByText("Browse workflow plans and runs."))
     .toBeVisible();
   expect(fxCard.element().textContent).not.toContain("127.0.0.1:4174");
+  const fxLink = log.getByRole("link", { name: "workflow viewer" });
+  expect(
+    fxLink.element().querySelector("svg[data-chat-web-link-favicon]")
+  ).toBeVisible();
+  const hover = page.getByRole("dialog", { name: "Link preview" });
+  await act(async () => fxLink.hover());
+  await expect
+    .element(hover.getByText("FX Viewer", { exact: true }))
+    .toBeVisible();
+  await expect.element(hover.getByText("Gallery cover workflow")).toBeVisible();
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await expect.element(hover).not.toBeInTheDocument();
+
   const archive = openButton(0, "localhost:4173");
   await act(async () => archive.element().scrollIntoView({ block: "center" }));
   const archiveCard = previews.nth(0);
@@ -209,21 +369,23 @@ it("shares the Desktop opener between finished previews and Markdown links", asy
 });
 
 it("starts a preview on intersection and releases pending work offscreen", async () => {
-  const load = vi.fn<Browser.PreviewLoader>(
+  const load = vi.fn<PagePreviews.Lookup>(
     (_, signal) =>
       new Promise<null>((resolve) =>
         signal.addEventListener("abort", () => resolve(null), { once: true })
       )
   );
   const url = "http://127.0.0.1:4174/plan";
+  const previews = new PagePreviews.Controller(load);
   const container = await mountDemo(
     <div style={{ height: 100, overflow: "auto" }}>
       <div style={{ height: 300 }} />
-      <ChatResponseCards
-        cards={ResponseCards.forReply({ text: url })}
-        open={() => true}
-        loadPreview={load}
-      />
+      <BrowserPreview value={previews}>
+        <ChatResponseCards
+          cards={ResponseCards.forReply({ text: url })}
+          open={() => true}
+        />
+      </BrowserPreview>
       <div style={{ height: 300 }} />
     </div>
   );
@@ -238,6 +400,70 @@ it("starts a preview on intersection and releases pending work offscreen", async
   expect(signal.aborted).toBe(false);
   scroller.scrollTop = 0;
   await expect.poll(() => signal.aborted).toBe(true);
+});
+
+it("shares a local preview refresh across existing cards and its inline icon", async () => {
+  await mountDemo(<PreviewRefreshDemo />);
+  const cards = page.getByRole("group", { name: "Web preview" });
+  const link = page.getByRole("link", { name: "workflow viewer" });
+  const card = page.getByRole("dialog", { name: "Link preview" });
+  const checks = page.getByRole("status");
+  await expect.element(cards.getByText("127.0.0.1:4174")).toHaveLength(2);
+  await expect.element(checks).toHaveTextContent("Preview checks: 1");
+  expect(link.element().querySelector("img")).toBeNull();
+
+  await act(async () =>
+    page.getByRole("button", { name: "Start sample server" }).click()
+  );
+  await expect.element(checks).toHaveTextContent("Preview checks: 1");
+  await act(async () => link.hover());
+  await expect.element(card.getByText("FX Viewer")).toBeVisible();
+  await expect.element(cards.getByText("FX Viewer")).toHaveLength(2);
+  await expect
+    .poll(() => link.element().querySelector("img")?.naturalWidth)
+    .toBe(64);
+  await expect.element(checks).toHaveTextContent("Preview checks: 2");
+
+  await act(async () =>
+    page.getByRole("button", { name: "Stop sample server" }).click()
+  );
+  await expect.element(card).not.toBeInTheDocument();
+  await act(async () => link.hover());
+  await expect.element(checks).toHaveTextContent("Preview checks: 3");
+  await expect.element(cards.getByText("127.0.0.1:4174")).toHaveLength(2);
+  expect(link.element().querySelector("img")).toBeNull();
+});
+
+it("keeps the inline favicon visible when a transcript link wraps", async () => {
+  const previews = new PagePreviews.Controller(async () => ({
+    metadata: { favicon: { dataUrl: "/logos/grida-favicon.png" } },
+  }));
+  await mountDemo(
+    <BrowserPreview value={previews}>
+      <div
+        className="wrapping-preview"
+        style={{ width: 200, font: "16px monospace" }}
+      >
+        <style>{".wrapping-preview img { max-width: 100%; }"}</style>
+        <span style={{ display: "inline-block", width: 150 }} />
+        <workspace_links.Link href="http://localhost:4173/plan">
+          Go to viewer
+        </workspace_links.Link>
+      </div>
+    </BrowserPreview>
+  );
+  const link = page.getByRole("link", { name: "Go to viewer" });
+  expect(link.element().getClientRects().length).toBeGreaterThan(1);
+  await act(async () => link.hover());
+  await expect
+    .poll(() => link.element().querySelector("img")?.naturalWidth)
+    .toBe(64);
+  await expect
+    .poll(() => {
+      const icon = link.element().querySelector("img");
+      return icon?.complete ? icon.getBoundingClientRect().width : 0;
+    })
+    .toBeGreaterThan(10);
 });
 
 function menuItem(panel: HTMLElement, title: string): HTMLElement {

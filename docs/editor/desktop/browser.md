@@ -44,6 +44,21 @@ cross-origin frames may also open in those windows.
 Pages your app generates with `blob:` or `about:blank` can open normally. These
 previews belong to the current session and are not restored after restarting.
 
+## Choose where workspace links open
+
+In **Settings → Browser**, choose **Grida** or **Default browser** for each
+setting.
+
+- **Open web links in** controls website links you open from a workspace.
+  It starts on **Default browser**.
+- **Open local links in** controls links to development sites on your computer,
+  such as `localhost:3000` and `127.0.0.1`. It starts on **Grida**.
+
+Changes apply to open workspaces right away and persist after you restart
+Desktop. Grida opens a link in your default browser if the built-in browser
+is unavailable. You can also use **Open in default browser** to open an
+individual link there.
+
 ## Test a page with the agent
 
 In a supported Desktop build, you can ask the agent in **Act** to test a local
