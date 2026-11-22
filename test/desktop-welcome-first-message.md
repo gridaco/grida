@@ -25,10 +25,10 @@ covered_by:
 
 ## Behavior
 
-A message typed on Welcome appears with its attachment when Send is pressed.
-The composer is immediately ready for the next draft. The outgoing message
-stays visible as the workspace opens and becomes the first turn of a new chat
-there. The model and effort chosen in the Welcome picker run
+A message typed on Welcome clears from the composer when Send is pressed.
+The composer is immediately ready for the next draft. The first message and
+its attachment appear in the workspace chat while it starts, then become its
+first turn. The model and effort chosen in the Welcome picker run
 that turn; Plan and Goal intents also travel with it. **Default** keeps the
 workspace's default connection. On an eligible connection, a response speed
 chosen on Home becomes the new chat's speed. Changing the project or model
@@ -89,8 +89,9 @@ attachment also keeps it with an explanation instead of omitting it.
 ## Steps
 
 1. On Welcome, type “Make a poster for a jazz night” and send.
-   - Expected: the default workspace opens; a new chat appears with that
-     message as its first turn, and the agent answers.
+   - Expected: Welcome clears the composer and shows no message bubble. The
+     message appears once in the new workspace chat while it starts, and the
+     agent answers.
 2. Reload the window (Cmd+R) after the turn starts.
    - Expected: the same chat is shown; the message is not sent again.
 3. Return to Welcome, choose a provider-key model in the picker, type a

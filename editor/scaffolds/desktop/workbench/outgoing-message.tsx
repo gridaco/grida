@@ -7,7 +7,7 @@ import { Message, MessageContent } from "@app/ui/ai-elements/message";
 import { Button } from "@app/ui/components/button";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
 
-/** The submitted draft while the host prepares its transcript or queue row. */
+/** The workspace transcript entry until the host confirms the send. */
 export function OutgoingMessage({
   text,
   attachmentName,

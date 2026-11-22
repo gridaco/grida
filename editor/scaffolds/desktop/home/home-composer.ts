@@ -622,9 +622,10 @@ export class HomeComposer {
     this.update({
       outgoing: this.recovery
         ? {
-            text: this.recovery.request.text,
-            attachmentName: this.recovery.request.attachmentName,
+            status: "failed",
             error: "This message was interrupted before opening the workspace.",
+            retryable: false,
+            handedOff: false,
           }
         : null,
     });
@@ -705,9 +706,10 @@ export class HomeComposer {
 
   private keepRecovery(captured: CapturedRequest): void {
     if (!captured.recoveryKey) return;
-    // The rich document carries the full text. Keep the recovery preview
-    // small so it does not duplicate the document against the storage limit.
-    const text = this.outgoingText(captured.input);
+    // Keep the recovery record compatible and bounded. The rich document
+    // carries the full draft for restoration.
+    const { input } = captured;
+    const text = input.text || (!input.template ? input.prompt : "");
     try {
       this.drafts.checkpoint(captured.recoveryKey, {
         requestId: captured.id,
@@ -740,23 +742,19 @@ export class HomeComposer {
 
   private showOutgoing(captured: CapturedRequest, error?: string) {
     if (this.captured !== captured) return;
-    const { input, attachment } = captured;
     this.update({
       attachment: null,
       notice: null,
-      outgoing: {
-        text: this.outgoingText(input),
-        attachmentName: attachment?.file.name ?? input.template?.name,
-        displayParts: input.messageContext?.displayParts,
-        ...(error && { error }),
-        retryable: !!error,
-        handedOff: captured.handedOff,
-      },
+      outgoing:
+        error === undefined
+          ? { status: "opening" }
+          : {
+              status: "failed",
+              error,
+              retryable: true,
+              handedOff: captured.handedOff === true,
+            },
     });
-  }
-
-  private outgoingText(input: HomeComposer.Input): string {
-    return input.text || (!input.template ? input.prompt : "");
   }
 
   private hasRequest(
@@ -999,16 +997,16 @@ export namespace HomeComposer {
     attachment: Attachment | null;
     notice: string | null;
     busy: boolean;
-    outgoing: Readonly<{
-      text: string;
-      attachmentName?: string;
-      displayParts?: NonNullable<
-        WelcomeMessage["messageContext"]
-      >["displayParts"];
-      error?: string;
-      retryable?: boolean;
-      handedOff?: boolean;
-    }> | null;
+    /** The workspace chat owns message presentation. */
+    outgoing:
+      | Readonly<{ status: "opening" }>
+      | Readonly<{
+          status: "failed";
+          error: string;
+          retryable: boolean;
+          handedOff: boolean;
+        }>
+      | null;
   }>;
   export type Input = Readonly<{
     text: string;

@@ -22,11 +22,12 @@ headless host. Windows Desktop has no agent chat.
 
 ## Start from Welcome
 
-Describe what you want in the Welcome composer and press **Send**. Your message
-appears immediately with its attachment. You can start typing your next message
-while Grida opens the selected project and starts the chat. Reloading during
-that handoff preserves the follow-up as a separate draft. If that chat already
-has an unsent draft, the text you typed during opening stays on Home.
+Describe what you want in the Welcome composer and press **Send**. The composer
+clears so you can start typing your next message while Grida opens the selected
+project. Your first message and its attachment appear in the project chat while
+it starts. Reloading during the handoff preserves the follow-up as a separate
+draft. If that chat already has an unsent draft, the text you typed during
+opening stays on Home.
 
 If the connection cannot start, the workspace keeps your Welcome message.
 Choose **Retry** once the original connection is ready. If you choose another

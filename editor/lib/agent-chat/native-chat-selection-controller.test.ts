@@ -275,7 +275,7 @@ describe("durable chat selection controller", () => {
           { ...source, read: () => store.read(source.key) }
         )
       ).toBe(true);
-      expect(home.read().outgoing?.text).toBe(first);
+      expect(home.read().outgoing).toEqual({ status: "opening" });
       store.write(source.key, second);
       expect(WorkspaceOpening.peek(workspace.id)).toBeUndefined();
 

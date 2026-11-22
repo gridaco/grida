@@ -56,10 +56,6 @@ import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
-import {
-  OutgoingMessage,
-  OutgoingMessageStatus,
-} from "@/scaffolds/desktop/shared/outgoing-message";
 import { AgentPermissionConfirmation } from "@/scaffolds/desktop/shared/agent-permission-confirmation";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
@@ -877,39 +873,6 @@ function WelcomeSurface({
                   accent) — it reads as an attachment, and starting is the
                   composer's own send. Its X removes; the gallery card also
                   toggles it. */}
-                  {staged.outgoing && (
-                    <div className="flex flex-col gap-1">
-                      <OutgoingMessage {...staged.outgoing}>
-                        <OutgoingMessageStatus
-                          status={staged.outgoing.error ? "failed" : "sending"}
-                          error={staged.outgoing.error}
-                          onRetry={
-                            staged.outgoing.retryable
-                              ? () => composer.retryCaptured(submissionHost)
-                              : undefined
-                          }
-                        />
-                      </OutgoingMessage>
-                      {staged.outgoing.error && !staged.outgoing.handedOff && (
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={restoreOutgoing}
-                          >
-                            Restore draft
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={discardOutgoing}
-                          >
-                            Discard
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                   {!staged.outgoing && pickedTemplate && (
                     <div className="flex items-center gap-2 rounded-lg border bg-background p-1.5 shadow-sm">
                       <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
@@ -1027,7 +990,7 @@ function WelcomeSurface({
                     }}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
-                    className={cn("@container", docked && "shadow-xl")}
+                    className={docked ? "shadow-xl" : undefined}
                     onCapture={capture}
                     onSubmit={(text) =>
                       composer.submit(submission(text), submissionHost)
@@ -1203,6 +1166,48 @@ function WelcomeSurface({
                       event.currentTarget.value = "";
                     }}
                   />
+                  <div role="status" className="sr-only">
+                    {staged.outgoing?.status === "opening"
+                      ? "Opening workspace"
+                      : ""}
+                  </div>
+                  {staged.outgoing?.status === "failed" && (
+                    <div className="flex flex-wrap items-center gap-2 px-1">
+                      <p
+                        role="status"
+                        className="grow text-xs text-destructive"
+                      >
+                        {staged.outgoing.error}
+                      </p>
+                      {staged.outgoing.retryable && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => composer.retryCaptured(submissionHost)}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                      {!staged.outgoing.handedOff && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={restoreOutgoing}
+                          >
+                            Restore draft
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={discardOutgoing}
+                          >
+                            Discard
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {staged.notice && (
                     <p
                       role="status"

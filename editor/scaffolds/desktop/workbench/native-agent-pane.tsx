@@ -67,10 +67,7 @@ import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import { AgentComposer } from "../shared/agent-composer";
-import {
-  OutgoingMessage,
-  OutgoingMessageStatus,
-} from "../shared/outgoing-message";
+import { OutgoingMessage, OutgoingMessageStatus } from "./outgoing-message";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";

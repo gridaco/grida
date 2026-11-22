@@ -106,11 +106,7 @@ describe("HomeComposer", () => {
     reloaded.recoverDraft(source.key, () => false);
     expect(reloaded.read()).toMatchObject({
       attachment: null,
-      outgoing: {
-        text: input.text,
-        attachmentName: "notes.txt",
-        error: expect.any(String),
-      },
+      outgoing: { status: "failed", retryable: false, handedOff: false },
     });
     expect(reloadedDrafts.read(source.key)).toEqual(following);
     reloaded.retryCaptured(host);
@@ -152,7 +148,7 @@ describe("HomeComposer", () => {
     }
   );
 
-  it("moves the whole outgoing request out of the composer while resolving its destination", async () => {
+  it("exposes only opening status on Home and hands the whole message to the workspace", async () => {
     const { composer, host } = setup();
     const target = Promise.withResolvers<Workspace>();
     vi.mocked(host.defaultWorkspace).mockReturnValue(target.promise);
@@ -165,8 +161,8 @@ describe("HomeComposer", () => {
     expect(composer.read()).toMatchObject({
       attachment: null,
       busy: true,
-      outgoing: { text: input.text, attachmentName: file.name },
     });
+    expect(composer.read().outgoing).toEqual({ status: "opening" });
     expect(host.open).not.toHaveBeenCalled();
     target.resolve(workspace);
     await vi.waitFor(() =>
@@ -193,13 +189,17 @@ describe("HomeComposer", () => {
     };
     expect(composer.capture(input, rich, host)).toBe(true);
     await vi.waitFor(() =>
-      expect(composer.read().outgoing?.error).toContain("Couldn't keep")
+      expect(composer.read().outgoing).toEqual({
+        status: "failed",
+        error: "Couldn't keep your message for the workspace.",
+        retryable: true,
+        handedOff: false,
+      })
     );
     const occupied = vi.fn<(document: unknown) => boolean>(() => false);
     expect(composer.restoreCaptured(occupied)).toBe(false);
     expect(occupied).toHaveBeenCalledExactlyOnceWith(rich);
     expect(composer.read().attachment).toBeNull();
-    expect(composer.read().outgoing?.attachmentName).toBe(file.name);
 
     const empty = vi.fn<(document: unknown) => boolean>(() => true);
     expect(composer.restoreCaptured(empty)).toBe(true);
@@ -219,7 +219,7 @@ describe("HomeComposer", () => {
       })
     ).toBe(true);
     await vi.waitFor(() =>
-      expect(composer.read().outgoing?.error).toBeTruthy()
+      expect(composer.read().outgoing).toMatchObject({ status: "failed" })
     );
     composer.retryCaptured(host);
     await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
@@ -293,11 +293,15 @@ describe("HomeComposer", () => {
       })
     ).toBe(true);
     await vi.waitFor(() =>
-      expect(composer.read().outgoing?.error).toContain("navigation")
+      expect(composer.read().outgoing).toMatchObject({
+        status: "failed",
+        error: "Workspace navigation interrupted",
+        handedOff: true,
+      })
     );
     expect(composer.restoreCaptured(() => true)).toBe(false);
     composer.discardCaptured();
-    expect(composer.read().outgoing?.handedOff).toBe(true);
+    expect(composer.read().outgoing).toMatchObject({ handedOff: true });
     composer.retryCaptured(host);
     await vi.waitFor(() => expect(host.open).toHaveBeenCalledTimes(2));
     expect(host.stash).toHaveBeenCalledOnce();
