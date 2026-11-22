@@ -1,6 +1,7 @@
 """Local HTTPS registries for the confined package-client regression tests."""
 
 import base64
+import faulthandler
 import gzip
 import hashlib
 import http.server
@@ -8,6 +9,7 @@ import io
 import json
 import pathlib
 import re
+import socketserver
 import ssl
 import subprocess
 import sys
@@ -147,13 +149,23 @@ def serve(root):
         def log_message(self, _format, *_arguments):
             pass
 
-    with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Registry) as server:
+    class LoopbackServer(http.server.ThreadingHTTPServer):
+        def server_bind(self):
+            # HTTPServer resolves a hostname during bind. The fixture only
+            # needs its local socket address and must work without a resolver.
+            socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = self.server_address
+
+    with LoopbackServer(("127.0.0.1", 0), Registry) as server:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(certificate, key)
         server.socket = context.wrap_socket(server.socket, server_side=True)
+        faulthandler.cancel_dump_traceback_later()
         print(server.server_port, flush=True)
         server.serve_forever()
 
 
 if __name__ == "__main__":
+    # Leave a startup stack on stderr before the Rust readiness deadline.
+    faulthandler.dump_traceback_later(15)
     serve(pathlib.Path(sys.argv[1]))
