@@ -2982,6 +2982,56 @@ export namespace models {
       export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
     }
 
+    /** Display facts for completed-recording transcription candidates. */
+    export namespace transcription {
+      export const models =
+        /* generated:facts:audio.transcription.models:start */
+        {
+          "google/gemini-3.5-transcribe": {
+            label: "Gemini 3.5 Transcribe",
+            vendor: "google",
+            reference_provider: "google",
+            provider_ids: ["google", "openrouter", "vercel", "vertex"],
+          },
+          "microsoft/mai-transcribe-2": {
+            label: "MAI-Transcribe-2",
+            vendor: "microsoft",
+            reference_provider: "azure",
+            provider_ids: ["azure", "openrouter", "vercel"],
+          },
+          "openai/gpt-transcribe": {
+            label: "GPT-Transcribe",
+            vendor: "openai",
+            reference_provider: "openai",
+            provider_ids: ["grida", "openai", "openrouter", "vercel"],
+          },
+          scribe_v1: {
+            label: "Scribe v1",
+            vendor: "elevenlabs",
+            reference_provider: "elevenlabs",
+            provider_ids: ["elevenlabs", "fal"],
+          },
+          scribe_v2: {
+            label: "Scribe v2",
+            vendor: "elevenlabs",
+            reference_provider: "elevenlabs",
+            provider_ids: ["elevenlabs", "fal", "openrouter"],
+          },
+          scribe_v2_medical: {
+            label: "Scribe v2 Medical",
+            vendor: "elevenlabs",
+            reference_provider: "elevenlabs",
+            provider_ids: ["elevenlabs", "openrouter"],
+          },
+          scribe_v3: {
+            label: "Scribe v3",
+            vendor: "elevenlabs",
+            reference_provider: "elevenlabs",
+            provider_ids: ["elevenlabs"],
+          },
+        } /* generated:facts:audio.transcription.models:end */ as const;
+    }
+
     /** ElevenLabs expressive text-to-speech generation. */
     export namespace text_to_speech {
       /** Exact ElevenLabs Text to Speech API `model_id`. */

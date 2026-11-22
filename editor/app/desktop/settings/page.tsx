@@ -45,24 +45,7 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { catalog as models } from "@grida/ai/catalogue";
 import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
-import {
-  AlibabaCloudLogo,
-  BlackForestLabsLogo,
-  ByteDanceLogo,
-  ElevenLabsLogo,
-  TripoLogo,
-  FalLogo,
-  GoogleLogo,
-  MetaLogo,
-  MicrosoftLogo,
-  OllamaLogo,
-  OpenAILogo,
-  OpenRouterLogo,
-  RecraftLogo,
-  SpaceXAILogo,
-  TencentLogo,
-  VercelLogo,
-} from "@grida/react-icons/logos";
+import { OllamaLogo, OpenAILogo } from "@grida/react-icons/logos";
 import {
   DesktopBridgeMissingError,
   getDesktopBridge,
@@ -104,6 +87,12 @@ import { BrowserSettings } from "./_components/browser-settings";
 import { ArchivedChatsSettings } from "./_components/archived-chats-settings";
 import { CreditsSection } from "./_components/credits-section";
 import { MediaModelReadiness } from "./_components/media-model-readiness";
+import {
+  BYOK_PROVIDER_LOGOS,
+  ModelVendorLogo,
+  ProviderLogos,
+} from "./_components/model-logos";
+import { VoiceSettings } from "./_components/voice-settings";
 
 /**
  * Desktop settings — BYOK key slots, version/platform.
@@ -209,6 +198,9 @@ export default function DesktopSettingsPage() {
               providerKeysRevision={providerKeysRevision}
               onKeyChanged={onProviderKeyChanged}
             />
+          </TabsContent>
+          <TabsContent value="voice" className="m-0">
+            <VoiceSettings />
           </TabsContent>
           <TabsContent value="hooks" className="m-0">
             <HooksSettings />
@@ -491,34 +483,6 @@ function AccountSection() {
 /* ───────────────────────────── Providers ──────────────────────────── */
 
 type ProviderModality = "text" | "image" | "video";
-
-const BYOK_PROVIDER_LOGOS: Partial<
-  Record<ByokProviderId, React.ComponentType<React.ComponentProps<"svg">>>
-> = {
-  [OPENAI_PROJECT_PROVIDER_ID]: OpenAILogo,
-  openrouter: OpenRouterLogo,
-  vercel: VercelLogo,
-  fal: FalLogo,
-  elevenlabs: ElevenLabsLogo,
-  tripo: TripoLogo,
-};
-
-const MODEL_VENDOR_LOGOS: Partial<
-  Record<string, React.ComponentType<React.ComponentProps<"svg">>>
-> = {
-  alibaba: AlibabaCloudLogo,
-  openai: OpenAILogo,
-  "recraft-ai": RecraftLogo,
-  google: GoogleLogo,
-  "black-forest-labs": BlackForestLabsLogo,
-  bytedance: ByteDanceLogo,
-  meta: MetaLogo,
-  elevenlabs: ElevenLabsLogo,
-  tripo: TripoLogo,
-  microsoft: MicrosoftLogo,
-  tencent: TencentLogo,
-  xai: SpaceXAILogo,
-};
 
 const BYOK_PROVIDER_SETUP: Record<
   ByokProviderId,
@@ -1323,7 +1287,7 @@ function MediaModelRow({
 }) {
   return (
     <div className="flex gap-3 px-6 py-4 text-sm">
-      {card.vendor && <MediaVendorLogo vendor={card.vendor} />}
+      {card.vendor && <ModelVendorLogo vendor={card.vendor} />}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">{card.label}</span>
@@ -1359,31 +1323,6 @@ function MediaModelRow({
   );
 }
 
-function MediaVendorLogo({ vendor }: { vendor: string }) {
-  const Logo = Object.hasOwn(MODEL_VENDOR_LOGOS, vendor)
-    ? MODEL_VENDOR_LOGOS[vendor]
-    : undefined;
-  if (!Logo) {
-    return (
-      <span
-        aria-hidden="true"
-        className="flex size-8 shrink-0 items-center justify-center rounded border bg-muted text-[10px] font-medium uppercase text-muted-foreground"
-      >
-        {vendor.slice(0, 1)}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="flex size-8 shrink-0 items-center justify-center rounded border bg-background"
-      aria-hidden="true"
-    >
-      <Logo focusable="false" className="size-5 text-foreground" />
-    </span>
-  );
-}
-
 function MediaProviderLogos({ card }: { card: MediaModelChoice }) {
   const providerIds = MEDIA_PROVIDER_IDS.filter((id) =>
     card.providers
@@ -1391,22 +1330,7 @@ function MediaProviderLogos({ card }: { card: MediaModelChoice }) {
       : card.provider === id
   );
 
-  return (
-    <div className="flex shrink-0 -space-x-1" aria-hidden="true">
-      {providerIds.map((id) => {
-        const Logo = BYOK_PROVIDER_LOGOS[id];
-        if (!Logo) return null;
-        return (
-          <span
-            key={id}
-            className="flex size-5 items-center justify-center rounded border bg-background ring-1 ring-background"
-          >
-            <Logo focusable="false" className="size-3.5 text-foreground" />
-          </span>
-        );
-      })}
-    </div>
-  );
+  return <ProviderLogos providerIds={providerIds} />;
 }
 
 function mediaToolHref(id: string): string {

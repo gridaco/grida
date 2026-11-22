@@ -4,7 +4,7 @@ import { EventEmitter } from "node:events";
 import type { DesktopPersonalization } from "./desktop-personalization";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { beforeEach, expect, it, vi } from "vitest";
-import { IPC_CHANNELS } from "../bridge/contract";
+import { IPC_CHANNELS, type DesktopSettingsSection } from "../bridge/contract";
 import type { DesktopIpcRole } from "./ipc-admission";
 
 const fixture = vi.hoisted(() => ({
@@ -30,7 +30,10 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock("electron", () => ({
   BrowserWindow: {
-    fromWebContents: () => fixture.window,
+    fromWebContents: (sender: WebContents) =>
+      fixture.windows.find(
+        (window) => (window as BrowserWindow).webContents === sender
+      ) ?? fixture.window,
     getAllWindows: () => fixture.windows,
   },
   dialog: { showMessageBox: fixture.confirm },
@@ -71,6 +74,7 @@ import { attachNavigationEvents, registerIpcHandlers } from "./ipc-handlers";
 
 beforeEach(() => {
   fixture.handlers.clear();
+  fixture.windows = [];
   fixture.confirm.mockReset().mockResolvedValue({ response: 0 });
   fixture.openPath.mockReset().mockResolvedValue("");
   fixture.endpoints.set.mockReset().mockResolvedValue();
@@ -179,14 +183,19 @@ it("revokes an endpoint Save request after navigation or role loss during native
   expect(fixture.confirm).not.toHaveBeenCalled();
 });
 
-function setup(hooks?: NativeAgentHooks, preferences?: DesktopPersonalization) {
+function setup(
+  hooks?: NativeAgentHooks,
+  preferences?: DesktopPersonalization,
+  voice?: Parameters<typeof registerIpcHandlers>[0]["voice"]
+) {
   let role: DesktopIpcRole | null = "main";
-  const open = vi.fn<(section?: "models") => void>();
+  const open = vi.fn<(section?: DesktopSettingsSection) => void>();
   registerIpcHandlers({
     resolve_ipc_role: () => role,
     open_settings: open,
     global_hooks: hooks,
     personalization: preferences,
+    voice,
   });
   const mainFrame = {
     url: "https://fixture.invalid/desktop/workspace?id=project",
@@ -216,6 +225,130 @@ function setup(hooks?: NativeAgentHooks, preferences?: DesktopPersonalization) {
     },
   };
 }
+
+it("keeps Voice writes in Settings and aborts the composer upload when paused", async () => {
+  const state = {
+    provider: "openrouter" as const,
+    useApiKey: true,
+    microphoneId: "default",
+    language: "auto",
+    dictionary: [],
+  };
+  const paused = { ...state, useApiKey: false };
+  const owner: NonNullable<Parameters<typeof registerIpcHandlers>[0]["voice"]> =
+    {
+      getSettings: () => state,
+      updateSettings: async (patch, check) => {
+        check?.();
+        expect(patch).toEqual({ useApiKey: false });
+        return paused;
+      },
+      saveKey: vi.fn<
+        (
+          provider: unknown,
+          key: unknown,
+          check?: () => void
+        ) => Promise<typeof state>
+      >(async (_provider, _key, check) => {
+        check?.();
+        return state;
+      }),
+      removeKey: async (check) => {
+        check?.();
+        return { ...state, provider: null };
+      },
+      transcribe: async (_request, signal) => {
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true })
+        );
+        return { ok: false, error: "cancelled" } as const;
+      },
+    };
+  const f = setup(undefined, undefined, owner);
+  const navigation = new EventEmitter();
+  Object.assign(f.event.sender, {
+    on: navigation.on.bind(navigation),
+    once: navigation.once.bind(navigation),
+    off: navigation.off.bind(navigation),
+  });
+  const request = {
+    id: "voice-1",
+    audio: new ArrayBuffer(8),
+    mimeType: "audio/webm",
+  };
+  expect(() =>
+    f.hook(IPC_CHANNELS.VOICE_SETTINGS_UPDATE, { useApiKey: false })
+  ).toThrow("denied");
+  expect(() =>
+    f.hook(IPC_CHANNELS.VOICE_KEY_SAVE, "openrouter", "sample")
+  ).toThrow("denied");
+  expect(() => f.hook(IPC_CHANNELS.VOICE_KEY_REMOVE)).toThrow("denied");
+  expect(f.invoke("voice")).toBeUndefined();
+  expect(f.open).toHaveBeenCalledWith("voice");
+  expect(f.hook(IPC_CHANNELS.VOICE_SETTINGS_GET)).toEqual(state);
+
+  const upload = f.hook(IPC_CHANNELS.VOICE_TRANSCRIBE, request);
+  await expect(f.hook(IPC_CHANNELS.VOICE_TRANSCRIBE, request)).resolves.toEqual(
+    {
+      ok: false,
+      error: "unavailable",
+    }
+  );
+  f.hook(IPC_CHANNELS.VOICE_CANCEL, "different-id");
+  f.hook(IPC_CHANNELS.VOICE_CANCEL, request.id);
+  await expect(upload).resolves.toEqual({ ok: false, error: "cancelled" });
+
+  const pendingUpload = f.hook(IPC_CHANNELS.VOICE_TRANSCRIBE, request);
+  const settingsFrame = {
+    url: "https://fixture.invalid/desktop/settings#voice",
+  };
+  const settingsSender = Object.assign(new EventEmitter(), {
+    mainFrame: settingsFrame,
+    isDestroyed: () => false,
+  });
+  const send = vi.fn<(channel: string, state: unknown) => void>();
+  Object.assign(f.event.sender, { send });
+  fixture.windows = [
+    Object.assign(fixture.window, { isDestroyed: () => false }),
+    { webContents: settingsSender, isDestroyed: () => false },
+  ];
+  await expect(
+    fixture.handlers.get(IPC_CHANNELS.VOICE_SETTINGS_UPDATE)!(
+      {
+        sender: settingsSender,
+        senderFrame: settingsFrame,
+      } as unknown as IpcMainInvokeEvent,
+      { useApiKey: false }
+    )
+  ).resolves.toEqual(paused);
+  await expect(pendingUpload).resolves.toEqual({
+    ok: false,
+    error: "cancelled",
+  });
+  expect(send).toHaveBeenCalledExactlyOnceWith(
+    IPC_CHANNELS.VOICE_SETTINGS_CHANGED,
+    paused
+  );
+
+  f.mainFrame.url = "https://fixture.invalid/desktop/settings#voice";
+  expect(() => f.hook(IPC_CHANNELS.VOICE_TRANSCRIBE, request)).toThrow(
+    "denied"
+  );
+  await expect(
+    f.hook(IPC_CHANNELS.VOICE_KEY_SAVE, "openrouter", "sample")
+  ).resolves.toEqual(state);
+  expect(owner.saveKey).toHaveBeenCalledExactlyOnceWith(
+    "openrouter",
+    "sample",
+    expect.any(Function)
+  );
+  await expect(f.hook(IPC_CHANNELS.VOICE_KEY_REMOVE)).resolves.toEqual({
+    ...state,
+    provider: null,
+  });
+  f.role("onboarding");
+  expect(() => f.hook(IPC_CHANNELS.VOICE_SETTINGS_GET)).toThrow("denied");
+});
 
 it("restricts prediction writes to the live Settings frame and broadcasts only to admitted chat surfaces", async () => {
   const state = { enabled: false, revision: 0 };

@@ -113,6 +113,55 @@ describe("ProviderNetworkHost", () => {
     expect(project.getSubscriptionModels).toBeUndefined();
   });
 
+  it.each(["openai", "openrouter"] as const)(
+    "sends %s Voice only through the private Chromium session and refuses redirects",
+    async (provider) => {
+      const networkSession = {
+        setProxy: vi.fn<() => Promise<void>>(async () => {}),
+        setUserAgent: vi.fn<(value: string) => void>(),
+      } as never;
+      vi.mocked(session.fromPartition).mockReturnValue(networkSession);
+      const request = new EventEmitter() as EventEmitter & {
+        end: (body: Buffer) => void;
+        setHeader: () => void;
+      };
+      request.end = vi.fn<(body: Buffer) => void>(() => {
+        request.emit("redirect", 307, "POST", "https://elsewhere.invalid/", {});
+      });
+      request.setHeader = vi.fn<() => void>();
+      vi.mocked(net.request).mockReturnValueOnce(request as never);
+
+      const send = ProviderNetworkHost.voiceTranscriptionNetwork();
+      expect(session.fromPartition).not.toHaveBeenCalled();
+      const response = await send(
+        provider,
+        new Headers({
+          authorization: "Bearer voice-fixture",
+          "content-type":
+            provider === "openrouter"
+              ? "application/json"
+              : "multipart/form-data; boundary=fixture",
+        }),
+        new Uint8Array([1, 2, 3]).buffer,
+        new AbortController().signal
+      );
+
+      expect(response.status).toBe(307);
+      expect(net.request).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          url: ProviderNetworkPolicy.voiceRoutes[provider].url,
+          method: "POST",
+          session: networkSession,
+          redirect: "manual",
+          credentials: "omit",
+        })
+      );
+      expect(request.end).toHaveBeenCalledExactlyOnceWith(
+        Buffer.from([1, 2, 3])
+      );
+    }
+  );
+
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {
     const pending = Promise.withResolvers<void>();
     const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);

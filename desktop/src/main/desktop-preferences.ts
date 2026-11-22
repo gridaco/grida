@@ -2,6 +2,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "@grida/daemon/server";
+import {
+  isDesktopVoiceProvider,
+  type DesktopVoiceProvider,
+  type DesktopVoiceSettings,
+} from "@grida/desktop-bridge";
 
 type PersistedDesktopPreferences = Record<string, unknown> & {
   schema_version: number;
@@ -11,6 +16,7 @@ type PersistedDesktopPreferences = Record<string, unknown> & {
   migrations?: Record<string, unknown> & {
     renderer_onboarding_v1?: boolean;
   };
+  voice?: unknown;
 };
 
 const SCHEMA_VERSION = 1;
@@ -19,7 +25,8 @@ const FILE_NAME = "preferences.json";
 const LEGACY_ONBOARDING_FILE_NAME = "onboarding.json";
 
 /**
- * Main-process owner for small, non-secret desktop preferences.
+ * Main-process owner for small desktop preferences. Voice credentials are
+ * stored here only as safeStorage ciphertext.
  *
  * The file is read once at startup and all mutations are serialized, written
  * owner-only, and atomically published before the in-memory snapshot changes.
@@ -104,6 +111,40 @@ export class DesktopPreferences {
     });
   }
 
+  getVoice(): DesktopPreferences.Voice {
+    const voice = isRecord(this.#value.voice) ? this.#value.voice : {};
+    const dictionary = Array.isArray(voice.dictionary) ? voice.dictionary : [];
+    return {
+      credential: voiceCredential(voice),
+      useApiKey: voice.useApiKey === undefined || voice.useApiKey === true,
+      microphoneId:
+        typeof voice.microphoneId === "string" ? voice.microphoneId : "default",
+      language: typeof voice.language === "string" ? voice.language : "auto",
+      dictionary: dictionary
+        .slice(0, 200)
+        .filter((entry): entry is string => typeof entry === "string"),
+    };
+  }
+
+  updateVoice(
+    update: (
+      voice: DesktopPreferences.Voice
+    ) => DesktopPreferences.Voice | Promise<DesktopPreferences.Voice>,
+    { replaceCredential = false }: { replaceCredential?: boolean } = {}
+  ): Promise<void> {
+    return this.#update(async () => {
+      const stored = isRecord(this.#value.voice) ? this.#value.voice : {};
+      const { credential, ...settings } = await update(this.getVoice());
+      return {
+        ...this.#value,
+        // A preferences edit does not migrate or reactivate legacy credentials.
+        voice: replaceCredential
+          ? { ...settings, credential }
+          : { ...stored, ...settings },
+      };
+    });
+  }
+
   #setOnboardingState({
     completed_version: completedVersion,
     renderer_migration_complete: rendererMigrationComplete,
@@ -111,13 +152,8 @@ export class DesktopPreferences {
     completed_version?: number;
     renderer_migration_complete?: boolean;
   }): Promise<void> {
-    const operation = this.#writeQueue.then(async () => {
-      if (!this.#writable) {
-        throw new Error(
-          "Desktop preferences were written by a newer Grida version"
-        );
-      }
-      const next: PersistedDesktopPreferences = {
+    return this.#update(
+      (): PersistedDesktopPreferences => ({
         ...this.#value,
         schema_version: SCHEMA_VERSION,
         onboarding: {
@@ -133,7 +169,22 @@ export class DesktopPreferences {
                 renderer_onboarding_v1: rendererMigrationComplete,
               },
             }),
-      };
+      })
+    );
+  }
+
+  #update(
+    update: () =>
+      | PersistedDesktopPreferences
+      | Promise<PersistedDesktopPreferences>
+  ): Promise<void> {
+    const operation = this.#writeQueue.then(async () => {
+      if (!this.#writable) {
+        throw new Error(
+          "Desktop preferences were written by a newer Grida version"
+        );
+      }
+      const next = await update();
       await atomicWrite(this.#filePath, `${JSON.stringify(next, null, 2)}\n`);
       this.#value = next;
     });
@@ -142,6 +193,47 @@ export class DesktopPreferences {
     this.#writeQueue = operation.catch(() => undefined);
     return operation;
   }
+}
+
+export namespace DesktopPreferences {
+  export type Voice = Omit<DesktopVoiceSettings, "provider"> & {
+    useApiKey: boolean;
+    credential?: VoiceCredential;
+  };
+  export type VoiceCredential =
+    | { version: 0; provider: "openai"; ciphertext: string }
+    | { version: 1; provider: DesktopVoiceProvider; ciphertext: string };
+}
+
+function voiceCredential(
+  voice: Record<string, unknown>
+): DesktopPreferences.VoiceCredential | undefined {
+  if (isRecord(voice.credential)) {
+    const { provider, version, ciphertext } = voice.credential;
+    if (
+      version === 1 &&
+      isDesktopVoiceProvider(provider) &&
+      isVoiceCiphertext(ciphertext)
+    ) {
+      return { version, provider, ciphertext };
+    }
+  }
+  if (
+    voice.credential === undefined &&
+    voice.useKey === true &&
+    isVoiceCiphertext(voice.keyCiphertext)
+  ) {
+    return { version: 0, provider: "openai", ciphertext: voice.keyCiphertext };
+  }
+}
+
+function isVoiceCiphertext(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 16_384 &&
+    value.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(value)
+  );
 }
 
 type LoadedPreferences = {

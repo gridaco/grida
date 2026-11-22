@@ -64,7 +64,11 @@ export type ComposerController = {
   readDocument: () => unknown | null;
   /** Restore a saved document into an empty editor. False when not applied. */
   restoreDocument: (doc: unknown) => boolean;
-  appendText: (text: string, maxBytes: number) => boolean;
+  appendText: (
+    text: string,
+    maxBytes: number,
+    placement?: "paragraph" | "inline"
+  ) => boolean;
   /** Put the caret at the end of the draft. False before the editor exists. */
   focus: () => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
@@ -177,8 +181,11 @@ export function useComposer() {
         ComposerTiptap.syncCore(core, editor);
         return true;
       },
-      appendText(text, maxBytes) {
-        return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);
+      appendText(text, maxBytes, placement) {
+        return (
+          !!editor &&
+          ComposerTiptap.appendText(editor, text, maxBytes, placement)
+        );
       },
       focus() {
         return !!editor && editor.commands.focus("end");

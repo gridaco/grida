@@ -4,6 +4,7 @@ import {
   CompactionProgress,
 } from "@/kits/agent-chat/message";
 import { DesktopComposerDemo } from "./desktop-demo";
+import { ComposerDemoVoice } from "./demo-voice";
 import { DictateDemo } from "./dictate-demo";
 import { ComposerKitDemo } from "./kit-demo";
 import { LinkDemo } from "./link-demo";
@@ -12,8 +13,23 @@ import { PreviewRefreshDemo } from "./preview-refresh-demo";
 
 export default function ComposerPage() {
   return (
+    <ComposerDemoVoice>
+      <ComposerExamples />
+    </ComposerDemoVoice>
+  );
+}
+
+function ComposerExamples() {
+  return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-semibold">Composer playground</h1>
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">Composer playground</h1>
+        <p className="text-sm text-muted-foreground">
+          Dictation uses your browser’s speech recognition, which may send audio
+          to its speech service. When recognition is unavailable, the playground
+          inserts a labeled sample transcript.
+        </p>
+      </header>
       <Example id="question-batch" title="Question batch">
         <p className="text-sm text-muted-foreground">
           Pick an option to advance. Use the arrows to revisit questions. On the

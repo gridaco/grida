@@ -56,6 +56,14 @@ const WORKBENCH_LIBRARY_CHANNELS = new Set<IpcChannel>([
  * in {@link DesktopEntryWindow.ipcRoleFor} and never reach this policy.
  */
 export namespace ipc_admission {
+  export function isVoiceComposer(pathname: string | null): boolean {
+    return (
+      pathname === "/desktop/welcome" ||
+      pathname === "/desktop/workspace" ||
+      pathname === "/desktop/file"
+    );
+  }
+
   export function allows({
     role,
     channel,
@@ -71,6 +79,18 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (
+          channel === IPC_CHANNELS.VOICE_TRANSCRIBE ||
+          channel === IPC_CHANNELS.VOICE_CANCEL
+        )
+          return isVoiceComposer(pathname);
+        if (
+          channel === IPC_CHANNELS.VOICE_SETTINGS_GET ||
+          channel === IPC_CHANNELS.VOICE_SETTINGS_CHANGED
+        )
+          return pathname === "/desktop/settings" || isVoiceComposer(pathname);
+        if (channel.startsWith("grida:voice:"))
+          return pathname === "/desktop/settings";
         if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
           return (
             pathname === "/desktop/workspace" &&

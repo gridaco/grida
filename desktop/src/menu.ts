@@ -22,7 +22,7 @@ import { servicesSidecarClient } from "./main/services-sidecar-client";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
 import { openAboutWindow } from "./main/about-window";
-import { IPC_CHANNELS } from "./bridge/contract";
+import { IPC_CHANNELS, type DesktopSettingsSection } from "./bridge/contract";
 
 export type DesktopWindowAdmission = {
   can_open: () => boolean;
@@ -43,7 +43,7 @@ export type DesktopWindowAdmission = {
 export function open_or_focus_settings(
   app: App,
   admission?: DesktopWindowAdmission,
-  section?: "models"
+  section?: DesktopSettingsSection
 ) {
   if (admission && !admission.can_open()) {
     admission.focus_entry();

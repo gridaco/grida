@@ -40,6 +40,35 @@ export namespace ProviderNetworkPolicy {
   export const OPENAI_MODELS_URL = `${OPENAI_API_BASE}/models`;
   export const OPENAI_IMAGE_URL = `${OPENAI_API_BASE}/images/generations`;
 
+  // A 24 MB Voice recording becomes 32 MB in base64, plus JSON and hints.
+  const MAX_VOICE_JSON_BODY_BYTES = 33_000_000;
+  export const voiceRoutes = {
+    openai: {
+      grantId: "provider:openai-voice",
+      url: `${OPENAI_API_BASE}/audio/transcriptions`,
+      maxBodyBytes: 25_000_000,
+    },
+    openrouter: {
+      grantId: "provider:openrouter-voice",
+      url: "https://openrouter.ai/api/v1/audio/transcriptions",
+      maxBodyBytes: MAX_VOICE_JSON_BODY_BYTES,
+    },
+    vercel: {
+      grantId: "provider:vercel-voice",
+      url: "https://ai-gateway.vercel.sh/v4/ai/transcription-model",
+      maxBodyBytes: MAX_VOICE_JSON_BODY_BYTES,
+    },
+    grida: {
+      grantId: "provider:grida-voice",
+      url: "https://gateway.grida.ai/v1/audio/transcriptions",
+      maxBodyBytes: 10 * 1024 * 1024,
+    },
+  } as const;
+  type VoiceRoute = (typeof voiceRoutes)[keyof typeof voiceRoutes];
+  const voiceRoutesByGrant = new Map<string, VoiceRoute>(
+    Object.values(voiceRoutes).map((route) => [route.grantId, route])
+  );
+
   const GG_DISCOVERY_ORIGIN = "https://gateway.grida.ai";
   const GG_DISCOVERY_PATHS = new Set([
     "/v1/models",
@@ -56,6 +85,11 @@ export namespace ProviderNetworkPolicy {
     "accept",
     "content-type",
   ]);
+  const VERCEL_VOICE_HEADERS: Readonly<Record<string, string>> = {
+    "ai-gateway-protocol-version": "0.0.1",
+    "ai-transcription-model-specification-version": "4",
+    "ai-model-id": "openai/gpt-transcribe",
+  };
 
   const MAX_HEADER_COUNT = 128;
   const MAX_HEADER_BYTES = 64 * 1024;
@@ -175,6 +209,11 @@ export namespace ProviderNetworkPolicy {
         lane: "provider",
         origins: [new URL(OPENAI_API_BASE).origin],
       },
+      ...Object.values(voiceRoutes).map(({ grantId, url }) => ({
+        id: grantId,
+        lane: "provider" as const,
+        origins: [new URL(url).origin],
+      })),
     ];
   }
 
@@ -263,6 +302,14 @@ export namespace ProviderNetworkPolicy {
         [...headers.keys()].some((name) => !OPENAI_PROJECT_HEADERS.has(name)))
     )
       throw new Error("OpenAI image request is not allowed");
+    const voiceRoute = voiceRoutesByGrant.get(grant.id);
+    if (
+      voiceRoute &&
+      (method !== "POST" ||
+        url.href !== voiceRoute.url ||
+        !allowsVoiceHeaders(voiceRoute, headers))
+    )
+      throw new Error("Voice request is not allowed");
     // GRIDA-SEC-006 / GRIDA-GG: provider — the signed object URL is the sole
     // upload authority. Never forward an API key or replay through redirects.
     if (
@@ -288,6 +335,8 @@ export namespace ProviderNetworkPolicy {
   export function maxRequestBodyBytes(
     request: AuthorizedRequest | null
   ): number {
+    const voiceRoute = request && voiceRoutesByGrant.get(request.grant.id);
+    if (voiceRoute) return voiceRoute.maxBodyBytes;
     if (
       request?.grant.id === BUILTIN_PROVIDER_GRANT_ID &&
       request.url.origin === GG_DISCOVERY_ORIGIN
@@ -313,6 +362,47 @@ export namespace ProviderNetworkPolicy {
     )
       return 64 * 1024 * 1024;
     return 32 * 1024 * 1024;
+  }
+
+  function allowsVoiceHeaders(route: VoiceRoute, headers: Headers): boolean {
+    if (!/^Bearer [!-~]+$/.test(headers.get("authorization") ?? ""))
+      return false;
+    const contentType = headers.get("content-type") ?? "";
+    if (route === voiceRoutes.openrouter) {
+      return (
+        contentType === "application/json" &&
+        [...headers.keys()].every((name) => OPENAI_PROJECT_HEADERS.has(name))
+      );
+    }
+    if (route === voiceRoutes.vercel) {
+      return (
+        contentType === "application/json" &&
+        Object.entries(VERCEL_VOICE_HEADERS).every(
+          ([name, value]) => headers.get(name) === value
+        ) &&
+        [...headers.keys()].every(
+          (name) =>
+            OPENAI_PROJECT_HEADERS.has(name) ||
+            Object.hasOwn(VERCEL_VOICE_HEADERS, name)
+        )
+      );
+    }
+    if (
+      !/^multipart\/form-data; boundary=[A-Za-z0-9_-]{1,70}$/.test(contentType)
+    )
+      return false;
+    if (route === voiceRoutes.grida) {
+      return (
+        /^[A-Za-z0-9_-]{1,128}$/.test(headers.get("idempotency-key") ?? "") &&
+        [...headers.keys()].every(
+          (name) =>
+            name === "idempotency-key" || OPENAI_PROJECT_HEADERS.has(name)
+        )
+      );
+    }
+    return [...headers.keys()].every((name) =>
+      OPENAI_PROJECT_HEADERS.has(name)
+    );
   }
 
   export function grantAllowsUrl(grant: Grant, url: URL): boolean {

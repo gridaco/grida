@@ -8,6 +8,11 @@ question placement, the composer, and its focus behavior. The fixture supplies
 chat data, events, and acknowledgements, so the page runs without Electron,
 an account, or a model.
 
+Dictation uses the microphone for the waveform and the browser’s speech
+recognition throughout the playground. The browser may send audio to its speech
+service. If recognition is unavailable, the playground inserts a labeled
+sample transcript.
+
 ## Examples
 
 - **Question batch** opens a three-question request. Pick an option to
@@ -33,14 +38,11 @@ an account, or a model.
   a same-day idle gap, and a new local calendar day.
 - **Suggested prompt** opens with a sample suggestion. Focus the composer,
   press **Tab**, then clear the draft to see it return.
-- **Dictate** uses the browser microphone to drive the scrolling waveform.
-  Recording from an empty draft collapses the editor to the waveform and
-  controls. Recording with a draft keeps the editor visible. **Cancel dictation**
-  leaves the draft in place. **Stop dictation** or **Esc** releases the
-  microphone and inserts the transcript once recognition finishes. The live
-  mode uses Web Speech on browsers that support recognition from an audio track
-  and automatically falls back to a labeled sample transcript if recognition
-  fails.
+- **Dictate** uses the production Desktop composer with browser speech
+  recognition. Start with an empty or existing draft to see both recording
+  layouts. **Cancel dictation** keeps the draft in place. **Stop dictation** or
+  **Esc** inserts the transcript. **Send** while recording transcribes and
+  submits the draft to the local preview.
 - **Links** uses the production composer and transcript components with local
   sample messages. Compare ordinary web links and the recognized site icons in
   the draft, the user bubble, and the agent response. Edit a draft link and send

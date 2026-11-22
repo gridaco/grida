@@ -13,6 +13,7 @@ import {
   type AgentComposerInputProps,
 } from "./agent-composer-input";
 import { AgentComposerTools } from "./agent-composer-tools";
+import { ComposerVoice } from "./composer-voice";
 import { NativeModelPicker } from "../workbench/native-chat-controls";
 import type { ComposerMenuAction } from "@/kits/composer";
 
@@ -93,6 +94,7 @@ export function AgentComposer({
   return (
     <AgentComposerInput
       {...input}
+      voiceDictation={ComposerVoice.desktopHost}
       commandActions={commands.map((command) => ({
         ...command,
         title: command.id,
@@ -157,7 +159,11 @@ export namespace AgentComposer {
   }>;
   export type Props = Omit<
     AgentComposerInputProps,
-    "toolbarStart" | "toolbarEnd" | "commandActions" | "onCommandSelect"
+    | "toolbarStart"
+    | "toolbarEnd"
+    | "commandActions"
+    | "onCommandSelect"
+    | "voiceDictation"
   > & {
     actions: Actions;
     commands?: readonly Command[];

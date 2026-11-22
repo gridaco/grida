@@ -35,6 +35,11 @@ const subscriptionDefinition = JSON.parse(
 
 test("public Models is the only factual source and unsupported bindings remain unavailable", () => {
   const projected = projectFacts(publicModels, presets);
+  assert.deepEqual(
+    projected["audio.transcription.models"]["openai/gpt-transcribe"]
+      .provider_ids,
+    ["grida", "openai", "openrouter", "vercel"]
+  );
   assert.equal(
     projected["image.models"]["openai/gpt-image-2"].providers.fal.id,
     publicModels["image.models"]["openai/gpt-image-2"].providers.fal.id

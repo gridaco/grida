@@ -16,6 +16,7 @@ Select a category in its sidebar:
 | Account         | Your Grida account and sign-out action.                                                                      |
 | Appearance      | Light, Dark or System theme, remembered on this device.                                                      |
 | Personalization | Suggested prompts and web search.                                                                            |
+| Voice           | Dictation key, microphone, language, and voice dictionary.                                                   |
 | Browser         | [Link destinations, downloads, site permissions, history and browser cleanup](../editor/desktop/browser.md). |
 | Credits         | Your Grida AI credit information.                                                                            |
 | LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                                 |
@@ -83,6 +84,30 @@ first connected provider that can serve the request in its usual provider
 order. A restricted key needs write
 access to the Images API for generation. Removing the key from either
 Settings tab disconnects it from both. [Choose a model](./models-and-usage.md#choose-a-model)
+
+## Voice dictation
+
+Open **Voice**, then choose **Configure** next to **GPT-Transcribe**. Create
+an API key for OpenAI, OpenRouter, Vercel AI Gateway, or Grida Gateway. Select
+its logo, paste its key, and choose **Save**. The model row shows the saved
+provider and **Delete**. **Use API key for dictation** is on when you first
+save a key. Turn it off to pause dictation and keep your key. The composer mic
+opens Voice settings while dictation is paused. Pausing cancels any active
+dictation. Turn the switch back on to resume. To switch providers, choose
+**Delete**, confirm, then choose **Configure**.
+
+Grida Gateway keys start with `sk-gg-v1-` and need Media access. Choose a
+microphone, leave the language on **Auto-detect** or select one, and add names
+or phrases to the voice dictionary as needed. OpenAI, OpenRouter, and Vercel AI
+Gateway use supported language selections and dictionary entries as hints.
+Grida Gateway detects the language automatically and keeps your preferences
+available for use with other providers.
+
+In the composer, select the microphone, speak, and choose **Stop**. Grida
+sends the completed recording to your selected provider and adds the transcript
+to your draft so you can edit it before sending. Choose **Send** while recording
+to stop, transcribe, and send in one step. When Voice needs a key, the
+microphone offers a link back to Voice settings.
 
 ## Compatible endpoints and Ollama
 

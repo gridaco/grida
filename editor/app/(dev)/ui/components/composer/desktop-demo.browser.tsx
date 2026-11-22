@@ -204,6 +204,21 @@ it("uses the independent Browser settings for composer and workspace link opens"
   }
 });
 
+it("offers dictation across the composer playground", async () => {
+  await mountDemo(<ComposerPage />);
+  for (const name of [
+    "Chat composer",
+    "Links",
+    "Long pasted text",
+    "Kit and files",
+  ]) {
+    const example = page.getByRole("region", { name, exact: true });
+    await expect
+      .element(example.getByRole("button", { name: "Dictate", exact: true }))
+      .toBeEnabled();
+  }
+});
+
 it("shows both compaction states when the playground opens", async () => {
   await mountDemo(<ComposerPage />);
   const example = page.getByRole("region", { name: "Compaction", exact: true });

@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { MediaStore, RecentStore } from "@grida/daemon/server";
+import { isDesktopVoiceReady } from "@grida/desktop-bridge";
 import create_menu, {
   focus_or_open_canvas_window,
   open_or_focus_settings,
@@ -53,6 +54,8 @@ import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
+import { VoiceService } from "./main/voice";
+import { installVoiceMicrophonePolicy } from "./main/voice-microphone";
 import { NativeChatSelections } from "./main/native-chat-selections";
 import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
@@ -1062,6 +1065,19 @@ app.on("ready", async () => {
   } catch {
     console.warn("[grida] browser history is unavailable");
   }
+  const voice = new VoiceService(desktopPreferences);
+  installVoiceMicrophonePolicy({
+    session: session.defaultSession,
+    editorOrigin: new URL(EDITOR_BASE_URL).origin,
+    admitted: (sender) => {
+      const window = BrowserWindow.fromWebContents(sender);
+      return (
+        window?.webContents === sender &&
+        entryWindow?.ipcRoleFor(window) === "main"
+      );
+    },
+    ready: () => isDesktopVoiceReady(voice.getSettings()),
+  });
   browserHost = registerIpcHandlers({
     on_native_chat: (chat) => {
       chatIpc = chat;
@@ -1077,6 +1093,7 @@ app.on("ready", async () => {
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     open_settings: (section) =>
       open_or_focus_settings(app, windowAdmission, section),
+    voice,
     archives: createDesktopArchives(
       native,
       NativeDesktopProfile.resourcesPath(app)

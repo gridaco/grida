@@ -11,6 +11,7 @@ import {
   NATIVE_DOCUMENT_ARGUMENT,
   NATIVE_DOCUMENT_CHAT_ARGUMENT,
   NATIVE_WORKSPACE_CHAT_ARGUMENT,
+  type DesktopSettingsSection,
 } from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
@@ -545,7 +546,7 @@ export function open_settings_window({
 }: {
   app: App;
   base_url: string;
-  section?: "models";
+  section?: DesktopSettingsSection;
 }) {
   return create_desktop_window({
     base_url: baseUrl,

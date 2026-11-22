@@ -284,7 +284,35 @@ function mediaProviders(card, family) {
 }
 
 export function projectFacts(source, presets) {
-  const result = {};
+  const result = {
+    "audio.transcription.models": Object.fromEntries(
+      Object.entries(source["audio.transcription.models"]).flatMap(
+        ([id, card]) => {
+          const provider_ids = Object.entries(card.providers)
+            .filter(([, binding]) =>
+              binding.endpoints?.some(
+                (endpoint) =>
+                  endpoint.input === "audio" &&
+                  (endpoint.interface === "http" ||
+                    endpoint.interface === "audio.transcriptions")
+              )
+            )
+            .map(([provider]) => provider)
+            .sort();
+          if (!provider_ids.length) return [];
+          return [
+            [
+              id,
+              {
+                ...pick(card, ["label", "vendor", "reference_provider"]),
+                provider_ids,
+              },
+            ],
+          ];
+        }
+      )
+    ),
+  };
   for (const [family, keys] of Object.entries(fields)) {
     if (family === "three_d.rig_check.operation") {
       result[family] = pick(source[family], keys);

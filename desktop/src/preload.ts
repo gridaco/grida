@@ -29,6 +29,7 @@ import {
   NativeEditorSvgText,
   type DesktopComposerPredictionSettings,
   type DesktopPersonalizationSettings,
+  type DesktopVoiceSettings,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
 import {
@@ -724,6 +725,27 @@ const bridge: DesktopBridge = {
       };
     },
   },
+  voice: {
+    getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.VOICE_SETTINGS_GET),
+    updateSettings: (patch) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VOICE_SETTINGS_UPDATE, patch),
+    saveKey: (provider, key) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VOICE_KEY_SAVE, provider, key),
+    removeKey: () => ipcRenderer.invoke(IPC_CHANNELS.VOICE_KEY_REMOVE),
+    subscribe: (listener) => {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        settings: DesktopVoiceSettings
+      ) => listener(settings);
+      ipcRenderer.on(IPC_CHANNELS.VOICE_SETTINGS_CHANGED, receive);
+      return () => {
+        ipcRenderer.off(IPC_CHANNELS.VOICE_SETTINGS_CHANGED, receive);
+      };
+    },
+    transcribe: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VOICE_TRANSCRIBE, request),
+    cancel: (id) => ipcRenderer.invoke(IPC_CHANNELS.VOICE_CANCEL, id),
+  },
   hooks: {
     inspect: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT),
     reload: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD),
@@ -1399,6 +1421,8 @@ const bridge: DesktopBridge = {
     open_settings: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_SETTINGS),
     open_llm_provider_settings: () =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_SETTINGS, "models"),
+    open_voice_settings: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_SETTINGS, "voice"),
     complete_onboarding: (workspaceId) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_COMPLETE_ONBOARDING, workspaceId),
     navigation: {

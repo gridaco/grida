@@ -4,6 +4,7 @@ export namespace SettingsNavigation {
     { id: "account", label: "Account" },
     { id: "appearance", label: "Appearance" },
     { id: "personalization", label: "Personalization" },
+    { id: "voice", label: "Voice" },
     { id: "browser", label: "Browser" },
     { id: "credits", label: "Credits" },
     { id: "models", label: "LLM Providers" },

@@ -21,11 +21,16 @@ import type { RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
+  type DesktopSettingsSection,
   type IpcChannel,
   type NavigationState,
   type OpenDialogOptions,
   type SaveDialogOptions,
 } from "../bridge/contract";
+import {
+  isDesktopVoiceReady,
+  type DesktopVoiceSettings,
+} from "@grida/desktop-bridge";
 import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
 import { servicesSidecarClient } from "./services-sidecar-client";
@@ -86,6 +91,7 @@ import { listDesktopChats, DesktopChatCatalogIpc } from "./chat-catalog-ipc";
 import type { DesktopChatCatalog } from "./native-desktop-chat-catalog";
 import type { NativeArchives } from "./native-archives";
 import type { NativeChatSelections } from "./native-chat-selections";
+import type { VoiceService } from "./voice";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -103,7 +109,11 @@ type RegisterIpcHandlersOptions = {
   on_browser_tools?: (tools: DesktopBrowserTools) => void;
   on_native_chat?: (chat: NativeChatIpc) => void;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
-  open_settings: (section?: "models") => void | Promise<void>;
+  open_settings: (section?: DesktopSettingsSection) => void | Promise<void>;
+  voice?: Pick<
+    VoiceService,
+    "getSettings" | "updateSettings" | "saveKey" | "removeKey" | "transcribe"
+  >;
   archives?: NativeArchives;
   chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
@@ -1505,6 +1515,90 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   personalization?.onPersonalizationChange((state) =>
     broadcastSettings(IPC_CHANNELS.PERSONALIZATION_CHANGED, state)
   );
+  const voice = options.voice;
+  const voiceUploads = new Map<
+    WebContents,
+    { id: string; controller: AbortController }
+  >();
+  function mutateVoice(
+    event: IpcMainInvokeEvent,
+    mutate: (check: () => void) => Promise<DesktopVoiceSettings>
+  ) {
+    return windowRequest(
+      event,
+      "voice_settings_unavailable",
+      async (_signal, check) => {
+        const state = await mutate(check);
+        if (!isDesktopVoiceReady(state)) {
+          for (const { controller } of voiceUploads.values())
+            controller.abort();
+        }
+        broadcastSettings(IPC_CHANNELS.VOICE_SETTINGS_CHANGED, state);
+        return state;
+      },
+      (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+    );
+  }
+  guarded(IPC_CHANNELS.VOICE_SETTINGS_GET, (_event, ...args: unknown[]) => {
+    if (!voice || args.length) throw new Error("voice_settings_unavailable");
+    return voice.getSettings();
+  });
+  guarded(
+    IPC_CHANNELS.VOICE_SETTINGS_UPDATE,
+    (event, patch: unknown, ...args: unknown[]) => {
+      if (!voice || args.length) throw new Error("voice_settings_unavailable");
+      return mutateVoice(event, (check) => voice.updateSettings(patch, check));
+    }
+  );
+  guarded(
+    IPC_CHANNELS.VOICE_KEY_SAVE,
+    (event, provider: unknown, key: unknown, ...args: unknown[]) => {
+      if (!voice || args.length) throw new Error("voice_settings_unavailable");
+      return mutateVoice(event, (check) => voice.saveKey(provider, key, check));
+    }
+  );
+  guarded(IPC_CHANNELS.VOICE_KEY_REMOVE, (event, ...args: unknown[]) => {
+    if (!voice || args.length) throw new Error("voice_settings_unavailable");
+    return mutateVoice(event, (check) => voice.removeKey(check));
+  });
+  guarded(IPC_CHANNELS.VOICE_CANCEL, (event, id: unknown) => {
+    const upload = voiceUploads.get(event.sender);
+    if (upload && upload.id === id) upload.controller.abort();
+  });
+  guarded(IPC_CHANNELS.VOICE_TRANSCRIBE, async (event, request: unknown) => {
+    if (!voice) return { ok: false, error: "unavailable" } as const;
+    if (
+      typeof request !== "object" ||
+      !request ||
+      !("id" in request) ||
+      typeof request.id !== "string" ||
+      request.id.length === 0 ||
+      request.id.length > 64
+    )
+      return { ok: false, error: "invalid_audio" } as const;
+    const sender = event.sender;
+    if (voiceUploads.has(sender))
+      return { ok: false, error: "unavailable" } as const;
+    const controller = new AbortController();
+    voiceUploads.set(sender, { id: request.id, controller });
+    try {
+      return await windowRequest(
+        event,
+        "voice_transcription_unavailable",
+        (signal) =>
+          voice.transcribe(
+            request,
+            AbortSignal.any([signal, controller.signal])
+          ),
+        (_window, url) =>
+          ipc_admission.isVoiceComposer(ipc_sender.pathname(url))
+      );
+    } catch {
+      return { ok: false, error: "cancelled" } as const;
+    } finally {
+      voiceUploads.delete(sender);
+    }
+  });
   guarded(IPC_CHANNELS.PERSONALIZATION_GET, (_event, ...args: unknown[]) => {
     if (args.length) throw new Error("personalization_preference_invalid");
     if (!personalization) throw new Error("personalization_unavailable");
@@ -1606,8 +1700,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       throw new Error("settings window request denied");
     }
     if (args.length === 0) return options.open_settings();
-    if (args.length === 1 && args[0] === "models")
-      return options.open_settings("models");
+    if (args.length === 1 && (args[0] === "models" || args[0] === "voice"))
+      return options.open_settings(args[0]);
     throw new Error("settings window request denied");
   });
 

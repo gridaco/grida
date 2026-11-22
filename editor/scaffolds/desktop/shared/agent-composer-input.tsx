@@ -36,9 +36,11 @@ import {
   ArrowUpIcon,
   CheckIcon,
   LoaderCircleIcon,
+  MicIcon,
   PencilIcon,
   SquareIcon,
 } from "lucide-react";
+import { isDesktopVoiceReady } from "@grida/desktop-bridge";
 import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
@@ -47,6 +49,15 @@ import {
   handleBrowserLinkClick,
 } from "@/lib/desktop/browser-open-context";
 import { AgentComposerEditSession } from "./agent-composer-edit-session";
+import type { ComposerVoice } from "./composer-voice";
+import {
+  DictationActivity,
+  DictationButton,
+  DictationSetupButton,
+  openVoiceSettings,
+  useComposerVoice,
+} from "./composer-dictation-controls";
+import voiceStyles from "./composer-dictation.module.css";
 import { EditorSelectionIndicator } from "@/kits/agent-chat/editor-selection-indicator";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
@@ -70,6 +81,7 @@ import {
 } from "./agent-composer-queue-submit";
 
 const ESCAPE_CONFIRM_MS = 2000;
+const MAX_DICTATION_DRAFT_BYTES = 512 * 1024;
 const toolbarIconClassName = cn(composerToolbarButtonClassName, "w-7");
 const noSuggestion = () => null;
 const noSubscription = () => () => {};
@@ -187,6 +199,7 @@ export type AgentComposerInputProps = {
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
   toolbarEnd?: ReactNode;
+  voiceDictation?: ComposerVoice.Host;
   className?: string;
 };
 
@@ -254,6 +267,7 @@ function AgentComposerInner({
   onClearSelection,
   toolbarStart,
   toolbarEnd,
+  voiceDictation,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
   const isBusy = busy ?? isStreaming;
@@ -269,6 +283,11 @@ function AgentComposerInner({
   const promotedFrom = draft?.promotedFrom;
   const editOwner = draftKey ?? submissionScope;
   const [binding] = useState(() => new ComposerDraftBinding());
+  const { voice, state: voiceState } = useComposerVoice(voiceDictation);
+  useLayoutEffect(
+    () => voice.cancel,
+    [voice, draftKey, draftStore, submissionScope, editing?.id]
+  );
   useEffect(() => {
     if (!draftKey || !draftStore || !composer.ready) return;
     const meeting = binding.meet(draftKey, promotedFrom);
@@ -446,7 +465,12 @@ function AgentComposerInner({
       }
       return;
     }
-    if (!canSubmit || submitting || (draftKey && binding.held !== draftKey))
+    if (
+      voice.getSnapshot().active ||
+      !canSubmit ||
+      submitting ||
+      (draftKey && binding.held !== draftKey)
+    )
       return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // No `isStreaming` early-return: submitting while a turn runs queues the
@@ -587,23 +611,49 @@ function AgentComposerInner({
     void onSubmit(text);
   };
 
-  const primaryAction = isStreaming
-    ? {
-        label: "Stop",
-        icon: <SquareIcon className="size-3 fill-current" />,
-        onClick: onStop,
-        confirmWithEscape: true,
-      }
-    : !composer.snapshot.text.trim()
-      ? emptyAction
-      : undefined;
-  const sending = isQueueing || submitting;
+  const primaryAction = voiceState.active
+    ? undefined
+    : isStreaming
+      ? {
+          label: "Stop",
+          icon: <SquareIcon className="size-3 fill-current" />,
+          onClick: onStop,
+          confirmWithEscape: true,
+        }
+      : !composer.snapshot.text.trim()
+        ? emptyAction
+        : undefined;
+  const sending = isQueueing || submitting || voiceState.sendPending;
+  const submitRef = useRef(submit);
+  useLayoutEffect(() => {
+    submitRef.current = submit;
+  });
+  const requestSubmit = () => {
+    if (!voice.getSnapshot().active) return submit();
+    if (!canSubmit || sending || (draftKey && binding.held !== draftKey))
+      return;
+    voice.stopAndSend(() => {
+      if (submissionScopeRef.current === submissionScope)
+        void submitRef.current();
+    });
+  };
+  const canStopDictation =
+    voiceState.state.phase === "starting" ||
+    voiceState.state.phase === "recording";
+  const finishingDictation = voiceState.state.phase === "finishing";
+  const showDictationProgress = finishingDictation && !voiceState.sendPending;
   const escapeAction =
-    !editing && !sending && primaryAction?.confirmWithEscape
+    !editing &&
+    !sending &&
+    !voiceState.active &&
+    primaryAction?.confirmWithEscape
       ? primaryAction
       : undefined;
   const submitLabel =
-    allowEmptySubmit && emptySubmitLabel && !composer.snapshot.text.trim()
+    !voiceState.active &&
+    allowEmptySubmit &&
+    emptySubmitLabel &&
+    !composer.snapshot.text.trim()
       ? emptySubmitLabel
       : "Send";
   const actionLabel = sending
@@ -634,23 +684,26 @@ function AgentComposerInner({
     event.target instanceof Element &&
     event.target.closest("[data-composer-formatting]") !== null;
 
+  const isComposerEscape = (event: KeyboardEvent<HTMLDivElement>) =>
+    !composer.trigger &&
+    !isFormattingMenuEvent(event) &&
+    !event.repeat &&
+    !event.nativeEvent.isComposing &&
+    event.nativeEvent.keyCode !== 229 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    event.currentTarget.contains(event.target as Node);
+
+  const stopDictation = () => {
+    voice.stop();
+    if (voiceState.state.phase === "starting") composer.focus();
+  };
+
   const confirmEscape = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      !escapeAction ||
-      composer.trigger ||
-      isFormattingMenuEvent(event) ||
-      event.defaultPrevented ||
-      event.repeat ||
-      event.nativeEvent.isComposing ||
-      event.nativeEvent.keyCode === 229 ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      !event.currentTarget.contains(event.target as Node)
-    ) {
+    if (!escapeAction || event.defaultPrevented || !isComposerEscape(event))
       return;
-    }
 
     event.preventDefault();
     const now = Date.now();
@@ -675,6 +728,17 @@ function AgentComposerInner({
         else if (confirmUntil) setConfirmUntil(0);
       }}
       onKeyDownCapture={(event) => {
+        // The Stop tooltip may already have handled Escape to dismiss itself.
+        if (
+          canStopDictation &&
+          event.key === "Escape" &&
+          isComposerEscape(event)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          stopDictation();
+          return;
+        }
         if (
           editing &&
           event.key === "Escape" &&
@@ -689,7 +753,9 @@ function AgentComposerInner({
       }}
       className={cn(
         "@container relative select-none rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
-        className
+        className,
+        voiceState.settings && voiceStyles.composer,
+        voiceState.active && voiceState.compact && voiceStyles.compact
       )}
     >
       {!editing && <ComposerTriggerMenu />}
@@ -727,7 +793,7 @@ function AgentComposerInner({
           if (event.key === "Escape") confirmEscape(event);
         }}
         autofocus={autofocus}
-        onSubmitRequest={submit}
+        onSubmitRequest={requestSubmit}
         suggestion={
           prediction && predictedText
             ? { text: predictedText, take: prediction.take }
@@ -743,6 +809,20 @@ function AgentComposerInner({
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
       )}
+      {voiceState.notice && (
+        <div role="status" className="px-3 pb-1 text-xs text-muted-foreground">
+          {voiceState.notice.text}
+          {voiceState.notice.settings && (
+            <button
+              type="button"
+              className="ms-2 underline underline-offset-2"
+              onClick={openVoiceSettings}
+            >
+              Open Voice Settings
+            </button>
+          )}
+        </div>
+      )}
       {/* Give the default ghost hover contrast against the composer surface. */}
       <div className="flex items-center gap-2 px-2 pb-2 pt-1 [--accent:color-mix(in_oklab,var(--foreground)_8%,transparent)] dark:[--accent:color-mix(in_oklab,var(--foreground)_16%,transparent)]">
         {/* Start/end tools share a shrinkable, clipping track. `ml-auto`
@@ -750,11 +830,82 @@ function AgentComposerInner({
             outside as shrink-0, so pickers truncate before the terminal
             action is ever culled. */}
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
-          {!editing && toolbarStart}
+          {voiceState.active ? (
+            <DictationActivity
+              state={voiceState.state}
+              cancel={() => {
+                voice.cancel();
+                composer.focus();
+              }}
+            />
+          ) : (
+            !editing && toolbarStart
+          )}
           <div className="ml-auto flex min-w-0 items-center gap-0.5 overflow-hidden">
-            {!editing && toolbarEnd}
+            {!editing && !voiceState.active && toolbarEnd}
           </div>
         </div>
+        {!editing &&
+          voiceState.supported &&
+          (isDesktopVoiceReady(voiceState.settings) ? (
+            <DictationButton
+              escapeShortcut={canStopDictation}
+              label={
+                showDictationProgress
+                  ? "Transcribing…"
+                  : voiceState.active
+                    ? "Stop dictation"
+                    : "Dictate"
+              }
+              aria-disabled={finishingDictation || undefined}
+              className="aria-disabled:opacity-50"
+              disabled={!voiceState.active && (sending || !composer.ready)}
+              onClick={(event) => {
+                if (finishingDictation) return;
+                if (voiceState.active) {
+                  stopDictation();
+                  return;
+                }
+                if (draftKey && binding.held !== draftKey) return;
+                const compact =
+                  composer.isEmptyDraft() && !attachments && !selectionLabel;
+                if (compact) event.currentTarget.focus();
+                else if (event.detail > 0) composer.focus();
+                void voice.start(compact, (text) => {
+                  if (draftKey && binding.held !== draftKey) return false;
+                  return composer.appendText(
+                    text,
+                    MAX_DICTATION_DRAFT_BYTES,
+                    "inline"
+                  );
+                });
+              }}
+            >
+              {showDictationProgress ? (
+                <LoaderCircleIcon
+                  aria-hidden="true"
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                />
+              ) : voiceState.active ? (
+                <SquareIcon
+                  aria-hidden="true"
+                  className="size-3 fill-current"
+                />
+              ) : (
+                <MicIcon aria-hidden="true" className="size-4" />
+              )}
+            </DictationButton>
+          ) : (
+            <DictationSetupButton
+              label={
+                !voiceState.settings
+                  ? "Voice settings unavailable"
+                  : voiceState.settings.provider
+                    ? "Resume dictation in Voice settings"
+                    : "Set up dictation"
+              }
+            />
+          ))}
         <div className="shrink-0">
           {editing ? (
             <div className="flex items-center gap-2">
@@ -806,16 +957,22 @@ function AgentComposerInner({
               <Button
                 type="button"
                 size="icon-xs"
-                className={toolbarIconClassName}
-                disabled={sending || (!primaryAction && !canSubmit)}
+                className={cn(toolbarIconClassName, "aria-disabled:opacity-50")}
+                disabled={
+                  (sending && !voiceState.sendPending) ||
+                  voiceState.state.phase === "starting" ||
+                  (!primaryAction && !canSubmit)
+                }
+                aria-disabled={voiceState.sendPending || undefined}
                 aria-label={actionLabel}
                 aria-busy={sending || undefined}
                 aria-keyshortcuts={actionKey}
                 onClick={() => {
+                  if (voiceState.sendPending) return;
                   if (primaryAction) {
                     setConfirmUntil(0);
                     primaryAction.onClick();
-                  } else void submit();
+                  } else void requestSubmit();
                 }}
               >
                 {sending ? (

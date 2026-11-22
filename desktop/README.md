@@ -90,11 +90,14 @@ It establishes startup independence; Desktop bundles `@grida/ai-host`.
 The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,
 Desktop lifecycle or chat state.
 
-Small, non-secret native preferences live in `preferences.json` under
+Small native preferences live in `preferences.json` under
 Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
-with owner-only atomic writes. Account cookies remain in Chromium's default
+with owner-only atomic writes. Voice stores its preferences and one dedicated
+provider key encrypted with Electron `safeStorage` in this document. Main sends
+completed recordings to the selected provider and returns transcript text.
+Account cookies remain in Chromium's default
 session cookie jar, while macOS/Linux BYOK API keys use the shared native
 `providers/credentials.toml` under Grida home through the sidecar's secret adapter.
 ChatGPT OAuth stays in the

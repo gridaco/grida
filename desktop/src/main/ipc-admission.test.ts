@@ -75,6 +75,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:composer-predictions:") &&
           !channel.startsWith("grida:personalization:") &&
+          !channel.startsWith("grida:voice:") &&
           !channel.startsWith("grida:archives:") &&
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
@@ -84,6 +85,36 @@ describe("ipc_admission", () => {
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
+  });
+
+  it("separates Voice settings from composer recording", () => {
+    const voice = (pathname: string) =>
+      allowedFor("main", pathname).filter((channel) =>
+        channel.startsWith("grida:voice:")
+      );
+    const read = [
+      IPC_CHANNELS.VOICE_SETTINGS_GET,
+      IPC_CHANNELS.VOICE_SETTINGS_CHANGED,
+    ];
+    expect(voice("/desktop/settings")).toEqual([
+      IPC_CHANNELS.VOICE_SETTINGS_GET,
+      IPC_CHANNELS.VOICE_SETTINGS_UPDATE,
+      IPC_CHANNELS.VOICE_SETTINGS_CHANGED,
+      IPC_CHANNELS.VOICE_KEY_SAVE,
+      IPC_CHANNELS.VOICE_KEY_REMOVE,
+    ]);
+    for (const route of [
+      "/desktop/welcome",
+      "/desktop/workspace",
+      "/desktop/file",
+    ]) {
+      expect(voice(route)).toEqual([
+        ...read,
+        IPC_CHANNELS.VOICE_TRANSCRIBE,
+        IPC_CHANNELS.VOICE_CANCEL,
+      ]);
+    }
+    expect(voice("/desktop/tools")).toEqual([]);
   });
 
   it("admits browser control only from the main workspace shell", () => {

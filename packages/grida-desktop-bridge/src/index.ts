@@ -62,7 +62,10 @@ import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
 import type { DesktopFxViewer } from "./fx-viewer";
+import type { DesktopVoice } from "./voice";
+
 export { DesktopBrowser } from "./browser";
+export * from "./voice";
 export { WebPreview } from "./web-preview";
 export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
@@ -82,6 +85,8 @@ export type {
 } from "./native-editor-surfaces";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
+
+export type DesktopSettingsSection = "models" | "voice";
 
 export type DesktopNativeCapabilities = {
   host_apps: boolean;
@@ -342,6 +347,8 @@ export type DesktopBridge = {
       onChanged: () => void
     ): Promise<(() => void) | null>;
   };
+  /** GPT-Transcribe dictation owned by Desktop Main. Absent on older builds. */
+  voice?: DesktopVoice;
   /** Global config.toml hooks. Absent on older native builds. */
   hooks?: DesktopHooks;
   /** Fixed Settings archive operations, absent on older protocol-1 hosts. */
@@ -382,6 +389,8 @@ export type DesktopBridge = {
     open_settings?: () => Promise<void>;
     /** Open the LLM Providers section of the native Settings window. */
     open_llm_provider_settings?: () => Promise<void>;
+    /** Open the Voice section of the native Settings window. */
+    open_voice_settings?: () => Promise<void>;
     /**
      * Finish the dedicated onboarding surface and promote the same entry
      * BrowserWindow to the regular workstation. Optional because older

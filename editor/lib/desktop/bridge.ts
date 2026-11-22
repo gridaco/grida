@@ -62,6 +62,12 @@ import type {
   DesktopMediaSaveCopyResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
+  DesktopSettingsSection,
+  DesktopVoiceProvider,
+  DesktopVoiceSettings,
+  DesktopVoiceSettingsPatch,
+  DesktopVoiceTranscriptionRequest,
+  DesktopVoiceTranscriptionResult,
   MediaItem,
   NativeEditorSurfaceSnapshot,
   NavigationState,
@@ -142,6 +148,13 @@ export type {
 } from "@grida/desktop-bridge";
 
 export { DESKTOP_BRIDGE_PROTOCOL, DESKTOP_HOST_APP_IDS };
+export type {
+  DesktopVoiceProvider,
+  DesktopVoiceSettings,
+  DesktopVoiceSettingsPatch,
+  DesktopVoiceTranscriptionRequest,
+  DesktopVoiceTranscriptionResult,
+};
 
 export type HostAppId = DesktopHostAppId;
 
@@ -820,6 +833,44 @@ export type DesktopAppInfo = {
   platform: string;
 };
 
+export namespace voice {
+  function owner() {
+    const capability = bridgeOrThrow().voice;
+    if (!capability) throw new DesktopBridgeMissingError();
+    return capability;
+  }
+
+  export async function getSettings(): Promise<DesktopVoiceSettings | null> {
+    return (await getDesktopBridge()?.voice?.getSettings()) ?? null;
+  }
+
+  export function subscribe(
+    listener: (settings: DesktopVoiceSettings) => void
+  ): () => void {
+    return getDesktopBridge()?.voice?.subscribe(listener) ?? (() => {});
+  }
+
+  export async function updateSettings(patch: DesktopVoiceSettingsPatch) {
+    return owner().updateSettings(patch);
+  }
+
+  export async function saveKey(provider: DesktopVoiceProvider, key: string) {
+    return owner().saveKey(provider, key);
+  }
+
+  export async function removeKey() {
+    return owner().removeKey();
+  }
+
+  export async function transcribe(request: DesktopVoiceTranscriptionRequest) {
+    return owner().transcribe(request);
+  }
+
+  export async function cancel(id: string) {
+    await owner().cancel(id);
+  }
+}
+
 /**
  * The static identity fields the preload fills in once at handshake
  * (app version, OS platform). Read by the settings page (and any
@@ -831,12 +882,16 @@ export type DesktopAppInfo = {
  */
 export namespace app {
   /** Open or focus the native Settings window, keeping the caller in place. */
-  export async function openSettings(section?: "models"): Promise<void> {
+  export async function openSettings(
+    section?: DesktopSettingsSection
+  ): Promise<void> {
     const window = bridgeOrThrow().window;
     const open =
       section === "models"
         ? (window.open_llm_provider_settings ?? window.open_settings)
-        : window.open_settings;
+        : section === "voice"
+          ? (window.open_voice_settings ?? window.open_settings)
+          : window.open_settings;
     if (!open) throw new DesktopBridgeMissingError();
     await open();
   }

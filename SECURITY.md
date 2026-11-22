@@ -442,6 +442,11 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    Responses and authenticated subscription models destinations. It is a Main-only grant: Main dispatches it for its
    native subscription host, it is never published to the sidecar, and it is
    never eligible for the asset lane.
+   Voice uses Main-only grants for the exact GPT-Transcribe file endpoint on
+   each supported provider. Main decrypts the single saved Voice key and sends
+   it only to its selected provider. The renderer submits bounded audio and
+   receives text or a typed failure. The bridge scopes transcription to admitted
+   composer frames and key changes to the admitted Settings frame.
    When this transport is enabled, the outer native
    policy omits BYOK/GG destinations, so missing provider wiring cannot fall
    back to direct sidecar egress. Electron main transiently observes provider
@@ -2121,6 +2126,8 @@ Today:
 - `desktop/src/services-sidecar-channel.ts`, `provider-network-policy.ts`, and `services-sidecar-network.ts` — strict private stdio framing, destination/header policy and the sidecar's explicit provider/provider-asset transport client. The channel carries no host command lane: `command.*` frames are unknown types, and malformed or unknown frames fail the channel.
 - `desktop/src/main/services-sidecar-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
 - `desktop/src/main/provider-network-host.ts` and `provider-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
+- `desktop/src/main/voice.ts` and `voice-microphone.ts` — Main-owned Voice key encryption and provider-bound GPT-Transcribe requests. Microphone requests require the admitted composer and a configured Voice provider.
+- `packages/grida-ai/src/gpt-transcription.ts` — provider-specific recording encoding and bounded transcript decoding over a host-supplied transport.
 - `desktop/src/main/provider-endpoint-consent.ts` — protected Main-owned durable endpoint receipts, explicit Save consent, exact binding restoration, non-minting discovery and serialized revocation. [Consent cases](desktop/src/main/provider-endpoint-consent.test.ts) and [startup cases](desktop/src/main/provider-endpoint-startup.test.ts) pin persistence and ordinary startup/restart wiring; adjacent authority, supervisor and [Settings IPC cases](desktop/src/main/settings-ipc.test.ts) pin transport ACK and frame admission.
 - The [finite command supervisor](crates/grida-agent/src/command.rs) runs reviewed hook and completion checks. It retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt.
 - Model commands run through the [chat process store](crates/grida-agent/src/processes.rs) and its [command tools](crates/grida-agent/src/processes/tools.rs). Each launch uses the approved scope and captured environment; later input reaches only that chat's own processes. Stop, eviction, deletion, scope lifetime and shutdown end them; a changed permission profile governs only later launches, and unverified cleanup is reported at shutdown. The [native session](crates/agent-kit-sandbox/src/native/session.rs) and [trusted helper](crates/agent-kit-sandbox/src/helper.rs) end a session at its scope deadline, on stop or handle drop, and when its owner disappears. The [private process controls](crates/grida-agent/src/acp/extensions/processes.rs) list and stop processes only for an attached chat on a negotiated private connection. [Command tests](crates/grida-agent/tests/commands.rs), [process tests](crates/grida-agent/tests/process/processes.rs) and [native sandbox tests](crates/agent-kit-sandbox/tests/native.rs) cover this boundary.
@@ -2432,7 +2439,8 @@ paths, and params are public, so the design must not rely on obscurity.
    either scheme with byte-identical fixed-target behavior; the OS only
    ever delivers a build its own declared scheme.
 
-Electron main holds no durable desktop account or provider credential.
+Chromium holds the durable Desktop account session. The single Voice provider key is
+encrypted by Electron in Main-owned Desktop preferences.
 Chromium's default session owns the account cookie jar. The current Supabase SSR
 helpers do not configure these cookies as HttpOnly; trusted same-origin renderer
 code is not excluded from that cookie authority. This boundary relies on the
@@ -2442,7 +2450,8 @@ the entry account client invokes `session.defaultSession.fetch` only for the
 two fixed same-origin account routes. Main never reads or exports cookie/token
 material, and `DesktopAccountSession` returns only the three-state projection
 needed by the entry controller—not the route's account payload. Main persists
-only non-secret Desktop preferences separately from every credential store.
+non-secret Desktop preferences and the encrypted Voice key separately from the
+shared provider credentials.
 Its provider
 broker does transiently route BYOK/GG request headers and bodies; the sidecar
 owns persisted BYOK material and may hold the purpose-scoped, short-lived

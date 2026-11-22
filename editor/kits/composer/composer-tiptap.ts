@@ -616,24 +616,47 @@ export namespace ComposerTiptap {
   export function appendText(
     editor: Editor,
     text: string,
-    maxBytes: number
+    maxBytes: number,
+    placement: "paragraph" | "inline" = "paragraph"
   ): boolean {
     if (editor.isDestroyed || !text) return false;
     const empty = hasEmptyParagraph(editor);
-    const next = empty
-      ? text
-      : `${editor.getText({ blockSeparator: "\n" })}\n${text}`;
+    const current = empty ? "" : editor.getText({ blockSeparator: "\n" });
+    const doc = editor.state.doc;
+    const last = doc.lastChild;
+    const inline = placement === "inline" && last?.type.name === "paragraph";
+    const separator = inline
+      ? last.content.size > 0 && !/\s$/.test(current) && !/^\s/.test(text)
+        ? " "
+        : ""
+      : empty
+        ? ""
+        : "\n";
+    const next = `${current}${separator}${text}`;
     if (new TextEncoder().encode(next).length > maxBytes) return false;
-    const paragraphs = text.split("\n").map((line) => ({
+
+    const lines = text.split("\n");
+    const end = doc.content.size;
+    const chain = editor.chain();
+    let insertAt: number | { from: number; to: number } = empty
+      ? { from: 0, to: end }
+      : end;
+    if (inline) {
+      const first = `${separator}${lines.shift() ?? ""}`;
+      if (first) {
+        chain.command(({ tr }) => {
+          tr.insert(end - 1, editor.schema.text(first));
+          return true;
+        });
+      }
+      insertAt = end + first.length;
+    }
+    const paragraphs = lines.map((line) => ({
       type: "paragraph",
       content: line ? [{ type: "text", text: line }] : [],
     }));
-    const end = editor.state.doc.content.size;
-    return editor
-      .chain()
-      .insertContentAt(empty ? { from: 0, to: end } : end, paragraphs)
-      .focus("end")
-      .run();
+    if (paragraphs.length > 0) chain.insertContentAt(insertAt, paragraphs);
+    return chain.focus("end").run();
   }
 
   export function toDocument(json: JSONContent): ComposerDocument.Root {

@@ -100,6 +100,39 @@ describe("composer menus in a browser", () => {
     expect(paragraphs()).toEqual(["First", "Second"]);
   });
 
+  it("continues the final paragraph with inline text and preserves explicit line breaks", async () => {
+    const fixture = await setup();
+    const editor = fixture.current().editor!;
+    const paragraphs = () =>
+      Array.from(editor.view.dom.querySelectorAll("p"), (p) => p.textContent);
+    const append = async (text: string, maxBytes: number) => {
+      let appended = false;
+      await act(async () => {
+        appended = ComposerTiptap.appendText(editor, text, maxBytes, "inline");
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => resolve())
+        );
+      });
+      return appended;
+    };
+
+    expect(await append("First", 5)).toBe(true);
+    expect(paragraphs()).toEqual(["First"]);
+    act(() => {
+      editor.commands.setContent("<p><strong>First</strong></p>");
+    });
+
+    const before = editor.getJSON();
+    expect(await append("café", 10)).toBe(false);
+    expect(editor.getJSON()).toEqual(before);
+    expect(await append("café", 11)).toBe(true);
+    expect(paragraphs()).toEqual(["First café"]);
+    expect(editor.view.dom.querySelector("strong")?.textContent).toBe("First");
+
+    expect(await append("together\nNext paragraph", Infinity)).toBe(true);
+    expect(paragraphs()).toEqual(["First café together", "Next paragraph"]);
+  });
+
   it("dismisses outside clicks without losing the typed completion and stays dismissed on unchanged inspection", async () => {
     const fixture = await setup();
     typeTrigger(fixture);
