@@ -1010,33 +1010,48 @@ function ToolCallView({
 }
 
 function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
+  if (entry.state === "input-streaming") return null;
   const description = toolDisplay.describe(entry);
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
-  if (entry.state === "input-streaming") return null;
   const waitingForAnswer =
     entry.state === "input-available" && getToolName(entry) === "question";
-  // A `question` part can be `output-error` — a headless host's fixed refusal
-  // (RFC §question), or any tool error. Surface its text rather than the empty
-  // answered summary, so the refusal/error isn't silently swallowed.
   const errored = entry.state === "output-error";
-  return (
-    <div className="w-full">
+  const output = entry.state === "output-available" ? entry.output : undefined;
+  const hasAnswerSummary =
+    output !== null &&
+    typeof output === "object" &&
+    (("answers" in output && Array.isArray(output.answers)) ||
+      ("skipped" in output && output.skipped === true));
+
+  // An optional question can register without a result to disclose.
+  if (!waitingForAnswer && !errored && !hasAnswerSummary) {
+    return (
       <div className="flex items-center gap-2 text-muted-foreground text-xs">
         <MessageCircleQuestionIcon className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </div>
-      {waitingForAnswer ? (
-        <p className="mt-1 text-xs text-muted-foreground/80">
-          Awaiting your answer below.
-        </p>
-      ) : errored ? (
-        <ToolOutput output={undefined} errorText={entry.errorText} />
-      ) : (
-        <AnsweredQuestionSummary entry={entry} />
-      )}
-    </div>
+    );
+  }
+
+  return (
+    <Task defaultOpen={false} className="w-full">
+      <TaskTrigger title={title}>
+        {triggerRow(MessageCircleQuestionIcon, title)}
+      </TaskTrigger>
+      <TaskContent>
+        {waitingForAnswer ? (
+          <p className="text-xs text-muted-foreground/80">
+            Awaiting your answer below.
+          </p>
+        ) : errored ? (
+          <ToolOutput output={undefined} errorText={entry.errorText} />
+        ) : (
+          <AnsweredQuestionSummary entry={entry} />
+        )}
+      </TaskContent>
+    </Task>
   );
 }
 
@@ -1049,7 +1064,10 @@ function triggerRow(
   options?: { busy?: boolean; shimmer?: boolean }
 ) {
   return (
-    <div className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground">
+    <button
+      type="button"
+      className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-left text-muted-foreground text-xs transition-colors hover:text-foreground"
+    >
       {options?.busy ? (
         <ToolActivitySpinner className="size-3.5 shrink-0" />
       ) : (
@@ -1065,7 +1083,7 @@ function triggerRow(
         )}
       </span>
       <ChevronRightIcon className="size-3 shrink-0 opacity-0 transition-[opacity,transform] duration-150 group-hover/tool-trigger:opacity-50 group-focus-visible/tool-trigger:opacity-50 group-data-[state=open]/tool-trigger:rotate-90 motion-reduce:transition-none" />
-    </div>
+    </button>
   );
 }
 

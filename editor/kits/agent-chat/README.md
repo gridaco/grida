@@ -138,9 +138,9 @@ Keys 1–9 activate numbered choices. Enter confirms the selected answer.
 Shift+Enter adds a line in a write-in. The kit never touches the transport.
 A native reply displays the host-attributed question above the person's
 answer in one bubble.
-The finished turn's **Worked**
-disclosure contains the reply. Survey-shaped tool outputs keep their
-read-only `AnsweredQuestionSummary`.
+The finished turn's **Worked** disclosure contains the reply. The question
+tool row starts collapsed. Expand it to see the read-only
+`AnsweredQuestionSummary` when the tool recorded an answer.
 
 ## Contract (kit rules)
 

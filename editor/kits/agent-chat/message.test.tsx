@@ -14,7 +14,11 @@ import {
   SLIDES_TEMPLATE_PART,
 } from "@/lib/desktop/slides-message-context";
 import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
-import { ChatMessageView, type ChatMessageActions } from "./message";
+import {
+  ChatMessageView,
+  ToolCallGroupView,
+  type ChatMessageActions,
+} from "./message";
 import { ToolCardContent } from "./tool-card";
 
 const actions = vi.hoisted(
@@ -94,6 +98,36 @@ it("quotes each accepted batch answer with its question in order", () => {
     html.indexOf("Which theme?")
   );
   expect(html).not.toContain("Plain fallback");
+});
+
+it("shows the submitted answer once while the question tool is collapsed", () => {
+  const question = "Which format?";
+  const answer = "Large print";
+  const entry = native_tool_parts.entry({
+    callId: "ask",
+    title: "question",
+    kind: "other",
+    outcome: "succeeded",
+    input: { questions: [{ question }] },
+    output: { text: "", truncated: false, structured: { answers: [[answer]] } },
+  });
+  const reply = native_message_parts.of({
+    messageId: "reply",
+    role: "user",
+    text: answer,
+    questionReply: { waitId: "wait", question },
+  });
+
+  const html = renderToStaticMarkup(
+    <>
+      <ToolCallGroupView entries={[entry]} />
+      <ChatMessageView message={{ id: "reply", role: "user", parts: reply }} />
+    </>
+  );
+
+  expect(html).toMatch(/<button[^>]*aria-expanded="false"/);
+  expect(html).toContain("Asked you");
+  expect(html.match(/Large print/g)).toHaveLength(1);
 });
 
 it("shows one passive selection marker on the accepted user message", () => {
