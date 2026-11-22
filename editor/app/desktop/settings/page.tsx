@@ -35,13 +35,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@app/ui/components/collapsible";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { catalog as models } from "@grida/ai/catalogue";
 import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
@@ -93,6 +86,7 @@ import {
   ProviderLogos,
 } from "./_components/model-logos";
 import { VoiceSettings } from "./_components/voice-settings";
+import { SettingsGroup, SettingsSection } from "./_components/settings-layout";
 
 /**
  * Desktop settings — BYOK key slots, version/platform.
@@ -176,7 +170,7 @@ export default function DesktopSettingsPage() {
               title="LLM Providers"
               description="Text model providers for Grida's native agent."
             >
-              <ProviderListCard
+              <ProviderList
                 title="Providers"
                 description={
                   <>
@@ -190,7 +184,7 @@ export default function DesktopSettingsPage() {
                 leading={<ChatGptProviderRow />}
               >
                 <OllamaProviderRow />
-              </ProviderListCard>
+              </ProviderList>
             </SettingsSection>
           </TabsContent>
           <TabsContent value="media" className="m-0">
@@ -279,7 +273,7 @@ function ChatGptProviderRow() {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
@@ -312,7 +306,7 @@ function ChatGptProviderRow() {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="px-6 pb-5 text-sm text-muted-foreground">
+        <div className="px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             {ready
               ? "ChatGPT is connected."
@@ -371,26 +365,6 @@ function ChatGptProviderRow() {
   );
 }
 
-function SettingsSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <header>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </header>
-      <div className="flex flex-col gap-3">{children}</div>
-    </section>
-  );
-}
-
 /* ───────────────────────────── Account ───────────────────────────── */
 
 type AccountState =
@@ -444,14 +418,11 @@ function AccountSection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Account</CardTitle>
-        <CardDescription>
-          The Grida account this app is signed in with.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <SettingsSection
+      title="Account"
+      description="The Grida account this app is signed in with."
+    >
+      <SettingsGroup className="px-4 py-3">
         {state.kind === "loading" ? (
           <Skeleton className="h-9 w-full" />
         ) : state.kind === "unavailable" ? (
@@ -459,8 +430,8 @@ function AccountSection() {
             Account status unavailable
           </span>
         ) : (
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <span className="min-w-0 wrap-anywhere text-sm">
               {state.kind === "signed-in" && state.email
                 ? state.email
                 : "Signed in"}
@@ -475,8 +446,8 @@ function AccountSection() {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </SettingsSection>
   );
 }
 
@@ -549,7 +520,7 @@ function providerServesAny(
   );
 }
 
-function ProviderListCard({
+function ProviderList({
   title,
   description,
   modalities,
@@ -587,26 +558,24 @@ function ProviderListCard({
         !providerServesAny(provider, excludeModalities)
     );
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="divide-y">
-          {leading}
-          {byokProviders.map((provider) => (
-            <ByokRow
-              key={provider.id}
-              provider={provider}
-              openAiImages={openAiImages}
-              onKeyChanged={onKeyChanged}
-            />
-          ))}
-          {children}
-        </div>
-      </CardContent>
-    </Card>
+    <section className="space-y-2">
+      <header className="space-y-1">
+        <h3 className="text-sm font-medium">{title}</h3>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </header>
+      <SettingsGroup>
+        {leading}
+        {byokProviders.map((provider) => (
+          <ByokRow
+            key={provider.id}
+            provider={provider}
+            openAiImages={openAiImages}
+            onKeyChanged={onKeyChanged}
+          />
+        ))}
+        {children}
+      </SettingsGroup>
+    </section>
   );
 }
 
@@ -750,7 +719,7 @@ function ByokRow({
         <button
           ref={triggerRef}
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <ProviderLogo providerId={providerId} label={label} />
@@ -770,7 +739,7 @@ function ByokRow({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="px-6 pb-5 text-sm text-muted-foreground">
+        <div className="px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             {statusKind === "configured"
               ? openAi
@@ -947,7 +916,7 @@ function MediaProviderSettings({
       title="Media Providers"
       description="Generation providers for image, video, 3D, and audio workflows."
     >
-      <ProviderListCard
+      <ProviderList
         title="Media Provider Keys"
         description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
         providerIds={
@@ -1127,15 +1096,15 @@ function MediaModelsSection({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Media models</CardTitle>
-        <CardDescription>
+    <section className="space-y-2">
+      <header className="space-y-1">
+        <h3 className="text-sm font-medium">Media models</h3>
+        <p className="text-xs text-muted-foreground">
           Each group reports the provider or hosted session it actually uses.
           You can still open the playground to finish setup there.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+        </p>
+      </header>
+      <SettingsGroup>
         {imageSupported && (
           <MediaModelGroup
             title="Image"
@@ -1236,8 +1205,8 @@ function MediaModelsSection({
             actionLabel="Open in voice generator"
           />
         )}
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </section>
   );
 }
 
@@ -1255,9 +1224,9 @@ function MediaModelGroup({
   actionLabel: string;
 }) {
   return (
-    <section className="border-t first:border-t-0">
-      <header className="px-6 py-3">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+    <section>
+      <header className="px-4 py-3">
+        <h4 className="text-sm font-medium text-muted-foreground">{title}</h4>
       </header>
       <div className="divide-y">
         {newestMediaModels(models).map((card) => (
@@ -1286,10 +1255,10 @@ function MediaModelRow({
   actionLabel: string;
 }) {
   return (
-    <div className="flex gap-3 px-6 py-4 text-sm">
+    <div className="flex gap-3 px-4 py-3 text-sm">
       {card.vendor && <ModelVendorLogo vendor={card.vendor} />}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-medium">{card.label}</span>
           {card.deprecated && (
             <span className="text-xs text-muted-foreground">Legacy</span>
@@ -1392,7 +1361,7 @@ function OllamaProviderRow() {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
@@ -1418,7 +1387,7 @@ function OllamaProviderRow() {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="flex flex-col gap-4 px-6 pb-5 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-4 px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             Run LLMs locally on your machine with{" "}
             <a
@@ -1888,25 +1857,26 @@ function AboutSection() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>About</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Version</dt>
-          <dd>{info ? info.version : <Skeleton className="h-4 w-16" />}</dd>
-          <dt className="text-muted-foreground">Platform</dt>
-          <dd>
-            {info ? (
-              app.describePlatform(info.platform)
-            ) : (
-              <Skeleton className="h-4 w-20" />
-            )}
-          </dd>
+    <SettingsSection title="About">
+      <SettingsGroup>
+        <dl className="divide-y text-sm">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="font-medium">Version</dt>
+            <dd>{info ? info.version : <Skeleton className="h-4 w-16" />}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="font-medium">Platform</dt>
+            <dd>
+              {info ? (
+                app.describePlatform(info.platform)
+              ) : (
+                <Skeleton className="h-4 w-20" />
+              )}
+            </dd>
+          </div>
         </dl>
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </SettingsSection>
   );
 }
 

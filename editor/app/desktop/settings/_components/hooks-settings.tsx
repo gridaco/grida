@@ -6,6 +6,7 @@ import type { NativeHookEvent } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { getDesktopBridge } from "@/lib/desktop/bridge";
 import { SettingsHooks } from "@/lib/desktop/settings-hooks";
+import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 const EVENT_LABELS: Record<NativeHookEvent, string> = {
   session_start: "Turn starts or resumes",
@@ -36,14 +37,11 @@ export function HooksSettings() {
   const inspection = state.inspection;
   const busy = state.loading || state.action !== null;
   return (
-    <section data-testid="settings-hooks" className="space-y-5">
-      <header>
-        <h2 className="text-lg font-semibold tracking-tight">Hooks</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Run checks at selected points in agent work. Hooks are configured in
-          your global config.toml and apply across workspaces.
-        </p>
-      </header>
+    <SettingsSection
+      title="Hooks"
+      description="Run checks at selected points in agent work. Hooks are configured in your global config.toml and apply across workspaces."
+      data-testid="settings-hooks"
+    >
       {state.loading && !inspection ? (
         <p role="status" className="text-sm text-muted-foreground">
           Loading hooks…
@@ -54,36 +52,38 @@ export function HooksSettings() {
         </p>
       ) : (
         <>
-          <div className="space-y-3 rounded-xl border p-4">
-            <p className="break-all font-mono text-xs text-muted-foreground">
-              {inspection?.configPath}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => void controller.openConfig()}
-              >
-                <FileCodeIcon className="size-3.5" />
-                Open config.toml
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={() => void controller.reload()}
-              >
-                <RefreshCwIcon className="size-3.5" />
-                Reload
-              </Button>
+          <SettingsGroup>
+            <div className="space-y-3 px-4 py-3">
+              <p className="break-all font-mono text-xs text-muted-foreground">
+                {inspection?.configPath}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void controller.openConfig()}
+                >
+                  <FileCodeIcon className="size-3.5" />
+                  Open config.toml
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void controller.reload()}
+                >
+                  <RefreshCwIcon className="size-3.5" />
+                  Reload
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                New or changed hooks need review before they can run. Changes
+                apply to new agent connections. Restart Desktop to update
+                existing connections; running work keeps its captured hooks.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              New or changed hooks need review before they can run. Changes
-              apply to new agent connections. Restart Desktop to update existing
-              connections; running work keeps its captured hooks.
-            </p>
-          </div>
+          </SettingsGroup>
           {inspection?.diagnostics.map((message, index) => (
             <p key={index} role="alert" className="text-sm text-destructive">
               {message}
@@ -97,9 +97,9 @@ export function HooksSettings() {
                 reload.
               </p>
             )}
-          <ul className="space-y-3">
+          <ul className="divide-y rounded-xl border empty:hidden">
             {inspection?.hooks.map((hook) => (
-              <li key={hook.id} className="space-y-2 rounded-xl border p-4">
+              <li key={hook.id} className="space-y-2 px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">{hook.id}</h3>
                   <span className="text-xs text-muted-foreground">
@@ -144,6 +144,6 @@ export function HooksSettings() {
           {state.error}
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }

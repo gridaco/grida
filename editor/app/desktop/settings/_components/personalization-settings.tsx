@@ -9,6 +9,7 @@ import {
 import type { DesktopBridge } from "@grida/desktop-bridge";
 import { Switch } from "@app/ui/components/switch";
 import { SettingsPersonalization } from "@/lib/desktop/settings-personalization";
+import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 export function PersonalizationSettings({
   api,
@@ -25,18 +26,12 @@ export function PersonalizationSettings({
         : null
   );
   return (
-    <section
+    <SettingsSection
+      title="Personalization"
+      description="Choose how the agent responds in your chats."
       data-testid="settings-personalization"
-      className="@container max-w-3xl space-y-5"
+      className="@container"
     >
-      <header>
-        <h2 className="text-lg font-semibold tracking-tight">
-          Personalization
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose how the agent responds in your chats.
-        </p>
-      </header>
       {controller ? (
         <PreferenceRows controller={controller} legacy={!api} />
       ) : (
@@ -44,7 +39,7 @@ export function PersonalizationSettings({
           Update Desktop to configure your chat preferences.
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -79,7 +74,7 @@ function PreferenceRows({
     );
   return (
     <>
-      <div className="divide-y border-y">
+      <SettingsGroup>
         <PreferenceRow
           id="suggested-prompts"
           label="Suggested prompts"
@@ -114,7 +109,7 @@ function PreferenceRows({
             />
           </PreferenceRow>
         )}
-      </div>
+      </SettingsGroup>
       {legacy && (
         <p className="text-sm text-muted-foreground">
           Update Desktop to configure web search.
@@ -141,13 +136,13 @@ function PreferenceRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-4">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
       <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
       <p
         id={id + "-description"}
-        className="col-span-2 row-start-2 max-w-prose text-sm text-muted-foreground @sm:col-span-1"
+        className="col-span-2 row-start-2 max-w-prose text-xs text-muted-foreground @sm:col-span-1"
       >
         {description}
       </p>

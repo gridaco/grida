@@ -56,6 +56,7 @@ import {
   ProviderLogos,
 } from "./model-logos";
 import { voiceLanguages } from "./voice-languages";
+import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 const voiceModel = models.audio.transcription.models["openai/gpt-transcribe"];
 const voiceProviderSetup = {
@@ -184,15 +185,11 @@ export function VoiceSettings() {
   }
 
   return (
-    <section className="space-y-5" data-testid="settings-voice">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Voice</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Dictate your prompts.
-          </p>
-        </div>
-      </header>
+    <SettingsSection
+      title="Voice"
+      description="Dictate your prompts."
+      data-testid="settings-voice"
+    >
       {state.kind === "loading" && (
         <p role="status" className="text-sm text-muted-foreground">
           Loading Voice settings…
@@ -232,7 +229,7 @@ export function VoiceSettings() {
             <h3 id="voice-general" className="text-sm font-medium">
               General
             </h3>
-            <div className="divide-y rounded-xl border">
+            <SettingsGroup>
               <MicrophoneSetting
                 selection={state.settings.microphoneId}
                 disabled={pending}
@@ -280,7 +277,7 @@ export function VoiceSettings() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </SettingsGroup>
           </section>
           <SpeechModelSetting
             provider={state.settings.provider}
@@ -339,7 +336,7 @@ export function VoiceSettings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -424,7 +421,7 @@ function SpeechModelSetting({
             through {voiceProviderList}.
           </p>
         )}
-        <div className="divide-y rounded-xl border">
+        <SettingsGroup>
           {configuredSetup && useApiKey !== undefined && (
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="min-w-0 flex-1">
@@ -498,7 +495,7 @@ function SpeechModelSetting({
               )}
             </div>
           </div>
-        </div>
+        </SettingsGroup>
       </section>
 
       <DialogContent

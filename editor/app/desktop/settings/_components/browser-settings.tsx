@@ -15,6 +15,7 @@ import { Browser } from "@/lib/desktop/browser";
 import { BrowserHistory } from "@/lib/desktop/browser-history";
 import { BrowserLinkPreferences } from "@/lib/desktop/browser-link-preferences";
 import { SettingsBrowser } from "@/lib/desktop/settings-browser";
+import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 const LINK_DESTINATION_SETTINGS = [
   {
@@ -51,7 +52,7 @@ function BrowserLinkOpeningSettings() {
   }
 
   return (
-    <section aria-label="Link opening" className="divide-y rounded-xl border">
+    <SettingsGroup role="region" aria-label="Link opening">
       {LINK_DESTINATION_SETTINGS.map(({ kind, label, description }) => {
         const id = `browser-link-destination-${kind}`;
         return (
@@ -95,7 +96,7 @@ function BrowserLinkOpeningSettings() {
           Couldn’t save where links open. Try again.
         </p>
       )}
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -132,16 +133,14 @@ export function BrowserSettings() {
   const busy = state.clearing || state.action !== null;
 
   return (
-    <section data-testid="settings-browser" className="space-y-5">
-      <header>
-        <h2 className="text-lg font-semibold tracking-tight">Browser</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose where links open and manage website data.
-        </p>
-      </header>
+    <SettingsSection
+      title="Browser"
+      description="Choose where links open and manage website data."
+      data-testid="settings-browser"
+    >
       <BrowserLinkOpeningSettings />
       {state.managementSupported && (
-        <div className="divide-y rounded-xl border">
+        <SettingsGroup>
           <section className="space-y-4 px-4 py-4" aria-label="Downloads">
             <div>
               <h3 className="text-sm font-medium">Downloads</h3>
@@ -219,14 +218,14 @@ export function BrowserSettings() {
               Clear cache
             </Button>
           </section>
-        </div>
+        </SettingsGroup>
       )}
       {!state.supported ? (
         <p className="text-sm text-muted-foreground">
           Update Desktop to manage browser data in Settings.
         </p>
       ) : (
-        <div className="divide-y rounded-xl border">
+        <SettingsGroup>
           <div className="space-y-1 px-4 py-3">
             <h3 className="text-sm font-medium">Cookies and site data</h3>
             <p className="text-xs leading-relaxed text-muted-foreground">
@@ -246,7 +245,7 @@ export function BrowserSettings() {
               Clear browsing data…
             </Button>
           </div>
-        </div>
+        </SettingsGroup>
       )}
       {state.result === "cleared" && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -402,6 +401,6 @@ export function BrowserSettings() {
         Website permission choices last for this Desktop session. Restart
         Desktop to fully reset development certificate exceptions.
       </p>
-    </section>
+    </SettingsSection>
   );
 }
