@@ -52,11 +52,16 @@ def python_wheel():
 
 
 def serve(root):
+    request_config = "[req]\ndistinguished_name=dn\nprompt=no\n[dn]\nCN="
+    ca_config = root / "openssl-ca.cnf"
+    # LibreSSL takes the subject from a noninteractive request config.
+    ca_config.write_text(
+        request_config + "Registry fixture CA\n"
+        "[ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n"
+    )
     config = root / "openssl.cnf"
     config.write_text(
-        "[req]\ndistinguished_name=dn\nprompt=no\n"
-        "[dn]\nCN=Registry fixture\n"
-        "[ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n"
+        request_config + "Registry fixture\n"
         "[server]\nbasicConstraints=critical,CA:FALSE\n"
         "keyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth\n"
         "subjectAltName=DNS:registry.example.test,DNS:files.example.test\n"
@@ -74,10 +79,13 @@ def serve(root):
     key = root / "key.pem"
     request = root / "registry.csr"
     certificate = root / "registry.pem"
-    # EC key generation avoids variable RSA prime search during fixture startup.
-    new_key = ("-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes")
+    # Both TLS clients require named curves. LibreSSL defaults to explicit parameters.
+    new_key = (
+        "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+        "-pkeyopt", "ec_param_enc:named_curve", "-nodes",
+    )
     openssl("req", "-x509", *new_key, "-days", "1", "-sha256",
-            "-keyout", ca_key, "-out", ca_certificate, "-config", config, "-extensions", "ca")
+            "-keyout", ca_key, "-out", ca_certificate, "-config", ca_config, "-extensions", "ca")
     openssl("req", *new_key, "-sha256", "-keyout", key, "-out", request,
             "-config", config)
     openssl("x509", "-req", "-in", request, "-CA", ca_certificate, "-CAkey", ca_key, "-set_serial", "2",
