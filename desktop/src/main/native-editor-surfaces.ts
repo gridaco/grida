@@ -875,20 +875,21 @@ export class NativeEditorSurfaceEndpoints {
       return previous.path === path && previous.explicitFocus === Boolean(focus)
         ? previous
         : undefined;
-    if (
-      endpoint.calls.size >= MAX_PRESENTATION_CALLS ||
-      !endpoint.deliver ||
-      endpoint.revision === undefined ||
-      (revision !== undefined && endpoint.revision !== revision)
-    )
-      return;
+    if (endpoint.calls.size >= MAX_PRESENTATION_CALLS) return;
 
     const receipt: PresentationReceipt = {
       path,
       requested: false,
       explicitFocus: Boolean(focus),
     };
+    // A refused call stays refused if presentation becomes available later.
     endpoint.calls.set(callId, receipt);
+    if (
+      !endpoint.deliver ||
+      endpoint.revision === undefined ||
+      (revision !== undefined && endpoint.revision !== revision)
+    )
+      return receipt;
     try {
       endpoint.deliver({
         path,

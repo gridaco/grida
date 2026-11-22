@@ -94,6 +94,9 @@ jobs:
           export GRIDA_DESKTOP_TEST_NATIVE_RESOURCES="$PWD/out/Grida-darwin-arm64/Grida.app/Contents/Resources"
           export GRIDA_DESKTOP_TEST_ELECTRON=1
           test -d "$GRIDA_DESKTOP_TEST_NATIVE_RESOURCES"
+          # Electron 42 lazily extracts its dev binary on import. Install it
+          # once before parallel Vitest workers load it from node_modules.
+          pnpm exec install-electron
           pnpm exec vitest run \
             src/bridge/workspace-cleanup.electron.test.ts \
             src/main/browser-automation.electron.test.ts \

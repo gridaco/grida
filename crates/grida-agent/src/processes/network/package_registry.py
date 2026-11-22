@@ -56,12 +56,14 @@ def serve(root):
         "[dn]\nCN=Registry fixture\n"
         "[ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n"
         "[server]\nbasicConstraints=critical,CA:FALSE\n"
-        "keyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n"
+        "keyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth\n"
         "subjectAltName=DNS:registry.example.test,DNS:files.example.test\n"
     )
 
     def openssl(*args):
-        generated = subprocess.run(["openssl", *args], capture_output=True)
+        generated = subprocess.run(
+            ["openssl", *args], stdin=subprocess.DEVNULL, capture_output=True, timeout=5
+        )
         if generated.returncode:
             raise RuntimeError(generated.stderr.decode())
 
@@ -70,9 +72,11 @@ def serve(root):
     key = root / "key.pem"
     request = root / "registry.csr"
     certificate = root / "registry.pem"
-    openssl("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-sha256",
+    # EC key generation avoids variable RSA prime search during fixture startup.
+    new_key = ("-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes")
+    openssl("req", "-x509", *new_key, "-days", "1", "-sha256",
             "-keyout", ca_key, "-out", ca_certificate, "-config", config, "-extensions", "ca")
-    openssl("req", "-newkey", "rsa:2048", "-nodes", "-sha256", "-keyout", key, "-out", request,
+    openssl("req", *new_key, "-sha256", "-keyout", key, "-out", request,
             "-config", config)
     openssl("x509", "-req", "-in", request, "-CA", ca_certificate, "-CAkey", ca_key, "-set_serial", "2",
             "-days", "1", "-sha256", "-out", certificate, "-extfile", config, "-extensions", "server")

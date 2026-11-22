@@ -44,18 +44,20 @@ impl Registry {
         let mut server = Command::new(program("python3"))
             .args(["-c", include_str!("package_registry.py")])
             .arg(root.path())
+            .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .kill_on_drop(true)
             .spawn()
             .unwrap();
         let mut ready = String::new();
-        tokio::time::timeout(
-            Duration::from_secs(10),
+        let bytes_read = tokio::time::timeout(
+            Duration::from_secs(20),
             BufReader::new(server.stdout.take().unwrap()).read_line(&mut ready),
         )
         .await
         .expect("fixture TLS server did not start")
         .unwrap();
+        assert_ne!(bytes_read, 0, "fixture TLS server exited before readiness");
         let port = ready.trim().parse().expect("fixture TLS server port");
         Self {
             _server: server,
