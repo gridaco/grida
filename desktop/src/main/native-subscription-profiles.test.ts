@@ -136,6 +136,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
     const network = async () => ({ getOpenAiModels, prepare });
     const inventory = new NativeOpenAiModels(home, network);
+    let discovered: Promise<NativeOpenAiModels.Offer> | undefined;
     try {
       await store.set(OPENAI_PROJECT_PROVIDER_ID, "project-fixture-key");
       sidecar.nativeAgentOpenAiOffer.mockImplementation((waitForDiscovery) =>
@@ -155,6 +156,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       const pending = await f.agent.welcomeProfiles();
       expect(pending.openAiIssue).toBe("loading");
+      discovered = inventory.offer();
       const subscription = pending.choices.find(
         ({ connection }) => connection === "ChatGPT Subscription"
       )!;
@@ -168,13 +170,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       discovery.resolve(
         Response.json({ object: "list", data: [{ id: "gpt-6.2-sol" }] })
       );
-      const choice = await vi.waitFor(async () => {
-        const found = (await f.agent.welcomeProfiles()).choices.find(
-          ({ connection }) => connection === "OpenAI API · Project billing"
-        );
-        if (!found) throw new Error("OpenAI project models are still loading");
-        return found;
-      });
+      expect(await discovered).toMatchObject({ status: "ready" });
+      const choice = (await f.agent.welcomeProfiles()).choices.find(
+        ({ connection }) => connection === "OpenAI API · Project billing"
+      );
+      if (!choice) throw new Error("OpenAI project model was not offered");
       await f.agent.selectProfile(
         f.workspace.id,
         { kind: "new", id: choice.id },
@@ -237,6 +237,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       ).toBe(true);
     } finally {
       discovery.resolve(new Response(null, { status: 503 }));
+      await discovered;
       await f.close();
     }
   },

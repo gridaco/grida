@@ -97,7 +97,8 @@ jobs:
           # Electron 42 lazily extracts its dev binary on import. Install it
           # once before parallel Vitest workers load it from node_modules.
           pnpm exec install-electron
-          pnpm exec vitest run \
+          # Electron fixtures share the macOS desktop and assert window focus.
+          pnpm exec vitest run --maxWorkers 1 \
             src/bridge/workspace-cleanup.electron.test.ts \
             src/main/browser-automation.electron.test.ts \
             src/main/live-chat-catalog.test.ts \
