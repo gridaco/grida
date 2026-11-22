@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Button } from "@app/ui/components/button";
 import { DesktopCompatibility } from "@grida/desktop-bridge";
 import {
   DESKTOP_BRIDGE_PROTOCOL,
@@ -79,9 +80,12 @@ export function DesktopBridgeGate({
   );
   if (status.kind === "unsupported") {
     return (
-      <DesktopUpdateRequired downloadHref={downloadHref}>
-        This desktop page needs bridge protocol {DESKTOP_BRIDGE_PROTOCOL}, but
-        the running app exposed {String(status.protocol ?? "no protocol")}.
+      <DesktopUpdateRequired
+        requiredVersion={compatibility.desktopVersion}
+        downloadHref={downloadHref}
+      >
+        Bridge protocol {String(status.protocol ?? "unavailable")} · Required{" "}
+        {DESKTOP_BRIDGE_PROTOCOL}
       </DesktopUpdateRequired>
     );
   }
@@ -95,9 +99,11 @@ export function DesktopBridgeGate({
     )
   ) {
     return (
-      <DesktopUpdateRequired downloadHref={downloadHref}>
-        This page requires a newer version of Grida Desktop. Installed version:{" "}
-        {installedVersion || "unknown"}.
+      <DesktopUpdateRequired
+        requiredVersion={compatibility.desktopVersion}
+        downloadHref={downloadHref}
+      >
+        Installed version {installedVersion || "unknown"}
       </DesktopUpdateRequired>
     );
   }
@@ -115,29 +121,49 @@ function DesktopBridgePending() {
 
 function DesktopUpdateRequired({
   children,
+  requiredVersion,
   downloadHref,
 }: {
   children: ReactNode;
+  requiredVersion: string;
   downloadHref: string | null;
 }) {
   return (
-    <DesktopCompatibilityNotice
-      title="Update Grida Desktop"
-      action={
-        downloadHref && (
-          <a
-            className="mt-6 text-sm font-medium underline"
-            href={downloadHref}
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="flex h-svh w-full overflow-auto bg-black px-6 py-10 text-center text-neutral-100">
+      <div className="m-auto flex w-full max-w-xl flex-col items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset under the Desktop CSP */}
+        <img
+          src="/brand/grida-symbol-240-dark.svg"
+          alt=""
+          width={32}
+          height={32}
+          className="mb-8"
+        />
+        <h1 className="text-2xl font-medium tracking-tight">
+          Update to continue
+        </h1>
+        <p className="mt-5 max-w-sm text-sm leading-relaxed text-neutral-400">
+          Download Grida Desktop {requiredVersion} and reinstall the app.
+        </p>
+        {downloadHref && (
+          <Button
+            asChild
+            className="mt-8 w-full max-w-xs bg-white text-black hover:bg-neutral-200 focus-visible:ring-white/70"
           >
-            Download Grida Desktop
-          </a>
-        )
-      }
-    >
-      {children}
-    </DesktopCompatibilityNotice>
+            <a href={downloadHref} target="_blank" rel="noopener noreferrer">
+              Download update
+            </a>
+          </Button>
+        )}
+        <footer className="mt-8 max-w-xs space-y-2 text-xs text-neutral-400">
+          <p>
+            We’ve updated how Grida works with the desktop app. Your installed
+            version is no longer compatible.
+          </p>
+          <p className="tabular-nums">{children}</p>
+        </footer>
+      </div>
+    </main>
   );
 }
 
