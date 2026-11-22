@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { BoxIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { differenceInCalendarDays } from "date-fns";
 import { models } from "@grida/ai/catalogue";
 import {
   CHATGPT_SUBSCRIPTION_MODEL_METADATA,
@@ -68,6 +69,9 @@ export function NativeTurnActivity({
     >
       {showModelChanges && block.modelChange && (
         <ModelChangeDivider {...block.modelChange} />
+      )}
+      {block.timeDividerAtMs !== undefined && (
+        <TurnTimeDivider atMs={block.timeDividerAtMs} />
       )}
       {block.requests.map((message) => renderMessage(message))}
       {(turn_activity.showsHeader(block) ||
@@ -153,6 +157,33 @@ export function NativeTurnActivity({
         )
       )}
     </div>
+  );
+}
+
+function TurnTimeDivider({ atMs }: { atMs: number }) {
+  const date = new Date(atMs);
+  const now = new Date();
+  const daysAgo = differenceInCalendarDays(now, date);
+  const day =
+    daysAgo === 0 || daysAgo === 1
+      ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
+          -daysAgo,
+          "day"
+        )
+      : date.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year:
+            date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+        });
+  return (
+    <time
+      dateTime={date.toISOString()}
+      className="text-muted-foreground mt-4 block text-center text-xs font-light first-letter:uppercase"
+    >
+      <span className="font-normal">{day}</span>{" "}
+      {date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+    </time>
   );
 }
 

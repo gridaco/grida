@@ -29,6 +29,8 @@ an account, or a model.
 - **Chat composer** exercises the + menu, slash commands, Goal and
   Plan, model and effort, and inline message edits. **Hold submission** lets
   you exercise pending, accepted, and refused sends or edits.
+- **Transcript time dividers** shows a quick follow-up after a long reply,
+  a same-day idle gap, and a new local calendar day.
 - **Suggested prompt** opens with a sample suggestion. Focus the composer,
   press **Tab**, then clear the draft to see it return.
 - **Dictate** uses the browser microphone to drive the scrolling waveform.

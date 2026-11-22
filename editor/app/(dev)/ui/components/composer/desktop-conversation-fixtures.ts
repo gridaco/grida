@@ -21,6 +21,7 @@ export namespace DesktopConversationFixtures {
     | "subagents"
     | "streaming"
     | "compaction"
+    | "time-dividers"
     | "paused"
     | "suggested-prompt"
     | "web-preview"
@@ -543,7 +544,67 @@ export namespace DesktopConversationFixtures {
     { id: "empty", messages: [] },
   ];
 
+  function timeDividers(): Example {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterdayEvening = new Date(today);
+    yesterdayEvening.setDate(today.getDate() - 1);
+    yesterdayEvening.setHours(23);
+    const minute = 60_000;
+    const turns = [
+      {
+        startedAtMs: +yesterdayEvening,
+        minutes: 20,
+        request: "Draft a tour route for the gallery.",
+        answer: "The route starts in the courtyard and ends in the east wing.",
+      },
+      {
+        startedAtMs: +yesterdayEvening + 23 * minute,
+        minutes: 4,
+        request: "Add a stop in the sculpture room.",
+        answer: "Added it between the courtyard and the east wing.",
+      },
+      {
+        startedAtMs: +yesterdayEvening + 45 * minute,
+        minutes: 13,
+        request: "Can we make a shorter route too?",
+        answer: "The short route has two stops, both on the ground floor.",
+      },
+      {
+        startedAtMs: +today,
+        minutes: 1,
+        request: "Use the short route for the handout.",
+        answer: "I’ll use the two-stop route in the handout.",
+      },
+    ];
+    return {
+      id: "time-dividers",
+      messages: turns.flatMap(({ request, answer }, index) => [
+        {
+          messageId: `tour-request-${index}`,
+          turnId: `tour-turn-${index}`,
+          role: "user",
+          text: request,
+        },
+        {
+          messageId: `tour-answer-${index}`,
+          turnId: `tour-turn-${index}`,
+          role: "assistant",
+          phase: "answer",
+          text: answer,
+        },
+      ]),
+      records: turns.map(({ startedAtMs, minutes }, index) => ({
+        turnId: `tour-turn-${index}`,
+        status: "succeeded",
+        startedAtMs,
+        settledAtMs: startedAtMs + minutes * minute,
+      })),
+    };
+  }
+
   export function get(id: Scenario): Example {
+    if (id === "time-dividers") return timeDividers();
     return scenarios.find((example) => example.id === id)!;
   }
 

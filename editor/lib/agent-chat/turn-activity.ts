@@ -1,3 +1,4 @@
+import { isSameDay } from "date-fns";
 import type {
   NativeChatActivity,
   NativeChatMessage,
@@ -17,6 +18,8 @@ import type {
  * See docs/wg/ai/agent/experience.md#read-each-finished-turn.
  */
 export namespace turn_activity {
+  const IDLE_DIVIDER_MS = 10 * 60 * 1000;
+
   export type Item =
     | Readonly<{ kind: "commentary"; message: NativeChatMessage }>
     | Readonly<{
@@ -55,6 +58,8 @@ export namespace turn_activity {
         turnId: string;
         /** Captured models of the neighboring turns at this boundary. */
         modelChange?: Readonly<{ from: string; to: string }>;
+        /** Start time to show before this turn's opening request. */
+        timeDividerAtMs?: number;
         /** Messages that opened the turn, shown before its header. */
         requests: readonly NativeChatMessage[];
         /** Running turns stay expanded; finished turns start collapsed. */
@@ -97,15 +102,20 @@ export namespace turn_activity {
       }
     };
     let previousModel: string | undefined;
+    let previousTurn: NativeChatTurnRecord | undefined;
     let index = 0;
     while (index < messages.length) {
       const first = messages[index];
-      if (first.messageId === transcriptGapBefore) previousModel = undefined;
+      if (first.messageId === transcriptGapBefore) {
+        previousModel = undefined;
+        previousTurn = undefined;
+      }
       const turnId = first.turnId;
       const position = turnId === undefined ? undefined : order.get(turnId);
       if (position !== undefined) placeCompactionsBefore(position);
       if (!turnId) {
         previousModel = undefined;
+        previousTurn = undefined;
         blocks.push({ kind: "message", message: first });
         index++;
         continue;
@@ -115,6 +125,8 @@ export namespace turn_activity {
       const members = messages.slice(index, end);
       index = end;
       const record = known.get(turnId);
+      const precedingTurn = previousTurn;
+      previousTurn = record;
       const observed =
         current?.turnId === turnId
           ? current
@@ -151,6 +163,11 @@ export namespace turn_activity {
         opening++;
       const requests = members.slice(0, opening);
       const rest = members.slice(opening);
+      const showTimeDivider =
+        requests.length > 0 &&
+        record &&
+        precedingTurn &&
+        startsNewTimeGroup(precedingTurn, record.startedAtMs);
       const outcome =
         record?.status ??
         (latest?.turnId === turnId ? (latest.status ?? null) : null);
@@ -167,6 +184,7 @@ export namespace turn_activity {
         kind: "turn",
         turnId,
         ...(modelChange && { modelChange }),
+        ...(showTimeDivider && { timeDividerAtMs: record.startedAtMs }),
         requests,
         finished,
         outcome,
@@ -180,6 +198,15 @@ export namespace turn_activity {
     }
     placeCompactionsBefore(Number.POSITIVE_INFINITY);
     return blocks;
+  }
+
+  function startsNewTimeGroup(previous: NativeChatTurnRecord, atMs: number) {
+    if (atMs < previous.startedAtMs) return false;
+    return (
+      !isSameDay(atMs, previous.startedAtMs) ||
+      (previous.settledAtMs !== undefined &&
+        atMs - previous.settledAtMs >= IDLE_DIVIDER_MS)
+    );
   }
 
   /**

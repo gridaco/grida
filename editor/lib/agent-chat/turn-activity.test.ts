@@ -596,6 +596,40 @@ describe("turn_activity model changes", () => {
   });
 });
 
+describe("transcript time dividers", () => {
+  const at = (day: number, hour: number, minute: number) =>
+    new Date(2026, 10, day, hour, minute).getTime();
+  const records = [
+    { turnId: "a", startedAtMs: at(21, 23, 0), settledAtMs: at(21, 23, 20) },
+    { turnId: "b", startedAtMs: at(21, 23, 23), settledAtMs: at(21, 23, 33) },
+    { turnId: "c", startedAtMs: at(21, 23, 43), settledAtMs: at(21, 23, 58) },
+    { turnId: "d", startedAtMs: at(22, 0, 2) },
+  ].map((record) => ({ ...record, status: "succeeded" as const }));
+  const messages = records.flatMap(({ turnId }) => turn(turnId));
+
+  it("marks a ten-minute idle gap or a new local day between turns", () => {
+    const blocks = turn_activity.group(messages, records, null);
+    expect(
+      blocks.flatMap((block) =>
+        block.kind === "turn" ? [block.timeDividerAtMs] : []
+      )
+    ).toEqual([undefined, undefined, at(21, 23, 43), at(22, 0, 2)]);
+  });
+
+  it("skips an incomplete opening and comparisons across a history gap", () => {
+    const blocks = turn_activity.group(
+      messages.slice(1),
+      records,
+      null,
+      null,
+      "c-ask"
+    );
+    expect(blocks[0]).not.toHaveProperty("timeDividerAtMs");
+    expect(blocks[2]).not.toHaveProperty("timeDividerAtMs");
+    expect(blocks[3]).toHaveProperty("timeDividerAtMs", at(22, 0, 2));
+  });
+});
+
 describe("turn_activity.measuredContext", () => {
   it("uses the latest turn's reported size and resets after a compaction", () => {
     expect(

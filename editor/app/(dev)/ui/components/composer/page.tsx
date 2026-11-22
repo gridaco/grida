@@ -37,6 +37,9 @@ export default function ComposerPage() {
       <Example id="chat-composer" title="Chat composer">
         <DesktopComposerDemo />
       </Example>
+      <Example id="transcript-time-dividers" title="Transcript time dividers">
+        <DesktopComposerDemo scenario="time-dividers" />
+      </Example>
       <Example id="suggested-prompt" title="Suggested prompt">
         <p className="text-sm text-muted-foreground">
           Focus the composer and press Tab to use the suggestion. Clear the
