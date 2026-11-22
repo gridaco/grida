@@ -25,14 +25,15 @@ covered_by:
 
 ## Behavior
 
-A message typed on Welcome opens its workspace and becomes the first turn of a
-new native chat there. The model and effort chosen in the Welcome picker run
+A message typed on Welcome appears with its attachment when Send is pressed.
+The composer is immediately ready for the next draft. The outgoing message
+stays visible as the workspace opens and becomes the first turn of a new chat
+there. The model and effort chosen in the Welcome picker run
 that turn; Plan and Goal intents also travel with it. **Default** keeps the
 workspace's default connection. On an eligible connection, a response speed
 chosen on Home becomes the new chat's speed. Changing the project or model
 clears the speed for the previous connection. If the selected speed becomes
-unavailable before the first send, the workspace keeps the message in its
-composer. A regular first message can use automatic web search when the
+unavailable before the first send, the workspace keeps the request for review. A regular first message can use automatic web search when the
 destination model and Personalization allow it. Workspace-specific
 connections appear after the workspace opens.
 
@@ -40,8 +41,8 @@ The message is sent at most once. It waits while the workspace's chat starts,
 however long that takes, and survives a reload before it is sent. Once the
 chat sends it, a reload does not send it again. When the chat cannot send it —
 the chosen model cannot open, the send fails, or the workspace needs a model
-choice first — the chat says the Welcome message wasn't sent and puts its text
-in the composer. If startup is temporarily unavailable, the workspace keeps
+choice first — Desktop keeps the ordinary request available for recovery
+alongside any newer draft. If startup is temporarily unavailable, the workspace keeps
 the waiting message for **Retry**. Reopening the workspace while a previous
 visit is still starting must allow the current visit to finish connecting,
 list its existing chats, and send the waiting message once.
@@ -108,7 +109,7 @@ attachment also keeps it with an explanation instead of omitting it.
    - Expected: the workspace explains the connection problem and keeps the
      request while you retry. Restore the original connection and choose
      **Retry** to send it once. Alternatively, choose a working model. The
-     request appears in the composer for you to review and send.
+     outgoing request offers **Edit** so you can review it and send it explicitly.
 6. Send a text-only request from Welcome and reload the workspace window while
    its chat is still starting.
    - Expected: after the reload the chat starts and sends the message once.

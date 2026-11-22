@@ -662,6 +662,8 @@ export type NativeChatUrlCitation = Readonly<{
 
 export type NativeChatMessage = Readonly<{
   messageId: string;
+  /** The accepted input that authored this user message, where known. */
+  inputId?: string;
   /** First nonempty public publication, compared only within the same turn. */
   activityOrder?: number;
   /** Missing retained order is explicit; clients must not infer it from arrival. */
@@ -1053,7 +1055,7 @@ export type NativeChatTextUpdate = Readonly<{
   activityOrder?: number;
   activityOrderIncomplete?: true;
 }> &
-  Pick<NativeChatMessage, "questionReply" | "questionReplies">;
+  Pick<NativeChatMessage, "inputId" | "questionReply" | "questionReplies">;
 
 export type NativeChatActivityUpdate = Readonly<{
   kind: "activity";

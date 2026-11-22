@@ -3087,6 +3087,79 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("preserves exact authored input IDs on transcript and text updates", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'session/new') {
+        send({id:request.id,result:{sessionId:'chat'}});
+        return;
+      }
+      const capability = '${TRANSCRIPT_WINDOW}';
+      const read = request.params._meta?.[capability];
+      if (read?.kind !== 'read') throw Error('unexpected request');
+      const turn = {turnId:'turn'};
+      const textChunk = (role, messageId, text) => ({
+        sessionUpdate:role+'_message_chunk',messageId,content:{type:'text',text},
+      });
+      const authored = textChunk('user','prompt','Same text');
+      const older = textChunk('user','older','Same text');
+      const reply = textChunk('agent','answer','Done');
+      const invalid = textChunk('user','malformed','Keep this message');
+      const file = {sessionUpdate:'user_message_chunk',messageId:'file',
+        content:{type:'resource_link',uri:'urn:grida:retained-attachment:fixture',
+          name:'notes.txt'}};
+      const publish = (update, key, metadata) =>
+        send({method:'session/update',params:{sessionId:'chat',_meta:{[key]:metadata},update}});
+      for (const [update, inputId] of [[authored,'accepted'],[reply,'accepted']]) {
+        publish(update,'co.grida/session/updates',{...turn,inputId,offsetBytes:0,replace:true});
+      }
+      const common = {...turn,requestId:read.requestId};
+      publish(authored,capability,{...common,inputId:'accepted'});
+      publish(older,capability,common);
+      publish(reply,capability,{...common,inputId:'accepted'});
+      publish(invalid,capability,{...common,inputId:'invalid id'});
+      publish(file,capability,{...common,inputId:'with-attachment'});
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const updates: Array<{ messageId?: string; inputId?: string }> = [];
+      chat.subscribe(session, (update) => {
+        if (update.kind === "text") updates.push(update);
+      });
+      const page = await chat.transcriptPage(session);
+      expect(
+        updates.map(({ messageId, inputId }) => [messageId, inputId])
+      ).toEqual([
+        ["prompt", "accepted"],
+        ["answer", undefined],
+      ]);
+      expect(
+        page.messages.map(({ messageId, inputId }) => [messageId, inputId])
+      ).toEqual([
+        ["prompt", "accepted"],
+        ["older", undefined],
+        ["answer", undefined],
+        ["malformed", undefined],
+        ["file", "with-attachment"],
+      ]);
+      expect(page.messages.at(-1)?.attachments).toEqual([
+        { name: "notes.txt" },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it("projects captured model IDs in the snapshot and reopened transcript pages", async () => {
     const test = fixture(
       `

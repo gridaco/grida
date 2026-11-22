@@ -12,7 +12,9 @@ an account, or a model.
 
 - **Question batch** opens a three-question request. Pick an option to
   advance, skip or revisit an item, then submit on the last question.
-  **Reset** brings back the batch.
+  Use Left and Right to change questions, and Up and Down to select an
+  answer or reach the write-in. Enter confirms the answer. **Reset** brings
+  back the batch.
 - **Question** shows the production prompt above the composer. Select a
   choice or type a custom answer. **Streaming** replays local commentary so
   you can test typing while the transcript updates. Close the question to
@@ -62,6 +64,9 @@ an account, or a model.
   context stays put.
 - **Tool activity**, **Streaming**, and **Empty conversation** show recorded
   work, a partial reply, and an empty chat with a working composer.
+- **Compaction** shows the production transcript rows for a saved summary
+  and compaction in progress on load. To try the full flow, send `/compact`
+  in the example below and select **Finish compaction**.
 - **Pause and resume** opens on a paused reply. Use **Resume** and **Pause**
   in the composer to switch states.
 - **Subagents** shows overlapping work with finished, failed, and stopped

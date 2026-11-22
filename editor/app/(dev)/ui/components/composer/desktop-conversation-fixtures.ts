@@ -20,6 +20,7 @@ export namespace DesktopConversationFixtures {
     | "activity"
     | "subagents"
     | "streaming"
+    | "compaction"
     | "paused"
     | "suggested-prompt"
     | "web-preview"
@@ -507,6 +508,21 @@ export namespace DesktopConversationFixtures {
       },
     },
     { id: "streaming", ...partialReply },
+    {
+      id: "compaction",
+      messages: [
+        {
+          messageId: "compaction-user",
+          role: "user",
+          text: "Let’s use the large-print layout for the gallery handout.",
+        },
+        {
+          messageId: "compaction-assistant",
+          role: "assistant",
+          text: "I’ll use large print and keep the map on the back.",
+        },
+      ],
+    },
     { id: "paused", ...partialReply },
     webPreview,
     {

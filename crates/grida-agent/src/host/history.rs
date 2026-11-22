@@ -94,6 +94,7 @@ pub(super) struct PriorContext {
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
     pub(crate) models: BTreeMap<TurnId, ModelId>,
+    pub(crate) authored_inputs: BTreeMap<MessageId, (TurnId, ChangeId)>,
     pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
     pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
@@ -189,6 +190,12 @@ impl Host {
                     continue;
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
+                let message = prompt_message_id(&input.id)?;
+                if stored.subagent.is_none() {
+                    facts
+                        .authored_inputs
+                        .insert(message.clone(), (turn.clone(), input.id));
+                }
                 if single_input && let Some(model) = stored.model {
                     facts.models.insert(turn.clone(), model);
                 }
@@ -199,21 +206,17 @@ impl Host {
                     facts.goal_starts.insert(turn.clone());
                 }
                 if stored.editor_svg_target.is_some() {
-                    facts
-                        .svg_text_selections
-                        .insert(prompt_message_id(&input.id)?);
+                    facts.svg_text_selections.insert(message.clone());
                 }
                 if stored.editor_tool_context_id.is_some() {
-                    facts
-                        .editor_tool_contexts
-                        .insert(prompt_message_id(&input.id)?);
+                    facts.editor_tool_contexts.insert(message.clone());
                 }
                 if let Some(context) = message_context::context(&stored.parts)
                     && !context.display_parts.is_empty()
                 {
                     facts
                         .display_parts
-                        .insert(prompt_message_id(&input.id)?, context.display_parts.clone());
+                        .insert(message, context.display_parts.clone());
                 }
             }
             if automatic_review {

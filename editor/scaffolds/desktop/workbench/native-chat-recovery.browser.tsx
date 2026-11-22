@@ -392,52 +392,6 @@ it("keeps a draft editable while predicting and discards a reply after typing th
   expect(f.submit).toHaveBeenCalledTimes(1);
 });
 
-it.each(["submit", "enqueue"] as const)(
-  "clears the composer on the %s receipt while transcript replay is pending",
-  async (action) => {
-    const f = await setup();
-    if (action === "enqueue") {
-      await send("Start the review.");
-      await expect
-        .element(page.getByText("Start the review.", { exact: true }))
-        .toBeVisible();
-    }
-    const text = "Check the margins.";
-    await writeDraft(text);
-    await expect
-      .element(page.getByRole("button", { name: "Send", exact: true }))
-      .toBeEnabled();
-    const receipt = Promise.withResolvers<void>();
-    const replay = Promise.withResolvers<void>();
-    const submit = f.submit.getMockImplementation()!;
-    f.submit.mockImplementationOnce(async (...args) => {
-      await receipt.promise;
-      return submit(...args);
-    });
-    const read = f.bridge.transcriptPage!;
-    const transcript = vi
-      .spyOn(f.bridge, "transcriptPage")
-      .mockImplementationOnce(async (...args) => {
-        await replay.promise;
-        return read(...args);
-      });
-    const sending = page.getByRole("button", { name: "Sending…" });
-    try {
-      await act(async () => userEvent.keyboard("{Enter}"));
-      await expect.element(sending).toBeDisabled();
-      expect(composer()?.textContent).toBe(text);
-      await act(async () => receipt.resolve());
-      await expect.poll(() => transcript.mock.calls.length).toBe(1);
-      expect(f.submit.mock.lastCall?.[0]).toBe(action);
-      await expect.poll(() => composer()?.textContent).toBe("");
-      await expect.element(sending).not.toBeInTheDocument();
-    } finally {
-      receipt.resolve();
-      await act(async () => replay.resolve());
-    }
-  }
-);
-
 it("shows a waiting input through automatic handoff while its queue details are delayed", async () => {
   const f = await setup();
   await send("Review the cover.");

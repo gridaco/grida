@@ -37,9 +37,12 @@ the agent accepted, clears it. A failed send keeps it. See the
 4. Reload the window (or quit and reopen Desktop) and reopen the chat. The
    draft is still there.
 5. Delete all the text, reload: the composer is empty.
-6. Send from an idle chat, then send a follow-up while the turn runs. On
-   confirmation of each send, the matching draft clears even if the transcript
-   is still loading. Reload and confirm the composer stays empty.
+6. Send from an idle chat, then send the same short follow-up twice while the
+   turn runs. Each accepted press of Send clears the composer immediately.
+   The initial message appears in the transcript. Both follow-ups appear as
+   separate rows inside the queue above the composer. When queue actions
+   become available, each message still has one row. Type a new draft,
+   reload and confirm that only the new draft is in the composer.
 7. In an idle chat with an empty queue and no unresolved Goal, prepare another
    unsent composer draft. Hover over an earlier plain-text user message and
    choose **Edit and resubmit**. Confirm that message becomes an editor in its

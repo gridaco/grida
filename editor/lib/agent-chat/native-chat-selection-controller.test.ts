@@ -7,6 +7,11 @@ import type {
   NativeChatSelectionTarget,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
+import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
+import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
+import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
+import { welcome_message } from "@/lib/desktop/welcome-message";
+import type { Workspace } from "@/lib/desktop/bridge";
 
 function fixture() {
   const a = "a".repeat(64),
@@ -196,6 +201,253 @@ function enableAutomaticSearch(controller: NativeChatController) {
 }
 
 describe("durable chat selection controller", () => {
+  it("carries a Home send through a slow workspace opening without consuming the follow-up draft", async () => {
+    const f = fixture();
+    const controller = f.make();
+    const workspace: Workspace = {
+      id: "project",
+      name: "Project",
+      root: "/project",
+      opened_at: 1,
+      pinned: false,
+    };
+    const records = new Map<string, ComposerDraftBlob>();
+    const store = new ComposerDrafts(null, {
+      get: async (key) => records.get(key) ?? null,
+      put: async (key, value) => {
+        records.set(key, value);
+      },
+      delete: async (key) => {
+        records.delete(key);
+      },
+    });
+    const entries = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => entries.set(key, value),
+      removeItem: (key: string) => entries.delete(key),
+    };
+    const resolveWorkspace = Promise.withResolvers<Workspace>();
+    const allowSubmit = Promise.withResolvers<void>();
+    const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, sessionId, inputId) => {
+        await allowSubmit.promise;
+        return {
+          sessionId,
+          inputId,
+          disposition: "claimed",
+          inputPosition: 1,
+          turnId: "first-turn",
+        };
+      }
+    );
+    f.bridge.submitInRegime = submit;
+    const home = new HomeComposer(store);
+    const source = home.draftFor("default");
+    const first = "Make a poster";
+    const second = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Use blue" }] },
+      ],
+    };
+    try {
+      expect(
+        home.capture(
+          {
+            text: first,
+            prompt: first,
+            target: null,
+            profileId: f.b,
+            references: [],
+          },
+          {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: first }] },
+            ],
+          },
+          {
+            defaultWorkspace: () => resolveWorkspace.promise,
+            stash: (id, message) => welcome_message.stash(id, message, storage),
+            open: WorkspaceOpening.href,
+          },
+          { ...source, read: () => store.read(source.key) }
+        )
+      ).toBe(true);
+      expect(home.read().outgoing?.text).toBe(first);
+      store.write(source.key, second);
+      expect(WorkspaceOpening.peek(workspace.id)).toBeUndefined();
+
+      resolveWorkspace.resolve(workspace);
+      await vi.waitFor(() =>
+        expect(WorkspaceOpening.peek(workspace.id)).toBe(workspace)
+      );
+      const handoff = welcome_message.pending(workspace.id, storage)!;
+      expect(handoff.peek()?.text).toBe(first);
+      expect(submit).not.toHaveBeenCalled();
+      controller.keepDrafts(store, workspace.id, {
+        sessionId: null,
+        home: handoff.message,
+      });
+      handoff.message.transferNextDraft?.(controller.composerDraft()!);
+      const start = controller.startChat(
+        handoff.message.profileId,
+        handoff.take,
+        handoff.message
+      );
+      await vi.waitFor(() => {
+        const view = controller.read();
+        expect(
+          view.error ?? view.profileError ?? view.outgoing[0]?.error ?? null
+        ).toBeNull();
+        expect(submit).toHaveBeenCalledOnce();
+      });
+      expect(controller.read().outgoing).toMatchObject([
+        { text: first, status: "sending" },
+      ]);
+      expect(submit.mock.calls[0]?.slice(0, 4)).toEqual([
+        "submit",
+        "created",
+        "stable-first-input",
+        first,
+      ]);
+      f.bridge.transcript = async () => [
+        {
+          messageId: "authored",
+          inputId: "stable-first-input",
+          role: "user",
+          text: first,
+          turnId: "first-turn",
+        },
+      ];
+      allowSubmit.resolve();
+      await start;
+      expect(controller.read().messages.map((m) => m.text)).toEqual([first]);
+      expect(controller.read().outgoing).toEqual([]);
+      expect(store.read(controller.composerDraft()!.key)).toEqual(second);
+      expect(store.read(source.key)).toBeNull();
+      expect(handoff.waiting()).toBe(false);
+      expect(submit).toHaveBeenCalledOnce();
+    } finally {
+      resolveWorkspace.resolve(workspace);
+      allowSubmit.resolve();
+      WorkspaceOpening.arrived(workspace);
+      controller.disconnect();
+    }
+  });
+  it("recovers the next draft through reloads on both sides of the Home handoff", async () => {
+    const f = fixture();
+    const entries = new Map<string, string>();
+    const storage: Storage = {
+      get length() {
+        return entries.size;
+      },
+      key: (i) => [...entries.keys()][i] ?? null,
+      getItem: (key) => entries.get(key) ?? null,
+      setItem: (key, value) => {
+        entries.set(key, value);
+      },
+      removeItem: (key) => {
+        entries.delete(key);
+      },
+      clear: () => entries.clear(),
+    };
+    const records = new Map<string, ComposerDraftBlob>();
+    const store = () =>
+      new ComposerDrafts(storage, {
+        get: async (key) => records.get(key) ?? null,
+        put: async (key, value) => {
+          records.set(key, value);
+        },
+        delete: async (key) => {
+          records.delete(key);
+        },
+      });
+    const workspace = "home-project";
+    const first = "Build the deck";
+    const followup = { nextDraft: "Use blue" };
+    welcome_message.stash(workspace, { text: first, profileId: f.b }, storage);
+    const handoff = welcome_message.pending(workspace, storage)!;
+    const options = { sessionId: null, home: handoff.message };
+    const selecting = Promise.withResolvers<void>();
+    const selection = vi.mocked(f.bridge.selection!).getMockImplementation()!;
+    vi.mocked(f.bridge.selection!).mockImplementationOnce(async (target) => {
+      await selecting.promise;
+      return selection(target);
+    });
+    const creating = Promise.withResolvers<void>();
+    const create = vi
+      .mocked(f.bridge.createFromDraft!)
+      .getMockImplementation()!;
+    vi.mocked(f.bridge.createFromDraft!).mockImplementationOnce(
+      async (...args) => {
+        await creating.promise;
+        return create(...args);
+      }
+    );
+    const sent = vi.mocked(f.bridge.submitInRegime!);
+    const before = f.make();
+    const during = f.make();
+    const after = f.make();
+    try {
+      before.keepDrafts(store(), workspace, options);
+      const opening = before.startChat(f.b, handoff.take, handoff.message);
+      const draft = before.composerDraft()!;
+      draft.store.write(draft.key, followup);
+      before.disconnect();
+      selecting.resolve();
+      await opening;
+      expect(handoff.waiting()).toBe(true);
+
+      during.keepDrafts(store(), workspace, options);
+      expect(
+        during.composerDraft()!.store.read(during.composerDraft()!.key)
+      ).toEqual(followup);
+      const starting = during.startChat(f.b, handoff.take, handoff.message);
+      await vi.waitFor(() =>
+        expect(f.bridge.createFromDraft).toHaveBeenCalledOnce()
+      );
+      expect(handoff.waiting()).toBe(false);
+      during.disconnect();
+      creating.resolve();
+      await starting;
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+
+      after.keepDrafts(store(), workspace, { sessionId: null });
+      after.connect(null);
+      await vi.waitFor(() =>
+        expect(after.read().outgoing).toMatchObject([
+          { text: first, status: "failed" },
+        ])
+      );
+      expect(
+        after.composerDraft()!.store.read(after.composerDraft()!.key)
+      ).toEqual(followup);
+      after.retryOutgoing(after.read().outgoing[0]!.id);
+      await vi.waitFor(() =>
+        expect(f.bridge.submitInRegime).toHaveBeenCalledOnce()
+      );
+      expect(
+        vi.mocked(f.bridge.createFromDraft!).mock.calls.map(([id]) => id)
+      ).toEqual([handoff.message.requestId, handoff.message.requestId]);
+      expect(sent.mock.calls[0]?.slice(0, 4)).toEqual([
+        "submit",
+        "created",
+        "stable-first-input",
+        first,
+      ]);
+      expect(
+        after.composerDraft()!.store.read(after.composerDraft()!.key)
+      ).toEqual(followup);
+    } finally {
+      selecting.resolve();
+      creating.resolve();
+      before.disconnect();
+      during.disconnect();
+      after.disconnect();
+    }
+  });
   it("keeps speed on the saved chat and starts a new draft at Standard without Personalization", async () => {
     const f = fixture();
     f.bridge.turnCapabilities = async () => ({
@@ -835,6 +1087,32 @@ describe("durable chat selection controller", () => {
     );
     controller.disconnect();
   });
+
+  it.each(["first request", "/compact"])(
+    "keeps %s on Home when the handoff cannot be retired",
+    async (text) => {
+      const f = fixture();
+      const controller = f.make();
+      const release = vi.fn<() => void>();
+      const input = {
+        requestId: crypto.randomUUID(),
+        text,
+        commit: () => {
+          throw new Error("Home handoff is still pending");
+        },
+        release,
+      };
+      try {
+        await controller.startChat(f.b, () => input);
+        expect(release).toHaveBeenCalledOnce();
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+        expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+        expect(f.bridge.submit).not.toHaveBeenCalled();
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
 
   it("waits for Home's saved effort before consuming and submitting the message", async () => {
     const f = fixture(),
@@ -1483,8 +1761,14 @@ describe("incomplete draft creation settings recovery", () => {
     const unsubscribe = f.controller.subscribe(() => {
       const draft = f.controller.composerDraft();
       if (!draft) return;
-      if (binding.meet(draft.key) === "switch") {
-        document = draft.store.read(draft.key) ?? { text: "" };
+      const meeting = binding.meet(draft.key, draft.promotedFrom);
+      if (meeting !== "held") {
+        const saved = draft.store.read(draft.key);
+        if (
+          meeting === "switch" ||
+          JSON.stringify(saved) !== JSON.stringify(document)
+        )
+          document = saved ?? { text: "" };
         binding.restored(draft.key);
       }
       if (binding.held === draft.key) draft.store.write(draft.key, document);
@@ -1531,6 +1815,7 @@ describe("incomplete draft creation settings recovery", () => {
         expect(f.controller.read().profileBusy).toBe(false)
       );
       expect(f.controller.draftKey()).toBe("workspace:created");
+      expect(f.controller.composerDraft()?.promotedFrom).toBe(f.key);
       expect(document).toEqual({ text: "Keep this draft" });
       expect(
         seen

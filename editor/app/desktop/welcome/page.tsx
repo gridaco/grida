@@ -42,6 +42,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
   getDesktopBridge,
@@ -55,6 +56,10 @@ import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
+import {
+  OutgoingMessage,
+  OutgoingMessageStatus,
+} from "@/scaffolds/desktop/shared/outgoing-message";
 import { AgentPermissionConfirmation } from "@/scaffolds/desktop/shared/agent-permission-confirmation";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
@@ -63,13 +68,14 @@ import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace
 import {
   ComposerDropArea,
   type ComposerCatalog,
+  type ComposerController,
   type ComposerTransfer,
 } from "@/kits/composer";
 import {
   LibraryExplorerView,
   type LibraryExplorerViewHandle,
 } from "@/kits/library-explorer";
-import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
+import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { resolveLibraryExplorerPage } from "@/scaffolds/desktop/shared/design-search";
 import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
 import {
@@ -258,6 +264,19 @@ function WelcomeSurface({
   }, [staged.permissionError]);
   const filePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<
+    | (Pick<ComposerController, "readDocument" | "restoreDocument"> & {
+        draftKey: string;
+      })
+    | null
+  >(null);
+  useLayoutEffect(() => {
+    window.addEventListener("pagehide", composer.flushNextDraft);
+    return () => {
+      window.removeEventListener("pagehide", composer.flushNextDraft);
+      composer.flushNextDraft();
+    };
+  }, [composer]);
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryMotionRef = useRef<HTMLDivElement>(null);
   // The home's single page-scroll container — everything (composer, gallery)
@@ -265,7 +284,8 @@ function WelcomeSurface({
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
   const [openingFolder, setBusy] = useState(false);
-  const busy = openingFolder || staged.busy || staged.permissionBusy;
+  const busy =
+    openingFolder || staged.busy || staged.permissionBusy || !!staged.outgoing;
   const {
     acceptsAutomaticApprovalReview,
     defaultsToAutomaticReview,
@@ -321,6 +341,13 @@ function WelcomeSurface({
     () => composer.draftFor(target?.id ?? "default"),
     [composer, target?.id]
   );
+  useEffect(() => {
+    composer.recoverDraft(
+      composerDraft.key,
+      (workspaceId, requestId) =>
+        welcome_message.pending(workspaceId)?.message.requestId === requestId
+    );
+  }, [composer, composerDraft.key]);
   const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
   const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
     null
@@ -403,14 +430,15 @@ function WelcomeSurface({
         const opened = nextWorkspaces.find(
           (workspace) => workspace.id === pendingId
         );
-        if (opened) setTarget((current) => current ?? opened);
+        if (opened && !composer.read().outgoing)
+          setTarget((current) => current ?? opened);
         pendingInitialWorkspaceId.current = null;
       }
     } catch (err) {
       // Non-fatal — the welcome page can still create or open a folder.
       console.warn("[welcome] workspaces.list failed:", err);
     }
-  }, []);
+  }, [composer]);
 
   useEffect(() => {
     void refreshWorkspaces();
@@ -584,8 +612,8 @@ function WelcomeSurface({
 
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
-  const start = useCallback(
-    async (text: string) => {
+  const submission = useCallback(
+    (text: string): HomeComposer.Input => {
       const template = pickedTemplate;
       const workflowReferences = selectedWorkflows?.map(
         ({ number, showcase }) => ({
@@ -618,31 +646,24 @@ function WelcomeSurface({
             "Update Grida Desktop to send this request. Your draft is still here."
           );
       }
-      await composer.submit(
-        {
-          text,
-          prompt: ApplicationPreset.prompt(preset, text),
-          profileId,
-          target,
-          references: [],
-          messageContext,
-          ...(template && {
-            template: {
-              name: template.name,
-              copy: async (workspaceId: string) => ({
-                title: template.title,
-                slides: template.pages.length,
-                path: await WorkspaceCanvasCreation.copy(workspaceId, template),
-              }),
-            },
-          }),
-        },
-        {
-          defaultWorkspace: workspacesNs.getDefault,
-          stash: welcome_message.stash,
-          open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
-        }
-      );
+      return {
+        text,
+        prompt: ApplicationPreset.prompt(preset, text),
+        profileId,
+        target: destination,
+        references: [],
+        messageContext,
+        ...(template && {
+          template: {
+            name: template.name,
+            copy: async (workspaceId: string) => ({
+              title: template.title,
+              slides: template.pages.length,
+              path: await WorkspaceCanvasCreation.copy(workspaceId, template),
+            }),
+          },
+        }),
+      };
     },
     [
       pickedTemplate,
@@ -650,13 +671,59 @@ function WelcomeSurface({
       selectedWorkflows,
       showWorkflows,
       showImages,
-      target,
+      destination,
       profileId,
-      router,
       composer,
       preset,
     ]
   );
+  const submissionHost: HomeComposer.Host = {
+    defaultWorkspace: () =>
+      defaultWorkspaceRead.current ?? workspacesNs.getDefault(),
+    stash: welcome_message.stash,
+    open: (workspace) => router.push(WorkspaceOpening.href(workspace)),
+  };
+  const reportSubmitError = (error: unknown) =>
+    toast.error(
+      error instanceof Error ? error.message : "Couldn't start a session."
+    );
+
+  const capture = (text: string, document: unknown) => {
+    try {
+      return composer.capture(submission(text), document, submissionHost, {
+        ...composerDraft,
+        read: () =>
+          editorRef.current?.draftKey === composerDraft.key
+            ? editorRef.current.readDocument()
+            : undefined,
+      });
+    } catch (error) {
+      reportSubmitError(error);
+      return false;
+    }
+  };
+
+  const restoreOutgoing = () => {
+    const editor = editorRef.current;
+    if (
+      !editor ||
+      !composer.restoreCaptured((document) =>
+        document == null
+          ? editor.readDocument() == null
+          : editor.restoreDocument(document)
+      )
+    )
+      toast.error(
+        "Keep or clear your current text before restoring the earlier draft."
+      );
+  };
+
+  const discardOutgoing = () => {
+    composer.discardCaptured();
+    setPickedTemplate(null);
+    setPickedRefs([]);
+    setWorkflowSelection([]);
+  };
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
@@ -775,13 +842,17 @@ function WelcomeSurface({
                 style={docked ? { height: heroHeight } : undefined}
               >
                 <WelcomeHeading question={presetSpec.composerQuestion}>
-                  <WorkspacePicker
-                    inline
-                    value={target}
-                    onChange={setTarget}
-                    workspaces={workspaces}
-                    onOpenFolder={onOpen}
-                  />
+                  <span className="contents" inert={busy}>
+                    <WorkspacePicker
+                      inline
+                      value={target}
+                      onChange={(workspace) => {
+                        if (!composer.read().outgoing) setTarget(workspace);
+                      }}
+                      workspaces={workspaces}
+                      onOpenFolder={onOpen}
+                    />
+                  </span>
                 </WelcomeHeading>
                 {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
@@ -806,7 +877,40 @@ function WelcomeSurface({
                   accent) — it reads as an attachment, and starting is the
                   composer's own send. Its X removes; the gallery card also
                   toggles it. */}
-                  {pickedTemplate && (
+                  {staged.outgoing && (
+                    <div className="flex flex-col gap-1">
+                      <OutgoingMessage {...staged.outgoing}>
+                        <OutgoingMessageStatus
+                          status={staged.outgoing.error ? "failed" : "sending"}
+                          error={staged.outgoing.error}
+                          onRetry={
+                            staged.outgoing.retryable
+                              ? () => composer.retryCaptured(submissionHost)
+                              : undefined
+                          }
+                        />
+                      </OutgoingMessage>
+                      {staged.outgoing.error && !staged.outgoing.handedOff && (
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={restoreOutgoing}
+                          >
+                            Restore draft
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={discardOutgoing}
+                          >
+                            Discard
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!staged.outgoing && pickedTemplate && (
                     <div className="flex items-center gap-2 rounded-lg border bg-background p-1.5 shadow-sm">
                       <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
@@ -844,7 +948,7 @@ function WelcomeSurface({
                   composer's own send. When docked the row floats above the input
                   in the same stack — same design language, lifted by shadow, not
                   boxed in a container. */}
-                  {showImages && pickedRefs.length > 0 && (
+                  {!staged.outgoing && showImages && pickedRefs.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-0.5">
                       {pickedRefs.map((p) => (
                         <div
@@ -879,13 +983,15 @@ function WelcomeSurface({
                       ))}
                     </div>
                   )}
-                  {selectedWorkflows && selectedWorkflows.length > 0 && (
-                    <WorkflowReferenceTray
-                      picks={selectedWorkflows}
-                      disabled={busy}
-                      onToggle={toggleWorkflowReference}
-                    />
-                  )}
+                  {!staged.outgoing &&
+                    selectedWorkflows &&
+                    selectedWorkflows.length > 0 && (
+                      <WorkflowReferenceTray
+                        picks={selectedWorkflows}
+                        disabled={busy}
+                        onToggle={toggleWorkflowReference}
+                      />
+                    )}
                   <AgentComposer
                     access={{
                       mode: staged.permissionMode,
@@ -909,17 +1015,24 @@ function WelcomeSurface({
                       },
                     }}
                     draft={composerDraft}
+                    draftRef={(editor) => {
+                      editorRef.current =
+                        editor?.readDocument && editor.restoreDocument
+                          ? {
+                              draftKey: composerDraft.key,
+                              readDocument: editor.readDocument,
+                              restoreDocument: editor.restoreDocument,
+                            }
+                          : null;
+                    }}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
                     className={cn("@container", docked && "shadow-xl")}
-                    onSubmit={start}
-                    onSubmitError={(error) =>
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Couldn't start a session."
-                      )
+                    onCapture={capture}
+                    onSubmit={(text) =>
+                      composer.submit(submission(text), submissionHost)
                     }
+                    onSubmitError={reportSubmitError}
                     awaitSubmission
                     submitting={staged.busy}
                     canSubmit={!busy}

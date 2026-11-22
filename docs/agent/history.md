@@ -23,9 +23,10 @@ explicitly; Grida does not borrow a different chat's current composer choice.
 Open the chat list at the top left of the chat pane. It shows every chat in
 this workspace, whichever model it used; type to search, or choose **Older
 chats** to see more. Choose **New chat** (+) in the pane's header to open a
-blank draft; the chat is created when you send its first message. Selecting a
-chat opens its transcript and saved work. Review any pending question or
-interruption before continuing. [Guide and interrupt work](./controls.md)
+blank draft; the chat is created when you send its first message. Each chat
+keeps its own draft when you switch, even while a send is being confirmed.
+You can read the transcript while Desktop loads any pending questions or
+permissions. Review them before continuing. [Guide and interrupt work](./controls.md)
 
 When you reopen a workspace while its chat connection is still starting,
 Desktop waits for startup to finish. The chat list can use a connection that
@@ -170,9 +171,9 @@ clients can open side chats too.
 ## Continue a long conversation
 
 In an idle chat with nothing queued, send **`/compact`** on its own to
-summarize earlier material for future model requests. **Compacting…** shows
-while it runs; use the composer's main button to pause it. The transcript
-stays in the chat, and a **Conversation compacted** note marks where the
-summary took over; open it to read the summary. When earlier conversation
-grows large, Grida also compacts it automatically before the next message and
-shows **Conversation auto-compacted**.
+summarize earlier material for future model requests. **Compacting context**
+appears in the transcript while it runs. Use the composer's main button to
+pause it. The transcript stays in the chat. Open **Conversation compacted**
+to read the summary. When earlier conversation grows large, Grida also
+compacts it automatically before the next message and shows
+**Conversation auto-compacted**.

@@ -39,6 +39,7 @@ export class QuestionSurvey {
     readonly questions: readonly QuestionSpec[],
     private readonly picked: readonly (readonly string[])[],
     private readonly writeIns: readonly string[],
+    private readonly writeInSelected: readonly boolean[],
     private readonly skipped: readonly boolean[],
     readonly step: number
   ) {}
@@ -50,6 +51,7 @@ export class QuestionSurvey {
       questions,
       questions.map(() => []),
       questions.map(() => ""),
+      questions.map(() => false),
       questions.map(() => false),
       0
     );
@@ -70,8 +72,11 @@ export class QuestionSurvey {
   pickedFor(qi: number): readonly string[] {
     return this.picked[qi] ?? [];
   }
+  isWriteInSelected(qi: number): boolean {
+    return this.writeInSelected[qi] === true && !this.isSkipped(qi);
+  }
   writeInFor(qi: number): string {
-    return this.writeIns[qi] ?? "";
+    return this.isWriteInSelected(qi) ? (this.writeIns[qi] ?? "") : "";
   }
   isSkipped(qi: number): boolean {
     return this.skipped[qi] === true;
@@ -81,7 +86,7 @@ export class QuestionSurvey {
    *  A custom write-in wins over a pick (they are mutually exclusive). */
   answersFor(qi: number): string[] {
     if (this.skipped[qi]) return [];
-    const wi = (this.writeIns[qi] ?? "").trim();
+    const wi = this.writeInFor(qi).trim();
     const q = this.questions[qi];
     if (q?.multi_select) {
       return [...(this.picked[qi] ?? []), ...(wi ? [wi] : [])];
@@ -116,36 +121,40 @@ export class QuestionSurvey {
       : [label];
     return this.with({
       picked: replace(this.picked, qi, next),
-      writeIns: replace(this.writeIns, qi, ""),
+      writeInSelected: replace(this.writeInSelected, qi, false),
       skipped: replace(this.skipped, qi, false),
     });
   }
 
   /** Set the custom write-in text for `qi` (also makes it exclusive + un-skips). */
   setWriteIn(qi: number, text: string): QuestionSurvey {
+    return this.selectWriteIn(qi).with({
+      writeIns: replace(this.writeIns, qi, text),
+    });
+  }
+
+  /** Choose the write-in as the answer source, keeping any text already entered. */
+  selectWriteIn(qi: number): QuestionSurvey {
+    if (this.isWriteInSelected(qi)) return this;
     return this.with({
       picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, text),
+      writeInSelected: replace(this.writeInSelected, qi, true),
       skipped: replace(this.skipped, qi, false),
     });
   }
 
   /** Clear and deselect the custom write-in for `qi`, leaving the question blank. */
   clearCustom(qi: number): QuestionSurvey {
-    return this.with({
-      picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, ""),
-      skipped: replace(this.skipped, qi, false),
-    });
+    return this.setWriteIn(qi, "");
   }
 
-  /** Skip the CURRENT question: clear its inputs and mark it skipped. Does not
+  /** Skip the current question while retaining its write-in draft. Does not
    *  move the step — the view decides whether to advance or finalize. */
   skipCurrent(): QuestionSurvey {
     const qi = this.step;
     return this.with({
       picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, ""),
+      writeInSelected: replace(this.writeInSelected, qi, false),
       skipped: replace(this.skipped, qi, true),
     });
   }
@@ -223,6 +232,7 @@ export class QuestionSurvey {
   private with(p: {
     picked?: readonly (readonly string[])[];
     writeIns?: readonly string[];
+    writeInSelected?: readonly boolean[];
     skipped?: readonly boolean[];
     step?: number;
   }): QuestionSurvey {
@@ -230,6 +240,7 @@ export class QuestionSurvey {
       this.questions,
       p.picked ?? this.picked,
       p.writeIns ?? this.writeIns,
+      p.writeInSelected ?? this.writeInSelected,
       p.skipped ?? this.skipped,
       p.step ?? this.step
     );

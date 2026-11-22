@@ -65,7 +65,8 @@ messages.map((m, i) => (
 
 Transcript-level indicators (rendered by the surface around the turn list, not
 per message): `PendingTurnIndicator` (labelled **Thinking**, immediately before
-first output and after 1.5 seconds of later quiet) and `CompactionNotice` (where
+first output and after 1.5 seconds of later quiet), `CompactionProgress` (while
+the Desktop `/compact` request is pending), and `CompactionNotice` (where
 earlier context was summarized). Pass a `progress` identity that changes only
 when streamed text or tool activity changes. Progress hides the pending indicator
 immediately and restarts its quiet delay; polling and history replay must not
@@ -112,10 +113,10 @@ write-in, and actions stay in view. The write-in starts on one line and grows as
 the answer wraps. The prompt stack can scroll if several open questions exceed
 the pane's available height.
 A required question waits for an answer or an explicit skip. An optional
-question allows independent work to continue. Close returns it to an
-**Answer question** action in the transcript. The person can reopen their
-draft until the question is answered or the turn ends. Single optional
-questions also offer Skip to close the card.
+question allows independent work to continue. Close or Skip puts a single
+optional question back in the transcript as an **Answer question** action.
+Escape puts an optional batch back as **Answer questions**. The person can
+reopen the draft until the question is answered or the turn ends.
 
 `QuestionPrompt` owns its in-progress form selections (the same kind of
 transient UI state as the collapsibles); the **committed** answer leaves through
@@ -123,14 +124,15 @@ transient UI state as the collapsibles); the **committed** answer leaves through
 the agent. `submitDisabled` gates the submission while the surface refreshes
 the review. In a batch, the arrows in the question counter stay available
 while the review refreshes. Next preserves an answer or skips a blank question.
-Skip clears the current answer and moves forward when possible. On the last
-question, Submit, Skip, and double-clicking a choice all request submission.
+Skip and the header’s close button clear the current answer and move forward
+when possible. On the last question, Submit, Skip, and double-clicking a
+choice all request submission.
 The card asks for confirmation if any questions are still unanswered.
 Picking a single choice advances to the next question when there is one.
-Keys 1–9 activate numbered choices. In a batch write-in, Enter advances from
-an earlier question and adds a line on the last question. Shift+Enter adds a
-line in any write-in. The kit never touches the transport. A native reply
-displays the host-attributed question above the person's answer in one bubble.
+Keys 1–9 activate numbered choices. Enter confirms the selected answer.
+Shift+Enter adds a line in a write-in. The kit never touches the transport.
+A native reply displays the host-attributed question above the person's
+answer in one bubble.
 The finished turn's **Worked**
 disclosure contains the reply. Survey-shaped tool outputs keep their
 read-only `AnsweredQuestionSummary`.

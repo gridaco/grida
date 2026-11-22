@@ -30,8 +30,25 @@ import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
 import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
 
-function durableDrafts(blobs = new Map<string, ComposerDraftBlob>()) {
-  return new ComposerDrafts(null, {
+function durableDrafts(
+  blobs = new Map<string, ComposerDraftBlob>(),
+  documents = new Map<string, string>()
+) {
+  const storage: Storage = {
+    get length() {
+      return documents.size;
+    },
+    clear: () => documents.clear(),
+    key: (index) => [...documents.keys()][index] ?? null,
+    getItem: (key) => documents.get(key) ?? null,
+    setItem: (key, value) => {
+      documents.set(key, value);
+    },
+    removeItem: (key) => {
+      documents.delete(key);
+    },
+  };
+  return new ComposerDrafts(storage, {
     get: async (key) => blobs.get(key) ?? null,
     put: async (key, value) => {
       blobs.set(key, value);
@@ -284,6 +301,937 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("moves a submitted attachment out of the composer before native acceptance", async () => {
+  const { bridge, controller, running, transcripts } = fixture();
+  const drafts = durableDrafts();
+  const receipt =
+    Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+  const submit = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>(
+    () => receipt.promise
+  );
+  bridge.acceptsFile = async () => true;
+  bridge.submitFile = submit;
+  controller.keepDrafts(drafts, "workspace");
+  await controller.select("chat-a");
+  const key = "workspace:chat-a";
+  const snapshot = controller.read();
+  const doc = { type: "doc", content: [{ type: "paragraph" }] };
+  const nextDoc = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "next draft" }] },
+    ],
+  };
+  drafts.write(key, doc);
+  await controller.pickAttachment(
+    snapshot.scope,
+    "file",
+    new File(["original bytes"], "brief.txt")
+  );
+
+  try {
+    expect(controller.submitOptimistically("", snapshot.scope, doc)).toBe(
+      false
+    );
+    expect(controller.read().attachmentDraft?.name).toBe("brief.txt");
+    expect(
+      controller.submitOptimistically("Inspect this.", snapshot.scope, doc)
+    ).toBe(true);
+    expect(controller.read().attachmentDraft).toBeNull();
+    expect(controller.read().outgoing).toMatchObject([
+      {
+        text: "Inspect this.",
+        status: "sending",
+        placement: "transcript",
+        attachment: { name: "brief.txt" },
+      },
+    ]);
+    expect(controller.canSubmit).toBe(false);
+    expect(drafts.read(key)).toBeNull();
+    drafts.write(key, nextDoc);
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    const [, request] = submit.mock.calls[0]!;
+    expect(request).toMatchObject({ text: "Inspect this.", name: "brief.txt" });
+    expect(drafts.read(key)).toEqual(nextDoc);
+    transcripts.set("chat-a", [
+      {
+        messageId: "canonical",
+        role: "user",
+        text: "Inspect this.",
+        inputId: request.inputId,
+        turnId: "turn-chat-a",
+      },
+    ]);
+    running.add("chat-a");
+    controller.checkObservation();
+    await vi.waitFor(() => expect(controller.read().outgoing).toHaveLength(0));
+    expect(controller.read().submitting).toBe(false);
+    expect(controller.read().acting).toBe(false);
+    await vi.waitFor(async () =>
+      expect(await drafts.readPending(key)).toBeNull()
+    );
+    receipt.resolve({
+      sessionId: "chat-a",
+      turnId: "turn-chat-a",
+      inputId: request.inputId,
+      inputPosition: 1,
+      disposition: "claimed",
+    });
+    await vi.waitFor(() => expect(controller.read().submitting).toBe(false));
+    expect(drafts.read(key)).toEqual(nextDoc);
+    expect(await drafts.readPending(key)).toBeNull();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("keeps an unknown send with its original chat and reconciles the same input on retry", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const submit = vi
+    .spyOn(bridge, "submit")
+    .mockRejectedValueOnce(new Error("lost reply"));
+  const readReceipt = vi
+    .spyOn(bridge, "inputReceipt")
+    .mockRejectedValueOnce(new Error("receipt transport failed"));
+  controller.keepDrafts(drafts, "workspace");
+  await controller.select("chat-a");
+  const key = "workspace:chat-a";
+  const nextDoc = { type: "doc", content: [{ type: "paragraph" }] };
+
+  try {
+    expect(
+      controller.submitOptimistically("First", controller.read().scope)
+    ).toBe(true);
+    const id = controller.read().outgoing[0]!.id;
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing[0]?.status).toBe("unconfirmed")
+    );
+    const inputId = submit.mock.calls[0]![1];
+    expect(await drafts.readPending(key)).toMatchObject({
+      inputId,
+      outgoing: { id },
+    });
+    drafts.write(key, nextDoc);
+    await controller.select("chat-b");
+    expect(controller.read().outgoing).toEqual([]);
+    expect(controller.canSubmit).toBe(true);
+    drafts.write("workspace:chat-b", { other: true });
+    await controller.select("chat-a");
+    expect(controller.read().outgoing[0]).toMatchObject({
+      id,
+      status: "unconfirmed",
+    });
+    expect(drafts.read(key)).toEqual(nextDoc);
+    readReceipt.mockResolvedValueOnce({
+      sessionId: "chat-a",
+      inputId,
+      inputPosition: 1,
+      disposition: "claimed",
+      turnId: "turn-chat-a",
+    });
+    controller.retryOutgoing(id);
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing[0]?.status).toBe("accepted")
+    );
+    expect(readReceipt).toHaveBeenLastCalledWith("chat-a", inputId);
+    expect(submit).toHaveBeenCalledOnce();
+    expect(drafts.read("workspace:chat-b")).toEqual({ other: true });
+    expect(drafts.read(key)).toEqual(nextDoc);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("keeps the previous input recoverable when removing the next draft's attachment", async () => {
+  const { bridge, controller } = fixture();
+  const blobs = new Map<string, ComposerDraftBlob>();
+  const drafts = durableDrafts(blobs);
+  const submit = vi
+    .spyOn(bridge, "submit")
+    .mockRejectedValueOnce(new Error("lost reply"));
+  bridge.inputReceipt = vi
+    .fn<DesktopNativeChat["inputReceipt"]>()
+    .mockRejectedValue(new Error("lost receipt"));
+  bridge.acceptsFile = async () => true;
+  bridge.submitFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>();
+  controller.keepDrafts(drafts, "workspace");
+  let reopened: NativeChatController | undefined;
+  try {
+    await controller.select("chat-a");
+    const { scope } = controller.read();
+    expect(controller.submitOptimistically("First", scope)).toBe(true);
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing[0]?.status).toBe("unconfirmed")
+    );
+    const id = controller.read().outgoing[0]!.id;
+    await controller.pickAttachment(
+      scope,
+      "file",
+      new File(["next"], "next.txt")
+    );
+    expect(controller.read().attachmentDraft?.name).toBe("next.txt");
+    await expect(
+      controller.submitFromComposer("/plan next", scope)
+    ).rejects.toThrow("native_chat_not_ready");
+    await vi.waitFor(() => expect(blobs.has("workspace:chat-a")).toBe(true));
+    controller.removeAttachment(scope);
+    await vi.waitFor(() => expect(blobs.has("workspace:chat-a")).toBe(false));
+    controller.disconnect();
+    reopened = new NativeChatController(bridge);
+    reopened.keepDrafts(durableDrafts(blobs), "workspace");
+    await reopened.select("chat-a");
+    expect(reopened.read().outgoing).toMatchObject([
+      { id, text: "First", status: "unconfirmed" },
+    ]);
+    expect(reopened.read().attachmentDraft).toBeNull();
+    expect(submit).toHaveBeenCalledOnce();
+  } finally {
+    controller.disconnect();
+    reopened?.disconnect();
+  }
+});
+
+it("confirms a reopened outgoing input from history without querying or resending it", async () => {
+  const { bridge, controller, transcripts } = fixture();
+  const drafts = durableDrafts();
+  const key = "workspace:chat-a";
+  await drafts.writePending(key, {
+    inputId: "native-input",
+    text: "First",
+    mode: "submit",
+    allowLibrarySelection: false,
+    outgoing: { id: "local-input" },
+  });
+  drafts.write(key, { nextDraft: true });
+  transcripts.set("chat-a", [
+    {
+      messageId: "canonical",
+      role: "user",
+      text: "First",
+      inputId: "native-input",
+    },
+  ]);
+  const submit = vi.spyOn(bridge, "submit");
+  const receipt = vi.spyOn(bridge, "inputReceipt");
+  controller.keepDrafts(drafts, "workspace");
+
+  try {
+    await controller.select("chat-a");
+    expect(controller.read().outgoing).toEqual([]);
+    expect(controller.canSubmit).toBe(true);
+    await vi.waitFor(async () =>
+      expect(await drafts.readPending(key)).toBeNull()
+    );
+    expect(drafts.read(key)).toEqual({ nextDraft: true });
+    expect(submit).not.toHaveBeenCalled();
+    expect(receipt).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("allows editing or dismissing when the host confirms absence and the captured attachment is no longer supported", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const key = "workspace:chat-a";
+  await drafts.writePending(key, {
+    inputId: "file-input",
+    text: "Inspect this.",
+    mode: "submit",
+    operatingRegime: "act",
+    allowLibrarySelection: false,
+    outgoing: { id: "file-input" },
+    attachment: {
+      kind: "file",
+      name: "original.txt",
+      bytes: new Uint8Array([1]).buffer,
+    },
+  });
+  bridge.acceptsFile = async () => false;
+  const submit = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>();
+  bridge.submitFile = submit;
+  const receipt = vi.spyOn(bridge, "inputReceipt");
+  controller.keepDrafts(drafts, "workspace");
+  try {
+    await controller.select("chat-a");
+    expect(controller.read().outgoing[0]?.status).toBe("unconfirmed");
+    controller.retryOutgoing("file-input");
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing[0]?.status).toBe("failed")
+    );
+    expect(receipt).toHaveBeenCalledExactlyOnceWith("chat-a", "file-input");
+    expect(submit).not.toHaveBeenCalled();
+    await expect(controller.dismissOutgoing("file-input")).resolves.toBe(true);
+    expect(await drafts.readPending(key)).toBeNull();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("shows a confirmed queue overlay until the authoritative queue arrives", async () => {
+  const { bridge, controller, running } = fixture();
+  const read =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["queue"]>>>
+    >();
+  running.add("chat-a");
+  const observe = bridge.observe.bind(bridge);
+  let queuedId: string | undefined;
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return queuedId
+      ? {
+          ...value,
+          snapshot: { ...value.snapshot, sessionRevision: 3, queuedInputs: 1 },
+        }
+      : value;
+  };
+  bridge.queue = vi.fn<NonNullable<DesktopNativeChat["queue"]>>(
+    () => read.promise
+  );
+  bridge.enqueue = async (id, inputId) => {
+    queuedId = inputId;
+    return {
+      sessionId: id,
+      inputId,
+      turnId: null,
+      inputPosition: 2,
+      disposition: "queued",
+    };
+  };
+  try {
+    await controller.select("chat-a");
+    expect(
+      controller.submitOptimistically("Next", controller.read().scope)
+    ).toBe(true);
+    await vi.waitFor(() => expect(bridge.queue).toHaveBeenCalledOnce());
+    expect(controller.read().outgoing).toMatchObject([
+      { text: "Next", status: "accepted", placement: "queue" },
+    ]);
+    read.resolve({
+      items: [{ inputId: queuedId!, preview: "Next" }],
+      offset: 0,
+      previousOffset: null,
+      nextOffset: null,
+    });
+    await vi.waitFor(() => expect(controller.read().outgoing).toEqual([]));
+    expect(controller.read().queue?.items).toMatchObject([
+      { inputId: queuedId, preview: "Next" },
+    ]);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("queues a second send when the first turn is claimed before its running snapshot arrives", async () => {
+  const { controller, bridge } = fixture();
+  const submit = vi.spyOn(bridge, "submit");
+  const enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>(
+    async (sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    })
+  );
+  bridge.enqueue = enqueue;
+  try {
+    await controller.select("chat-a");
+    expect(
+      controller.submitOptimistically("Again", controller.read().scope)
+    ).toBe(true);
+    await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+    expect(
+      controller.submitOptimistically("Again", controller.read().scope)
+    ).toBe(true);
+    expect(controller.read().outgoing.map((item) => item.placement)).toEqual([
+      "transcript",
+      "queue",
+    ]);
+    await vi.waitFor(() => expect(enqueue).toHaveBeenCalledOnce());
+    expect(submit).toHaveBeenCalledOnce();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it.each(["live", "history"] as const)(
+  "uses %s confirmation before an IPC reply without confusing a finished turn with current work",
+  async (source) => {
+    const { bridge, controller, updates, transcripts } = fixture();
+    const receipt =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    const submit = vi
+      .spyOn(bridge, "submit")
+      .mockImplementationOnce(() => receipt.promise);
+    const enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>(
+      async (sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 2,
+        turnId: null,
+      })
+    );
+    bridge.enqueue = enqueue;
+    try {
+      await controller.select("chat-a");
+      expect(
+        controller.submitOptimistically("Again", controller.read().scope)
+      ).toBe(true);
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      const [, inputId] = submit.mock.calls[0]!;
+      const message = {
+        role: "user" as const,
+        inputId,
+        messageId: "authored",
+        turnId: "turn-a",
+        text: "Again",
+      };
+      if (source === "live") {
+        updates.get("chat-a")!({
+          ...message,
+          kind: "text",
+          offsetBytes: 0,
+          replace: true,
+        });
+      } else {
+        transcripts.set("chat-a", [message]);
+        updates.get("chat-a")!({ kind: "resync" });
+      }
+      await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+      expect(
+        controller.submitOptimistically("Again", controller.read().scope)
+      ).toBe(true);
+      expect(controller.read().outgoing[0]?.placement).toBe(
+        source === "live" ? "queue" : "transcript"
+      );
+      await vi.waitFor(() =>
+        expect(source === "live" ? enqueue : submit).toHaveBeenCalledTimes(
+          source === "live" ? 1 : 2
+        )
+      );
+      receipt.resolve({
+        sessionId: "chat-a",
+        inputId,
+        turnId: "turn-a",
+        inputPosition: 1,
+        disposition: "completed",
+      });
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("keeps identical follow-ups distinct across a failed queue read and a delayed page", async () => {
+  const { bridge, running, controller } = fixture();
+  running.add("chat-a");
+  const ids: string[] = [];
+  const observe = bridge.observe.bind(bridge);
+  const original = { inputId: "older", preview: "Again" };
+  let showAll = false;
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return {
+      ...value,
+      snapshot: {
+        ...value.snapshot,
+        queuedInputs: 1 + ids.length,
+        sessionRevision: 2 + ids.length + Number(showAll),
+      },
+    };
+  };
+  bridge.queue = async () => {
+    if (ids.length && !showAll)
+      throw new Error("queue_temporarily_unavailable");
+    return {
+      items: [
+        original,
+        ...ids.map((inputId) => ({ inputId, preview: "Again" })),
+      ],
+      offset: 0,
+      previousOffset: null,
+      nextOffset: null,
+    };
+  };
+  bridge.enqueue = async (sessionId, inputId) => {
+    ids.push(inputId);
+    return {
+      sessionId,
+      inputId,
+      turnId: null,
+      inputPosition: ids.length + 1,
+      disposition: "queued",
+    };
+  };
+  try {
+    await controller.select("chat-a");
+    for (const count of [1, 2]) {
+      expect(
+        controller.submitOptimistically("Again", controller.read().scope)
+      ).toBe(true);
+      expect(controller.read().outgoing.at(-1)?.placement).toBe("queue");
+      await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+      expect(controller.read().outgoing.map((item) => item.id)).toEqual(ids);
+      expect(new Set(ids).size).toBe(count);
+    }
+    showAll = true;
+    controller.checkObservation();
+    await vi.waitFor(() =>
+      expect(
+        controller.read().queue?.items.map((item) => item.inputId)
+      ).toEqual(["older", ...ids])
+    );
+    expect(controller.read().outgoing).toEqual([]);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it.each(["withdrawn", "completed", "queued"] as const)(
+  "reconciles a follow-up by its own receipt when the queue page never included it (%s)",
+  async (disposition) => {
+    const { bridge, controller, running } = fixture();
+    running.add("chat-a");
+    const observe = bridge.observe.bind(bridge);
+    const older = { inputId: "earlier", preview: "Again" };
+    let inputId: string | undefined;
+    bridge.observe = async (sessionId) => {
+      const value = await observe(sessionId);
+      return {
+        ...value,
+        snapshot: {
+          ...value.snapshot,
+          sessionRevision: inputId ? 3 : 2,
+          queuedInputs: disposition === "queued" && inputId ? 2 : 1,
+        },
+      };
+    };
+    bridge.queue = async () => ({
+      items: [older],
+      offset: 0,
+      previousOffset: null,
+      nextOffset: disposition === "queued" && inputId ? 1 : null,
+    });
+    bridge.enqueue = async (sessionId, id) => {
+      inputId = id;
+      return {
+        inputId: id,
+        sessionId,
+        inputPosition: 2,
+        turnId: null,
+        disposition: "queued",
+      };
+    };
+    bridge.inputReceipt = vi.fn<DesktopNativeChat["inputReceipt"]>(
+      async (sessionId, id) => ({
+        inputId: id,
+        sessionId,
+        inputPosition: 2,
+        turnId: disposition === "completed" ? "another-turn" : null,
+        disposition,
+      })
+    );
+    vi.mocked(bridge.inputReceipt).mockRejectedValueOnce(
+      new Error("disconnected")
+    );
+    try {
+      await controller.select("chat-a");
+      expect(
+        controller.submitOptimistically("Again", controller.read().scope)
+      ).toBe(true);
+      await vi.waitFor(() =>
+        expect(bridge.inputReceipt).toHaveBeenCalledExactlyOnceWith(
+          "chat-a",
+          inputId
+        )
+      );
+      expect(controller.read().outgoing).toMatchObject([
+        { id: inputId, placement: "queue" },
+      ]);
+      controller.checkObservation();
+      await vi.waitFor(() =>
+        expect(bridge.inputReceipt).toHaveBeenCalledTimes(2)
+      );
+      expect(controller.read().queue?.items).toEqual([older]);
+      expect(controller.read().outgoing).toMatchObject(
+        disposition === "completed"
+          ? [{ id: inputId, placement: "transcript" }]
+          : []
+      );
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("dismisses a refused send without replacing a newer composer document", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const key = "workspace:chat-a";
+  const next = { nextDraft: true };
+  const stage = vi
+    .spyOn(drafts, "stageOutgoing")
+    .mockRejectedValueOnce(new Error("storage refused"));
+  const submit = vi.spyOn(bridge, "submit");
+  controller.keepDrafts(drafts, "workspace");
+
+  try {
+    await controller.select("chat-a");
+    expect(
+      controller.submitOptimistically("First", controller.read().scope)
+    ).toBe(true);
+    drafts.write(key, next);
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing[0]?.status).toBe("failed")
+    );
+    expect(stage).toHaveBeenCalledOnce();
+    expect(submit).not.toHaveBeenCalled();
+    await expect(
+      controller.dismissOutgoing(controller.read().outgoing[0]!.id)
+    ).resolves.toBe(true);
+    expect(controller.read().outgoing).toEqual([]);
+    expect(controller.canSubmit).toBe(true);
+    expect(drafts.read(key)).toEqual(next);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("keeps the complete outgoing capture when its file cannot be stored for editing", async () => {
+  const { controller } = fixture();
+  const blobs = new Map<string, ComposerDraftBlob>();
+  const drafts = durableDrafts(blobs);
+  const key = "workspace:chat-a";
+  await drafts.writePending(key, {
+    inputId: "refused",
+    text: "Read this.",
+    mode: "submit",
+    allowLibrarySelection: false,
+    attachment: {
+      kind: "file",
+      name: "brief.txt",
+      bytes: new Uint8Array([17]).buffer,
+    },
+    outgoing: { id: "refused", staged: true },
+  });
+  controller.keepDrafts(drafts, "workspace");
+  try {
+    await controller.select("chat-a");
+    vi.spyOn(blobs, "set").mockImplementationOnce(() => {
+      throw new Error("quota exceeded");
+    });
+    await expect(controller.editOutgoing("refused", () => true)).resolves.toBe(
+      false
+    );
+    expect(controller.read().outgoing[0]).toMatchObject({
+      id: "refused",
+      status: "failed",
+    });
+    const reopened = durableDrafts(blobs);
+    expect(await reopened.readPending(key)).toMatchObject({
+      text: "Read this.",
+      attachment: { name: "brief.txt", bytes: new Uint8Array([17]).buffer },
+    });
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("requires the original reference to be replaced or removed even after editing and reopening", async () => {
+  const { bridge, controller } = fixture();
+  const blobs = new Map<string, ComposerDraftBlob>();
+  const documents = new Map<string, string>();
+  const drafts = durableDrafts(blobs, documents);
+  let reopened: NativeChatController | undefined;
+  await drafts.writePending("workspace:chat-a", {
+    inputId: "local-input",
+    text: "Use this file.",
+    mode: "submit",
+    allowLibrarySelection: false,
+    attachment: {
+      kind: "reference",
+      name: "original.txt",
+      referenceId: "original-reference",
+    },
+    outgoing: { id: "local-input", staged: true },
+  });
+  controller.keepDrafts(drafts, "workspace");
+  const submit = vi.spyOn(bridge, "submit");
+
+  try {
+    await controller.select("chat-a");
+    const item = controller.read().outgoing[0]!;
+    expect(item.attachment?.name).toBe("original.txt");
+    expect(item.retryable).toBe(false);
+    expect(item.error).toContain("original attachment");
+    expect(controller.read().attachmentDraft).toBeNull();
+    controller.retryOutgoing(item.id);
+    const restore = vi.fn<(doc: unknown) => boolean>(() => true);
+    await expect(controller.editOutgoing(item.id, restore)).resolves.toBe(true);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(controller.read().attachmentDraft?.error).toContain(
+      "Attach it again"
+    );
+    expect(controller.canSubmit).toBe(false);
+    controller.disconnect();
+    reopened = new NativeChatController(bridge);
+    const restored = durableDrafts(blobs, documents);
+    reopened.keepDrafts(restored, "workspace");
+    await reopened.select("chat-a");
+    expect(restored.read("workspace:chat-a")).toEqual(
+      restore.mock.calls[0]![0]
+    );
+    expect(reopened.read().outgoing).toEqual([]);
+    expect(reopened.read().attachmentDraft).toMatchObject({
+      name: "original.txt",
+      error: expect.stringContaining("Attach it again"),
+    });
+    expect(
+      reopened.submitOptimistically("Use this file.", reopened.read().scope)
+    ).toBe(false);
+    expect(submit).not.toHaveBeenCalled();
+    reopened.removeAttachment(reopened.read().scope);
+    expect(reopened.canSubmit).toBe(true);
+  } finally {
+    controller.disconnect();
+    reopened?.disconnect();
+  }
+});
+
+it("commits a Home handoff after staging and sends with the reserved first input", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const persist = Promise.withResolvers<void>();
+  const stage = drafts.stageOutgoing.bind(drafts);
+  vi.spyOn(drafts, "stageOutgoing").mockImplementationOnce(async (...args) => {
+    await persist.promise;
+    await stage(...args);
+  });
+  bridge.create = async () => ({
+    attachmentId: "first",
+    sessionId: "first",
+    firstInputId: "reserved-input",
+  });
+  const submit = vi.spyOn(bridge, "submit");
+  const commit = vi.fn<() => void>();
+  controller.keepDrafts(drafts, "workspace");
+  const home = controller.startChat(null, () => ({
+    requestId: "welcome-request",
+    text: "First",
+    commit,
+  }));
+  try {
+    await vi.waitFor(() =>
+      expect(controller.read().outgoing).toMatchObject([
+        { id: "welcome-request", text: "First" },
+      ])
+    );
+    expect(commit).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    const newer = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "next" }] },
+      ],
+    };
+    drafts.write("workspace:new", newer);
+    persist.resolve();
+    await home;
+    expect(commit).toHaveBeenCalledOnce();
+    expect(submit).toHaveBeenCalledExactlyOnceWith(
+      "first",
+      "reserved-input",
+      "First"
+    );
+    expect(drafts.read("workspace:first")).toEqual(newer);
+  } finally {
+    persist.resolve();
+    controller.disconnect();
+  }
+});
+
+describe("when the first Home handoff cannot be retired", () => {
+  async function failedHandoff() {
+    const { bridge, controller } = fixture();
+    const drafts = durableDrafts();
+    const commit = vi.fn<() => void>().mockImplementationOnce(() => {
+      throw new Error("Could not retire the Home request");
+    });
+    const release = vi.fn<() => void>();
+    const submit = vi.spyOn(bridge, "submit");
+    controller.keepDrafts(drafts, "workspace");
+    await controller.startChat(null, () => ({
+      requestId: "welcome-request",
+      text: "First",
+      commit,
+      release,
+    }));
+    expect(submit).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
+    expect(controller.read().outgoing[0]?.status).toBe("failed");
+    return { controller, drafts, commit, submit };
+  }
+
+  it("retains the next draft when retrying the original Home request", async () => {
+    const { controller, drafts, commit, submit } = await failedHandoff();
+    try {
+      const next = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "next" }] },
+        ],
+      };
+      drafts.write("workspace:new", next);
+      controller.retryOutgoing("welcome-request");
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      expect(drafts.read("workspace:new")).toEqual(next);
+      expect(commit).toHaveBeenCalledTimes(2);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("retires the original Home request before editing it", async () => {
+    const { controller, commit, submit } = await failedHandoff();
+    try {
+      const restore = vi.fn<(document: unknown) => boolean>(() => true);
+      await expect(
+        controller.editOutgoing("welcome-request", restore)
+      ).resolves.toBe(true);
+      expect(restore).toHaveBeenCalledOnce();
+      expect(submit).not.toHaveBeenCalled();
+      expect(commit).toHaveBeenCalledTimes(2);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("retires the original Home request when dismissing the failed send", async () => {
+    const { controller, commit, submit } = await failedHandoff();
+    try {
+      await expect(controller.dismissOutgoing("welcome-request")).resolves.toBe(
+        true
+      );
+      expect(submit).not.toHaveBeenCalled();
+      expect(commit).toHaveBeenCalledTimes(2);
+    } finally {
+      controller.disconnect();
+    }
+  });
+});
+
+it("publishes saved history while input capabilities and turn controls are still loading", async () => {
+  const { bridge, waiting } = fixture();
+  const files = Promise.withResolvers<boolean>();
+  const publication = Promise.withResolvers<void>();
+  const permissions =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["permissionMode"]>>>
+    >();
+  const questions =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["questions"]>>>
+    >();
+  const transcript = [message("saved", "Earlier reply")];
+  waiting.add("chat-a");
+  bridge.transcriptPage = vi.fn<
+    NonNullable<DesktopNativeChat["transcriptPage"]>
+  >(async () => ({ view: 1, messages: transcript, older: null }));
+  bridge.publishEditorSurfaces = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(() => publication.promise);
+  bridge.submitFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>();
+  bridge.acceptsFile = vi.fn<NonNullable<DesktopNativeChat["acceptsFile"]>>(
+    () => files.promise
+  );
+  bridge.permissionMode = vi.fn<
+    NonNullable<DesktopNativeChat["permissionMode"]>
+  >(() => permissions.promise);
+  bridge.acceptsPermissionMode = async () => true;
+  bridge.questions = vi.fn<NonNullable<DesktopNativeChat["questions"]>>(
+    () => questions.promise
+  );
+  bridge.answerQuestion =
+    vi.fn<NonNullable<DesktopNativeChat["answerQuestion"]>>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  const submit = vi.spyOn(bridge, "submit");
+  const opening = controller.select("chat-a");
+  const access = {
+    sessionId: "chat-a",
+    revision: 1,
+    mode: "restricted" as const,
+    available: ["restricted", "full_access"] as const,
+  };
+
+  try {
+    await vi.waitFor(() => {
+      expect(controller.read().messages).toEqual(transcript);
+      expect(bridge.permissionMode).toHaveBeenCalled();
+      expect(bridge.questions).toHaveBeenCalled();
+      expect(bridge.acceptsFile).toHaveBeenCalled();
+    });
+    expect(bridge.transcriptPage).toHaveBeenCalledExactlyOnceWith("chat-a");
+    expect(bridge.publishEditorSurfaces).toHaveBeenCalled();
+    expect(controller.hasOpenedHistory).toBe(true);
+    expect(controller.read().questionReady).toBe(false);
+    expect(controller.read().permissionModeLoading).toBe(true);
+    expect(controller.canSubmit).toBe(false);
+    expect(submit).not.toHaveBeenCalled();
+  } finally {
+    publication.resolve();
+    files.resolve(false);
+    permissions.resolve(access);
+    questions.resolve([]);
+    await opening;
+    controller.disconnect();
+  }
+});
+
+it("restores a saved draft's modes and retry before the chat attaches", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const attachment =
+    Promise.withResolvers<Awaited<ReturnType<typeof bridge.load>>>();
+  bridge.load = () => attachment.promise;
+  bridge.submitInRegime =
+    vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+  drafts.writeModes("workspace:chat-a", { plan: true });
+  await drafts.writePending("workspace:chat-a", {
+    inputId: "retained-input",
+    text: "Inspect this file.",
+    mode: "submit",
+    operatingRegime: "plan",
+    allowLibrarySelection: false,
+    attachment: {
+      kind: "file",
+      name: "draft.txt",
+      bytes: new Uint8Array([1, 2, 3]).buffer,
+    },
+  });
+  controller.keepDrafts(drafts, "workspace");
+  const opening = controller.select("chat-a");
+
+  try {
+    await vi.waitFor(() =>
+      expect(controller.read().attachmentDraft?.name).toBe("draft.txt")
+    );
+    expect(controller.read().operatingRegime).toBe("plan");
+    expect(controller.presentedAttachmentId).toBeUndefined();
+    expect(controller.canSubmit).toBe(false);
+  } finally {
+    attachment.resolve({ attachmentId: "chat-a", sessionId: "chat-a" });
+    await opening;
+    controller.disconnect();
+  }
+});
 
 it("reads a recorded user PNG without submitting work and drops a stale chat response", async () => {
   const { bridge, transcripts, controller } = fixture();
@@ -7822,6 +8770,24 @@ describe("Native workspace chat controller", () => {
     }
   });
 
+  it("keeps an authored input identity learned on a repeated live chunk", async () => {
+    const { controller, running, updates } = fixture();
+    running.add("a");
+    try {
+      await controller.select("a");
+      const publish = updates.get("a")!;
+      const chunk = { ...text("a", "Hello", 0), role: "user" } as const;
+      publish(chunk);
+      publish({ ...chunk, inputId: "submitted" });
+      publish({ ...chunk, replace: true });
+      expect(controller.read().messages).toMatchObject([
+        { text: "Hello", inputId: "submitted" },
+      ]);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
   it("replaces a gapped stream with committed text and ignores late provisional chunks", async () => {
     const { controller, running, updates, transcripts } = fixture();
     running.add("a");
@@ -7985,10 +8951,10 @@ describe("Native workspace chat controller", () => {
 
     try {
       const opening = controller.select("a");
-      await vi.waitFor(() =>
-        expect(restore).toHaveBeenCalledWith("workspace:a")
-      );
-      expect(controller.read().connectionRecovery).toBe("reconnecting");
+      await vi.waitFor(() => {
+        expect(restore).toHaveBeenCalledWith("workspace:a");
+        expect(controller.read().connectionRecovery).toBe("reconnecting");
+      });
       expect(status).not.toHaveBeenCalled();
       expect(controller.canSubmit).toBe(false);
 

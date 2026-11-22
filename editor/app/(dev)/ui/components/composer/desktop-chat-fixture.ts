@@ -39,6 +39,7 @@ type Input = {
 /** Local implementation of the fragment of Desktop IPC used by the examples. */
 export class DesktopChatFixture {
   readonly submission = new DesktopRequestFixture();
+  readonly compaction = new DesktopRequestFixture();
   readonly modelsRead = new DesktopRequestFixture();
   readonly accessRead = new DesktopRequestFixture();
   readonly reconnect = new DesktopRequestFixture();
@@ -72,6 +73,7 @@ export class DesktopChatFixture {
     queued: boolean
   ) {
     const example = conversations.get(scenario);
+    if (scenario === "compaction") this.compaction.hold(true);
     this.questions = example.questions ?? [];
     this.waitingFor =
       scenario === "approval" || scenario === "library-request"
@@ -222,6 +224,7 @@ export class DesktopChatFixture {
 
   resetRequests() {
     this.submission.reset();
+    this.compaction.reset();
     this.modelsRead.reset();
     this.accessRead.reset();
     this.reconnect.reset();
@@ -522,11 +525,29 @@ export class DesktopChatFixture {
     load: async (id) => ({ sessionId: id, attachmentId: id }),
     detach: async () => {},
     commands: async () => ["compact"],
-    runCommand: async () => ({
-      command: "compact",
-      turnId: null,
-      status: "no_change",
-    }),
+    runCommand: async (_attachmentId, _command, requestId) => {
+      if (this.scenario !== "compaction") {
+        return { command: "compact", turnId: null, status: "no_change" };
+      }
+      await this.compaction.wait();
+      const turnId = `compaction-${requestId}`;
+      this.records = [
+        ...this.records,
+        {
+          turnId,
+          status: "succeeded",
+          startedAtMs: conversations.startedAtMs,
+          settledAtMs: conversations.startedAtMs + 3200,
+          compaction: {
+            summary:
+              "The gallery handout uses large print with a map on the back.",
+            automatic: false,
+          },
+        },
+      ];
+      this.changed();
+      return { command: "compact", turnId, status: "installed" };
+    },
     acceptsSelectedImage: async () => true,
     acceptsPng: async () => true,
     acceptsFile: async () => true,

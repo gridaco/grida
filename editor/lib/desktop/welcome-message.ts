@@ -12,14 +12,14 @@
  * navigation and a reload, and stays with this window. Entries are keyed by
  * workspace so two windows opening different workspaces do not cross.
  *
- * Delivery is at most once: the chat {@link welcome_message.takeMessage | takes} the
- * entry immediately before it sends, so a reload after that point cannot send
- * it again. A waiting entry survives startup failures, retries and reloads.
- * A connected chat that refuses the first input returns it to its composer
+ * The chat claims one entry and removes it after taking durable custody of the
+ * input. A waiting entry survives startup failures, retries and reloads.
+ * A refused ordinary input remains available to review beside the next draft
  * (see test/desktop-welcome-first-message.md).
  */
 
 import { parseNativeChatMessageContext } from "@grida/desktop-bridge";
+import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import type {
   NativeChatInitialComposer,
   NativeChatFirstInput,
@@ -34,6 +34,19 @@ const KEY_PREFIX = "grida.welcome.message.v1.";
 const PROFILE_ID = /^[a-f0-9]{64}$/;
 const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const attachmentTokens = new Map<string, string>();
+const nextDrafts = new Map<
+  string,
+  { requestId: string; transfer: WelcomeDraftTransfer }
+>();
+const claims = new Map<
+  string,
+  { raw: string; storage: object; released: boolean }
+>();
+
+const HANDOFF_CHANGED =
+  "The Home message changed before it could be sent. Reopen the workspace to see the current request.";
+const HANDOFF_STORAGE_UNAVAILABLE =
+  "Couldn't verify the Home message handoff. Retry this message.";
 
 function key(workspaceId: string): string {
   return `${KEY_PREFIX}${workspaceId}`;
@@ -47,8 +60,85 @@ export type WelcomeMessage = NativeChatFirstInput &
      * `null` keeps the workspace's default connection.
      */
     profileId: string | null;
+    /** Home editor whose subsequent edits belong to this request. */
+    homeDraftKey?: string;
+    transferNextDraft?: WelcomeDraftTransfer;
   }> &
   NativeChatInitialComposer;
+
+/** Move only the text typed after Send, within the window that authored it. */
+export type WelcomeDraftTransfer = (destination: {
+  store: ComposerDrafts;
+  key: string;
+}) => void;
+
+/** A request owns its follow-up until the destination editor can take it. */
+export class WelcomeFollowupDraft {
+  private transferred = false;
+  private readonly key: string;
+
+  constructor(
+    requestId: string,
+    private readonly homeKey: string,
+    private readonly source?: { store: ComposerDrafts; read(): unknown }
+  ) {
+    this.key = `desktop-home:followup:${requestId}`;
+  }
+
+  /** Keep the last Home edit across a renderer reload, independently of later Home use. */
+  save(document: unknown, flushHome = false): void {
+    if (this.transferred || !this.source) return;
+    const { store } = this.source;
+    if (flushHome) store.write(this.homeKey, document);
+    store.write(
+      this.key,
+      document == null
+        ? null
+        : { document, revision: store.documentRevision(this.homeKey) }
+    );
+  }
+
+  transfer: WelcomeDraftTransfer = ({ store, key }) => {
+    if (this.transferred) return;
+    const source = this.source?.store ?? store;
+    const saved = source.read(this.key) as {
+      document?: unknown;
+      revision?: string;
+    } | null;
+    const current = this.source?.read();
+    const document = current === undefined ? saved?.document : current;
+    // A different Home visit might have written exactly the same words.
+    const revision = source.documentRevision(this.homeKey);
+    const owned = saved?.revision
+      ? saved.revision === revision
+      : !revision && this.source && source.read(this.homeKey) === document;
+    if (store.read(key) !== null) {
+      // The follow-up belongs on Home. Flush a final live edit before retiring
+      // the handoff copy. A later Home visit owns its own version.
+      if (this.source && current !== undefined && (owned || !revision)) {
+        try {
+          source.checkpoint(this.homeKey, current);
+        } catch {
+          return;
+        }
+      }
+      this.transferred = true;
+      source.write(this.key, null);
+      return;
+    }
+    if (document == null) return;
+    store.write(key, document);
+    this.transferred = true;
+    // Preserve the on-disk copy if the target could only retain it in memory.
+    if (
+      (revision || source.documentRevision(this.key)) &&
+      !store.documentRevision(key)
+    )
+      return;
+    if (owned) source.write(this.homeKey, null);
+    source.write(this.key, null);
+  };
+}
 
 /** A slides template already copied into the workspace as its own deck. */
 export type WelcomeTemplate = Readonly<{
@@ -96,27 +186,32 @@ export namespace welcome_message {
     try {
       if (!storage) return false;
       const token = message.attachment ? crypto.randomUUID() : undefined;
-      const { attachment, ...settings } = message;
-      storage.setItem(
-        key(workspaceId),
-        JSON.stringify({
-          ...settings,
-          requestId: crypto.randomUUID(),
-          ...(attachment && {
-            attachment: {
-              token,
-              kind: attachment.kind,
-              name: attachment.file.name,
-            },
-          }),
-        })
-      );
+      const { attachment, transferNextDraft, ...settings } = message;
+      const requestId = message.requestId ?? crypto.randomUUID();
+      const raw = JSON.stringify({
+        ...settings,
+        requestId,
+        ...(attachment && {
+          attachment: {
+            token,
+            kind: attachment.kind,
+            name: attachment.file.name,
+          },
+        }),
+      });
+      storage.setItem(key(workspaceId), raw);
+      const claim = claims.get(workspaceId);
+      if (claim?.storage === storage && claim.raw !== raw)
+        claims.delete(workspaceId);
       const previous = attachmentTokens.get(workspaceId);
       if (previous) attachments.delete(previous);
       if (token && attachment) {
         attachments.set(token, attachment);
         attachmentTokens.set(workspaceId, token);
       } else attachmentTokens.delete(workspaceId);
+      if (transferNextDraft)
+        nextDrafts.set(workspaceId, { requestId, transfer: transferNextDraft });
+      else nextDrafts.delete(workspaceId);
       return true;
     } catch {
       return false;
@@ -144,24 +239,89 @@ export namespace welcome_message {
   ): Readonly<{
     message: WelcomeMessage;
     waiting: () => boolean;
+    peek: () => WelcomeMessage | null;
     take: () => WelcomeMessage | null;
   }> | null {
     try {
       if (!storage) return null;
       const raw = storage.getItem(key(workspaceId));
-      const message = parse(raw);
-      if (!message) return null;
-      const waiting = () => {
+      const message = parse(raw, true);
+      if (raw === null || !message) return null;
+      const nextDraft = nextDrafts.get(workspaceId);
+      const transferNextDraft =
+        nextDraft && nextDraft.requestId === message.requestId
+          ? nextDraft.transfer
+          : message.requestId &&
+              (message.homeDraftKey === "desktop-home:default" ||
+                message.homeDraftKey === `desktop-home:${workspaceId}`)
+            ? new WelcomeFollowupDraft(message.requestId, message.homeDraftKey)
+                .transfer
+            : undefined;
+      const snapshot = transferNextDraft
+        ? { ...message, transferNextDraft }
+        : message;
+      const matches = () => {
         try {
           return storage.getItem(key(workspaceId)) === raw;
         } catch {
           return false;
         }
       };
+      const waiting = () => {
+        const claim = claims.get(workspaceId);
+        return (
+          matches() &&
+          !(claim?.raw === raw && claim.storage === storage && !claim.released)
+        );
+      };
       return {
-        message,
+        message: snapshot,
         waiting,
-        take: () => (waiting() ? takeMessage(workspaceId, storage) : null),
+        peek: () => (matches() ? snapshot : null),
+        take: () => {
+          if (!waiting()) return null;
+          const claim = { raw, storage, released: false };
+          claims.set(workspaceId, claim);
+          let removed = false;
+          const release = () => {
+            if (claims.get(workspaceId) !== claim) return;
+            // A failed post-removal read can be retried only by this owner.
+            if (removed) claim.released = true;
+            else claims.delete(workspaceId);
+          };
+          let committed = false;
+          return {
+            ...snapshot,
+            commit: () => {
+              if (committed) return;
+              const current = claims.get(workspaceId);
+              if (current && current !== claim)
+                throw new Error(HANDOFF_CHANGED);
+              // An explicit retry can reclaim the same waiting request after
+              // pre-dispatch failure releases its claim.
+              const remaining = readHandoff(workspaceId, storage);
+              if (remaining === null && removed && current === claim) {
+                forgetHandoff(workspaceId, storage, raw);
+              } else {
+                if (remaining !== raw) throw new Error(HANDOFF_CHANGED);
+                claim.released = false;
+                claims.set(workspaceId, claim);
+                try {
+                  storage.removeItem(key(workspaceId));
+                  removed = true;
+                } catch (cause) {
+                  throw new Error(HANDOFF_STORAGE_UNAVAILABLE, { cause });
+                }
+                const after = readHandoff(workspaceId, storage);
+                if (after === raw) throw new Error(HANDOFF_STORAGE_UNAVAILABLE);
+                if (after !== null) throw new Error(HANDOFF_CHANGED);
+                forgetHandoff(workspaceId, storage, raw);
+              }
+              committed = true;
+            },
+            release,
+          };
+        },
       };
     } catch {
       return null;
@@ -180,14 +340,7 @@ export namespace welcome_message {
       const raw = storage.getItem(key(workspaceId));
       storage.removeItem(key(workspaceId));
       const message = parse(raw);
-      if (raw) {
-        const value = JSON.parse(raw);
-        if (typeof value?.attachment?.token === "string") {
-          attachments.delete(value.attachment.token);
-          if (attachmentTokens.get(workspaceId) === value.attachment.token)
-            attachmentTokens.delete(workspaceId);
-        }
-      }
+      if (raw) forgetHandoff(workspaceId, storage, raw);
       return message;
     } catch {
       return null;
@@ -195,13 +348,47 @@ export namespace welcome_message {
   }
 }
 
-function parse(raw: string | null): WelcomeMessage | null {
+function readHandoff(
+  workspaceId: string,
+  storage: Pick<Storage, "getItem">
+): string | null {
+  try {
+    return storage.getItem(key(workspaceId));
+  } catch (cause) {
+    throw new Error(HANDOFF_STORAGE_UNAVAILABLE, { cause });
+  }
+}
+
+function forgetHandoff(
+  workspaceId: string,
+  storage: object,
+  raw: string
+): void {
+  const claim = claims.get(workspaceId);
+  if (claim?.raw === raw && claim.storage === storage)
+    claims.delete(workspaceId);
+  const value = JSON.parse(raw);
+  if (nextDrafts.get(workspaceId)?.requestId === value?.requestId)
+    nextDrafts.delete(workspaceId);
+  if (typeof value?.attachment?.token === "string") {
+    attachments.delete(value.attachment.token);
+    if (attachmentTokens.get(workspaceId) === value.attachment.token)
+      attachmentTokens.delete(workspaceId);
+  }
+}
+
+function parse(
+  raw: string | null,
+  includeRequestId = false
+): WelcomeMessage | null {
   if (raw === null) return null;
   const value = JSON.parse(raw) as unknown;
   if (typeof value !== "object" || value === null) return null;
   const {
     text,
     profileId,
+    requestId,
+    homeDraftKey,
     messageContext: rawContext,
   } = value as Record<string, unknown>;
   const messageContext =
@@ -287,6 +474,11 @@ function parse(raw: string | null): WelcomeMessage | null {
     return null;
   return {
     text,
+    ...(includeRequestId &&
+      typeof requestId === "string" &&
+      SESSION_ID.test(requestId) && { requestId }),
+    ...(includeRequestId &&
+      typeof homeDraftKey === "string" && { homeDraftKey }),
     ...(messageContext && { messageContext }),
     profileId,
     ...(effort !== undefined && {

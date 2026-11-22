@@ -52,7 +52,8 @@ composer as an unsent draft.
 
 Send an ordinary follow-up while a turn is running to put it in the queue. For
 example, “When the deck is ready, describe the changes” can run as its own
-turn. It appears above the composer while its details load. After the current
+turn. Each press of Send shows a row in the queue above the composer, even
+if several messages have identical text. Queue actions appear as Grida confirms each row. After the current
 turn finishes normally, the next waiting message starts automatically when
 there is room to run it. Each waiting message keeps the options you selected
 when you sent it. The row shows a **Plan** or **Ultra** choice. The model
@@ -80,16 +81,19 @@ If the current turn asks a question, answer it in its card. Use Shift+Enter
 to add a line in a custom answer. For a set of questions, use the arrows around
 the question counter to go back or forward. Selecting an option advances to
 the next question when there is one. **Next** keeps your answer and skips the
-question if it is blank. **Skip** skips the current question even if it has
-an answer. On the last question, use **Submit**, double-click an option to
-submit it, or use **Skip** to submit with that question skipped. If earlier
-questions are still unanswered, you can go back or confirm skipping them.
+question if it is blank. In a set, **Skip** and the close button skip the
+current question even if it has an answer. On the last question, use **Submit**,
+double-click an option to submit it, or use **Skip** to submit with that
+question skipped. If earlier questions are still unanswered, you can go back
+or confirm skipping them.
 
 A required question or set waits for your submission. An optional question or
 set lets the agent keep working.
-Use the close button to put the card away. The chat shows an **Answer question**
-or **Answer questions** button while the request is open. The agent gives you
-time to reply before proceeding on a stated assumption. The card expires when
+A required single question’s close button skips it. Use the close button to put
+a single optional question away, or press Escape to put an optional set away.
+The chat shows an **Answer question** or **Answer questions** button while the
+request is open. The agent gives you time to reply before proceeding on a
+stated assumption. The card expires when
 the turn ends. A separate queued message leaves the questions open.
 
 Your answers appear with their questions. Open **Worked for …** on a finished
@@ -138,9 +142,11 @@ disconnected, you can still read the saved messages already on screen and keep
 writing your draft. Choose **Reconnect** if the automatic attempt ends. This
 restores the view of the same chat without sending a message or starting its queue.
 
-If a message was awaiting confirmation, retry that same draft to check whether
-it was already accepted. Desktop uses the original send identity so checking
-doesn't create a second turn.
+For an ordinary message awaiting confirmation, choose **Retry** on the
+outgoing message. Desktop checks its original send identity. You can keep
+typing while it checks. Once that send is accounted for, you can send the
+next draft. A confirmed refusal also offers **Edit** to restore the message
+into an empty composer, or **Dismiss** to continue with your current draft.
 
 If the agent process ended during a turn, the chat can show that the turn was
 interrupted. Review any partial work, then choose **End interrupted turn** to

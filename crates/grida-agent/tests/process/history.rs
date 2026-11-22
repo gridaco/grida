@@ -148,13 +148,26 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
     let session = &created["result"]["sessionId"];
     let prompt = plain
         .request(
-            "session/prompt",
-            json!({"sessionId":session,"prompt":[{"type":"text","text":"Saved question"}]}),
+            "_co.grida/session/submit",
+            json!({"sessionId":session,"inputId":"saved-question","prompt":[{"type":"text","text":"Saved question"}]}),
         )
         .await;
-    assert_eq!(prompt["result"]["stopReason"], "end_turn", "{prompt}");
+    assert_eq!(prompt["result"]["inputId"], "saved-question", "{prompt}");
     endpoint.request().await;
     endpoint.request().await;
+    timeout(WAIT, async {
+        loop {
+            let observed = plain
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            if observed["result"]["latest"]["status"] == "succeeded" {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
     let mut load = json!({"sessionId":session,"cwd":workspace,"mcpServers":[]});
     let attach = json!({CAPABILITY:{"kind":"attach"}});
     let read = json!({CAPABILITY:{"kind":"read","requestId":"page-1"}});
@@ -231,6 +244,7 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
             let meta = &params["_meta"][CAPABILITY];
             if params["update"]["sessionUpdate"] == "tool_call" {
                 assert!(correlated, "standard replay stays text-only: {frame}");
+                assert!(meta.get("inputId").is_none(), "{frame}");
                 assert_eq!(params["update"]["title"], "read_file");
                 assert_eq!(params["update"]["kind"], "read");
                 assert_eq!(params["update"]["status"], "completed");
@@ -251,6 +265,11 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
                 assert_eq!(frame["method"], "session/update");
                 assert_eq!(params["sessionId"], *session);
                 assert_eq!(meta["requestId"].as_str(), correlated.then_some("page-1"),);
+                assert_eq!(
+                    meta.get("inputId"),
+                    (correlated && text == "Saved question").then_some(&json!("saved-question")),
+                    "{frame}"
+                );
                 if correlated {
                     assert!(meta["turnId"].is_string(), "{frame}");
                     turn.get_or_insert_with(|| meta["turnId"].clone());

@@ -57,12 +57,14 @@ export function AgentPane({
       ? null
       : welcome_message.pending(workspaceId);
     if (!pending) return;
-    const { message, waiting, take } = pending;
+    const { message, waiting, peek, take } = pending;
     return {
       profileId: message.profileId,
       composer: message,
       waiting,
+      peek,
       take,
+      transferNextDraft: message.transferNextDraft,
     };
   }, [workspaceId, initialSession]);
   // The route can still be resolving the next workspace after navigation.

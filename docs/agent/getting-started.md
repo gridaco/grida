@@ -22,25 +22,23 @@ headless host. Windows Desktop has no agent chat.
 
 ## Start from Welcome
 
-Describe what you want in the Welcome composer and send. Grida opens the
-default project folder, or the project chosen at the top left, and sends your
-message as the first message of a new chat there. Your message is sent once:
-reloading the window does not send it again.
+Describe what you want in the Welcome composer and press **Send**. Your message
+appears immediately with its attachment. You can start typing your next message
+while Grida opens the selected project and starts the chat. Reloading during
+that handoff preserves the follow-up as a separate draft. If that chat already
+has an unsent draft, the text you typed during opening stays on Home.
 
 If the connection cannot start, the workspace keeps your Welcome message.
-Choose **Retry** to send it once the original connection is ready. If you
-choose a different model, the message appears in the composer so you can
-review it and press **Send**.
+Choose **Retry** once the original connection is ready. If you choose another
+model, review the outgoing message with **Edit**, then send it explicitly.
 
 The model picker on Welcome lists **Default**, models from a connected
 **ChatGPT Subscription**, and models available through your saved provider
 keys and endpoints. New chats use your last explicitly chosen model and
 effort together. With no saved choice, a new chat prefers a ready subscription.
 The chat in the project uses the model you choose; more
-Grida models appear in the project's own picker once its chat is running. If
-the chosen model cannot start, or the project needs a model choice first,
-the chat says your message wasn't sent and puts it in the composer so you
-can send it yourself. [Choose a model](./models-and-usage.md#choose-a-model)
+Grida models appear in the project's own picker once its chat is running.
+[Choose a model](./models-and-usage.md#choose-a-model)
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template

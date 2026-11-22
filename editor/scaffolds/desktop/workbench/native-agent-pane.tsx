@@ -39,6 +39,7 @@ import {
   ChatMessageView,
   ChatResponseCards,
   CompactionNotice,
+  CompactionProgress,
   PendingTurnIndicator,
   QuestionPrompt,
   workspace_links,
@@ -69,6 +70,10 @@ import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import { AgentComposer } from "../shared/agent-composer";
+import {
+  OutgoingMessage,
+  OutgoingMessageStatus,
+} from "../shared/outgoing-message";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -119,6 +124,11 @@ export type NativeFirstMessage = Readonly<{
   profileId: string | null;
   composer?: NativeChatInitialComposer;
   waiting: () => boolean;
+  peek?: () => NativeChatFirstInput | null;
+  transferNextDraft?: (destination: {
+    store: ComposerDrafts;
+    key: string;
+  }) => void;
   take: () => NativeChatFirstInput | null;
 }>;
 
@@ -233,9 +243,20 @@ export function NativeAgentPaneGate({
     !!bridge.selectProfile;
   const unavailable =
     !starting && readiness !== "native-ready" && !connectionRequired;
-  if (unavailable)
+  if (unavailable) {
+    const pending = firstMessage?.peek?.();
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
+        {pending && (
+          <OutgoingMessage
+            text={pending.text}
+            displayParts={pending.messageContext?.displayParts}
+            attachmentName={
+              firstMessage?.composer?.attachment?.file.name ??
+              firstMessage?.composer?.missingAttachment?.name
+            }
+          />
+        )}
         <span role="alert" className="text-destructive">
           {readiness === null
             ? "Couldn't check chat availability."
@@ -254,6 +275,7 @@ export function NativeAgentPaneGate({
         </Button>
       </div>
     );
+  }
   return (
     <NativeAgentPane
       key={initialSession}
@@ -375,10 +397,15 @@ export function NativeAgentPane({
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone", {
       sessionId:
         initialSession ?? firstMessage?.composer?.preparedSessionId ?? null,
-      fromHome: firstMessage?.waiting() === true,
+      home: firstMessage?.waiting() ? firstMessage.composer : undefined,
     });
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId, libraryRequestSource]);
+  useLayoutEffect(() => {
+    const destination = controller.composerDraft();
+    if (destination && firstMessage?.waiting())
+      firstMessage.transferNextDraft?.(destination);
+  }, [controller, firstMessage]);
   useEffect(() => {
     const publish = () =>
       onProcessesChange?.(
@@ -473,7 +500,7 @@ export function NativeAgentPane({
       editorSurfaces={editorSurfaces}
       libraryRequestSource={libraryRequestSource}
       recovery={recovery}
-      waitingForHome={!!recovery && firstMessage?.waiting()}
+      firstMessage={initialSession ? undefined : firstMessage}
       draftRef={draft}
       subagentsInTabs={!!subagentPlacement}
       header={(state) => (
@@ -490,7 +517,8 @@ export function NativeAgentPane({
 }
 
 /** The composer handle a chat pane lends its owner. */
-type NativeChatComposer = Pick<ComposerController, "appendText" | "focus">;
+type NativeChatComposer = Pick<ComposerController, "appendText" | "focus"> &
+  Partial<Pick<ComposerController, "restoreDocument">>;
 
 /**
  * A side chat, as a placement presents it: the ordinary chat pane bound to
@@ -558,7 +586,7 @@ function NativeChatPane({
   editorSurfaces,
   libraryRequestSource,
   recovery,
-  waitingForHome,
+  firstMessage,
   draftRef: draft,
   header,
   autofocus = true,
@@ -575,7 +603,7 @@ function NativeChatPane({
   libraryRequestSource?: LibraryRequestSource;
   /** No connection can run yet; the composer's model picker starts the chat. */
   recovery?: ConnectionRecovery;
-  waitingForHome?: boolean;
+  firstMessage?: NativeFirstMessage;
   draftRef: RefObject<NativeChatComposer | null>;
   header: (state: NativeChatView) => ReactNode;
   autofocus?: boolean;
@@ -600,6 +628,36 @@ function NativeChatPane({
     controller.subscribe,
     controller.read,
     controller.read
+  );
+  const handoffInput =
+    (!state.selected ||
+      state.selected === firstMessage?.composer?.preparedSessionId) &&
+    firstMessage?.peek?.();
+  const homeInput =
+    handoffInput &&
+    !state.outgoing.some((item) => item.id === handoffInput.requestId)
+      ? handoffInput
+      : null;
+  const homeAttachmentName =
+    firstMessage?.composer?.attachment?.file.name ??
+    firstMessage?.composer?.missingAttachment?.name;
+  const renderOutgoingStatus = (item: NativeChatView["outgoing"][number]) => (
+    <OutgoingMessageStatus
+      status={item.status}
+      error={item.error}
+      onRetry={
+        item.retryable === false
+          ? undefined
+          : () => controller.retryOutgoing(item.id)
+      }
+      onEdit={() =>
+        controller.editOutgoing(
+          item.id,
+          (doc) => draft.current?.restoreDocument?.(doc) ?? false
+        )
+      }
+      onDismiss={() => void controller.dismissOutgoing(item.id)}
+    />
   );
   const awaitingProfiles =
     !!bridge.profiles && !controller.fixedSession && !state.profilesLoaded;
@@ -870,7 +928,7 @@ function NativeChatPane({
   // editor; the composer consumes its own drops first, so each is handled once.
   // (see test/desktop-agent-chat-pane-drop.md)
   const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
-    if (!activityOpen)
+    if (!activityOpen && !homeInput)
       void controller.pickTransferredAttachment(state.scope, resources);
   };
 
@@ -914,7 +972,7 @@ function NativeChatPane({
             className={`py-1 text-xs text-muted-foreground ${layout.contentInset}`}
           >
             <p role="status">{recovery.note}</p>
-            {waitingForHome && (
+            {firstMessage?.waiting() && (
               <p>Your message from Home is still waiting to send.</p>
             )}
             {state.profiles &&
@@ -1008,6 +1066,25 @@ function NativeChatPane({
                   renderMessage(block.message)
                 )
               )}
+              {homeInput && (
+                <OutgoingMessage
+                  text={homeInput.text}
+                  displayParts={homeInput.messageContext?.displayParts}
+                  attachmentName={homeAttachmentName}
+                />
+              )}
+              {state.outgoing
+                .filter((item) => item.placement === "transcript")
+                .map((item) => (
+                  <OutgoingMessage
+                    key={item.id}
+                    text={item.text}
+                    attachmentName={item.attachment?.name}
+                    displayParts={item.displayParts}
+                  >
+                    {renderOutgoingStatus(item)}
+                  </OutgoingMessage>
+                ))}
               {subagentActivity?.activityAvailable &&
                 !subagentActivity.eventsComplete && (
                   <Button
@@ -1020,13 +1097,15 @@ function NativeChatPane({
                     More subagent activity is available in Subagents
                   </Button>
                 )}
-              {stillWorking && (
+              {state.commandRunning === "compact" ? (
+                <CompactionProgress />
+              ) : stillWorking ? (
                 <PendingTurnIndicator
                   key={turn?.turnId}
                   progress={state.progressRevision}
                   immediate={!outputStarted}
                 />
-              )}
+              ) : null}
               <div ref={setQuestionTranscript} className="contents" />
               {/* See test/desktop-agent-chat-transcript-history.md. */}
               {!turn &&
@@ -1245,7 +1324,7 @@ function NativeChatPane({
               }}
             />
           )}
-          {state.attachmentReading && (
+          {!homeInput && state.attachmentReading && (
             <p
               role="status"
               className="text-muted-foreground px-1 pb-1 text-xs"
@@ -1253,7 +1332,8 @@ function NativeChatPane({
               Reading attachment…
             </p>
           )}
-          {state.attachmentDraft &&
+          {!homeInput &&
+            state.attachmentDraft &&
             (state.attachmentDraft.error ||
               !(state.attachmentDraft.kind === "image"
                 ? state.selectedImageInput
@@ -1281,14 +1361,12 @@ function NativeChatPane({
               {state.attachmentNotice}
             </p>
           )}
-          {(state.commandRunning || state.commandNotice) && (
+          {(state.commandRunning === "fork" || state.commandNotice) && (
             <div className="flex items-center gap-2 px-1 pb-1 text-xs">
               <span role="status">
-                {state.commandRunning === "compact"
-                  ? "Compacting…"
-                  : state.commandRunning === "fork"
-                    ? "Creating fork…"
-                    : state.commandNotice}
+                {state.commandRunning === "fork"
+                  ? "Creating fork…"
+                  : state.commandNotice}
               </span>
               {state.commandFork && (
                 <Button
@@ -1305,6 +1383,7 @@ function NativeChatPane({
           <NativeComposerTray
             controller={controller}
             view={state}
+            renderOutgoingStatus={renderOutgoingStatus}
             onReturnedText={(text) =>
               void draft.current?.appendText(text, MAX_DRAFT_BYTES)
             }
@@ -1363,6 +1442,7 @@ function NativeChatPane({
               run: () => controller.runComposerCommand(id),
             }))}
             attachments={
+              !homeInput &&
               (state.draftMessageContext ||
                 (state.attachmentDraft && !state.attachmentReading)) && (
                 <>
@@ -1415,7 +1495,13 @@ function NativeChatPane({
             onClearSelection={controller.clearComposerEditorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
+            onCapture={(text, document) =>
+              controller.canSubmitOptimistically(text)
+                ? controller.submitOptimistically(text, state.scope, document)
+                : undefined
+            }
             canSubmit={
+              !homeInput &&
               controller.canSubmit &&
               (!state.goalIntent || controller.canStartGoal)
             }
@@ -1459,6 +1545,7 @@ function NativeChatPane({
                 state.fileInput || state.fileReferenceInput
                   ? {
                       disabled:
+                        !!homeInput ||
                         state.goalIntent ||
                         !(
                           controller.canAttach("file") ||
@@ -1469,14 +1556,17 @@ function NativeChatPane({
                   : undefined,
               image: state.imageInput
                 ? {
-                    disabled: state.goalIntent || !controller.canAttach("png"),
+                    disabled:
+                      !!homeInput ||
+                      state.goalIntent ||
+                      !controller.canAttach("png"),
                     onSelect: () => pngPicker.current?.click(),
                   }
                 : undefined,
               library:
                 workspaceId && state.imageInput
                   ? {
-                      disabled: state.acting || state.goalIntent,
+                      disabled: !!homeInput || state.acting || state.goalIntent,
                       onSelect: () => setLibraryScope(state.scope),
                     }
                   : undefined,

@@ -108,6 +108,8 @@ export type AgentComposerInputProps = {
    * `allowEmptySubmit` is set.
    */
   onSubmit: (text: string) => void | Promise<void>;
+  /** Transfer the draft immediately. An undefined result uses onSubmit. */
+  onCapture?: (text: string, document: unknown) => boolean | undefined;
   /** Override the inline notice when an awaited send fails. */
   onSubmitError?: (error: unknown) => void;
   isStreaming: boolean;
@@ -127,7 +129,10 @@ export type AgentComposerInputProps = {
    * in the newly selected session.
    */
   submissionScope?: string | number;
-  draftRef?: Ref<Pick<ComposerController, "appendText" | "focus">>;
+  draftRef?: Ref<
+    Pick<ComposerController, "appendText" | "focus"> &
+      Partial<Pick<ComposerController, "readDocument" | "restoreDocument">>
+  >;
   /** An Escape confirmation applies only to the turn visible on the first press. */
   activeTurnId?: string;
   onStop: () => void;
@@ -145,7 +150,13 @@ export type AgentComposerInputProps = {
    * Where unsent text is kept, keyed by chat. The draft survives remounting,
    * reconnection and restarts; only deleting it or an accepted send clears it.
    */
-  draft?: { key: string; store: ComposerDrafts };
+  draft?: {
+    key: string;
+    store: ComposerDrafts;
+    promotedFrom?: string;
+    /** Retain edits that must also cross a Home-to-workspace handoff. */
+    onWrite?: (document: unknown | null) => void;
+  };
   placeholder?: string;
   prediction?: NativeComposerPrediction;
   /** Focus on mount and when switching to another chat's restored draft. */
@@ -214,6 +225,7 @@ function AgentComposerInner({
   editing,
   commandActions,
   onSubmit,
+  onCapture,
   onSubmitError,
   isStreaming,
   busy,
@@ -247,17 +259,22 @@ function AgentComposerInner({
   // change. A different chat starts from its own draft.
   const draftKey = draft?.key;
   const draftStore = draft?.store;
+  const onDraftWrite = draft?.onWrite;
+  const promotedFrom = draft?.promotedFrom;
   const editOwner = draftKey ?? submissionScope;
   const [binding] = useState(() => new ComposerDraftBinding());
   useEffect(() => {
     if (!draftKey || !draftStore || !composer.ready) return;
-    const meeting = binding.meet(draftKey);
+    const meeting = binding.meet(draftKey, promotedFrom);
     if (meeting === "held") return;
-    if (meeting === "renamed") {
-      draftStore.write(draftKey, readDocument());
+    const saved = draftStore.read(draftKey);
+    if (
+      meeting === "promoted" &&
+      JSON.stringify(saved) === JSON.stringify(readDocument())
+    ) {
+      binding.restored(draftKey);
       return;
     }
-    const saved = draftStore.read(draftKey);
     if (binding.held !== null) composer.clear();
     if (saved === null || restoreDocument(saved)) {
       binding.restored(draftKey);
@@ -269,6 +286,7 @@ function AgentComposerInner({
     binding,
     draftKey,
     draftStore,
+    promotedFrom,
     readDocument,
     restoreDocument,
     composer.ready,
@@ -277,10 +295,13 @@ function AgentComposerInner({
   ]);
   useEffect(() => {
     if (!draftKey || !draftStore || binding.held !== draftKey) return;
-    draftStore.write(draftKey, editSession.document(editOwner, readDocument()));
+    const document = editSession.document(editOwner, readDocument());
+    draftStore.write(draftKey, document);
+    onDraftWrite?.(document);
   }, [
     binding,
     composer.snapshot,
+    onDraftWrite,
     draftKey,
     draftStore,
     readDocument,
@@ -326,8 +347,13 @@ function AgentComposerInner({
 
   useImperativeHandle(
     draftRef,
-    () => ({ appendText: composer.appendText, focus: composer.focus }),
-    [composer.appendText, composer.focus]
+    () => ({
+      appendText: composer.appendText,
+      focus: composer.focus,
+      readDocument,
+      restoreDocument,
+    }),
+    [composer.appendText, composer.focus, readDocument, restoreDocument]
   );
 
   const actionById = useMemo(() => {
@@ -414,7 +440,8 @@ function AgentComposerInner({
       }
       return;
     }
-    if (!canSubmit || submitting) return;
+    if (!canSubmit || submitting || (draftKey && binding.held !== draftKey))
+      return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // No `isStreaming` early-return: submitting while a turn runs queues the
     // message.
@@ -485,29 +512,40 @@ function AgentComposerInner({
 
     const text = lowerPrompt(message);
     if (!text.trim() && !allowEmptySubmit) return;
+    if (onCapture) {
+      try {
+        const captured = onCapture(text, readDocument());
+        if (captured !== undefined) {
+          if (captured) {
+            composer.clear();
+            composer.focus();
+            notify(null);
+          }
+          return;
+        }
+      } catch (error) {
+        if (onSubmitError) onSubmitError(error);
+        else notify("Couldn't send the message. Your draft is still here.");
+        return;
+      }
+    }
     if (isBusy || awaitSubmission) {
-      // Busy/admission-blocked submits take the durable text queue path. Keep
-      // the draft intact until enqueue is confirmed; otherwise a transient
-      // bridge failure would clear the only copy of the user's text. The guard also prevents Enter/button double-enqueues while
-      // that acknowledgement is in flight.
+      // Keep the draft while awaiting confirmation and guard against duplicate
+      // Enter or button presses.
       const lease = queueSubmitGuard.begin(submissionScope);
       if (!lease) return;
       setQueueingLease(lease);
-      // The chat this draft belongs to can change while the send is confirmed,
-      // e.g. when a new chat is created. Clear exactly the draft that was sent.
-      const sentDraft = draftKey && {
-        key: draftKey,
-        doc: JSON.stringify(readDocument()),
-      };
-      if (sentDraft) binding.send(sentDraft.key);
+      const sentDraft =
+        draftKey && draftStore?.beginDocumentSend(draftKey, readDocument());
       try {
         await onSubmit(text);
-        // A new chat's draft is kept under the id it was assigned meanwhile.
-        if (sentDraft && draftStore)
-          for (const key of binding.settle(sentDraft.key))
-            if (JSON.stringify(draftStore.read(key)) === sentDraft.doc)
-              draftStore.write(key, null);
-        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
+        const settled =
+          !sentDraft || draftStore?.settleDocumentSend(sentDraft, true);
+        if (
+          settled &&
+          (!sentDraft || sentDraft.key === binding.held) &&
+          queueSubmitGuard.owns(lease, submissionScopeRef.current)
+        ) {
           // The editor remains usable while the bridge acknowledges enqueue.
           // Re-read it now: a user edit or session switch may have produced a
           // newer draft that this older acknowledgement must never clear.
@@ -530,7 +568,7 @@ function AgentComposerInner({
             );
         }
       } finally {
-        if (sentDraft) binding.settle(sentDraft.key);
+        if (sentDraft) draftStore?.settleDocumentSend(sentDraft, false);
         if (queueSubmitGuard.finish(lease)) {
           setQueueingLease((current) => (current === lease ? null : current));
         }

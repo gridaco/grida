@@ -205,6 +205,12 @@ impl Projection {
             let mut meta = json!({"requestId": request_id});
             if let Some(turn) = &turn {
                 meta["turnId"] = json!(turn);
+                if message.role == Role::User
+                    && let Some((owner, input)) = input_facts.authored_inputs.get(&message.id)
+                    && owner == turn
+                {
+                    meta["inputId"] = json!(input);
+                }
             }
             self.stamp(&mut meta, turn.as_ref(), Some(&message.id), None);
             if message.role == Role::Assistant {

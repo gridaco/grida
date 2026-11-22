@@ -4,7 +4,7 @@
  * A person can spend minutes writing a prompt. The product never discards it:
  * switching models, reconnecting a chat, an error, remounting the composer,
  * switching chats or restarting the app all leave it in place. Only the person
- * deleting the text, or a send the host accepted, removes it.
+ * deleting the text, or handing it to a recoverable outgoing message, clears it.
  *
  * A draft is the whole composer state: the editor's document (so references
  * and other inline chips survive), the Plan and Goal intents, and an attached
@@ -15,7 +15,7 @@
  * chat requires its exact retry identity and attachment to commit first.
  * A file attached by reference has no bytes here; it is the person's File,
  * which only lives in memory, so it stays with the draft until Desktop
- * restarts.
+ * restarts. Its name then prompts the person to attach it again.
  */
 import {
   NativeEditorSelection,
@@ -23,6 +23,7 @@ import {
   type NativeChatEffort,
   type NativeChatMessageContext,
   type NativeChatOperatingRegime,
+  type NativeChatSpeed,
 } from "@grida/desktop-bridge";
 
 export type ComposerDraftModes = Readonly<{
@@ -76,6 +77,21 @@ export type ComposerDraftPending = Readonly<{
   editorContextId?: string;
   editorToolContextId?: string | NativeEditorSelection.Capture;
   messageContext?: NativeChatMessageContext;
+  outgoing?: Readonly<{
+    id: string;
+    /** This capture has not been bound to a native admission request. */
+    staged?: true;
+    document?: unknown;
+    documentRevision?: string;
+    contextRevision?: string;
+    retryBlocked?: true;
+    missingAttachmentName?: string;
+    model?: Readonly<{
+      profileId: string | null;
+      modelId: string;
+      speed: NativeChatSpeed;
+    }>;
+  }>;
   attachment?:
     | StoredDraftAttachment
     | Readonly<{
@@ -86,8 +102,21 @@ export type ComposerDraftPending = Readonly<{
       }>;
 }>;
 
+type MissingAttachment = Readonly<{ kind: "missing"; name: string }>;
+type AttachmentValue = ComposerDraftAttachment | MissingAttachment | null;
+type AttachmentSlot = Readonly<{
+  revision?: string;
+  promotedFrom?: string;
+  value: AttachmentValue;
+}>;
+
+type StoredAttachmentRow = (StoredDraftAttachment | MissingAttachment) & {
+  draftRevision?: string;
+  promotedFrom?: string;
+};
+
 export type ComposerDraftBlob =
-  | StoredDraftAttachment
+  | StoredAttachmentRow
   | Readonly<{
       kind: "migration";
       version: 1;
@@ -107,7 +136,26 @@ export interface ComposerDraftBlobs {
   get(key: string): Promise<ComposerDraftBlob | null>;
   put(key: string, value: ComposerDraftBlob): Promise<void>;
   delete(key: string): Promise<void>;
+  transfer?(
+    key: string,
+    value: ComposerDraftBlob,
+    retiredKey: string
+  ): Promise<void>;
 }
+
+type DocumentSend = { key: string; readonly document: string | undefined };
+type InterruptedCapture = Readonly<{
+  submission: ComposerDraftPending;
+  attachmentName?: string;
+  attachmentRevision?: string;
+}>;
+
+type OutgoingRotation = Readonly<{
+  id: string;
+  documentRevision?: string;
+  contextRevision?: string;
+  journaled: boolean;
+}>;
 
 export class ComposerDrafts {
   static readonly prefix = "grida.composer-draft.v1:";
@@ -119,18 +167,22 @@ export class ComposerDrafts {
   static readonly modesPrefix = "grida.composer-draft-modes.v1:";
   static readonly contextPrefix = "grida.composer-draft-context.v1:";
   static readonly pendingPrefix = "grida.composer-pending.v1:";
+  private static readonly missingPrefix =
+    "grida.composer-missing-attachment.v1:";
+  private static readonly rotationPrefix =
+    "grida.composer-outgoing-rotation.v1:";
 
   private readonly memory = new Map<string, unknown>();
+  private readonly documentSends = new Map<string, DocumentSend>();
+  private readonly outgoingDrafts = new Map<string, OutgoingRotation>();
   private readonly modes = new Map<string, ComposerDraftModes>();
   private readonly contexts = new Map<
     string,
     NativeChatMessageContext | null
   >();
-  private readonly attachments = new Map<
-    string,
-    ComposerDraftAttachment | null
-  >();
+  private readonly attachments = new Map<string, AttachmentSlot>();
   private readonly pending = new Map<string, ComposerDraftPending | null>();
+  private readonly moves = new Map<string, Promise<void>>();
   private readonly pendingWrites = new Map<string, Promise<unknown>>();
   private readonly migrations = new Map<
     string,
@@ -160,7 +212,7 @@ export class ComposerDrafts {
         modes.plan ||
         modes.goal ||
         this.readMessageContext(target) ||
-        (await this.readAttachment(target)) ||
+        (await this.attachmentSlot(target)).value ||
         (await this.readPending(target));
       claim = { target, done: !!occupied };
       this.migrations.set(legacy, claim);
@@ -193,29 +245,152 @@ export class ComposerDrafts {
   /** The same row binds retry identity to its exact frozen attachment. */
   async writePending(
     key: string,
-    submission: ComposerDraftPending
+    submission: ComposerDraftPending,
+    retiredAttachment?: ComposerDraftAttachment
   ): Promise<void> {
     if (!validPending(submission))
       throw new Error("native_chat_retry_storage_invalid");
+    const retired = this.attachments.get(key);
+    this.pending.set(key, submission);
+    await this.pendingWrite(key, () =>
+      this.persistPending(
+        key,
+        submission,
+        retiredAttachment && retired?.value === retiredAttachment
+          ? retired
+          : undefined
+      )
+    );
+  }
+
+  private async persistPending(
+    key: string,
+    submission: ComposerDraftPending,
+    retired?: AttachmentSlot
+  ): Promise<void> {
     const record: ComposerDraftBlob = {
       kind: "pending",
       version: 1,
       key,
       submission,
     };
-    this.pending.set(key, submission);
-    await this.pendingWrite(key, async () => {
-      if (this.blobs) await this.blobs.put(this.pendingKey(key), record);
-      else if (
-        this.storage &&
-        (!submission.attachment || submission.attachment.kind === "reference")
-      )
-        this.storage.setItem(
-          ComposerDrafts.pendingPrefix + key,
-          JSON.stringify(record)
+    const retire = retired && this.attachments.get(key) === retired;
+    if (this.blobs) {
+      if (retire && this.blobs.transfer)
+        await this.blobs.transfer(this.pendingKey(key), record, key);
+      else {
+        await this.blobs.put(this.pendingKey(key), record);
+        if (retire) await this.blobs.delete(key);
+      }
+    } else if (
+      this.storage &&
+      (!submission.attachment || submission.attachment.kind === "reference")
+    ) {
+      this.storage.setItem(
+        ComposerDrafts.pendingPrefix + key,
+        JSON.stringify(record)
+      );
+      if (retire) await this.persistAttachment(key, { value: null });
+    } else throw new Error("native_chat_retry_storage_unavailable");
+    if (retire && this.attachments.get(key) === retired)
+      this.attachments.set(key, { value: null });
+  }
+
+  /** Keep the submitted document on disk until its outgoing capture commits. */
+  async stageOutgoing(
+    key: string,
+    submission: ComposerDraftPending,
+    rotateDocument = true,
+    retiredAttachment?: ComposerDraftAttachment
+  ): Promise<void> {
+    const outgoing = submission.outgoing;
+    if (!outgoing?.id || !outgoing.staged || !validPending(submission))
+      throw new Error("native_chat_retry_storage_invalid");
+    let rotation = this.outgoingDrafts.get(key);
+    if (rotation?.id !== outgoing.id) {
+      const document = rotateDocument ? null : this.read(key);
+      const revisions = {
+        id: outgoing.id,
+        ...(rotateDocument && {
+          documentRevision: this.storedRevision(ComposerDrafts.prefix + key),
+        }),
+        ...(submission.messageContext &&
+          this.readMessageContext(key) === submission.messageContext && {
+            contextRevision: this.storedRevision(
+              ComposerDrafts.contextPrefix + key
+            ),
+          }),
+      };
+      const { attachment, ...settings } = submission;
+      const slot = this.attachments.get(key);
+      const journal: InterruptedCapture = {
+        submission: {
+          ...settings,
+          outgoing: { ...outgoing, ...revisions },
+          ...(attachment?.kind === "reference" && { attachment }),
+        },
+        ...(attachment && {
+          attachmentName: attachment.name,
+          attachmentRevision:
+            retiredAttachment && slot?.value === retiredAttachment
+              ? slot.revision
+              : undefined,
+        }),
+      };
+      let journaled = false;
+      try {
+        // Home already owns its submission until this capture commits.
+        this.storage?.setItem(
+          ComposerDrafts.rotationPrefix + key,
+          rotateDocument ? JSON.stringify(journal) : outgoing.id
         );
-      else throw new Error("native_chat_retry_storage_unavailable");
-    });
+        journaled = !!this.storage || !rotateDocument;
+      } catch {
+        // Keep the original document row until the capture commits.
+      }
+      rotation = { ...revisions, journaled };
+      this.outgoingDrafts.set(key, rotation);
+      this.memory.set(key, document);
+    }
+    const { journaled: _journaled, ...revisions } = rotation;
+    await this.writePending(
+      key,
+      { ...submission, outgoing: { ...outgoing, ...revisions } },
+      retiredAttachment
+    );
+    if (
+      submission.messageContext &&
+      this.readMessageContext(key) === submission.messageContext
+    )
+      this.writeMessageContext(key, null);
+    this.releaseOutgoingDraft(key, outgoing.id);
+  }
+
+  releaseOutgoingDraft(key: string, id: string): void {
+    if (this.outgoingDrafts.get(key)?.id !== id) return;
+    this.outgoingDrafts.delete(key);
+    // The controller and editor already advanced to the next draft in memory.
+    const next = this.memory.get(key);
+    if (next == null) this.remove(key);
+    else this.save(key, next);
+    this.clearRotation(key);
+  }
+
+  isRecoveringRotation(key: string): boolean {
+    if (this.outgoingDrafts.has(key)) return false;
+    try {
+      return !!this.storage?.getItem(ComposerDrafts.rotationPrefix + key);
+    } catch {
+      return false;
+    }
+  }
+
+  private clearRotation(key: string): void {
+    try {
+      this.storage?.removeItem(ComposerDrafts.rotationPrefix + key);
+    } catch {
+      // The saved payload and the next draft remain recoverable.
+    }
   }
 
   async readPending(key: string): Promise<ComposerDraftPending | null> {
@@ -226,7 +401,12 @@ export class ComposerDrafts {
       const raw = this.storage?.getItem(ComposerDrafts.pendingPrefix + key);
       record = raw ? JSON.parse(raw) : null;
     }
-    if (record === null || record === undefined) return null;
+    if (this.pending.has(key)) return this.pending.get(key) ?? null;
+    if (record === null || record === undefined) {
+      const interrupted = await this.interruptedCapture(key);
+      this.clearRotation(key);
+      return interrupted;
+    }
     if (
       typeof record !== "object" ||
       (record as ComposerDraftBlob).kind !== "pending"
@@ -239,8 +419,64 @@ export class ComposerDrafts {
       !validPending(stored.submission)
     )
       throw new Error("native_chat_retry_storage_invalid");
+    if (stored.submission.outgoing?.staged)
+      this.recoverDraftRotation(key, stored.submission.outgoing);
+    this.clearRotation(key);
     this.pending.set(key, stored.submission);
     return stored.submission;
+  }
+
+  /** A reload can interrupt IndexedDB after the next draft was already typed. */
+  private async interruptedCapture(
+    key: string
+  ): Promise<ComposerDraftPending | null> {
+    let raw: string | null | undefined;
+    try {
+      raw = this.storage?.getItem(ComposerDrafts.rotationPrefix + key);
+    } catch {
+      return null;
+    }
+    // Earlier markers, and submissions still held by Home, contain only an ID.
+    if (!raw?.startsWith("{")) return null;
+    const journal: InterruptedCapture = JSON.parse(raw);
+    let pending = journal.submission;
+    if (!validPending(pending) || !pending.outgoing?.staged)
+      throw new Error("native_chat_retry_storage_invalid");
+    const slot = journal.attachmentName
+      ? await this.attachmentSlot(key)
+      : undefined;
+    const retired =
+      slot?.revision && slot.revision === journal.attachmentRevision
+        ? slot
+        : undefined;
+    if (journal.attachmentName && !pending.attachment) {
+      const value = retired?.value;
+      if (value && value.kind !== "missing" && value.kind !== "reference") {
+        const attachment: StoredDraftAttachment =
+          value.kind === "image"
+            ? {
+                kind: value.kind,
+                file: value.file,
+                name: value.name,
+                mimeType: value.mimeType,
+              }
+            : value;
+        pending = { ...pending, attachment };
+      } else {
+        pending = {
+          ...pending,
+          outgoing: {
+            ...pending.outgoing,
+            missingAttachmentName: journal.attachmentName,
+            retryBlocked: true,
+          },
+        };
+      }
+    }
+    await this.persistPending(key, pending, retired);
+    this.recoverDraftRotation(key, journal.submission.outgoing!);
+    this.pending.set(key, pending);
+    return pending;
   }
 
   async clearPending(key: string, expectedInputId?: string): Promise<void> {
@@ -249,7 +485,11 @@ export class ComposerDrafts {
       if (expectedInputId && current?.inputId !== expectedInputId) return;
       if (this.blobs) await this.blobs.delete(this.pendingKey(key));
       this.storage?.removeItem(ComposerDrafts.pendingPrefix + key);
-      this.pending.set(key, null);
+      if (
+        !expectedInputId ||
+        this.pending.get(key)?.inputId === expectedInputId
+      )
+        this.pending.set(key, null);
     });
   }
 
@@ -258,17 +498,19 @@ export class ComposerDrafts {
     await this.pendingWrite(key, async () => {
       const current = await this.readPending(key);
       if (current?.inputId !== inputId) return;
-      const attachment = this.attachments.get(key);
-      if (this.blobs) await this.blobs.delete(key);
-      if ((await this.readPending(key))?.inputId !== inputId) return;
-      if (this.attachments.get(key) === attachment)
-        this.attachments.set(key, null);
-      if (
-        current.messageContext &&
-        JSON.stringify(this.readMessageContext(key)) ===
-          JSON.stringify(current.messageContext)
-      )
-        this.writeMessageContext(key, null);
+      if (!current.outgoing) {
+        const attachment = this.attachments.get(key);
+        await this.persistAttachment(key, { value: null });
+        if ((await this.readPending(key))?.inputId !== inputId) return;
+        if (this.attachments.get(key) === attachment)
+          this.attachments.set(key, { value: null });
+        if (
+          current.messageContext &&
+          JSON.stringify(this.readMessageContext(key)) ===
+            JSON.stringify(current.messageContext)
+        )
+          this.writeMessageContext(key, null);
+      }
       if (this.blobs) await this.blobs.delete(this.pendingKey(key));
       this.storage?.removeItem(ComposerDrafts.pendingPrefix + key);
       if (this.pending.get(key)?.inputId === inputId)
@@ -276,7 +518,7 @@ export class ComposerDrafts {
     });
   }
 
-  private pendingWrite(key: string, write: () => Promise<void>): Promise<void> {
+  private pendingWrite<T>(key: string, write: () => Promise<T>): Promise<T> {
     const result = (this.pendingWrites.get(key) ?? Promise.resolve())
       .catch(() => {})
       .then(write);
@@ -290,10 +532,16 @@ export class ComposerDrafts {
     return result;
   }
 
+  private readonly storage: Storage | null;
+  private readonly memoryOnlyDocuments: boolean;
+
   constructor(
-    private readonly storage: Storage | null = defaultStorage(),
+    storage?: Storage | null,
     private readonly blobs: ComposerDraftBlobs | null = IndexedDbBlobs.open()
-  ) {}
+  ) {
+    this.memoryOnlyDocuments = storage === null;
+    this.storage = storage === undefined ? defaultStorage() : storage;
+  }
 
   /** Plan and Goal as the person left them in this chat's composer. */
   readModes(key: string): ComposerDraftModes {
@@ -313,13 +561,18 @@ export class ComposerDrafts {
     }
   }
 
-  writeModes(key: string, modes: ComposerDraftModes): void {
+  writeModes(
+    key: string,
+    modes: ComposerDraftModes,
+    options?: { requirePersistence: true }
+  ): void {
     const value: ComposerDraftModes = {
       ...(modes.plan && { plan: true }),
       ...(modes.goal && { goal: true }),
     };
-    this.modes.set(key, value);
     try {
+      if (options?.requirePersistence && !this.storage)
+        throw new Error("native_chat_retry_storage_unavailable");
       if (!value.plan && !value.goal)
         this.storage?.removeItem(ComposerDrafts.modesPrefix + key);
       else
@@ -327,9 +580,11 @@ export class ComposerDrafts {
           ComposerDrafts.modesPrefix + key,
           JSON.stringify(value)
         );
-    } catch {
+    } catch (error) {
+      if (options?.requirePersistence) throw error;
       // Memory still holds the modes for this session.
     }
+    this.modes.set(key, value);
   }
 
   /** Context supplied alongside the draft and restored before retrying. */
@@ -337,9 +592,8 @@ export class ComposerDrafts {
     if (this.contexts.has(key)) return this.contexts.get(key) ?? null;
     try {
       const raw = this.storage?.getItem(ComposerDrafts.contextPrefix + key);
-      const context = raw
-        ? parseNativeChatMessageContext(JSON.parse(raw))
-        : null;
+      const stored = raw ? JSON.parse(raw) : null;
+      const context = parseNativeChatMessageContext(stored?.context ?? stored);
       this.contexts.set(key, context);
       return context;
     } catch {
@@ -349,131 +603,279 @@ export class ComposerDrafts {
 
   writeMessageContext(
     key: string,
-    context: NativeChatMessageContext | null
+    context: NativeChatMessageContext | null,
+    options?: { requirePersistence: true }
   ): void {
-    this.contexts.set(key, context);
     try {
+      if (options?.requirePersistence && !this.storage)
+        throw new Error("native_chat_retry_storage_unavailable");
       if (context)
         this.storage?.setItem(
           ComposerDrafts.contextPrefix + key,
-          JSON.stringify(context)
+          JSON.stringify({ context, revision: crypto.randomUUID() })
         );
       else this.storage?.removeItem(ComposerDrafts.contextPrefix + key);
-    } catch {
+    } catch (error) {
+      if (options?.requirePersistence) throw error;
       // The current draft keeps its context in memory if storage is full.
     }
+    this.contexts.set(key, context);
   }
 
-  /** The attachment kept with this chat's draft, with its bytes. */
+  private async attachmentSlot(key: string): Promise<AttachmentSlot> {
+    const known = this.attachments.get(key);
+    if (known) return known;
+    const stored = this.blobs
+      ? await this.blobs.get(key)
+      : (JSON.parse(
+          this.storage?.getItem(ComposerDrafts.missingPrefix + key) ?? "null"
+        ) as MissingAttachment | null);
+    // A selection or explicit removal during the read wins.
+    const changed = this.attachments.get(key);
+    if (changed) return changed;
+    let slot: AttachmentSlot = { value: null };
+    if (stored && stored.kind !== "pending" && stored.kind !== "migration") {
+      const { draftRevision, promotedFrom, ...value } =
+        stored as StoredAttachmentRow;
+      slot = { revision: draftRevision, promotedFrom, value };
+    }
+    this.attachments.set(key, slot);
+    return slot;
+  }
+
   async readAttachment(key: string): Promise<ComposerDraftAttachment | null> {
-    if (this.attachments.has(key)) return this.attachments.get(key) ?? null;
-    const stored = await this.blobs?.get(key).catch(() => null);
-    if (stored && stored.kind !== "pending" && stored.kind !== "migration")
-      this.attachments.set(key, stored);
-    return stored && stored.kind !== "pending" && stored.kind !== "migration"
-      ? stored
-      : null;
+    await this.moves.get(key);
+    const value = (await this.attachmentSlot(key)).value;
+    return value?.kind === "missing" ? null : value;
   }
 
-  /** Keep an attachment, or forget it when the person removed or sent it. */
+  async readMissingAttachment(key: string): Promise<string | null> {
+    await this.moves.get(key);
+    const value = (await this.attachmentSlot(key)).value;
+    return value?.kind === "missing" ? value.name : null;
+  }
+
+  async writeMissingAttachment(key: string, name: string): Promise<void> {
+    await this.setAttachment(key, { kind: "missing", name }, true);
+  }
+
   async writeAttachment(
     key: string,
-    attachment: ComposerDraftAttachment | null
+    attachment: ComposerDraftAttachment | null,
+    options?: { requirePersistence: true }
   ): Promise<void> {
-    this.attachments.set(key, attachment);
+    await this.setAttachment(key, attachment, options?.requirePersistence);
+  }
+
+  private async setAttachment(
+    key: string,
+    value: AttachmentValue,
+    requirePersistence = false
+  ): Promise<void> {
+    const previous = this.attachments.get(key);
+    const slot = { value, revision: crypto.randomUUID() };
+    this.attachments.set(key, slot);
     try {
-      await this.pendingWrite(key, () =>
-        this.persistAttachment(key, attachment)
-      );
-    } catch {
-      // Memory still holds the attachment for this session.
+      await this.pendingWrite(key, () => this.persistAttachment(key, slot));
+    } catch (error) {
+      if (!requirePersistence) return;
+      if (this.attachments.get(key) === slot) {
+        if (previous) this.attachments.set(key, previous);
+        else this.attachments.delete(key);
+      }
+      throw error;
     }
   }
 
   private async persistAttachment(
     key: string,
-    attachment: ComposerDraftAttachment | null
+    slot: AttachmentSlot
   ): Promise<void> {
-    // A reference cannot outlive the native File it names. Only the live map
-    // retains that origin; durable image rows retain the frozen bytes alone.
-    if (!attachment || attachment.kind === "reference") {
-      await this.blobs?.delete(key);
-    } else if (attachment.kind === "image") {
+    const { value, revision: draftRevision, promotedFrom } = slot;
+    const metadata = { draftRevision, ...(promotedFrom && { promotedFrom }) };
+    // A native reference can retain its display name after the File is gone.
+    const attachment =
+      value?.kind === "reference"
+        ? { kind: "missing" as const, name: value.name }
+        : value;
+    const marker = ComposerDrafts.missingPrefix + key;
+    if (!this.blobs) {
+      if (attachment?.kind === "missing") {
+        if (!this.storage)
+          throw new Error("native_chat_retry_storage_unavailable");
+        this.storage.setItem(
+          marker,
+          JSON.stringify({ ...attachment, ...metadata })
+        );
+      } else if (attachment) {
+        throw new Error("native_chat_retry_storage_unavailable");
+      } else this.storage?.removeItem(marker);
+      return;
+    }
+    if (!attachment) await this.blobs.delete(key);
+    else if (attachment.kind === "image") {
       const { originalFile: _origin, ...frozen } = attachment;
-      await this.blobs?.put(key, frozen);
-    } else await this.blobs?.put(key, attachment);
+      await this.blobs.put(key, { ...frozen, ...metadata });
+    } else await this.blobs.put(key, { ...attachment, ...metadata });
   }
 
   /** The draft document for a chat, if one was kept. */
   read(key: string): unknown | null {
     if (this.memory.has(key)) return this.memory.get(key) ?? null;
+    if (this.outgoingDrafts.has(key)) return null;
     const stored = this.load(key);
     if (stored !== null) this.memory.set(key, stored);
     return stored;
   }
 
+  /** Identifies this exact persisted edit, including repeated identical text. */
+  documentRevision(key: string): string | undefined {
+    return this.storedRevision(ComposerDrafts.prefix + key);
+  }
+
+  /** Require custody before clearing an editor, using the configured backing store. */
+  checkpoint(key: string, document: unknown): void {
+    this.write(
+      key,
+      document,
+      this.memoryOnlyDocuments ? undefined : { requirePersistence: true }
+    );
+  }
+
   /** Keep the current document, or forget the draft when it is empty. */
-  write(key: string, doc: unknown | null): void {
+  write(
+    key: string,
+    doc: unknown | null,
+    options?: { requirePersistence: true }
+  ): void {
     if (doc === null) {
       this.memory.delete(key);
-      this.remove(key);
+      if (this.outgoingDrafts.get(key)?.journaled !== false) this.remove(key);
       return;
     }
+    if (
+      options?.requirePersistence ||
+      this.outgoingDrafts.get(key)?.journaled !== false
+    )
+      this.save(key, doc, options?.requirePersistence);
     this.memory.set(key, doc);
-    this.save(key, doc);
+  }
+
+  /** Capture the document this send may clear when the host confirms it. */
+  beginDocumentSend(key: string, doc: unknown): Readonly<DocumentSend> {
+    const send = { key, document: JSON.stringify(doc) };
+    this.documentSends.set(key, send);
+    return send;
+  }
+
+  /** A later send for the same draft supersedes the earlier cleanup. */
+  settleDocumentSend(send: Readonly<DocumentSend>, accepted: boolean): boolean {
+    const { key } = send;
+    if (this.documentSends.get(key) !== send) return false;
+    this.documentSends.delete(key);
+    if (accepted && JSON.stringify(this.read(key)) === send.document)
+      this.write(key, null);
+    return true;
   }
 
   /**
    * Carry a draft to the key its chat now has, such as a new chat that was
    * just assigned its id. Each part a target already holds is kept; the rest
    * moves, so nothing is lost and nothing is left behind under the old key.
-   * Memory moves at once; stored attachment bytes follow asynchronously.
+   * The source remains editable until its stored attachment bytes have moved.
    */
   move(from: string, to: string): Promise<void> {
     if (from === to) return Promise.resolve();
-    // Present a cached attachment immediately, while retaining the source row
-    // until the destination copy commits. A refused copy must remain retryable.
-    const moving = this.attachments.get(from);
-    if (moving && !this.attachments.get(to)) this.attachments.set(to, moving);
-    return (async () => {
+    const moving = (async () => {
       const pending = await this.readPending(from);
-      if (pending && !(await this.readPending(to))) {
-        await this.writePending(to, pending);
-        await this.clearPending(from);
+      const targetPending = pending && (await this.readPending(to));
+      const captured =
+        pending && (!targetPending || targetPending.inputId === pending.inputId)
+          ? pending
+          : null;
+      if (captured) {
+        // A refused destination write may be present only in memory. Confirm
+        // its durable commit before removing the last copy at the source.
+        await this.writePending(to, targetPending ?? captured);
       }
-      const attachment = await this.readAttachment(from);
-      const targetAttachment = await this.readAttachment(to);
-      if (
-        attachment &&
-        (!targetAttachment || targetAttachment === attachment)
-      ) {
-        await this.pendingWrite(to, () =>
-          this.persistAttachment(to, attachment)
-        );
-        this.attachments.set(to, attachment);
-        await this.pendingWrite(from, () => this.persistAttachment(from, null));
-        if (this.attachments.get(from) === attachment)
-          this.attachments.set(from, null);
-      }
+      await this.moveAttachment(from, to);
+      if (captured) await this.clearPending(from, captured.inputId);
       // The composer keeps the source key until this move resolves. Read its
       // latest edits only after every asynchronous copy has committed.
+      const copy = (prefix: string) =>
+        this.storedRevision(prefix + from)
+          ? ({ requirePersistence: true } as const)
+          : undefined;
       const doc = this.read(from);
       if (doc !== null && this.read(to) === null) {
-        this.write(to, doc);
+        this.write(to, doc, copy(ComposerDrafts.prefix));
         this.write(from, null);
+        const send = this.documentSends.get(from);
+        if (send) {
+          this.documentSends.delete(from);
+          if (!this.documentSends.has(to)) {
+            send.key = to;
+            this.documentSends.set(to, send);
+          }
+        }
       }
       const context = this.readMessageContext(from);
       if (context && !this.readMessageContext(to)) {
-        this.writeMessageContext(to, context);
+        this.writeMessageContext(
+          to,
+          context,
+          copy(ComposerDrafts.contextPrefix)
+        );
         this.writeMessageContext(from, null);
       }
       const modes = this.readModes(from);
       const target = this.readModes(to);
       if ((modes.plan || modes.goal) && !target.plan && !target.goal) {
-        this.writeModes(to, modes);
+        this.writeModes(to, modes, copy(ComposerDrafts.modesPrefix));
         this.writeModes(from, {});
       }
-    })();
+    })().finally(() => {
+      if (this.moves.get(to) === moving) this.moves.delete(to);
+    });
+    this.moves.set(to, moving);
+    return moving;
+  }
+
+  private async moveAttachment(from: string, to: string): Promise<void> {
+    let destination = await this.attachmentSlot(to);
+    let source = await this.attachmentSlot(from);
+    if (
+      destination.value &&
+      destination.promotedFrom !== from &&
+      (!source.revision || destination.revision !== source.revision)
+    )
+      return;
+    if (
+      !source.value &&
+      !(destination.promotedFrom === from && source.revision)
+    )
+      return;
+    while (true) {
+      const copy = { ...source, promotedFrom: from };
+      const copied = await this.pendingWrite(to, async () => {
+        if (this.attachments.get(to) !== destination) return;
+        await this.persistAttachment(to, copy);
+        if (this.attachments.get(to) !== destination) return;
+        this.attachments.set(to, copy);
+        return true;
+      });
+      if (!copied) return;
+      destination = copy;
+      const retired = await this.pendingWrite(from, async () => {
+        if (this.attachments.get(from) !== source) return;
+        await this.persistAttachment(from, { value: null });
+        if (this.attachments.get(from) !== source) return;
+        this.attachments.set(from, { value: null });
+        return true;
+      });
+      if (retired) return;
+      source = await this.attachmentSlot(from);
+    }
   }
 
   private load(key: string): unknown | null {
@@ -487,12 +889,22 @@ export class ComposerDrafts {
     }
   }
 
-  private save(key: string, doc: unknown): void {
+  private save(key: string, doc: unknown, requirePersistence = false): void {
     const storage = this.storage;
-    if (!storage) return;
+    if (!storage) {
+      if (requirePersistence)
+        throw new Error("native_chat_retry_storage_unavailable");
+      return;
+    }
     try {
-      const raw = JSON.stringify({ doc, at: Date.now() });
+      const raw = JSON.stringify({
+        doc,
+        at: Date.now(),
+        revision: crypto.randomUUID(),
+      });
       if (raw.length > ComposerDrafts.maxStoredBytes) {
+        if (requirePersistence)
+          throw new Error("native_chat_retry_storage_unavailable");
         storage.removeItem(ComposerDrafts.prefix + key);
         return;
       }
@@ -501,9 +913,42 @@ export class ComposerDrafts {
       const added = storage.getItem(ComposerDrafts.prefix + key) === null;
       storage.setItem(ComposerDrafts.prefix + key, raw);
       if (added) this.prune(storage);
-    } catch {
+    } catch (error) {
+      if (requirePersistence) throw error;
       // Memory still holds the draft for this session.
     }
+  }
+
+  private storedRevision(key: string): string | undefined {
+    try {
+      const raw = this.storage?.getItem(key);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      return typeof parsed?.revision === "string" ? parsed.revision : raw;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private recoverDraftRotation(
+    key: string,
+    rotation: Pick<OutgoingRotation, "documentRevision" | "contextRevision">
+  ): void {
+    if (this.outgoingDrafts.has(key)) return;
+    if (
+      rotation.documentRevision &&
+      rotation.documentRevision ===
+        this.storedRevision(ComposerDrafts.prefix + key)
+    ) {
+      this.memory.delete(key);
+      this.remove(key);
+    }
+    if (
+      rotation.contextRevision &&
+      rotation.contextRevision ===
+        this.storedRevision(ComposerDrafts.contextPrefix + key)
+    )
+      this.writeMessageContext(key, null);
   }
 
   private remove(key: string): void {
@@ -594,6 +1039,7 @@ class IndexedDbBlobs implements ComposerDraftBlobs {
     }
     if (value?.kind === "pending" || value?.kind === "migration") return null;
     if (!value || typeof value.name !== "string") return null;
+    if (value.kind === "missing") return value.name ? value : null;
     if (value.kind === "image")
       return value.file instanceof File &&
         value.file.size > 0 &&
@@ -612,6 +1058,17 @@ class IndexedDbBlobs implements ComposerDraftBlobs {
 
   async delete(key: string): Promise<void> {
     await this.run("readwrite", (store) => store.delete(key));
+  }
+
+  async transfer(
+    key: string,
+    value: ComposerDraftBlob,
+    retiredKey: string
+  ): Promise<void> {
+    await this.run("readwrite", (store) => {
+      store.put(value, key);
+      return store.delete(retiredKey);
+    });
   }
 }
 
@@ -654,7 +1111,19 @@ function validPending(value: ComposerDraftPending): boolean {
         !/^[a-f0-9-]{36}$/.test(value.editorContextId))) ||
     (value.editorToolContextId !== undefined &&
       !NativeEditorSelection.isId(value.editorToolContextId) &&
-      !NativeEditorSelection.capture(value.editorToolContextId))
+      !NativeEditorSelection.capture(value.editorToolContextId)) ||
+    (value.outgoing !== undefined &&
+      (!value.outgoing ||
+        typeof value.outgoing !== "object" ||
+        typeof value.outgoing.id !== "string" ||
+        !value.outgoing.id ||
+        value.outgoing.id.length > 256 ||
+        (value.outgoing.missingAttachmentName !== undefined &&
+          (typeof value.outgoing.missingAttachmentName !== "string" ||
+            !value.outgoing.missingAttachmentName ||
+            value.outgoing.missingAttachmentName.length > 256)) ||
+        (value.outgoing.staged !== undefined &&
+          value.outgoing.staged !== true)))
   )
     return false;
   if (
@@ -674,6 +1143,7 @@ function validPending(value: ComposerDraftPending): boolean {
           "editorToolContextId",
           "messageContext",
           "attachment",
+          "outgoing",
         ].includes(key)
     )
   )

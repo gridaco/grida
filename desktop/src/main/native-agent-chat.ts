@@ -2799,6 +2799,7 @@ export class NativeAgentChat {
             this.process.acceptsActivityOrder,
             true
           );
+          const turnId = optionalIdentity(order.turnId ?? attribution?.turnId);
           const previewId =
             (this.process.acceptsInputImageChunks &&
               ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
@@ -2817,9 +2818,12 @@ export class NativeAgentChat {
           captureAttachment(
             capture,
             messageId,
-            optionalIdentity(order.turnId ?? attribution?.turnId),
             Object.freeze({ ...entry, ...(previewId && { previewId }) }),
-            order
+            {
+              ...order,
+              turnId,
+              ...authoredInputIdentity(role, turnId, attribution?.inputId),
+            }
           );
         }
         return;
@@ -2850,14 +2854,16 @@ export class NativeAgentChat {
             this.process.acceptsActivityOrder,
             content.text.length > 0
           );
+          const turnId = optionalIdentity(order.turnId ?? attribution?.turnId);
           captureText(capture, identity(update.messageId), role, content.text, {
-            turnId: optionalIdentity(order.turnId ?? attribution?.turnId),
+            ...order,
+            turnId,
+            ...authoredInputIdentity(role, turnId, attribution?.inputId),
             phase: messagePhase(attribution?.phase, role),
             ...(role === "assistant" &&
               attribution?.citations !== undefined && {
                 citations: urlCitations(attribution.citations),
               }),
-            ...order,
             ...(displayParts?.length && { displayParts }),
             ...(role === "user" && questionReplyMetadata(attribution)),
             ...(role === "user" &&
@@ -2886,6 +2892,11 @@ export class NativeAgentChat {
               text: content.text,
               messageId: identity(update.messageId),
               turnId: identity(attribution.turnId),
+              ...authoredInputIdentity(
+                role,
+                attribution.turnId,
+                attribution.inputId
+              ),
               ...(role === "user" && questionReplyMetadata(attribution)),
               offsetBytes: revision(attribution.offsetBytes),
               replace: flag(attribution.replace),
@@ -3205,6 +3216,7 @@ function captureText(
   attribution?: Pick<
     NativeChatMessage,
     | "turnId"
+    | "inputId"
     | "phase"
     | "activityOrder"
     | "activityOrderIncomplete"
@@ -3247,6 +3259,7 @@ function captureText(
   capture.messages.set(messageId, {
     ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
+    ...(attribution?.inputId && { inputId: attribution.inputId }),
     ...(attribution?.phase && { phase: attribution.phase }),
     ...(attribution?.citations && { citations: attribution.citations }),
     ...(attribution?.questionReply && {
@@ -3308,14 +3321,14 @@ function urlCitations(value: unknown): readonly NativeChatUrlCitation[] {
 function captureAttachment(
   capture: TranscriptCapture,
   messageId: string,
-  turnId: string | undefined,
   entry: NativeChatMessageAttachment,
-  order: NativeActivityOrder.Fact = {}
+  attribution: NativeActivityOrder.Fact &
+    Pick<NativeChatMessage, "turnId" | "inputId">
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   if (previous && previous.role !== "user") throw invalidResponse();
-  const merged = NativeActivityOrder.merge(previous ?? {}, order);
+  const merged = NativeActivityOrder.merge(previous ?? {}, attribution);
   const kept = { ...previous };
   delete kept.activityOrder;
   delete kept.activityOrderIncomplete;
@@ -3336,7 +3349,8 @@ function captureAttachment(
     role: "user",
     text: "",
     ...kept,
-    ...(turnId && { turnId }),
+    ...(attribution.turnId && { turnId: attribution.turnId }),
+    ...(attribution.inputId && { inputId: attribution.inputId }),
     ...merged,
     attachments: [...recorded, entry],
   });
@@ -3501,6 +3515,19 @@ function toolOutput(
 
 function optionalIdentity(value: unknown): string | undefined {
   return value === undefined ? undefined : identity(value);
+}
+
+function authoredInputIdentity(
+  role: NativeChatMessage["role"],
+  turnId: unknown,
+  value: unknown
+): Pick<NativeChatMessage, "inputId"> {
+  return role === "user" &&
+    typeof turnId === "string" &&
+    typeof value === "string" &&
+    IDENTITY.test(value)
+    ? { inputId: value }
+    : {};
 }
 
 function messagePhase(

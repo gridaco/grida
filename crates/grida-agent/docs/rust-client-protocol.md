@@ -455,6 +455,12 @@ at the same `cwd`. Each response carries the same `requestId`, a `view`, and
 an opaque `older` cursor at the same `_meta` key. Standard text chunks for
 that response also carry the `requestId` in `_meta`.
 
+Chunks for a locally authored user message can include `inputId` in the same
+metadata. It identifies the exact accepted input that produced the message
+and can differ from its `messageId`. A message with only attachments carries
+the input ID on its resource links. Inherited messages and messages without
+an exact submission match omit the field.
+
 Pass `older` as `before` in a new read to step backward until `older` is null.
 The host delivers each page in chronological order. A page can contain no
 visible messages and still have an older cursor. When a cursor's view or its

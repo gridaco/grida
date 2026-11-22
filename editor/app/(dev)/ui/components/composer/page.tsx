@@ -1,4 +1,8 @@
 import type { ReactNode } from "react";
+import {
+  CompactionNotice,
+  CompactionProgress,
+} from "@/kits/agent-chat/message";
 import { DesktopComposerDemo } from "./desktop-demo";
 import { DictateDemo } from "./dictate-demo";
 import { ComposerKitDemo } from "./kit-demo";
@@ -68,6 +72,20 @@ export default function ComposerPage() {
       </Example>
       <Example id="streaming" title="Streaming">
         <DesktopComposerDemo scenario="streaming" />
+      </Example>
+      <Example id="compaction" title="Compaction">
+        <div className="flex flex-col gap-4 rounded-xl border bg-background p-4">
+          <CompactionNotice
+            auto
+            summary="The gallery handout is for a self-guided tour."
+          />
+          <CompactionProgress />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          To try the full flow, send <code>/compact</code> below and select
+          Finish compaction.
+        </p>
+        <DesktopComposerDemo scenario="compaction" />
       </Example>
       <Example id="pause-and-resume" title="Pause and resume">
         <DesktopComposerDemo scenario="paused" />

@@ -1,6 +1,7 @@
 export {
   ChatMessageView,
   CompactionNotice,
+  CompactionProgress,
   PendingTurnIndicator,
   ToolCallGroupView,
 } from "./message";

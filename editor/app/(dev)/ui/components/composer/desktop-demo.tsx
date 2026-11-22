@@ -52,6 +52,11 @@ export function DesktopComposerDemo({
     fixture.submission.read,
     fixture.submission.read
   );
+  const compaction = useSyncExternalStore(
+    fixture.compaction.subscribe,
+    fixture.compaction.read,
+    fixture.compaction.read
+  );
   const question = scenario === "question";
   const webPreview = scenario === "web-preview";
   const [openRequest, setOpenRequest] = useState<Browser.OpenIntent | null>(
@@ -206,6 +211,16 @@ export function DesktopComposerDemo({
               fixture={fixture.reconnect}
               disconnect={() => fixture.disconnect()}
             />
+          )}
+          {scenario === "compaction" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!compaction.pending}
+              onClick={fixture.compaction.accept}
+            >
+              Finish compaction
+            </Button>
           )}
           <Button size="sm" variant="ghost" className="ml-auto" onClick={reset}>
             Reset

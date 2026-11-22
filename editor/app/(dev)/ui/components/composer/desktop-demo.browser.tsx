@@ -53,6 +53,48 @@ function conversation(container: HTMLElement): HTMLElement {
   return container.querySelector<HTMLElement>('[role="log"]')!;
 }
 
+it("shows both compaction states when the playground opens", async () => {
+  await mountDemo(<ComposerPage />);
+  const example = page.getByRole("region", { name: "Compaction", exact: true });
+  const saved = example.getByText("Conversation auto-compacted", {
+    exact: true,
+  });
+  const progress = example.getByRole("status").getByText("Compacting context");
+  await expect.element(saved).toBeVisible();
+  await expect.element(progress).toBeVisible();
+  expect(saved.element().compareDocumentPosition(progress.element())).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
+  await saved.click();
+  await expect
+    .element(
+      example.getByText("The gallery handout is for a self-guided tour.")
+    )
+    .toBeVisible();
+});
+
+it("runs the optional compaction walkthrough through the Desktop composer", async () => {
+  const container = await mountConversationDemo({ scenario: "compaction" });
+  const editor = container.querySelector<HTMLElement>(
+    '[contenteditable="true"]'
+  )!;
+  await act(async () => userEvent.fill(editor, "/compact"));
+  await expect
+    .element(page.getByRole("option", { name: /compact/i }))
+    .toBeVisible();
+  await act(async () => page.getByRole("option", { name: /compact/i }).click());
+  await act(async () => userEvent.keyboard("{Enter}"));
+
+  const log = page.getByRole("log");
+  const progress = log.getByText("Compacting context", { exact: true });
+  await expect.element(progress).toBeVisible();
+  await clickButton("Finish compaction");
+  await expect
+    .element(log.getByText("Conversation compacted", { exact: true }))
+    .toBeVisible();
+  await expect.element(progress).not.toBeInTheDocument();
+});
+
 it("shares the Desktop opener between finished previews and Markdown links", async () => {
   await mountConversationDemo({ scenario: "web-preview" });
   const log = page.getByRole("log");
@@ -536,6 +578,75 @@ it("keeps a question write-in focused during streaming and shows the accepted an
   expect(conversation(container).textContent).toContain("Use a folded sheet");
 });
 
+it("navigates question pages, choices, and the write-in with arrow keys", async () => {
+  await mountConversationDemo({ scenario: "question-batch" });
+  const first = page.getByRole("button", { name: /Compact/ });
+  const last = page.getByRole("button", { name: /Large print/ });
+  const writeIn = page.getByRole("textbox", {
+    name: DesktopConversationFixtures.question.question,
+  });
+  const next = page.getByRole("button", { name: "Next question" });
+  await act(async () => {
+    (next.element() as HTMLButtonElement).focus();
+    await userEvent.keyboard("{ArrowRight}");
+  });
+  await expect.element(page.getByText("2 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{ArrowLeft}"));
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect.element(first).toHaveFocus();
+  await expect.element(first).toHaveAttribute("aria-pressed", "true");
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect.element(last).toHaveFocus();
+  await expect.element(last).toHaveAttribute("aria-pressed", "true");
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect.element(writeIn).toHaveFocus();
+  await expect.element(last).toHaveAttribute("aria-pressed", "false");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByText("1 of 3", { exact: true })).toBeVisible();
+
+  await act(async () => {
+    await writeIn.fill("Custom");
+    await userEvent.keyboard("{End}{ArrowLeft}");
+  });
+  expect((writeIn.element() as HTMLTextAreaElement).selectionStart).toBe(5);
+  await expect.element(page.getByText("1 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{Home}{ArrowUp}"));
+  await expect.element(last).toHaveFocus();
+  await expect.element(last).toHaveAttribute("aria-pressed", "true");
+
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByText("2 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{ArrowLeft}"));
+  await expect.element(last).toHaveAttribute("aria-pressed", "true");
+  await expect.element(writeIn).toHaveValue("");
+  await act(async () => userEvent.keyboard("{ArrowUp}"));
+  await expect.element(first).toHaveFocus();
+  await expect.element(first).toHaveAttribute("aria-pressed", "true");
+  await act(async () => userEvent.keyboard("{ArrowDown}{ArrowDown}"));
+  await expect.element(writeIn).toHaveFocus();
+  await expect.element(writeIn).toHaveValue("Custom");
+  await expect.element(last).toHaveAttribute("aria-pressed", "false");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByText("2 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{ArrowLeft}"));
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect.element(writeIn).toHaveFocus();
+  await expect.element(writeIn).toHaveValue("Custom");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByText("2 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect.element(page.getByText("3 of 3", { exact: true })).toBeVisible();
+  await act(async () => userEvent.keyboard("{ArrowDown}"));
+  await expect
+    .element(page.getByRole("radio", { name: "50 copies" }))
+    .toHaveAttribute("aria-checked", "true");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect
+    .element(page.getByText("I’ll use your answers to prepare the handout."))
+    .toBeVisible();
+});
+
 it.each([
   ["Submit", "100 copies"],
   ["Double-click", "50 copies"],
@@ -548,13 +659,21 @@ it.each([
     });
     const status = (step: number) =>
       page.getByText(`${step} of 3`, { exact: true });
+    const waitForChoiceFlash = async () => {
+      const [flash] = document.activeElement?.getAnimations() ?? [];
+      expect(flash?.playState).toBe("running");
+      await new Promise<void>((resolve) => {
+        flash.addEventListener("finish", () => resolve(), { once: true });
+      });
+    };
     await expect.element(status(1)).toBeVisible();
     await expect
       .element(page.getByText("Format", { exact: true }))
       .not.toBeInTheDocument();
-    await act(async () =>
-      page.getByRole("button", { name: /Compact/ }).click()
-    );
+    await act(async () => {
+      await page.getByRole("button", { name: /Compact/ }).click();
+      await waitForChoiceFlash();
+    });
     await expect.element(status(2)).toBeVisible();
     await expect
       .element(page.getByText("Map", { exact: true }))
@@ -562,9 +681,12 @@ it.each([
 
     await clickButton("Previous question");
     await expect.element(status(1)).toBeVisible();
-    await act(async () => userEvent.keyboard("2"));
+    await act(async () => {
+      await userEvent.keyboard("2");
+      await waitForChoiceFlash();
+    });
     await expect.element(status(2)).toBeVisible();
-    await clickButton("Skip");
+    await clickButton("Skip question");
     await expect.element(status(3)).toBeVisible();
     await expect
       .element(page.getByText("Copies", { exact: true }))
@@ -638,8 +760,8 @@ it("shows a blocking text-only question and the long and overlapping question va
     .toBeVisible();
   await expect
     .element(page.getByRole("button", { name: "Close question" }))
-    .not.toBeInTheDocument();
-  await clickButton("Skip");
+    .toBeEnabled();
+  await clickButton("Close question");
   await expect
     .element(page.getByText("I’ll leave the print quantity open for now."))
     .toBeVisible();

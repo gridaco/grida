@@ -1,8 +1,8 @@
 /**
  * /desktop/workspace — VSCode-style workspace workbench surface.
  *
- * The route resolves a `?id=<workspaceId>` query param against
- * `bridge.workspaces.list()` and mounts `<WorkspaceWorkbench>` on a hit.
+ * Home can hand off a workspace it has just resolved. Direct navigation
+ * resolves the workspace ID against `bridge.workspaces.list()`.
  * Misses surface a friendly "workspace not found" message with a
  * link back to /desktop/welcome so the user can re-open the folder.
  *
@@ -32,6 +32,7 @@ import {
 } from "@/lib/desktop/bridge";
 import { Button } from "@app/ui/components/button";
 import { WorkspaceWorkbench } from "@/scaffolds/desktop/workbench/workspace-workbench";
+import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 
 export default function DesktopWorkspacePage() {
   return (
@@ -44,14 +45,32 @@ export default function DesktopWorkspacePage() {
 function WorkspacePageInner() {
   const params = useSearchParams();
   const workspaceId = params.get("id");
-  const initialActiveRelPath = params.get("path") ?? undefined;
+  return (
+    <WorkspaceRoute
+      key={workspaceId}
+      workspaceId={workspaceId}
+      initialActiveRelPath={params.get("path") ?? undefined}
+    />
+  );
+}
+
+function WorkspaceRoute({
+  workspaceId,
+  initialActiveRelPath,
+}: {
+  workspaceId: string | null;
+  initialActiveRelPath?: string;
+}) {
+  const [opening] = useState(() => WorkspaceOpening.peek(workspaceId));
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "ready"; workspace: Workspace }
     | { kind: "not-found" }
     | { kind: "bridge-missing" }
     | { kind: "error"; message: string }
-  >({ kind: "loading" });
+  >(() =>
+    opening ? { kind: "ready", workspace: opening } : { kind: "loading" }
+  );
 
   const resolve = useCallback(async () => {
     const bridge = getDesktopBridge();
@@ -81,8 +100,9 @@ function WorkspacePageInner() {
   }, [workspaceId]);
 
   useEffect(() => {
-    void resolve();
-  }, [resolve]);
+    if (opening) WorkspaceOpening.arrived(opening);
+    else void resolve();
+  }, [resolve, opening]);
 
   if (state.kind === "loading" || state.kind === "bridge-missing") {
     return <LoadingScreen />;

@@ -55,6 +55,7 @@ function inputOf(entry: ToolCallEntry): unknown {
 }
 
 const questionTextClassName = "text-sm leading-5 font-normal";
+const choiceAdvanceDelayMs = 280;
 
 function optionRowClassName(selected: boolean, disabled: boolean) {
   return cn(
@@ -86,10 +87,19 @@ export function QuestionPrompt({
   const [closed, setClosed] = useState(dismissal?.initiallyClosed ?? false);
   const [confirmingSkips, setConfirmingSkips] = useState(false);
   const form = useRef<HTMLDivElement>(null);
+  const questionText = useRef<HTMLParagraphElement>(null);
+  const choices = useRef<HTMLDivElement>(null);
+  const previousStep = useRef(survey.step);
+  const previousHeight = useRef<number | undefined>(undefined);
   const reopen = useRef<HTMLButtonElement>(null);
   const writeInInput = useRef<HTMLTextAreaElement>(null);
   const keepAnsweringButton = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
+  const choiceFlash = useRef<Animation | null>(null);
+  useLayoutEffect(
+    () => () => choiceFlash.current?.cancel(),
+    [closed, confirmingSkips, survey.step]
+  );
   useLayoutEffect(() => {
     if (confirmingSkips) {
       keepAnsweringButton.current?.focus();
@@ -99,6 +109,46 @@ export function QuestionPrompt({
       (closed ? reopen.current : form.current)?.focus();
       restoreFocus.current = false;
     }
+  }, [closed, confirmingSkips, survey.step]);
+  useLayoutEffect(() => {
+    const from = previousStep.current;
+    previousStep.current = survey.step;
+    const fromHeight = previousHeight.current;
+    previousHeight.current = undefined;
+    if (
+      from === survey.step ||
+      closed ||
+      confirmingSkips ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const rtl = questionText.current?.matches(":dir(rtl)");
+    const offset = (survey.step > from ? 1 : -1) * (rtl ? -12 : 12);
+    const timing = { duration: 180, easing: "ease-out" };
+    const card = form.current;
+    const toHeight = card?.offsetHeight;
+    const resize =
+      card && fromHeight !== undefined && toHeight !== fromHeight
+        ? card.animate(
+            [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
+            timing
+          )
+        : undefined;
+    const sweep = [questionText.current, choices.current].map((element) =>
+      element?.animate(
+        [
+          { opacity: 0.45, translate: `${offset}px` },
+          { opacity: 1, translate: "0px" },
+        ],
+        timing
+      )
+    );
+    return () => {
+      resize?.cancel();
+      sweep.forEach((animation) => animation?.cancel());
+    };
   }, [closed, confirmingSkips, survey.step]);
 
   if (survey.count === 0) return null;
@@ -113,6 +163,8 @@ export function QuestionPrompt({
   const writeIn = survey.writeInFor(qi);
   const hasNext = survey.multiStep && !survey.isLast;
   const canSubmit = !busy && (survey.multiStep || survey.canSubmit);
+  const skipDisabled =
+    hasNext || (!survey.multiStep && dismissal) ? submitted : busy;
   const changeClosed = (next: boolean) => {
     restoreFocus.current = true;
     setClosed(next);
@@ -156,6 +208,9 @@ export function QuestionPrompt({
       );
   };
   const showStep = (next: QuestionSurvey) => {
+    if (next.step !== survey.step) {
+      previousHeight.current = form.current?.offsetHeight;
+    }
     restoreFocus.current = true;
     setSurvey(next);
   };
@@ -200,9 +255,19 @@ export function QuestionPrompt({
           keepAnswering();
         }}
       >
-        <div className="flex items-center gap-2 px-2 text-muted-foreground">
-          <MessageCircleQuestionIcon className="size-4" />
-          Question
+        <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
+          <MessageCircleQuestionIcon aria-hidden className="size-4 shrink-0" />
+          <span>Question</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="ms-auto"
+            aria-label="Close confirmation"
+            onClick={keepAnswering}
+          >
+            <XIcon aria-hidden />
+          </Button>
         </div>
         <p id={titleId} className="px-2">
           Skip {unanswered.length} unanswered{" "}
@@ -235,8 +300,7 @@ export function QuestionPrompt({
     );
   }
 
-  // Radix prevents Enter on radio items and checkboxes.
-  const handleChoiceKey = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handlePromptKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const { key, target } = event;
     if (
       submitted ||
@@ -247,22 +311,85 @@ export function QuestionPrompt({
       event.shiftKey ||
       event.nativeEvent.isComposing ||
       event.keyCode === 229 ||
-      !(target instanceof Element) ||
+      !(target instanceof Element)
+    ) {
+      return;
+    }
+
+    const input = writeInInput.current;
+    const leaveWriteIn =
+      key === "ArrowUp" &&
+      input === target &&
+      input.selectionStart === 0 &&
+      input.selectionEnd === 0;
+    if (
+      !leaveWriteIn &&
       target.closest("input, textarea, select, [contenteditable]")
     ) {
       return;
     }
 
-    const focusedChoice = target.closest<HTMLButtonElement>(
-      '[role="radio"], [role="checkbox"]'
-    );
-    if (key === "Enter" && focusedChoice) {
+    if (survey.multiStep && (key === "ArrowLeft" || key === "ArrowRight")) {
       event.preventDefault();
       event.stopPropagation();
-      if (!event.repeat) {
-        if (survey.multiStep && !hasNext) focusedChoice.click();
-        else advance();
+      const rtl = event.currentTarget.matches(":dir(rtl)");
+      const forward = (key === "ArrowRight") !== rtl;
+      if (forward && hasNext) showStep(survey.next());
+      if (!forward && survey.step > 0) showStep(survey.back());
+      return;
+    }
+
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      const buttons = Array.from(
+        event.currentTarget.querySelectorAll<HTMLButtonElement>(
+          "[data-question-choice]"
+        )
+      );
+      if (!buttons.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      choiceFlash.current?.cancel();
+      const focused = buttons.findIndex((button) => button.contains(target));
+      const selected = survey.isWriteInSelected(qi)
+        ? buttons.length
+        : options.findIndex((option) =>
+            survey.pickedFor(qi).includes(option.label)
+          );
+      const current = leaveWriteIn
+        ? buttons.length
+        : focused >= 0
+          ? focused
+          : selected;
+      const down = key === "ArrowDown";
+      const index =
+        current < 0
+          ? down
+            ? 0
+            : buttons.length
+          : Math.min(buttons.length, Math.max(0, current + (down ? 1 : -1)));
+      const button = buttons[index];
+      if (!button) {
+        if (input) {
+          setSurvey((current) => current.selectWriteIn(qi));
+          input.focus();
+        }
+        return;
       }
+      button.focus();
+      if (!q.multi_select) {
+        setSurvey((current) => current.togglePick(qi, options[index].label));
+      }
+      return;
+    }
+
+    if (
+      key === "Enter" &&
+      (target === event.currentTarget ||
+        target.closest("[data-question-choice]"))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat && survey.isAnswered(qi)) advance();
       return;
     }
 
@@ -273,10 +400,29 @@ export function QuestionPrompt({
     if (!option) return;
     event.preventDefault();
     event.stopPropagation();
-    if (!event.repeat) {
-      option.focus();
-      option.click();
-    }
+    if (event.repeat) return;
+
+    option.focus();
+    option.click();
+  };
+
+  const selectAndAdvance = (option: HTMLButtonElement, label: string) => {
+    choiceFlash.current?.cancel();
+    const answered = survey.togglePick(qi, label);
+    setSurvey(answered);
+    const highlight = { backgroundColor: "var(--color-accent)" };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const flash = option.animate(
+      reducedMotion.matches
+        ? [highlight, highlight]
+        : [highlight, { backgroundColor: "transparent" }, highlight],
+      { duration: choiceAdvanceDelayMs }
+    );
+    choiceFlash.current = flash;
+    flash.onfinish = () => {
+      choiceFlash.current = null;
+      showStep(answered.next());
+    };
   };
 
   const singleChoices =
@@ -319,7 +465,8 @@ export function QuestionPrompt({
           type="button"
           disabled={submitted}
           aria-pressed={selected}
-          onClick={() => showStep(survey.togglePick(qi, opt.label).next())}
+          onBlur={() => choiceFlash.current?.cancel()}
+          onClick={(event) => selectAndAdvance(event.currentTarget, opt.label)}
         >
           {label}
         </button>
@@ -352,7 +499,7 @@ export function QuestionPrompt({
           ? "min-h-36 grid-rows-[auto_minmax(0,auto)_minmax(2.5rem,1fr)_auto]"
           : "grid-rows-[auto_minmax(0,auto)_auto]"
       )}
-      onKeyDownCapture={handleChoiceKey}
+      onKeyDownCapture={handlePromptKey}
       onKeyDown={(event) => {
         if (event.key === "Escape" && dismissal && !submitted) {
           event.stopPropagation();
@@ -361,7 +508,9 @@ export function QuestionPrompt({
       }}
     >
       <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
-        {survey.multiStep ? (
+        <MessageCircleQuestionIcon aria-hidden className="size-4 shrink-0" />
+        <span>Question</span>
+        {survey.multiStep && (
           <div
             role="group"
             aria-label="Question navigation"
@@ -377,7 +526,7 @@ export function QuestionPrompt({
             >
               <ChevronLeftIcon aria-hidden />
             </Button>
-            <span className="tabular-nums">
+            <span className="text-xs tabular-nums">
               {survey.step + 1} of {survey.count}
             </span>
             <Button
@@ -391,32 +540,29 @@ export function QuestionPrompt({
               <ChevronRightIcon aria-hidden />
             </Button>
           </div>
-        ) : (
-          <>
-            <MessageCircleQuestionIcon className="size-4" />
-            Question
-          </>
         )}
-        {dismissal && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className={survey.multiStep ? undefined : "ms-auto"}
-            aria-label="Close question"
-            disabled={submitted}
-            onClick={() => changeClosed(true)}
-          >
-            <XIcon />
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className={survey.multiStep ? undefined : "ms-auto"}
+          aria-label={survey.multiStep ? "Skip question" : "Close question"}
+          disabled={skipDisabled}
+          onClick={onSkip}
+        >
+          <XIcon aria-hidden />
+        </Button>
       </div>
-      <p id={questionId} className="min-h-0 overflow-y-auto wrap-anywhere px-2">
+      <p
+        ref={questionText}
+        id={questionId}
+        className="mb-2 min-h-0 overflow-y-auto wrap-anywhere px-2"
+      >
         {q.question}
       </p>
 
       {hasOptions && (
-        <div className="-m-1 min-h-0 overflow-y-auto p-1">
+        <div ref={choices} className="-m-1 min-h-0 overflow-y-auto p-1">
           {!q.multi_select ? (
             hasNext ? (
               <div
@@ -429,6 +575,7 @@ export function QuestionPrompt({
             ) : (
               <RadioGroup.Root
                 aria-labelledby={questionId}
+                orientation="vertical"
                 value={survey.pickedFor(qi)[0] ?? ""}
                 onValueChange={(label) =>
                   setSurvey(survey.togglePick(qi, label))
@@ -453,6 +600,7 @@ export function QuestionPrompt({
                     className={optionRowClassName(selected, submitted)}
                   >
                     <Checkbox
+                      data-question-choice=""
                       checked={selected}
                       onCheckedChange={() =>
                         setSurvey(survey.togglePick(qi, opt.label))
@@ -493,13 +641,17 @@ export function QuestionPrompt({
             ref={writeInInput}
             aria-labelledby={questionId}
             value={writeIn}
+            onClick={
+              submitted
+                ? undefined
+                : () => setSurvey((current) => current.selectWriteIn(qi))
+            }
             onChange={(e) =>
               setSurvey((current) => current.setWriteIn(qi, e.target.value))
             }
             onKeyDown={(event) => {
               if (
                 event.key !== "Enter" ||
-                (survey.multiStep && !hasNext) ||
                 event.shiftKey ||
                 event.nativeEvent.isComposing ||
                 event.keyCode === 229
@@ -507,7 +659,7 @@ export function QuestionPrompt({
                 return;
               event.preventDefault();
               event.stopPropagation();
-              if (!event.repeat) advance();
+              if (!event.repeat && survey.isAnswered(qi)) advance();
             }}
             readOnly={submitted}
             rows={1}
@@ -541,9 +693,7 @@ export function QuestionPrompt({
             size="xs"
             className={questionTextClassName}
             onClick={onSkip}
-            disabled={
-              hasNext || (!survey.multiStep && dismissal) ? submitted : busy
-            }
+            disabled={skipDisabled}
           >
             Skip
           </Button>

@@ -129,12 +129,28 @@ describe("QuestionSurvey — answer building", () => {
     expect(custom.answersFor(0)).toEqual(["Pastel"]);
   });
 
-  it("picking after a write-in clears the custom text", () => {
+  it("keeps an inactive write-in draft for each step", () => {
     const s = QuestionSurvey.from(SINGLE)
       .setWriteIn(0, "Pastel")
       .togglePick(0, "Cool");
     expect(s.writeInFor(0)).toBe("");
     expect(s.answersFor(0)).toEqual(["Cool"]);
+    expect(s.singleAnswer()).toEqual({ kind: "choice", index: 1 });
+    expect(s.selectWriteIn(0).singleAnswer()).toEqual({
+      kind: "text",
+      text: "Pastel",
+    });
+
+    const batch = QuestionSurvey.from(SURVEY)
+      .setWriteIn(0, "Pastel")
+      .skipCurrent()
+      .next()
+      .setWriteIn(1, "Program")
+      .back();
+    expect(batch.answersFor(0)).toEqual([]);
+    expect(batch.selectWriteIn(0).writeInFor(0)).toBe("Pastel");
+    expect(batch.selectWriteIn(0).writeInFor(1)).toBe("Program");
+    expect(batch.clearCustom(0).selectWriteIn(0).writeInFor(0)).toBe("");
   });
 
   it("keeps a choice through navigation and replaces it only when a write-in is edited", () => {

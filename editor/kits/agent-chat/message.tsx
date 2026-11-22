@@ -53,6 +53,7 @@ import {
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
+  ScrollTextIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
@@ -786,23 +787,18 @@ const ELAPSED_REVEAL_AFTER_MS = 10000;
  * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
  * operation settles before a timer grows, and only a wait long enough to feel
  * slow surfaces the elapsed time as reassurance.
- *
- * The counter is a sibling of the `Shimmer`, not its child: `Shimmer` requires a
- * string child and recreates its motion element whenever that child changes, so
- * feeding it the ticking label would restart the shimmer every second.
  */
 function ShimmerWithElapsed({ label }: { label: string }) {
   const elapsed = useElapsedSeconds();
+  const text =
+    elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS
+      ? `${label} · ${formatElapsed(elapsed)}`
+      : label;
+
   return (
-    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-      <Shimmer as="span">{label}</Shimmer>
-      {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
-        <>
-          <span aria-hidden>·</span>
-          <span className="tabular-nums">{formatElapsed(elapsed)}</span>
-        </>
-      )}
-    </span>
+    <Shimmer as="span" className="whitespace-nowrap text-xs tabular-nums">
+      {text}
+    </Shimmer>
   );
 }
 
@@ -842,11 +838,19 @@ export function PendingTurnIndicator({
   );
 }
 
-// The settled compaction affordance (RFC `session / compaction`: "the user
-// sees a one-line affordance"). A divider reading "Conversation compacted";
-// clicking the label expands the summary the model now sees in place of the
-// hidden turns.
-/** A divider where earlier context was summarized, with the summary inside. */
+const compactionRowClassName =
+  "flex w-fit items-center gap-2 text-sm text-muted-foreground";
+
+export function CompactionProgress() {
+  return (
+    <div role="status" className={cn(compactionRowClassName, "select-none")}>
+      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+      <Shimmer as="span">Compacting context</Shimmer>
+    </div>
+  );
+}
+
+/** A transcript disclosure for the summary the model now reads. */
 export function CompactionNotice({
   summary,
   auto,
@@ -855,14 +859,19 @@ export function CompactionNotice({
   auto: boolean;
 }) {
   return (
-    <details className="group/compaction my-3 w-full">
-      <summary className="flex w-full cursor-pointer list-none items-center gap-3 px-1 text-muted-foreground">
-        <span aria-hidden className="h-px flex-1 bg-border" />
-        <span className="flex items-center gap-1.5 whitespace-nowrap text-xs transition-colors hover:text-foreground">
-          {auto ? "Conversation auto-compacted" : "Conversation compacted"}
-          <ChevronDownIcon className="size-3 shrink-0 opacity-50 transition-transform group-open/compaction:rotate-180" />
-        </span>
-        <span aria-hidden className="h-px flex-1 bg-border" />
+    <details className="group/compaction w-full">
+      <summary
+        className={cn(
+          compactionRowClassName,
+          "cursor-pointer list-none transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
+        )}
+      >
+        <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+        {auto ? "Conversation auto-compacted" : "Conversation compacted"}
+        <ChevronRightIcon
+          aria-hidden
+          className="size-3 shrink-0 opacity-0 transition-[opacity,rotate] group-open/compaction:rotate-90 group-open/compaction:opacity-100 group-hover/compaction:opacity-100 group-focus-within/compaction:opacity-100"
+        />
       </summary>
       <div className="mt-2 whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs leading-5 text-foreground/80">
         {summary}
