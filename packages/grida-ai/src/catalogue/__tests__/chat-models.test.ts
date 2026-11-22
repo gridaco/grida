@@ -40,6 +40,10 @@ describe("foreground chat catalogue resolution", () => {
         "account-selector",
       ],
       [{ provider: "openrouter" }, "router-selector"],
+      [
+        { provider: "openai", models: new Set(["api-selector"]) },
+        "api-selector",
+      ],
     ];
     for (const [connection, wireModel] of connections) {
       const binding = ChatModels.resolve(release, connection, canonical);
@@ -57,6 +61,98 @@ describe("foreground chat catalogue resolution", () => {
         selectors: ["api-selector"],
       })
     ).toEqual([]);
+  });
+
+  it("offers an OpenAI API model only when the project's list has its wire ID", () => {
+    const connection = {
+      provider: "openai",
+      models: new Set([canonical, "account-selector", "unknown"]),
+    } as const;
+    expect(ChatModels.list(release, connection)).toEqual([]);
+    expect(ChatModels.resolve(release, connection, canonical)).toBeUndefined();
+    expect(
+      ChatModels.resolve(
+        seed,
+        { provider: "openai", models: new Set(["gpt-6.2-sol"]) },
+        sample.id
+      )
+    ).toMatchObject({
+      modelId: sample.id,
+      wireModel: "gpt-6.2-sol",
+      imageInput: false,
+      reasoning: true,
+      speeds: [],
+    });
+  });
+
+  it.each([{ streaming: undefined }, { streaming: false }, { tools: false }])(
+    "requires explicit OpenAI streaming and function-tool support (%j)",
+    (capabilities) => {
+      const row = release.text[canonical]!;
+      const incompatible = {
+        ...release,
+        text: {
+          [canonical]: {
+            ...row,
+            bindings: {
+              openai: { ...row.bindings.openai!, ...capabilities },
+            },
+          },
+        },
+      };
+      const connection = {
+        provider: "openai",
+        models: new Set(["api-selector"]),
+      } as const;
+      expect(ChatModels.list(incompatible, connection)).toEqual([]);
+      expect(
+        ChatModels.resolve(incompatible, connection, canonical)
+      ).toBeUndefined();
+    }
+  );
+
+  it("reauthorizes the retained OpenAI wire ID without substituting the current catalogue selector", () => {
+    const connection = { provider: "openai" } as const;
+    const retained = { wireModel: "previous-api-selector", imageInput: false };
+    expect(
+      ChatModels.resume(release, connection, canonical, retained)
+    ).toMatchObject({
+      modelId: canonical,
+      ...retained,
+      speeds: [],
+    });
+    const other = "openai/another";
+    const reassigned = {
+      ...release,
+      text: {
+        ...release.text,
+        [other]: {
+          ...sample,
+          id: other,
+          bindings: {
+            openai: {
+              ...sample.bindings.openai!,
+              wireModel: retained.wireModel,
+            },
+          },
+        },
+      },
+    };
+    expect(
+      ChatModels.resume(reassigned, connection, canonical, retained)
+    ).toBeUndefined();
+    expect(
+      ChatModels.resume(release, connection, canonical, {
+        ...retained,
+        imageInput: true,
+      })
+    ).toBeUndefined();
+    expect(
+      ChatModels.resume(release, connection, canonical, {
+        ...retained,
+        speed: "fast",
+      })
+    ).toBeUndefined();
   });
 
   it("keeps an accepted selector while its original connection is eligible and refuses a reassigned selector", () => {

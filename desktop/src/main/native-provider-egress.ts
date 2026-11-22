@@ -37,6 +37,11 @@ export type NativeProviderNetwork = {
     headers: Headers,
     signal: AbortSignal
   ): Promise<Response | null>;
+  /** Main-only, fixed authenticated OpenAI project model list. */
+  getOpenAiModels?(
+    headers: Headers,
+    signal: AbortSignal
+  ): Promise<Response | null>;
 };
 
 type Exchange = {

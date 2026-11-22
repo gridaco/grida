@@ -324,6 +324,13 @@ export type NativeChatProfileCatalog = Readonly<{
   inputRoutes?: true;
   /** A signed-in subscription could not supply its model list. Other connections remain usable. */
   subscriptionIssue?: "unavailable" | "reauthenticationRequired";
+  /** Status of model discovery for a saved OpenAI project key. */
+  openAiIssue?:
+    | "loading"
+    | "unavailable"
+    | "keyRejected"
+    | "modelsForbidden"
+    | "noCompatibleModels";
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */

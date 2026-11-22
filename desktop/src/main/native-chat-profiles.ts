@@ -18,6 +18,7 @@ import {
   ChatModels,
 } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -199,12 +200,16 @@ export namespace NativeChatProfiles {
       providerId: string,
       modelId: string,
       binding: ChatModels.Binding
-    ) => Promise<Launch>
+    ) => Promise<Launch>,
+    openAiModels: readonly ChatModels.Binding[] = []
   ): Promise<Saved[]> {
     const choices: Saved[] = [];
     for (const { id, label: connection } of byokProvidersFor("text")) {
       if (!NativeProviderSelection.isBuiltInByok(id)) continue;
-      const models = ChatModels.list(snapshot, { provider: id });
+      const models =
+        id === OPENAI_PROJECT_PROVIDER_ID
+          ? openAiModels
+          : ChatModels.list(snapshot, { provider: id });
       const sample = models[0];
       if (!sample) continue;
       // The credential owner is common to every binding on this provider.

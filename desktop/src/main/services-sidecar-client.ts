@@ -1,5 +1,6 @@
 import type { ChatModels } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 /**
  * GRIDA-SEC-004 — main-process client for the services sidecar.
  *
@@ -276,7 +277,7 @@ export namespace servicesSidecarClient {
       providerId,
       modelId,
       {
-        ...nativeAgentByokSettings(),
+        ...nativeAgentByokSettings(providerId === OPENAI_PROJECT_PROVIDER_ID),
         hasKey: transport.secrets.has,
         imageRequest: (init) => transport.fetch("/images/generate", init),
         modelCatalogue,

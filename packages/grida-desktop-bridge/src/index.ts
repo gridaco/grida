@@ -102,12 +102,16 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
   /** Optional browser; negotiate its version and presentation before use. */
   browser?: boolean;
+  /** Named OpenAI API project key custody and native chat support. */
+  openai_api?: boolean;
 };
 
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
   /** Bundled media capabilities; omission means an older Desktop binary. */
   media?: {
+    /** Direct image generation using the OpenAI project key. */
+    openai_images?: boolean;
     /** First-party Tripo credentials, generation and host-authorized egress. */
     tripo?: boolean;
     /** Explicit eligibility and rigging plus bounded native GLB upload. */

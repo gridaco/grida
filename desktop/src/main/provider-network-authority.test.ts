@@ -86,7 +86,7 @@ it("never publishes the Main-only subscription grant to the sidecar", () => {
     authority
       .grants()
       .flatMap((grant) => grant.origins)
-      .some((origin) => /openai\.com|chatgpt\.com/.test(origin))
+      .some((origin) => /auth\.openai\.com|chatgpt\.com/.test(origin))
   ).toBe(false);
   expect(authority.nativeGrants().find((grant) => grant.id === id)).toEqual({
     id,

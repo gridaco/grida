@@ -18,7 +18,7 @@ import {
 import { liveGgMediaDeps, type GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
-import { byokProvidersFor } from "./provider-ids";
+import { byokProvidersFor, OPENAI_PROJECT_PROVIDER_ID } from "./provider-ids";
 import {
   GGDiscoveryStore,
   supportsGGPromptOperation,
@@ -304,7 +304,9 @@ export class ImageClient {
 
 export namespace ImageClient {
   export type Background = "auto" | "opaque" | "transparent";
-  export type ByokProvider = models.image.ImageProvider;
+  export type ByokProvider =
+    | models.image.ImageProvider
+    | typeof OPENAI_PROJECT_PROVIDER_ID;
   export type Provider = ByokProvider | "gg";
   /** Private host capability. It is never returned or forwarded to a model. */
   export type Keys = {
@@ -378,7 +380,10 @@ export namespace ImageClient {
 }
 
 function isImageProvider(value: string): value is ImageClient.ByokProvider {
-  return (models.image.providers as readonly string[]).includes(value);
+  return (
+    value === OPENAI_PROJECT_PROVIDER_ID ||
+    (models.image.providers as readonly string[]).includes(value)
+  );
 }
 
 function selection(value: ImageClient.Selection): ImageClient.Selection {

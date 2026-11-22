@@ -44,6 +44,7 @@ import {
 } from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { catalog as models } from "@grida/ai/catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
 import {
   AlibabaCloudLogo,
   BlackForestLabsLogo,
@@ -204,18 +205,10 @@ export default function DesktopSettingsPage() {
             </SettingsSection>
           </TabsContent>
           <TabsContent value="media" className="m-0">
-            <SettingsSection
-              title="Media Providers"
-              description="Generation providers for image, video, 3D, and audio workflows."
-            >
-              <ProviderListCard
-                title="Media Provider Keys"
-                description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
-                providerIds={MEDIA_PROVIDER_IDS}
-                onKeyChanged={onProviderKeyChanged}
-              />
-              <MediaModelsSection providerKeysRevision={providerKeysRevision} />
-            </SettingsSection>
+            <MediaProviderSettings
+              providerKeysRevision={providerKeysRevision}
+              onKeyChanged={onProviderKeyChanged}
+            />
           </TabsContent>
           <TabsContent value="hooks" className="m-0">
             <HooksSettings />
@@ -502,6 +495,7 @@ type ProviderModality = "text" | "image" | "video";
 const BYOK_PROVIDER_LOGOS: Partial<
   Record<ByokProviderId, React.ComponentType<React.ComponentProps<"svg">>>
 > = {
+  [OPENAI_PROJECT_PROVIDER_ID]: OpenAILogo,
   openrouter: OpenRouterLogo,
   vercel: VercelLogo,
   fal: FalLogo,
@@ -534,6 +528,7 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleLabel: string;
     consoleHref: string;
     placeholder: string;
+    note?: string;
   }
 > = {
   openrouter: {
@@ -549,6 +544,14 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleLabel: "Vercel AI Gateway's console",
     consoleHref: "https://vercel.com/ai-gateway",
     placeholder: "vck_00000000000000000000000000000000",
+  },
+  [OPENAI_PROJECT_PROVIDER_ID]: {
+    label: "OpenAI API",
+    article: "an",
+    consoleLabel: "OpenAI’s project settings",
+    consoleHref: "https://platform.openai.com/api-keys",
+    placeholder: "sk-proj-…",
+    note: "Chat usage is billed to your OpenAI project. A restricted key needs permission to list models and create Responses.",
   },
   fal: {
     label: "fal",
@@ -588,6 +591,7 @@ function ProviderListCard({
   modalities,
   providerIds,
   excludeModalities = [],
+  openAiImages = false,
   onKeyChanged,
   leading,
   children,
@@ -598,14 +602,18 @@ function ProviderListCard({
   /** Exact provider identities for provider-shaped, non-resolver surfaces. */
   providerIds?: readonly ByokProviderId[];
   excludeModalities?: readonly ProviderModality[];
+  openAiImages?: boolean;
   onKeyChanged?: () => void;
   leading?: ReactNode;
   children?: ReactNode;
 }) {
+  const openAiSupported =
+    openAiImages || getDesktopBridge()?.caps?.native?.openai_api === true;
   const byokProviders = secrets
     .byokProviderMetadata()
     .filter(
       (provider) =>
+        (provider.id !== OPENAI_PROJECT_PROVIDER_ID || openAiSupported) &&
         (provider.id !== "tripo" ||
           modelGeneration.isSupported() ||
           rigging.isSupported()) &&
@@ -627,6 +635,7 @@ function ProviderListCard({
             <ByokRow
               key={provider.id}
               provider={provider}
+              openAiImages={openAiImages}
               onKeyChanged={onKeyChanged}
             />
           ))}
@@ -647,9 +656,11 @@ type RowState =
 
 function ByokRow({
   provider,
+  openAiImages,
   onKeyChanged,
 }: {
   provider: ByokProviderMetadata;
+  openAiImages: boolean;
   onKeyChanged?: () => void;
 }) {
   const providerId = provider.id;
@@ -662,6 +673,11 @@ function ByokRow({
       : undefined;
   const setup = BYOK_PROVIDER_SETUP[providerId];
   const label = setup.label;
+  const openAi = providerId === OPENAI_PROJECT_PROVIDER_ID;
+  const note =
+    openAi && openAiImages
+      ? "Image usage is billed to your OpenAI project. A restricted key needs permission to generate images."
+      : setup.note;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<RowState>({ kind: "loading" });
@@ -726,7 +742,7 @@ function ByokRow({
   const handleRemove = useCallback(async () => {
     let confirmed = false;
     try {
-      confirmed = await secrets.confirmDeleteKey(providerId);
+      confirmed = await secrets.confirmDeleteKey(providerId, label);
     } catch (err) {
       setState({
         kind: "error",
@@ -749,7 +765,7 @@ function ByokRow({
         previous: "configured",
       });
     }
-  }, [providerId, refresh, onKeyChanged]);
+  }, [providerId, label, refresh, onKeyChanged]);
 
   const handleErrorDismiss = useCallback(() => {
     void refresh();
@@ -793,9 +809,12 @@ function ByokRow({
         <div className="px-6 pb-5 text-sm text-muted-foreground">
           <p className="text-foreground">
             {statusKind === "configured"
-              ? `${label} is connected.`
+              ? openAi
+                ? "Your OpenAI project key is saved."
+                : `${label} is connected.`
               : `To use Grida with ${label}, add ${setup.article} API key.`}
           </p>
+          {note && <p className="mt-2">{note}</p>}
           {statusKind !== "configured" && (
             <>
               <p className="mt-2">Follow these steps:</p>
@@ -939,6 +958,7 @@ const MEDIA_PROVIDER_IDS = [
   "openrouter",
   "vercel",
   "fal",
+  OPENAI_PROJECT_PROVIDER_ID,
   "elevenlabs",
   "tripo",
 ] as const satisfies readonly ByokProviderId[];
@@ -949,6 +969,42 @@ const VISUAL_BYOK_PROVIDER_IDS = [
   "fal",
 ] as const satisfies readonly ByokProviderId[];
 
+function MediaProviderSettings({
+  providerKeysRevision,
+  onKeyChanged,
+}: {
+  providerKeysRevision: number;
+  onKeyChanged: () => void;
+}) {
+  const visual = useVisualModels();
+  const openAiImages = providers.supportsOpenAiImages();
+  return (
+    <SettingsSection
+      title="Media Providers"
+      description="Generation providers for image, video, 3D, and audio workflows."
+    >
+      <ProviderListCard
+        title="Media Provider Keys"
+        description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
+        providerIds={
+          openAiImages
+            ? MEDIA_PROVIDER_IDS
+            : MEDIA_PROVIDER_IDS.filter(
+                (id) => id !== OPENAI_PROJECT_PROVIDER_ID
+              )
+        }
+        openAiImages={openAiImages}
+        onKeyChanged={onKeyChanged}
+      />
+      <MediaModelsSection
+        providerKeysRevision={providerKeysRevision}
+        visual={visual}
+        openAiImages={openAiImages}
+      />
+    </SettingsSection>
+  );
+}
+
 /**
  * Media-generation models. Readiness is scoped to each callable route rather
  * than inferred from one unrelated provider key: fal for 3D, ElevenLabs for
@@ -956,8 +1012,12 @@ const VISUAL_BYOK_PROVIDER_IDS = [
  */
 function MediaModelsSection({
   providerKeysRevision,
+  visual,
+  openAiImages,
 }: {
   providerKeysRevision: number;
+  visual: ReturnType<typeof useVisualModels>;
+  openAiImages: boolean;
 }) {
   const [connectedVisualProviders, setConnectedVisualProviders] =
     useState<ReadonlySet<ByokProviderId> | null>(null);
@@ -983,7 +1043,6 @@ function MediaModelsSection({
   const soundEffectSupported = audio.soundEffects.isSupported();
   const voiceSupported = audio.textToSpeech.isSupported();
   const currentGG = useGGModels();
-  const visual = useVisualModels();
   const imageModels = imageSupported
     ? mediaModelChoices(
         visual ? promptModels(visual.image) : models.image.listed_models(),
@@ -1026,18 +1085,15 @@ function MediaModelsSection({
   useEffect(() => {
     let live = true;
     if (imageSupported || videoSupported) {
+      const providerIds: readonly ByokProviderId[] = openAiImages
+        ? [...VISUAL_BYOK_PROVIDER_IDS, OPENAI_PROJECT_PROVIDER_ID]
+        : VISUAL_BYOK_PROVIDER_IDS;
       void Promise.all(
-        VISUAL_BYOK_PROVIDER_IDS.map((id) =>
-          secrets.hasKey(id).catch(() => false)
-        )
+        providerIds.map((id) => secrets.hasKey(id).catch(() => false))
       ).then((present) => {
         if (!live) return;
         setConnectedVisualProviders(
-          new Set(
-            VISUAL_BYOK_PROVIDER_IDS.filter(
-              (_provider, index) => present[index]
-            )
-          )
+          new Set(providerIds.filter((_provider, index) => present[index]))
         );
       });
     }
@@ -1082,6 +1138,7 @@ function MediaModelsSection({
     providerKeysRevision,
     imageSupported,
     musicSupported,
+    openAiImages,
     soundEffectSupported,
     threeDSupported,
     tripoSupported,

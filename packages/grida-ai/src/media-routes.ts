@@ -4,6 +4,7 @@ import { catalog as models } from "./catalogue/grida";
 import type { ImageClient } from "./image-client";
 import type { VideoClient } from "./video-client";
 import type { ThreeDClient } from "./three-d-client";
+import { OPENAI_PROJECT_PROVIDER_ID } from "./provider-ids";
 
 export namespace MediaRoutes {
   export function imageModel(
@@ -16,13 +17,18 @@ export namespace MediaRoutes {
   ): card is models.video.VideoModelCard {
     return card?.listed === true;
   }
-  export function image(
+  export function image<Provider extends ImageClient.Provider>(
     card: models.image.ImageModelCard,
-    provider: ImageClient.Provider,
+    provider: Provider,
     references: boolean,
     background?: ImageClient.Background
-  ): ImageClient.Descriptor | null {
-    if (!imageModel(card) || provider === "gg") return null;
+  ): (ImageClient.Descriptor & { provider_id: Provider }) | null {
+    if (
+      !imageModel(card) ||
+      provider === "gg" ||
+      provider === OPENAI_PROJECT_PROVIDER_ID
+    )
+      return null;
     const native_background = models.image.supportsTransparentBackground(
       card,
       provider

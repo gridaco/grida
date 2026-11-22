@@ -6,7 +6,8 @@ import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { catalog as models } from "@grida/ai/catalogue";
+import { catalog as models, VisualModels } from "@grida/ai/catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -94,18 +95,33 @@ type SizeOption = { label: string; width?: number; height?: number };
 const AUTO_SIZE: SizeOption = { label: "Auto" };
 const QUALITY_OPTIONS = ["auto", "high", "medium", "low"] as const;
 
-/** Size options for a model — 2K/4K only when its constraints allow. */
-function sizeOptionsFor(card: ImageSettings | undefined): SizeOption[] {
-  const maxEdge = card?.constraints?.max_edge;
+/** The direct OpenAI route needs catalogue support for sizes beyond its standard presets. */
+function sizeOptionsFor(
+  settings: ImageSettings | undefined,
+  choice: VisualModels.Choice | undefined,
+  configured: MediaModelAvailability.ImageProviderState["configured"],
+  transparent: boolean
+): SizeOption[] {
+  const provider = VisualModels.providers("image").find((id) => {
+    const route = choice?.providers[id];
+    return (
+      configured.includes(id) &&
+      route?.text &&
+      (!transparent || route.transparent)
+    );
+  });
+  const maxEdge =
+    settings?.constraints?.max_edge ??
+    (provider === OPENAI_PROJECT_PROVIDER_ID ? 0 : Number.POSITIVE_INFINITY);
   const opts: SizeOption[] = [
     AUTO_SIZE,
     { label: "Square (1024×1024)", width: 1024, height: 1024 },
     { label: "Portrait (1024×1536)", width: 1024, height: 1536 },
     { label: "Landscape (1536×1024)", width: 1536, height: 1024 },
   ];
-  if (!maxEdge || maxEdge >= 2560)
+  if (maxEdge >= 2560)
     opts.push({ label: "2K (2560×1440)", width: 2560, height: 1440 });
-  if (!maxEdge || maxEdge >= 3840)
+  if (maxEdge >= 3840)
     opts.push({ label: "4K (3840×2160)", width: 3840, height: 2160 });
   return opts;
 }
@@ -195,12 +211,19 @@ export function DesktopImagePlayground({
   );
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
+  const [requestedSize, setSize] = useState<SizeOption>(AUTO_SIZE);
   const card = models.image.models[modelId];
-  const settings = visual
-    ? visual.image.find(({ id }) => id === modelId)?.options
-    : card;
+  const visualChoice = visual?.image.find(({ id }) => id === modelId);
+  const settings = visual ? visualChoice?.options : card;
   const [transparent, setTransparent] = useState(false);
+  const sizeOptions = sizeOptionsFor(
+    settings,
+    visualChoice,
+    providers.configured,
+    transparent
+  );
+  const size =
+    sizeOptions.find(({ label }) => label === requestedSize.label) ?? AUTO_SIZE;
   const access = MediaModelAvailability.image(
     card,
     providers,
@@ -246,8 +269,29 @@ export function DesktopImagePlayground({
       ).available
     )
       return;
+    const submittedSize = sizeOptionsFor(
+      settings,
+      visualChoice,
+      refreshed.configured,
+      transparent
+    ).find(({ label }) => label === size.label);
     const id = crypto.randomUUID();
     const model_id = modelId;
+    if (!submittedSize) {
+      setSize(AUTO_SIZE);
+      setTiles((prev) => [
+        {
+          id,
+          prompt,
+          model_id,
+          status: "error",
+          error:
+            "The connected provider no longer supports this size. Size reset to Auto.",
+        },
+        ...prev,
+      ]);
+      return;
+    }
     setTiles((prev) => [
       { id, prompt, model_id, status: "generating" },
       ...prev,
@@ -257,8 +301,8 @@ export function DesktopImagePlayground({
       const res = await images.generate({
         model_id,
         prompt,
-        ...(size.width && size.height
-          ? { width: size.width, height: size.height }
+        ...(submittedSize.width && submittedSize.height
+          ? { width: submittedSize.width, height: submittedSize.height }
           : {}),
         ...(settings?.quality || quality !== "auto" ? { quality } : {}),
         ...(transparent ? { background: "transparent" as const } : {}),
@@ -353,6 +397,7 @@ export function DesktopImagePlayground({
                 <TemplateMenu />
                 <SettingsMenu
                   card={settings}
+                  sizeOptions={sizeOptions}
                   size={size}
                   onSize={setSize}
                   quality={quality}
@@ -432,6 +477,7 @@ function TemplateMenu() {
 /** Composer toolbar menu of model-aware generation controls (size + quality). */
 function SettingsMenu({
   card,
+  sizeOptions,
   size,
   onSize,
   quality,
@@ -441,6 +487,7 @@ function SettingsMenu({
   transparencyAvailable,
 }: {
   card: ImageSettings | undefined;
+  sizeOptions: readonly SizeOption[];
   size: SizeOption;
   onSize: (s: SizeOption) => void;
   quality: string;
@@ -449,7 +496,6 @@ function SettingsMenu({
   onTransparent: (value: boolean) => void;
   transparencyAvailable: boolean;
 }) {
-  const sizeOptions = sizeOptionsFor(card);
   const qualityOptions = qualityOptionsFor(card);
   return (
     <DropdownMenu>

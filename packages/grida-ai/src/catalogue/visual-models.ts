@@ -1,6 +1,6 @@
 import type { ImageClient } from "../image-client";
 import type { VideoClient } from "../video-client";
-import { byokProvidersFor } from "../provider-ids";
+import { byokProvidersFor, OPENAI_PROJECT_PROVIDER_ID } from "../provider-ids";
 import type {
   CatalogueVisualKind,
   CatalogueVisualBinding,
@@ -45,12 +45,18 @@ export namespace VisualModels {
     );
   }
 
+  export function providers(kind: "image"): ImageClient.ByokProvider[];
+  export function providers(kind: "video"): VideoClient.ByokProvider[];
+  export function providers(kind: Kind): Provider[];
   export function providers(kind: Kind): Provider[] {
     return byokProvidersFor(kind)
       .map(({ id }) => id)
       .filter(
         (id): id is Provider =>
-          id === "fal" || id === "openrouter" || id === "vercel"
+          id === "fal" ||
+          id === "openrouter" ||
+          id === "vercel" ||
+          (kind === "image" && id === OPENAI_PROJECT_PROVIDER_ID)
       );
   }
 
@@ -72,7 +78,9 @@ export namespace VisualModels {
     model: CatalogueVisualModel | undefined,
     provider: Provider
   ): CatalogueVisualBinding | undefined {
-    const route = model?.bindings[provider];
+    const catalogueProvider =
+      provider === OPENAI_PROJECT_PROVIDER_ID ? "openai" : provider;
+    const route = model?.bindings[catalogueProvider];
     if (route && !route.deprecated && validBinding(route.id)) return route;
   }
 
@@ -87,6 +95,7 @@ export namespace VisualModels {
     const route = binding(model, provider);
     if (
       !route ||
+      (provider === OPENAI_PROJECT_PROVIDER_ID && references) ||
       !(
         route.pricingType === "per_image_flat" ||
         route.pricingType === "per_image_tiered" ||
@@ -123,6 +132,7 @@ export namespace VisualModels {
     provider: Provider,
     withImage = false
   ): VideoClient.Descriptor | null {
+    if (provider === OPENAI_PROJECT_PROVIDER_ID) return null;
     const route = binding(card(snapshot, "video", id), provider);
     if (
       !route ||

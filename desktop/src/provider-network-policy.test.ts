@@ -4,6 +4,87 @@ import { ProviderNetworkPolicy } from "./provider-network-policy";
 const grants = ProviderNetworkPolicy.builtInGrants("https://grida.co/path");
 
 describe("ProviderNetworkPolicy", () => {
+  it("publishes only the authenticated OpenAI image generation POST to the sidecar", () => {
+    const { OPENAI_IMAGE_GRANT_ID, OPENAI_IMAGE_URL, OPENAI_API_BASE } =
+      ProviderNetworkPolicy;
+    const request = {
+      grant_id: OPENAI_IMAGE_GRANT_ID,
+      method: "POST",
+      url: OPENAI_IMAGE_URL,
+      headers: [
+        ["authorization", "Bearer project-fixture"],
+        ["content-type", "application/json"],
+      ] as const,
+    };
+    expect(ProviderNetworkPolicy.authorize(grants, request).url.href).toBe(
+      OPENAI_IMAGE_URL
+    );
+    for (const override of [
+      { method: "GET" },
+      { url: `${OPENAI_API_BASE}/responses` },
+      { url: `${OPENAI_API_BASE}/images/edits` },
+      { url: `${OPENAI_IMAGE_URL}?other=1` },
+      { headers: [["content-type", "application/json"]] as const },
+      { headers: [...request.headers, ["openai-project", "other"]] as const },
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(grants, { ...request, ...override })
+      ).toThrow(/not allowed/);
+    }
+    for (const id of [
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+      ProviderNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(grants, { ...request, grant_id: id })
+      ).toThrow(/not (allowed|granted)/);
+    }
+  });
+
+  it("admits project discovery and Responses only on the Main OpenAI grant", () => {
+    const { OPENAI_PROJECT_GRANT_ID, OPENAI_API_BASE } = ProviderNetworkPolicy;
+    const native = [...grants, ...ProviderNetworkPolicy.mainOnlyGrants()];
+    const request = (method: string, url: string) => ({
+      grant_id: OPENAI_PROJECT_GRANT_ID,
+      method,
+      url,
+      headers: [["authorization", "Bearer project-key"]] as const,
+    });
+    for (const [method, path] of [
+      ["GET", "models"],
+      ["POST", "responses"],
+      ["POST", "responses/input_tokens"],
+    ]) {
+      const metadata = request(method!, `${OPENAI_API_BASE}/${path}`);
+      expect(ProviderNetworkPolicy.authorize(native, metadata).method).toBe(
+        method
+      );
+      expect(() => ProviderNetworkPolicy.authorize(grants, metadata)).toThrow(
+        /unknown/
+      );
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, { ...metadata, headers: [] })
+      ).toThrow(/not allowed/);
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, {
+          ...metadata,
+          headers: [...metadata.headers, ["openai-project", "other-project"]],
+        })
+      ).toThrow(/not allowed/);
+    }
+    for (const [method, url] of [
+      ["POST", `${OPENAI_API_BASE}/models`],
+      ["POST", `${OPENAI_API_BASE}/responses?other=1`],
+      ["POST", `${OPENAI_API_BASE}/chat/completions`],
+      ["GET", "https://api.openai.com.example/v1/models"],
+      ["POST", "https://chatgpt.com/backend-api/codex/responses"],
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, request(method!, url!))
+      ).toThrow(/not (allowed|granted)/);
+    }
+  });
+
   it("authorizes only built-in provider origins and suffixes", () => {
     const exact = ProviderNetworkPolicy.authorize(grants, {
       grant_id: ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,

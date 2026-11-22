@@ -9,6 +9,7 @@ import { LinkDemo } from "./link-demo";
 import { PreviewRefreshDemo } from "./preview-refresh-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import { NativeModelPicker } from "@/scaffolds/desktop/workbench/native-chat-controls";
 import { BrowserSettings } from "@/app/desktop/settings/_components/browser-settings";
 import { ChatResponseCards, workspace_links } from "@/kits/agent-chat";
 import { ResponseCards } from "@/lib/agent-chat/response-cards";
@@ -19,7 +20,10 @@ import {
   BrowserPreview,
 } from "@/lib/desktop/browser-open-context";
 import { PagePreviews } from "@/lib/desktop/page-previews";
-import { DESKTOP_BRIDGE_PROTOCOL } from "@grida/desktop-bridge";
+import {
+  DESKTOP_BRIDGE_PROTOCOL,
+  type NativeChatProfileSelection,
+} from "@grida/desktop-bridge";
 import "@/components/chat-web-link.css";
 
 // These examples exercise Desktop layout and chat IPC with local fixtures.
@@ -1037,6 +1041,140 @@ it("drives model and access loading, failure and retry from the actual composer 
   await expect
     .element(page.getByRole("button", { name: "Access: Full access" }))
     .toBeVisible();
+});
+
+it("selects OpenAI project billing separately and keeps the choice through rejected discovery", async () => {
+  const model = "GPT-6.2 Sol";
+  const subscription = {
+    id: "subscription",
+    connection: "ChatGPT Subscription",
+    model,
+  };
+  const project = {
+    id: "project",
+    connection: "OpenAI API · Project billing",
+    model,
+  };
+  let keyAccepted = true;
+  const select = vi.fn<(selection: NativeChatProfileSelection) => void>();
+
+  function PickerFixture() {
+    const [active, setActive] = useState<string | null>(null);
+    const [available, setAvailable] = useState(true);
+    return (
+      <NativeModelPicker
+        profiles={{
+          active,
+          choices: available ? [subscription, project] : [subscription],
+          saved: active === project.id ? [{ ...project, available }] : [],
+          ...(!available && { openAiIssue: "keyRejected" }),
+        }}
+        busy={false}
+        onSelect={(selection) => {
+          select(selection);
+          setActive(selection.kind === "default" ? null : selection.id);
+        }}
+        onRefresh={() => setAvailable(keyAccepted)}
+      />
+    );
+  }
+
+  await mountDemo(<PickerFixture />);
+  const picker = page.getByRole("combobox", { name: "Model connection" });
+  const projectChoice = page
+    .getByRole("group", { name: project.connection })
+    .getByRole("option", { name: /^GPT-6\.2 Sol/ });
+  const subscriptionChoice = page
+    .getByRole("group", { name: subscription.connection })
+    .getByRole("option", { name: model });
+  await act(async () => picker.click());
+  await expect.element(subscriptionChoice).toBeVisible();
+  await act(async () => projectChoice.click());
+  expect(select).toHaveBeenCalledExactlyOnceWith({
+    kind: "new",
+    id: project.id,
+  });
+  await expect.element(picker).toHaveAttribute("aria-expanded", "false");
+
+  keyAccepted = false;
+  await act(async () => picker.click());
+  await expect
+    .element(page.getByRole("alert"))
+    .toHaveTextContent("OpenAI rejected the project key.");
+  await expect.element(projectChoice).toHaveAttribute("aria-disabled", "true");
+
+  keyAccepted = true;
+  await clickButton("Retry");
+  await expect.element(page.getByRole("alert")).not.toBeInTheDocument();
+  await expect.element(projectChoice).toHaveAttribute("aria-disabled", "false");
+  await act(async () =>
+    page.getByRole("option", { name: "Show all models" }).click()
+  );
+  await expect
+    .element(subscriptionChoice)
+    .toHaveAttribute("aria-disabled", "false");
+  expect(select).toHaveBeenCalledTimes(1);
+});
+
+it("keeps other models selectable and refreshes OpenAI while discovery runs", async () => {
+  const subscription = {
+    id: "subscription",
+    connection: "ChatGPT Subscription",
+    model: "Subscription model",
+  };
+  const project = {
+    id: "project",
+    connection: "OpenAI API · Project billing",
+    model: "Project model",
+  };
+  const select = vi.fn<(selection: NativeChatProfileSelection) => void>();
+  const refreshed = Promise.withResolvers<void>();
+  let discovered = false;
+
+  function PickerFixture() {
+    const [ready, setReady] = useState(false);
+    return (
+      <NativeModelPicker
+        profiles={{
+          active: null,
+          choices: ready ? [subscription, project] : [subscription],
+          saved: [],
+          openAiIssue: ready ? undefined : "loading",
+        }}
+        busy={false}
+        onSelect={select}
+        onRefresh={() => {
+          if (!discovered) return;
+          setReady(true);
+          refreshed.resolve();
+        }}
+      />
+    );
+  }
+
+  await mountDemo(<PickerFixture />);
+  const picker = page.getByRole("combobox", { name: "Model connection" });
+  const loading = page.getByText("Loading OpenAI API models…");
+  const subscriptionChoice = page.getByRole("option", {
+    name: subscription.model,
+  });
+  const projectChoice = page.getByRole("option", { name: project.model });
+  await act(async () => picker.click());
+  await expect.element(loading).toBeVisible();
+  await expect.element(projectChoice).not.toBeInTheDocument();
+  await act(async () => subscriptionChoice.click());
+  expect(select).toHaveBeenCalledExactlyOnceWith({
+    kind: "new",
+    id: subscription.id,
+  });
+
+  await act(async () => picker.click());
+  await expect.element(loading).toBeVisible();
+  discovered = true;
+  await act(async () => refreshed.promise);
+  await expect.element(projectChoice).toBeVisible();
+  await expect.element(subscriptionChoice).toBeVisible();
+  await expect.element(loading).not.toBeInTheDocument();
 });
 
 it("demonstrates disconnecting, failing a reconnect and restoring the same chat", async () => {

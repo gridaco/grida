@@ -276,6 +276,36 @@ describe("native model catalogue refresh", () => {
     expect(html).toContain(">Retry<");
     expect(html).not.toContain("Refresh models");
   });
+
+  it.each([
+    ["unavailable", "Couldn’t load OpenAI API models."],
+    ["keyRejected", "OpenAI rejected the project key. Replace it in Settings."],
+    [
+      "modelsForbidden",
+      "The OpenAI project key needs permission to list models.",
+    ],
+    ["noCompatibleModels", "This OpenAI project has no compatible models."],
+  ] as const)(
+    "shows the OpenAI discovery issue %s alongside other providers and retry",
+    (openAiIssue, message) => {
+      const html = renderToStaticMarkup(
+        <NativeModelPicker
+          profiles={{
+            ...profiles,
+            subscriptionIssue: "unavailable",
+            openAiIssue,
+          }}
+          busy={false}
+          onSelect={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+      expect(html).toContain("Text model");
+      expect(html).toContain("Couldn’t load ChatGPT models.");
+      expect(html).toContain(message);
+      expect(html).toContain(">Retry<");
+    }
+  );
 });
 
 describe("native model shortlist", () => {

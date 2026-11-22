@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — native provider admission and custody.
 import { ChatModels } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
@@ -34,6 +35,86 @@ async function privateHome() {
     path.join(await fs.realpath(os.tmpdir()), "grida-native-byok-")
   );
 }
+
+it.runIf(sharedCustody)(
+  "binds the named project key to the two official Responses POSTs",
+  async () => {
+    const home = await privateHome();
+    const store = new ProviderCredentialStore({ home });
+    const endpoint = "https://api.openai.com/v1";
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(
+      () => async () => new Response(null, { status: 401 })
+    );
+    const authenticationFailed = vi.fn<() => void>();
+    try {
+      await store.set("openai", "legacy-key");
+      await store.set(OPENAI_PROJECT_PROVIDER_ID, "project-key");
+      const launch = await NativeProviderSelection.builtInByok(
+        OPENAI_PROJECT_PROVIDER_ID,
+        "openai/fixture",
+        {
+          credentialHome: home,
+          hasKey: async (id) => (await store.read(id)) !== null,
+          network: async () => ({ prepare }),
+          imageRequest: vi.fn<(init: RequestInit) => Promise<Response>>(),
+          onOpenAiAuthenticationFailure: authenticationFailed,
+        },
+        {
+          modelId: "openai/fixture",
+          wireModel: "wire-fixture",
+          label: "Fixture",
+          imageInput: false,
+          reasoning: true,
+          speeds: [],
+        }
+      );
+      expect(launch).toMatchObject({
+        provider: "responses",
+        endpoint,
+        model: "openai/fixture",
+        wireModel: "wire-fixture",
+      });
+      expect(launch).not.toHaveProperty("imageGeneration");
+      const headers = new Headers({ authorization: "Bearer project-key" });
+      const egress = launch.providerNetwork;
+      const responses = `${endpoint}/responses`;
+      expect(
+        egress.prepare(
+          responses,
+          new Headers({ authorization: "Bearer legacy-key" })
+        )
+      ).toBeNull();
+      expect(
+        egress.prepare(`${endpoint}/chat/completions`, headers)
+      ).toBeNull();
+      expect(
+        egress.prepare(
+          "https://chatgpt.com/backend-api/codex/responses",
+          headers
+        )
+      ).toBeNull();
+      expect(prepare).not.toHaveBeenCalled();
+      for (const url of [responses, `${responses}/input_tokens`]) {
+        const dispatch = egress.prepare(url, headers);
+        expect(
+          (await dispatch!(Buffer.from("{}"), new AbortController().signal))
+            ?.status
+        ).toBe(401);
+        expect(prepare).toHaveBeenLastCalledWith(url, headers);
+      }
+      expect(authenticationFailed).toHaveBeenCalledTimes(2);
+      const stale = egress.prepare(responses, headers);
+      await store.remove(OPENAI_PROJECT_PROVIDER_ID);
+      expect(
+        await stale!(Buffer.from("{}"), new AbortController().signal)
+      ).toBeNull();
+      expect(prepare).toHaveBeenCalledTimes(2);
+      expect(await store.read("openai")).toBe("legacy-key");
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
 
 /** The base64 text that must appear wherever `text` is stored inside a
  * base64 payload, for each of its three possible byte alignments. */

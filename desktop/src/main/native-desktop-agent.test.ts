@@ -21,6 +21,10 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const sidecar = vi.hoisted(() => ({
+  nativeAgentOpenAiOffer:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentOpenAiOffer
+    >(),
   selectNativeChat:
     vi.fn<typeof import("./services-sidecar-supervisor").selectNativeChat>(),
   nativeAgentSubscriptionSettings:
@@ -70,6 +74,7 @@ const OTHER_PNG =
 
 beforeEach(() => {
   vi.resetModules();
+  sidecar.nativeAgentOpenAiOffer.mockResolvedValue({ status: "missing" });
   sidecar.nativeAgentSubscriptionSettings.mockClear();
   sidecar.nativeAgentGatewayConnection.mockClear();
   sidecar.listGatewayModels.mockResolvedValue([]);

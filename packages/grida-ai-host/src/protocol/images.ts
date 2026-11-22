@@ -4,14 +4,14 @@
  * for the `/images/generate` route, no provider SDK imports.
  */
 
-import type { models } from "@grida/ai/catalogue";
+import type { ImageClient } from "@grida/ai";
 import type { MediaItem } from "@grida/daemon";
 
-/** A BYOK image provider (mirrors {@link models.image.ImageProvider}). */
-export type ImageGenProvider = models.image.ImageProvider;
+/** A BYOK provider supported by the installed image operation. */
+export type ImageGenProvider = ImageClient.ByokProvider;
 
 export type ImageGenerateRequest = {
-  /** Canonical catalog id (a curated `listed` image model). */
+  /** Canonical catalogue ID of an image model. */
   model_id: string;
   prompt: string;
   /** Optional explicit provider override; otherwise the resolver picks. */

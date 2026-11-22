@@ -32,8 +32,13 @@ export namespace ProviderNetworkPolicy {
 
   export const BUILTIN_PROVIDER_GRANT_ID = "provider:built-in";
   export const TRIPO_UPLOAD_GRANT_ID = "provider:tripo-upload";
+  export const OPENAI_IMAGE_GRANT_ID = "provider:openai-image";
   export const PROVIDER_ASSET_GRANT_ID = "download:provider-assets";
   export const CHATGPT_SUBSCRIPTION_GRANT_ID = "provider:chatgpt-subscription";
+  export const OPENAI_PROJECT_GRANT_ID = "provider:openai-project";
+  export const OPENAI_API_BASE = "https://api.openai.com/v1";
+  export const OPENAI_MODELS_URL = `${OPENAI_API_BASE}/models`;
+  export const OPENAI_IMAGE_URL = `${OPENAI_API_BASE}/images/generations`;
 
   const GG_DISCOVERY_ORIGIN = "https://gateway.grida.ai";
   const GG_DISCOVERY_PATHS = new Set([
@@ -45,6 +50,11 @@ export namespace ProviderNetworkPolicy {
     "accept",
     "accept-encoding",
     "user-agent",
+  ]);
+  const OPENAI_PROJECT_HEADERS = new Set([
+    "authorization",
+    "accept",
+    "content-type",
   ]);
 
   const MAX_HEADER_COUNT = 128;
@@ -117,6 +127,11 @@ export namespace ProviderNetworkPolicy {
     ];
     return [
       {
+        id: OPENAI_IMAGE_GRANT_ID,
+        lane: "provider",
+        origins: [new URL(OPENAI_API_BASE).origin],
+      },
+      {
         id: TRIPO_UPLOAD_GRANT_ID,
         lane: "provider",
         origins: ["https://tripo-data.s3.us-west-2.amazonaws.com"],
@@ -146,8 +161,7 @@ export namespace ProviderNetworkPolicy {
 
   /**
    * GRIDA-SEC-008 — grants only Electron Main dispatches, never published to
-   * the sidecar: the exact OAuth and inference authorities of the native
-   * ChatGPT-subscription provider. Neither origin joins the download lane.
+   * the sidecar: ChatGPT subscription and the direct OpenAI API.
    */
   export function mainOnlyGrants(): Grant[] {
     return [
@@ -155,6 +169,11 @@ export namespace ProviderNetworkPolicy {
         id: CHATGPT_SUBSCRIPTION_GRANT_ID,
         lane: "provider",
         origins: ["https://auth.openai.com", "https://chatgpt.com"],
+      },
+      {
+        id: OPENAI_PROJECT_GRANT_ID,
+        lane: "provider",
+        origins: [new URL(OPENAI_API_BASE).origin],
       },
     ];
   }
@@ -223,6 +242,27 @@ export namespace ProviderNetworkPolicy {
         [...headers.keys()].some((name) => !GG_DISCOVERY_HEADERS.has(name)))
     )
       throw new Error("GG discovery request is not allowed");
+    if (
+      grant.id === OPENAI_PROJECT_GRANT_ID &&
+      (!/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "") ||
+        [...headers.keys()].some((name) => !OPENAI_PROJECT_HEADERS.has(name)) ||
+        !(
+          (method === "GET" && url.href === OPENAI_MODELS_URL) ||
+          (method === "POST" &&
+            (url.href === `${OPENAI_API_BASE}/responses` ||
+              url.href === `${OPENAI_API_BASE}/responses/input_tokens`))
+        ))
+    )
+      throw new Error("OpenAI project request is not allowed");
+    if (
+      grant.id === OPENAI_IMAGE_GRANT_ID &&
+      (method !== "POST" ||
+        url.href !== OPENAI_IMAGE_URL ||
+        headers.get("content-type") !== "application/json" ||
+        !/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "") ||
+        [...headers.keys()].some((name) => !OPENAI_PROJECT_HEADERS.has(name)))
+    )
+      throw new Error("OpenAI image request is not allowed");
     // GRIDA-SEC-006 / GRIDA-GG: provider — the signed object URL is the sole
     // upload authority. Never forward an API key or replay through redirects.
     if (

@@ -67,6 +67,23 @@ to use standard speed again. [Choose a response speed](./models-and-usage.md#cho
 
 Desktop 0.7.0’s hook reader rejects the `[desktop]` table. Upgrade builds sharing this file before saving the setting, or give a concurrently used older build its own `GRIDA_HOME`. To reopen the same home with 0.7.0, remove the personalization keys and tables introduced since that build, keeping `schema_version` and any `[[hooks]]` entries.
 
+## OpenAI API project key
+
+On macOS or Linux, open **LLM Providers → OpenAI API**. Create an API key in
+the OpenAI project you want to bill, paste it into Settings, and choose
+**Save**. For a restricted key, grant **List models** read access and
+**Responses API** write access.
+[OpenAI project keys](https://platform.openai.com/api-keys) · [OpenAI permissions](https://developers.openai.com/api/docs/guides/rbac)
+
+Choose a model in the **OpenAI API · Project billing** picker group to use
+that project for streamed text chat and agent tool calls. The same key appears
+under **Media Providers → OpenAI API** and can generate images from text for
+models with a direct OpenAI badge in the catalogue. The image tool uses the
+first connected provider that can serve the request in its usual provider
+order. A restricted key needs write
+access to the Images API for generation. Removing the key from either
+Settings tab disconnects it from both. [Choose a model](./models-and-usage.md#choose-a-model)
+
 ## Compatible endpoints and Ollama
 
 In **LLM Providers → Ollama**, choose **Set up Ollama**, check the Base URL,

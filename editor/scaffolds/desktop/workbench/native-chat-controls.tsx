@@ -590,6 +590,18 @@ function effortStop(effort: NativeChatEffort | undefined): EffortStop {
   return !effort || effort === "standard" ? DEFAULT_EFFORT : effort;
 }
 
+const OPENAI_MODEL_LIST_ERRORS = {
+  unavailable: "Couldn’t load OpenAI API models.",
+  keyRejected: "OpenAI rejected the project key. Replace it in Settings.",
+  modelsForbidden: "The OpenAI project key needs permission to list models.",
+  noCompatibleModels: "This OpenAI project has no compatible models.",
+} satisfies Record<
+  Exclude<NonNullable<NativeChatProfileCatalog["openAiIssue"]>, "loading">,
+  string
+>;
+
+const OPENAI_MODEL_REFRESH_INTERVAL_MS = 500;
+
 export function NativeModelPicker({
   profiles,
   busy,
@@ -743,6 +755,28 @@ export function NativeModelPicker({
       : profiles?.subscriptionIssue === "reauthenticationRequired"
         ? "Sign in to ChatGPT again to load its models."
         : undefined);
+  const openAiIssue = profiles?.openAiIssue;
+  const openAiLoading = openAiIssue === "loading" && !refreshError;
+  const openAiModelError =
+    openAiIssue &&
+    openAiIssue !== "loading" &&
+    OPENAI_MODEL_LIST_ERRORS[openAiIssue];
+  const refreshOpenAi =
+    open && showModels && openAiLoading && !busy && !loading && !initialError;
+  const refreshModels = useRef(onRefresh);
+  useEffect(() => {
+    refreshModels.current = onRefresh;
+  }, [onRefresh]);
+  useEffect(() => {
+    if (!refreshOpenAi) return;
+    // The profile reader shares overlapping reads. Poll only while the list
+    // can show the result of Main's pending discovery.
+    const timer = setInterval(
+      () => refreshModels.current(),
+      OPENAI_MODEL_REFRESH_INTERVAL_MS
+    );
+    return () => clearInterval(timer);
+  }, [refreshOpenAi]);
   if (initialError)
     return (
       <ComposerToolbarTooltip label={initialError}>
@@ -1133,14 +1167,23 @@ export function NativeModelPicker({
                 {settingsError}
               </p>
             )}
-            {showModels && modelListError && (
+            {showModels && openAiLoading && (
+              <p
+                role="status"
+                className="px-3 py-2 text-xs text-muted-foreground"
+              >
+                Loading OpenAI API models…
+              </p>
+            )}
+            {showModels && (modelListError || openAiModelError) && (
               <div
                 role="alert"
                 className="flex items-center gap-2 px-3 py-2 text-xs"
               >
-                <span className="min-w-0 flex-1 text-muted-foreground">
-                  {modelListError}
-                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground">
+                  {modelListError && <span>{modelListError}</span>}
+                  {openAiModelError && <span>{openAiModelError}</span>}
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -1165,7 +1208,8 @@ function ConnectionIcon({ connection }: { connection?: string }) {
       ? OpenRouterLogo
       : connection === "Vercel AI Gateway"
         ? VercelLogo
-        : connection === "ChatGPT Subscription"
+        : connection === "ChatGPT Subscription" ||
+            connection === "OpenAI API · Project billing"
           ? OpenAILogo
           : connection === "Ollama"
             ? OllamaLogo

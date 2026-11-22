@@ -23,6 +23,7 @@ import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
 import { registerProvidersRoutes } from "../http/routes/providers";
 import { registerSecretsRoutes } from "../http/routes/secrets";
+import { OPENAI_PROJECT_PROVIDER_ID } from "../protocol/provider-ids";
 import { EndpointProvidersStore } from "./endpoints";
 
 const OLLAMA: EndpointProviderConfig = {
@@ -45,6 +46,7 @@ describe("validateEndpointProviderConfig", () => {
     expect(isValidEndpointProviderId("vercel")).toBe(false);
     expect(isValidEndpointProviderId("gg")).toBe(false);
     expect(isValidEndpointProviderId("chatgpt")).toBe(false);
+    expect(isValidEndpointProviderId(OPENAI_PROJECT_PROVIDER_ID)).toBe(false);
     expect(isValidEndpointProviderId("Ollama")).toBe(false);
     expect(isValidEndpointProviderId("")).toBe(false);
     expect(isValidEndpointProviderId("ollama")).toBe(true);
@@ -538,6 +540,50 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     // The key went with the endpoint: nothing stale in auth.json, and a
     // re-created "ollama" endpoint can't silently reuse the old credential.
     expect(await secrets.has("ollama")).toBe(false);
+  });
+
+  it("keeps the OpenAI project key separate from a stored custom endpoint named openai", async () => {
+    const custom = { ...OLLAMA, id: "openai" };
+    await fs.writeFile(endpoints.filePath, JSON.stringify([custom]), "utf8");
+    const project = { provider_id: OPENAI_PROJECT_PROVIDER_ID };
+    const key = "sk-proj-synthetic";
+    expect(await (await post("/providers/endpoints/list")).json()).toEqual([
+      custom,
+    ]);
+    expect(await (await post("/secrets/has", project)).json()).toEqual({
+      has: false,
+    });
+    expect(
+      (await post("/secrets/set", { ...project, key: `  ${key}  ` })).status
+    ).toBe(200);
+    expect(await secrets._getKey(OPENAI_PROJECT_PROVIDER_ID)).toBe(key);
+    expect(await secrets.has("openai")).toBe(false);
+    expect(await (await post("/secrets/has", project)).json()).toEqual({
+      has: true,
+    });
+    expect((await post("/secrets/get", project)).status).toBe(404);
+
+    const malformed = await post("/secrets/set", {
+      ...project,
+      key: "synthetic invalid key",
+    });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({
+      error: "Invalid OpenAI project API key.",
+    });
+    expect(
+      (
+        await post("/providers/endpoints/delete", {
+          id: OPENAI_PROJECT_PROVIDER_ID,
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (await post("/providers/endpoints/delete", { id: "openai" })).status
+    ).toBe(200);
+    expect(await secrets._getKey(OPENAI_PROJECT_PROVIDER_ID)).toBe(key);
+    expect((await post("/secrets/delete", project)).status).toBe(200);
+    expect(await secrets.has(OPENAI_PROJECT_PROVIDER_ID)).toBe(false);
   });
 
   it("secrets routes accept a configured endpoint id, reject unknown ids", async () => {

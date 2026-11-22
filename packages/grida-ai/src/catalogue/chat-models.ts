@@ -7,7 +7,11 @@ import { catalog } from "./grida/catalog";
 export namespace ChatModels {
   export type Connection =
     | { provider: "chatgpt"; selectors: readonly string[] }
-    | { provider: "openrouter" | "vercel" };
+    | { provider: "openrouter" | "vercel" }
+    | { provider: "openai"; models: ReadonlySet<string> };
+  type ResumeConnection =
+    | Exclude<Connection, { provider: "openai" }>
+    | { provider: "openai" };
   export type Binding = Readonly<{
     modelId: string;
     wireModel: string;
@@ -24,7 +28,10 @@ export namespace ChatModels {
     snapshot: ModelCatalogueSnapshot,
     connection: Connection
   ): Binding[] {
-    return Array.from(candidates(snapshot, connection));
+    const bindings = Array.from(candidates(snapshot, connection));
+    return connection.provider === "openai"
+      ? bindings.filter(({ wireModel }) => connection.models.has(wireModel))
+      : bindings;
   }
 
   export function resolve(
@@ -32,7 +39,12 @@ export namespace ChatModels {
     connection: Connection,
     modelId: string
   ): Binding | undefined {
-    for (const binding of candidates(snapshot, connection, modelId))
+    const binding = candidates(snapshot, connection, modelId).next().value;
+    if (
+      binding &&
+      (connection.provider !== "openai" ||
+        connection.models.has(binding.wireModel))
+    )
       return binding;
   }
 
@@ -45,7 +57,7 @@ export namespace ChatModels {
 
   export function resume(
     snapshot: ModelCatalogueSnapshot,
-    connection: Connection,
+    connection: ResumeConnection,
     modelId: string,
     retained: Retained
   ): Binding | undefined {
@@ -54,7 +66,7 @@ export namespace ChatModels {
       !isChatModelIdentifier(retained.wireModel)
     )
       return;
-    const current = resolve(snapshot, connection, modelId);
+    const current = candidates(snapshot, connection, modelId).next().value;
     if (connection.provider === "chatgpt") {
       const owner =
         snapshot.agents["openai-codex"]?.[retained.wireModel]?.canonicalModelId;
@@ -76,6 +88,8 @@ export namespace ChatModels {
     }
     if (
       !current ||
+      (connection.provider === "openai" &&
+        (retained.imageInput || retained.speed)) ||
       Object.values(snapshot.text).some(
         (row) =>
           row.id !== modelId &&
@@ -92,9 +106,9 @@ export namespace ChatModels {
 
   function* candidates(
     snapshot: ModelCatalogueSnapshot,
-    connection: Connection,
+    connection: ResumeConnection,
     only?: string
-  ): Generator<Binding> {
+  ): Generator<Binding, void> {
     if (connection.provider === "chatgpt") {
       const agentModels = snapshot.agents["openai-codex"];
       if (!agentModels) return;
@@ -155,7 +169,8 @@ export namespace ChatModels {
         !model.tools ||
         !binding?.tools ||
         !isChatModelIdentifier(binding.wireModel) ||
-        binding.streaming === false
+        binding.streaming === false ||
+        (connection.provider === "openai" && binding.streaming !== true)
       )
         continue;
       const limit = binding.outputLimit ?? model.outputLimit;

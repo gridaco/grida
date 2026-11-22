@@ -13,7 +13,9 @@ import * as root from ".";
 import {
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
+  OPENAI_PROJECT_PROVIDER_ID,
   type ByokProviderId,
+  type ImageGenerateRequest,
   type ImageGenerateResult,
   type VideoGenerateResult,
   type ThreeDGenerateRequest,
@@ -66,6 +68,7 @@ describe("@grida/ai-host public API", () => {
         "fal",
         "elevenlabs",
         "tripo",
+        OPENAI_PROJECT_PROVIDER_ID,
       ]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
@@ -73,6 +76,7 @@ describe("@grida/ai-host public API", () => {
         "fal",
         "ElevenLabs",
         "Tripo",
+        "OpenAI API · Project billing",
       ]);
       // The modality matrix drives image/video resolver routing (via
       // byokProvidersFor) — pin it so a bad metadata edit can't silently
@@ -85,11 +89,18 @@ describe("@grida/ai-host public API", () => {
         { id: "fal", modalities: ["image", "video"] },
         { id: "elevenlabs", modalities: [] },
         { id: "tripo", modalities: [] },
+        { id: OPENAI_PROJECT_PROVIDER_ID, modalities: ["text", "image"] },
       ]);
       const byok: ByokProviderId = "vercel";
       expect(byok).toBe("vercel");
       expect(BYOK_PROVIDER_METADATA[0].id).toBe("openrouter");
 
+      expectTypeOf<
+        Extract<
+          ImageGenerateRequest["provider"],
+          typeof OPENAI_PROJECT_PROVIDER_ID
+        >
+      >().toEqualTypeOf<typeof OPENAI_PROJECT_PROVIDER_ID>();
       expectTypeOf<
         ImageGenerateResult["images"][number]["stored_media"]
       >().toEqualTypeOf<MediaItem | undefined>();

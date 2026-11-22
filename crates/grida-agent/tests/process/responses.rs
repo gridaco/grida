@@ -289,6 +289,7 @@ mod subscription_history {
         endpoint: &'static str,
         alternate_route: Option<String>,
         alternate_account: Option<char>,
+        catalog_connection: Option<String>,
         catalog_route: Option<Value>,
         retained_resolutions: Vec<Value>,
         prediction_route: Option<(Value, Option<Value>)>,
@@ -367,6 +368,7 @@ mod subscription_history {
                     .contains(&"provider/routes")
                     .then(|| uuid::Uuid::new_v4().to_string()),
                 alternate_account: None,
+                catalog_connection: None,
                 catalog_route: None,
                 retained_resolutions: Vec::new(),
                 prediction_route: None,
@@ -463,13 +465,16 @@ mod subscription_history {
                             if self
                                 .catalog_route
                                 .as_ref()
-                                .is_some_and(|r| r["model"] == model) =>
+                                .is_some_and(|r| r["model"] == model)
+                                && self.catalog_connection.as_ref().is_none_or(|connection| {
+                                    frame["params"]["connectionId"] == connection.as_str()
+                                }) =>
                         {
                             let mut route = self.catalog_route.clone().unwrap();
                             route["routeId"] = json!(route_id);
                             route
                         }
-                        "fixture-a" | "openai/gpt-6.1-sol" => {
+                        model if model == self.model => {
                             json!({"kind":"launch","routeId":LAUNCH_ROUTE,"model":model})
                         }
                         "fixture-b" => {
@@ -526,6 +531,10 @@ mod subscription_history {
                     .as_ref()
                     .is_some_and(|id| params["routeId"] == id.as_str())
             });
+            let http_protocol = catalog_route
+                .and_then(|route| route["protocol"].as_str())
+                .map(|protocol| protocol.parse::<ProviderProtocol>().unwrap());
+            let protocol = http_protocol.unwrap_or(self.protocol);
             let (model, endpoint) = match params["routeId"].as_str() {
                 None | Some(LAUNCH_ROUTE) => (self.model.as_str(), self.endpoint),
                 Some(ECONOMY_ROUTE) => (ECONOMY_MODEL, ENDPOINT),
@@ -549,7 +558,7 @@ mod subscription_history {
             };
             let reply = match params["action"].as_str().unwrap() {
                 "open" => {
-                    let path = if self.protocol == ProviderProtocol::Responses {
+                    let path = if protocol == ProviderProtocol::Responses {
                         "responses"
                     } else {
                         "chat/completions"
@@ -593,18 +602,21 @@ mod subscription_history {
                 "dispatch" => {
                     let exchange = self.exchanges.get_mut(&id).unwrap();
                     let request: Value = serde_json::from_slice(&exchange.body).unwrap();
-                    let model = if self.protocol == ProviderProtocol::Responses
-                        && catalog_route.is_none()
-                    {
-                        model.strip_prefix("openai/").unwrap()
-                    } else {
-                        model
-                    };
+                    let model =
+                        if protocol == ProviderProtocol::Responses && catalog_route.is_none() {
+                            model.strip_prefix("openai/").unwrap()
+                        } else {
+                            model
+                        };
                     assert_eq!(request["model"], model);
                     assert_eq!(request["stream"], true);
-                    if self.protocol == ProviderProtocol::Responses {
+                    if protocol == ProviderProtocol::Responses {
                         assert_eq!(request["store"], false);
-                        assert!(request.get("max_output_tokens").is_none());
+                        if http_protocol.is_some() {
+                            assert_eq!(request["max_output_tokens"], 4_096);
+                        } else {
+                            assert!(request.get("max_output_tokens").is_none());
+                        }
                     }
                     let mut response = self
                         .replies
@@ -615,7 +627,7 @@ mod subscription_history {
                     }
                     exchange.held = matches!(response, Reply::Hold(_));
                     self.requests.push(request);
-                    exchange.response = Some(fixture_body(response, self.protocol).replace(
+                    exchange.response = Some(fixture_body(response, protocol).replace(
                         "retained-private-reasoning",
                         &format!("private-{}", self.model),
                     ));
@@ -1789,17 +1801,157 @@ mod subscription_history {
 
     #[tokio::test]
     async fn a_rotated_named_key_dispatches_new_inputs_but_cannot_resume_the_old_turn() {
+        assert_rotated_key_is_refused(false).await;
+    }
+
+    #[tokio::test]
+    async fn openai_project_dispatches_the_selected_wire_model_and_keeps_key_continuity() {
+        assert_rotated_key_is_refused(true).await;
+    }
+
+    #[tokio::test]
+    async fn switching_funding_for_the_same_model_preserves_already_queued_project_work() {
+        use super::super::lifecycle::prompt_request;
+        let fixture = Fixture::new(false);
+        let credentials = tempfile::tempdir().unwrap();
+        let home = credentials.path().canonicalize().unwrap();
+        grida_auth::ProviderStore::new(home.clone())
+            .unwrap()
+            .set("desktop-openai-project-credential", "fixture-project-key")
+            .unwrap();
+        let session = "funding-switch";
+        let project = "b".repeat(64);
+        let subscription = "a".repeat(64);
+        let wire_model = "fixture-project-wire";
+        let capabilities = &["provider/routes", "session/selection"];
+        let mut worker = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![
+                Reply::Finished("First project turn"),
+                Reply::Finished("Queued project turn"),
+                Reply::Finished("Subscription turn"),
+            ],
+            capabilities,
+        )
+        .await;
+        worker.alternate_key = Some((home.clone(), "fixture-project-key"));
+        worker.catalog_connection = Some(project.clone());
+        worker.catalog_route = Some(json!({
+            "kind":"http","model":FIRST,"wireModel":wire_model,"imageInput":false,
+            "endpoint":"https://api.openai.com/v1","protocol":"responses","credentialHome":home
+        }));
+        let selection =
+            |connection: &str| json!({"connectionId":connection,"model":FIRST,"effort":"medium"});
+        let created = worker
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,
+                    "requestId":"create","selection":selection(&project)
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let input = |id: &str, revision: u64| {
+            let mut request = prompt_request(session, id, "Use the accepted connection.");
+            request["_meta"] = json!({"co.grida/selectionRevision":revision});
+            request
+        };
+        let submit = worker
+            .client
+            .send("_co.grida/session/submit", input("first", 1))
+            .await;
+        let mut accepted = false;
+        let mut first_read = None;
+        while !accepted || first_read.is_none() {
+            let frame = worker.client.read_frame().await;
+            if frame["method"].is_null() && frame["id"] == submit {
+                assert!(frame["result"]["turnId"].is_string(), "{frame}");
+                accepted = true;
+            } else if frame["method"] == "_co.grida/provider/exchange"
+                && frame["params"]["action"] == "read"
+            {
+                first_read = Some(frame);
+            } else {
+                worker.on_frame(frame).await;
+            }
+        }
+        let queued = worker
+            .request("_co.grida/session/enqueue", input("project", 1))
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let changed = worker
+            .request(
+                "_co.grida/session/selection/update",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"expectedRevision":1,
+                    "operationId":"switch","selection":selection(&subscription)
+                }),
+            )
+            .await;
+        assert_eq!(changed["result"]["revision"], 2, "{changed}");
+        let queued = worker
+            .request("_co.grida/session/enqueue", input("subscription", 2))
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        worker.on_frame(first_read.unwrap()).await;
+        let settled = worker
+            .wait_for_snapshot(session, |view| {
+                view["current"].is_null() && view["queuedInputs"] == 0
+            })
+            .await;
+        assert_eq!(settled["latest"]["status"], "succeeded");
+        assert_eq!(settled["latest"]["modelId"], FIRST);
+        let selectors: Vec<_> = worker
+            .requests
+            .iter()
+            .map(|request| request["model"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            selectors,
+            [
+                wire_model,
+                wire_model,
+                FIRST.strip_prefix("openai/").unwrap()
+            ]
+        );
+        worker.close().await;
+    }
+
+    async fn assert_rotated_key_is_refused(openai_project: bool) {
         use super::super::lifecycle::{prompt_request, task_basis};
         let fixture = Fixture::new(false);
         let credentials = tempfile::tempdir().unwrap();
         let home = credentials.path().canonicalize().unwrap();
         let store = grida_auth::ProviderStore::new(home.clone()).unwrap();
+        let (key_id, model, wire_model) = if openai_project {
+            store.set("openai", "fixture-legacy-openai-key").unwrap();
+            (
+                "desktop-openai-project-credential",
+                "openai/fixture-public-model",
+                "fixture-openai-wire-model",
+            )
+        } else {
+            ("fixture-byok", "fixture-b", "fixture-b")
+        };
+        let configure = |worker: &mut Worker, key| {
+            worker.alternate_key = Some((home.clone(), key));
+            if openai_project {
+                worker.catalog_route = Some(json!({
+                    "kind":"http","model":model,"wireModel":wire_model,"imageInput":false,
+                    "endpoint":"https://api.openai.com/v1","protocol":"responses","credentialHome":home
+                }));
+            }
+        };
         let session = "old-byok";
         let capabilities = &["provider/routes", "session/selection"];
         let selection = |session: &str| {
             json!({
                 "cwd":fixture.primary,"sessionId":session,"requestId":"create",
-                "selection":{"connectionId":"b".repeat(64),"model":"fixture-b","effort":"medium"}
+                "selection":{"connectionId":"b".repeat(64),"model":model,"effort":"medium"}
             })
         };
         let input = |session: &str| {
@@ -1807,7 +1959,7 @@ mod subscription_history {
             input["_meta"] = json!({"co.grida/selectionRevision":1});
             input
         };
-        store.set("fixture-byok", "fixture-old-key").unwrap();
+        store.set(key_id, "fixture-old-key").unwrap();
         let mut worker = Worker::start(
             &fixture,
             "fixture-a",
@@ -1816,7 +1968,7 @@ mod subscription_history {
             capabilities,
         )
         .await;
-        worker.alternate_key = Some((home.clone(), "fixture-old-key"));
+        configure(&mut worker, "fixture-old-key");
         let created = worker
             .request("_co.grida/session/selection/create", selection(session))
             .await;
@@ -1829,9 +1981,32 @@ mod subscription_history {
             .as_str()
             .unwrap_or_else(|| panic!("{accepted}"));
         let paused = worker.pause_dispatched(session, turn).await;
+        assert_eq!(worker.requests[0]["model"], wire_model);
+        assert_eq!(paused["current"]["modelId"], model);
         worker.close().await;
 
-        store.set("fixture-byok", "fixture-new-key").unwrap();
+        let resume = json!({
+            "task":task_basis(&paused,session,"resume"),
+            "expectedEpoch":paused["current"]["epoch"],
+            "expectedJournalPosition":paused["current"]["journalPosition"]
+        });
+        if openai_project {
+            store.remove(key_id).unwrap();
+            let mut worker = Worker::start(&fixture, "fixture-a", None, vec![], capabilities).await;
+            configure(&mut worker, "fixture-old-key");
+            worker.load(&fixture, session).await;
+            let missing = worker
+                .request("_co.grida/session/resume", resume.clone())
+                .await;
+            assert_eq!(
+                missing["error"]["data"], "provider_credential_unavailable",
+                "{missing}"
+            );
+            assert!(worker.requests.is_empty());
+            worker.close().await;
+        }
+
+        store.set(key_id, "fixture-new-key").unwrap();
         let mut worker = Worker::start(
             &fixture,
             "fixture-a",
@@ -1840,18 +2015,9 @@ mod subscription_history {
             capabilities,
         )
         .await;
-        worker.alternate_key = Some((home, "fixture-new-key"));
+        configure(&mut worker, "fixture-new-key");
         worker.load(&fixture, session).await;
-        let refuse = worker
-            .request(
-                "_co.grida/session/resume",
-                json!({
-                    "task":task_basis(&paused,session,"resume"),
-                    "expectedEpoch":paused["current"]["epoch"],
-                    "expectedJournalPosition":paused["current"]["journalPosition"]
-                }),
-            )
-            .await;
+        let refuse = worker.request("_co.grida/session/resume", resume).await;
         assert_eq!(
             refuse["error"]["data"], "session_active_route_changed",
             "{refuse}"
@@ -1867,8 +2033,11 @@ mod subscription_history {
             .request("_co.grida/session/submit", input(fresh))
             .await;
         assert!(accepted["result"]["turnId"].is_string(), "{accepted}");
-        assert_eq!(worker.idle(fresh).await["latest"]["status"], "succeeded");
+        let latest = worker.idle(fresh).await["latest"].clone();
+        assert_eq!(latest["status"], "succeeded");
+        assert_eq!(latest["modelId"], model);
         assert_eq!(worker.requests.len(), 1);
+        assert_eq!(worker.requests[0]["model"], wire_model);
         worker.close().await;
     }
 

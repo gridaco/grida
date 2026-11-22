@@ -81,8 +81,8 @@ export function useVisualModels(): VisualModelCatalogueView | null {
       if (pending) return;
       pending = true;
       try {
-        const next = await read();
-        if (active) setSnapshot(next);
+        const next = await providers.visualModels(bridge);
+        if (active && next) setSnapshot(next);
       } catch {
         // Retain the last successful view while the sidecar is unavailable.
       } finally {
@@ -97,7 +97,7 @@ export function useVisualModels(): VisualModelCatalogueView | null {
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [read]);
+  }, [bridge, read]);
   return read ? snapshot : null;
 }
 

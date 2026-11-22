@@ -62,6 +62,8 @@ function getCliArg(name: string): string | undefined {
 
 const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
+const openAiProjectSupported =
+  appPlatform === "darwin" || appPlatform === "linux";
 const nativeDocumentId = getCliArg(NATIVE_DOCUMENT_ARGUMENT);
 const nativeDocumentChatId = getCliArg(NATIVE_DOCUMENT_CHAT_ARGUMENT);
 const nativeWorkspaceChatOnly =
@@ -550,7 +552,13 @@ const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
   caps: {
-    media: { tripo: true, rigging: true, tripo_gg: true, rigging_gg: true },
+    media: {
+      openai_images: openAiProjectSupported,
+      tripo: true,
+      rigging: true,
+      tripo_gg: true,
+      rigging_gg: true,
+    },
     native: {
       host_apps: true,
       // Native-OS surfaces — always present in a desktop build.
@@ -566,6 +574,7 @@ const bridge: DesktopBridge = {
       // Workspace file-change watcher.
       workspace_watch: true,
       browser: true,
+      openai_api: openAiProjectSupported,
     },
   },
 

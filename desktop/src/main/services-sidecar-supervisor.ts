@@ -29,6 +29,7 @@ import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
 import { ProviderEndpointConsent } from "./provider-endpoint-consent";
 import { MediaTransport } from "@grida/ai-host/media-transport";
+import { NativeOpenAiModels } from "./native-openai-models";
 
 export type ServicesSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -54,6 +55,7 @@ export type NativeChatPaths = Readonly<{
 }>;
 
 export class ServicesSidecarSupervisor {
+  private openAiModels?: NativeOpenAiModels;
   private servicesStarted = false;
   private nativeChat?: NativeChatPaths;
   private ordinaryNativeChat = false;
@@ -228,15 +230,29 @@ export class ServicesSidecarSupervisor {
     return this.endpointConsent;
   }
 
-  nativeByokSettings() {
+  nativeByokSettings(openAiProject = false) {
     return {
       credentialHome: this.provider_home,
       network: () =>
         ProviderNetworkHost.nativeProviderNetwork(
           this.networkAuthority,
-          ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+          openAiProject
+            ? ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID
+            : ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
         ),
+      ...(openAiProject && {
+        onOpenAiAuthenticationFailure: () => this.openAiModels?.invalidate(),
+      }),
     };
+  }
+
+  async nativeOpenAiOffer(
+    waitForDiscovery: boolean
+  ): Promise<NativeOpenAiModels.Offer> {
+    if (!this.nativeChat || this.isShuttingDown) return { status: "missing" };
+    const { credentialHome, network } = this.nativeByokSettings(true);
+    this.openAiModels ??= new NativeOpenAiModels(credentialHome, network);
+    return await this.openAiModels.offer(waitForDiscovery);
   }
 
   // GRIDA-SEC-008 — the selected native chat paths name the sole OAuth home.
@@ -770,8 +786,16 @@ export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
   return sidecar().nativeEndpointNetwork(id, baseUrl);
 }
 
-export function nativeAgentByokSettings() {
-  return sidecar().nativeByokSettings();
+export function nativeAgentByokSettings(openAiProject?: boolean) {
+  return sidecar().nativeByokSettings(openAiProject);
+}
+
+export async function nativeAgentOpenAiOffer(
+  waitForDiscovery = true
+): Promise<NativeOpenAiModels.Offer> {
+  return supervisor
+    ? await supervisor.nativeOpenAiOffer(waitForDiscovery)
+    : { status: "missing" };
 }
 
 export function nativeAgentSubscriptionSettings() {

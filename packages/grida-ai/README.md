@@ -9,8 +9,10 @@ product presets; it is not the live GG offering list. See
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel AI Gateway, fal, or scoped Grida
-Gateway credentials. Music generation uses GG’s current music interface;
-sound effects and speech use their existing ElevenLabs BYOK operations. Three
+Gateway credentials. The runtime V2 image catalogue also supports direct
+OpenAI project billing for its compatible text-to-image bindings. Music
+generation uses GG’s current music interface. Sound effects and speech use
+their existing ElevenLabs BYOK operations. Three
 existing fal 3D endpoints and direct Tripo H3.1/P1/P2 model generation return a
 primary GLB asset.
 
@@ -42,7 +44,7 @@ or executor scaffolding to anticipate future operations.
 
 ## Discovery and JSON inputs
 
-`MediaOperations` describes installed BYOK adapters and the typed GG Tripo
+`MediaOperations` describes the schema-1 BYOK adapter set and the typed GG Tripo
 file/rigging adapters without
 constructing a client, reading credentials, refreshing a catalogue, or making
 network requests. Its descriptors and schemas are deeply immutable and JSON

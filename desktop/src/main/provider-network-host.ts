@@ -131,25 +131,24 @@ export class ProviderNetworkHost {
     grantId: string
   ): Promise<NativeProviderNetwork> {
     const networkSession = await ProviderNetworkHost.networkSession();
+    const getModels =
+      (url: string) => (headers: Headers, signal: AbortSignal) => {
+        const approved = ProviderNetworkPolicy.authorize(
+          authority.nativeGrants(),
+          { grant_id: grantId, method: "GET", url, headers: [...headers] }
+        );
+        return requestThroughSession(networkSession, approved.url.href, {
+          method: approved.method,
+          headers: approved.headers,
+          signal,
+        });
+      };
     return {
       ...(grantId === ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID && {
-        getSubscriptionModels: (headers: Headers, signal: AbortSignal) => {
-          const approved = ProviderNetworkPolicy.authorize(
-            authority.nativeGrants(),
-            {
-              grant_id: grantId,
-              method: "GET",
-              url: CHATGPT_MODELS_URL,
-              headers: [...headers],
-            }
-          );
-          return requestThroughSession(networkSession, approved.url.href, {
-            method: "GET",
-            headers: approved.headers,
-            signal,
-            redirect: "manual",
-          });
-        },
+        getSubscriptionModels: getModels(CHATGPT_MODELS_URL),
+      }),
+      ...(grantId === ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID && {
+        getOpenAiModels: getModels(ProviderNetworkPolicy.OPENAI_MODELS_URL),
       }),
       isCurrent: () =>
         authority.nativeGrants().some((grant) => grant.id === grantId),
@@ -753,6 +752,7 @@ export class ProviderNetworkHost {
       await response.body?.cancel().catch(() => undefined);
       if (
         current.grant.id === ProviderNetworkPolicy.TRIPO_UPLOAD_GRANT_ID ||
+        current.grant.id === ProviderNetworkPolicy.OPENAI_IMAGE_GRANT_ID ||
         redirects >= MAX_REDIRECTS
       )
         throw deniedError();

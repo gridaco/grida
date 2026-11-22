@@ -2,6 +2,8 @@
 import { AuthStore } from "@grida/daemon/server";
 import { bundledModelCatalogue, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -16,8 +18,14 @@ import { DesktopAccountSession } from "./account-session";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import { NativeChatProfiles } from "./native-chat-profiles";
+import { NativeOpenAiModels } from "./native-openai-models";
+import { NativeProviderSelection } from "./native-provider-selection";
 
 const sidecar = vi.hoisted(() => ({
+  nativeAgentOpenAiOffer:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentOpenAiOffer
+    >(),
   selectNativeChat:
     vi.fn<typeof import("./services-sidecar-supervisor").selectNativeChat>(),
   nativeAgentSubscriptionSettings:
@@ -55,7 +63,185 @@ const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
+  sidecar.nativeAgentOpenAiOffer.mockResolvedValue({ status: "missing" });
 });
+
+it("offers project billing separately from subscription and never selects it as Gateway fallback", async () => {
+  const f = await subscriptionDesktop();
+  try {
+    sidecar.nativeAgentOpenAiOffer.mockResolvedValue({
+      status: "ready",
+      models: new Set(["gpt-6.2-sol"]),
+      isCurrent: async () => true,
+    });
+    sidecar.nativeBuiltInByok.mockImplementation(
+      async (provider, model, binding) => {
+        if (provider !== OPENAI_PROJECT_PROVIDER_ID || !binding)
+          throw new Error("fixture key absent");
+        return {
+          provider: "responses",
+          endpoint: "https://api.openai.com/v1",
+          model,
+          wireModel: binding.wireModel,
+          providerNetwork: { prepare: () => null },
+          credentialHome: f.base,
+        };
+      }
+    );
+    const welcome = await f.agent.welcomeProfiles();
+    const sol = welcome.choices.filter(({ model }) => model === "GPT-6.2 Sol");
+    expect(sol.map(({ connection }) => connection)).toEqual([
+      "ChatGPT Subscription",
+      "OpenAI API · Project billing",
+    ]);
+    expect(new Set(sol.map(({ id }) => id)).size).toBe(2);
+    expect(welcome.recommendedProfileId).toBe(sol[0]!.id);
+    expect((await f.agent.profiles(f.workspace.id)).choices).toEqual(
+      welcome.choices
+    );
+    expect(await f.agent.fallbackProfile()).toBeNull();
+
+    sidecar.nativeAgentOpenAiOffer.mockResolvedValue({ status: "keyRejected" });
+    expect(await f.agent.welcomeProfiles()).toMatchObject({
+      choices: welcome.choices.filter(({ id }) => id !== sol[1]!.id),
+      openAiIssue: "keyRejected",
+    });
+    sidecar.nativeAgentOpenAiOffer.mockResolvedValue({
+      status: "ready",
+      models: new Set(),
+      isCurrent: async () => true,
+    });
+    expect(await f.agent.profiles(f.workspace.id)).toMatchObject({
+      choices: welcome.choices.filter(({ id }) => id !== sol[1]!.id),
+      openAiIssue: "noCompatibleModels",
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "discovers a project model, streams through the staged worker and preserves its selection on removal",
+  async () => {
+    const f = await subscriptionDesktop();
+    const home = path.join(f.base, "providers");
+    const store = new ProviderCredentialStore({ home });
+    const discovery = Promise.withResolvers<Response>();
+    const getOpenAiModels = vi.fn<
+      NonNullable<NativeProviderNetwork["getOpenAiModels"]>
+    >(() => discovery.promise);
+    const dispatch = vi.fn<(body: Buffer) => Promise<Response>>(async () =>
+      subscriptionResponse("Project reply", "project-reply")
+    );
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    const network = async () => ({ getOpenAiModels, prepare });
+    const inventory = new NativeOpenAiModels(home, network);
+    try {
+      await store.set(OPENAI_PROJECT_PROVIDER_ID, "project-fixture-key");
+      sidecar.nativeAgentOpenAiOffer.mockImplementation((waitForDiscovery) =>
+        inventory.offer(waitForDiscovery)
+      );
+      sidecar.nativeBuiltInByok.mockImplementation((provider, model, binding) =>
+        NativeProviderSelection.builtInByok(
+          provider,
+          model,
+          {
+            credentialHome: home,
+            hasKey: async (id) => (await store.read(id)) !== null,
+            network,
+          },
+          binding
+        )
+      );
+      const pending = await f.agent.welcomeProfiles();
+      expect(pending.openAiIssue).toBe("loading");
+      const subscription = pending.choices.find(
+        ({ connection }) => connection === "ChatGPT Subscription"
+      )!;
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: subscription.id },
+        () => {}
+      );
+      expect(f.agent.current(f.workspace.id, subscription.id)).not.toBeNull();
+      expect(sidecar.nativeAgentOpenAiOffer).not.toHaveBeenCalledWith(true);
+      discovery.resolve(
+        Response.json({ object: "list", data: [{ id: "gpt-6.2-sol" }] })
+      );
+      const choice = await vi.waitFor(async () => {
+        const found = (await f.agent.welcomeProfiles()).choices.find(
+          ({ connection }) => connection === "OpenAI API · Project billing"
+        );
+        if (!found) throw new Error("OpenAI project models are still loading");
+        return found;
+      });
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: choice.id },
+        () => {}
+      );
+      const chat = f.agent.current(f.workspace.id, choice.id)!.chat;
+      const session = await chat.createSelected!({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: {
+          connectionId: choice.id,
+          model: "openai/gpt-6.2-sol",
+          effort: "medium",
+        },
+      });
+      await chat.submit(
+        session,
+        "project-first",
+        "Reply from the project",
+        "act",
+        undefined,
+        "medium",
+        1
+      );
+      await vi.waitFor(
+        async () => {
+          expect(
+            await chat.inputReceipt(session, "project-first")
+          ).toMatchObject({ disposition: "completed" });
+        },
+        { timeout: 5_000 }
+      );
+      expect(getOpenAiModels).toHaveBeenCalledTimes(1);
+      expect(getOpenAiModels.mock.lastCall![0].get("authorization")).toBe(
+        "Bearer project-fixture-key"
+      );
+      expect(prepare.mock.lastCall![0]).toBe(
+        "https://api.openai.com/v1/responses"
+      );
+      expect(prepare.mock.lastCall![1].get("authorization")).toBe(
+        "Bearer project-fixture-key"
+      );
+      expect(JSON.parse(dispatch.mock.lastCall![0].toString())).toMatchObject({
+        model: "gpt-6.2-sol",
+      });
+      expect(f.dispatch).not.toHaveBeenCalled();
+
+      await store.remove(OPENAI_PROJECT_PROVIDER_ID);
+      const profiles = await f.agent.profiles(f.workspace.id);
+      expect(profiles.saved).toContainEqual(
+        expect.objectContaining({ id: choice.id, available: false })
+      );
+      expect(
+        profiles.choices.find(({ id }) => id === choice.id)
+      ).toBeUndefined();
+      expect(
+        profiles.choices.some(
+          ({ connection }) => connection === "ChatGPT Subscription"
+        )
+      ).toBe(true);
+    } finally {
+      discovery.resolve(new Response(null, { status: 503 }));
+      await f.close();
+    }
+  },
+  30_000
+);
 
 it("discovers features only on the selected live subscription receipt without starting a worker", async () => {
   const f = await subscriptionDesktop();

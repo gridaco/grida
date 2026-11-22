@@ -18,6 +18,7 @@ import { useSyncExternalStore } from "react";
 import {
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
+  OPENAI_PROJECT_PROVIDER_ID,
   OLLAMA_ENDPOINT_PRESET,
   mergeProbedModels,
   resolveEndpointModel,
@@ -30,6 +31,7 @@ import {
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type GGModelsView,
+  type VisualModelCatalogueView,
   type ProbedEndpointModel,
   type ImageGenerateRequest,
   type ImageGenerateResult,
@@ -376,6 +378,30 @@ export namespace providers {
   export async function ggModels(): Promise<GGModelsView | null> {
     const bridge = getDesktopBridge()?.providers;
     return bridge?.gg_models ? bridge.gg_models() : null;
+  }
+
+  export function supportsOpenAiImages(bridge = getDesktopBridge()): boolean {
+    return bridge?.caps?.media?.openai_images === true;
+  }
+
+  export async function visualModels(
+    bridge = getDesktopBridge()
+  ): Promise<VisualModelCatalogueView | null> {
+    const native = bridge?.providers;
+    if (!native?.visual_models) return null;
+    const catalogue = await native.visual_models();
+    if (supportsOpenAiImages(bridge)) return catalogue;
+    return {
+      ...catalogue,
+      image: catalogue.image.flatMap((card) => {
+        const { [OPENAI_PROJECT_PROVIDER_ID]: openAi, ...otherProviders } =
+          card.providers;
+        if (!openAi) return [card];
+        return Object.keys(otherProviders).length
+          ? [{ ...card, providers: otherProviders }]
+          : [];
+      }),
+    };
   }
 
   export function isSupported(): boolean {

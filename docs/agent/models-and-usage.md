@@ -17,7 +17,7 @@ Desktop can run chat on:
 
 - your connected **ChatGPT subscription**;
 - **Grida Gateway**, under your Grida account;
-- a saved **OpenRouter** or **Vercel AI Gateway** key;
+- a saved **OpenAI API**, **OpenRouter**, or **Vercel AI Gateway** key;
 - an approved compatible endpoint, which can use a key saved under its own ID.
 
 For a new chat with no saved or explicit model choice, Desktop prefers a ready
@@ -82,15 +82,19 @@ preference for ordinary project chats.
 The list groups models by the connection that runs them. A model offered by
 two connections appears in both groups. Choose the account or key you want
 to use. ChatGPT Subscription lists compatible models offered by your signed-in
-account. OpenRouter and Vercel AI Gateway list compatible models for that
-provider once you add its key. Grida Gateway and your configured endpoints
-supply their own model lists.
+account. **OpenAI API · Project billing** lists compatible models available to
+your OpenAI project key and supports streamed text and agent tool calls.
+OpenRouter and Vercel AI Gateway list compatible models for that provider once
+you add its key. Grida Gateway and your configured endpoints supply their own
+model lists. [Set up an OpenAI project key](./desktop-settings.md#openai-api-project-key)
 
 Desktop checks for new model data in the background. You can open the picker
 using the last verified catalog, or the copy included with Desktop on first
 launch. A compatible model can therefore appear without a Desktop update.
 ChatGPT still needs a recent model list from your signed-in account. If that
 check fails, new subscription choices are unavailable until it succeeds.
+OpenAI project models appear when their availability check finishes. You can
+choose another connection while the check runs.
 Your provider checks access, available credits and quota when you send.
 
 Chats belong to the workspace: every model connection shares its chat list.
@@ -173,6 +177,10 @@ If your subscription needs a new sign-in, reconnect it in Settings.
   subscription again. A new sign-in does not transfer accepted work to the
   new connection. Resolve any retained work before choosing it for a future
   message in the same chat.
+- If the OpenAI model list is temporarily unavailable, choose **Retry** in the
+  picker. If the key was rejected or cannot list models, check its permissions
+  and key in **Settings → LLM Providers → OpenAI API**, then refresh the picker.
+  Accepted messages still require the project key and model that accepted them.
 - If chat asks for an API key, add a key for that provider in Desktop
   settings, then open the model list and pick
   the model again or choose another one.

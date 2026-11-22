@@ -1152,6 +1152,7 @@ function WelcomeSurface({
                       profiles: {
                         active: profileId,
                         subscriptionIssue: profiles?.subscriptionIssue,
+                        openAiIssue: profiles?.openAiIssue,
                         choices: profiles?.choices ?? [],
                         saved: profiles?.saved ?? [],
                       },

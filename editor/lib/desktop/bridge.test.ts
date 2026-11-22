@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DesktopBridge } from "@grida/desktop-bridge";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
 import {
   BYOK_PROVIDER_METADATA,
   DESKTOP_BRIDGE_PROTOCOL,
@@ -170,6 +171,50 @@ describe("desktop bridge client contract", () => {
     ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
     expect(save).not.toHaveBeenCalled();
   });
+
+  it("shows direct OpenAI image bindings only when the host exposes image generation for the project key", async () => {
+    const direct = { text: true as const };
+    const mixed = {
+      id: "mixed-image",
+      label: "Mixed image",
+      providers: { fal: direct, [OPENAI_PROJECT_PROVIDER_ID]: direct },
+    };
+    const openAiOnly = {
+      id: "openai-image",
+      label: "OpenAI image",
+      providers: { [OPENAI_PROJECT_PROVIDER_ID]: direct },
+    };
+    const catalogue = {
+      version: "current",
+      image: [mixed, openAiOnly],
+      video: [{ id: "video", label: "Video", providers: { fal: direct } }],
+    };
+    const read = async () => catalogue;
+    for (const openai_images of [false, undefined]) {
+      installBridge({
+        grida: {
+          protocol: DESKTOP_BRIDGE_PROTOCOL,
+          caps: { native: { openai_api: true }, media: { openai_images } },
+          providers: { visual_models: read },
+        },
+      });
+      expect(providers.supportsOpenAiImages()).toBe(false);
+      await expect(providers.visualModels()).resolves.toEqual({
+        ...catalogue,
+        image: [{ ...mixed, providers: { fal: direct } }],
+      });
+    }
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        caps: { media: { openai_images: true } },
+        providers: { visual_models: read },
+      },
+    });
+    expect(providers.supportsOpenAiImages()).toBe(true);
+    await expect(providers.visualModels()).resolves.toBe(catalogue);
+  });
+
   it("rejects a missing or unsupported bridge protocol", () => {
     installBridge({});
     expect(getDesktopBridge()).toBeNull();
@@ -279,6 +324,7 @@ describe("desktop bridge client contract", () => {
       "fal",
       "elevenlabs",
       "tripo",
+      OPENAI_PROJECT_PROVIDER_ID,
     ]);
   });
 

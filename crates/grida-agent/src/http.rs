@@ -1,6 +1,8 @@
 //! GRIDA-SEC-014 — host-owned dispatch for explicitly selected provider endpoints.
 
-use crate::custody::{CapturedCredential, CredentialFormat, CredentialSource};
+use crate::custody::{
+    CapturedCredential, CredentialFormat, CredentialSource, DESKTOP_OPENAI_PROJECT,
+};
 use crate::supervised_provider::SupervisedProvider;
 
 use agent_kit_core::authority::AuthorityBinding;
@@ -133,10 +135,7 @@ impl HttpTransport {
             return Err(invalid("llama_cpp_input_count_requires_numeric_loopback"));
         }
         let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
-        let configured_key = supervised
-            .as_ref()
-            .and_then(SupervisedProvider::configured_endpoint_key);
-        let source = credential_source(options, &base, configured_key)?;
+        let source = credential_source(options, &base, supervised.as_ref())?;
         let source_identity = match &source {
             Some(CredentialSource::Environment { name }) => {
                 serde_json::json!(["environment", name])
@@ -248,7 +247,14 @@ impl HttpTransport {
         if self.protocol != ProviderProtocol::Responses {
             return None;
         }
-        responses_context_window(&self.target, model)
+        let wire_model = match &self.dispatch {
+            Dispatch::Supervised(supervisor) => supervisor
+                .model_binding
+                .as_ref()
+                .map_or(model, |binding| &binding.selector),
+            Dispatch::Direct(_) => model,
+        };
+        responses_context_window(&self.target, wire_model)
     }
 
     /// OpenRouter reads `reasoning.effort`; other compatible endpoints read
@@ -600,8 +606,27 @@ fn direct_client(base: &Url) -> Result<Client> {
 fn credential_source(
     options: &ProviderOptions,
     base: &Url,
-    configured_key: Option<&str>,
+    supervised: Option<&SupervisedProvider>,
 ) -> Result<Option<CredentialSource>> {
+    let configured_key = supervised.and_then(SupervisedProvider::configured_endpoint_key);
+    let selected_key = match supervised.and_then(|host| host.model_binding.as_ref()) {
+        Some(binding) if configured_key.is_none() && options.credential_home.is_some() => {
+            Some(match (options.protocol, options.endpoint.as_str()) {
+                (ProviderProtocol::OpenAiCompatible, "https://openrouter.ai/api/v1") => {
+                    "openrouter"
+                }
+                (ProviderProtocol::OpenAiCompatible, "https://ai-gateway.vercel.sh/v1") => "vercel",
+                (ProviderProtocol::Responses, "https://api.openai.com/v1")
+                    if !binding.image_input =>
+                {
+                    DESKTOP_OPENAI_PROJECT
+                }
+                _ => return Err(invalid("supervised_model_binding_unavailable")),
+            })
+        }
+        Some(_) => return Err(invalid("supervised_model_binding_unavailable")),
+        None => None,
+    };
     if configured_key.is_some()
         && (options.protocol != ProviderProtocol::OpenAiCompatible
             || options.credential_home.is_none()
@@ -613,7 +638,8 @@ fn credential_source(
         (Some(_), Some(_)) => Err(invalid("provider_credential_source_conflict")),
         (Some(name), None) => Ok(Some(CredentialSource::Environment { name: name.clone() })),
         (None, Some(home)) => {
-            let provider = configured_key
+            let provider = selected_key
+                .or(configured_key)
                 .or_else(|| stored_provider(options.protocol, base))
                 .ok_or_else(|| invalid("stored_credential_endpoint_mismatch"))?;
             if !home.is_absolute() {
@@ -977,5 +1003,56 @@ mod tests {
                 None
             );
         }
+    }
+
+    #[test]
+    fn desktop_openai_credential_requires_the_exact_supervised_responses_route() {
+        let home = tempfile::tempdir().unwrap();
+        let mut options = options(ProviderProtocol::Responses);
+        options.endpoint = "https://api.openai.com/v1".into();
+        options.credential_home = Some(home.path().into());
+        let selector = ModelId::new("openai-wire-model").unwrap();
+        let named = SupervisedProvider::default()
+            .with_model_binding(Some(selector.clone()), false)
+            .unwrap();
+        let configured = SupervisedProvider::for_configured_endpoint("custom")
+            .unwrap()
+            .with_model_binding(Some(selector.clone()), false)
+            .unwrap();
+        let image = SupervisedProvider::default()
+            .with_model_binding(Some(selector), true)
+            .unwrap();
+        let base = provider_base(&options.endpoint).unwrap();
+        for (supervisor, expected) in [(Some(&named), DESKTOP_OPENAI_PROJECT), (None, "openai")] {
+            assert!(matches!(
+                credential_source(&options, &base, supervisor).unwrap(),
+                Some(CredentialSource::Stored { provider, .. }) if provider == expected
+            ));
+        }
+        for supervisor in [&configured, &image] {
+            assert!(matches!(
+                credential_source(&options, &base, Some(supervisor)),
+                Err(error) if error.code == "supervised_model_binding_unavailable"
+            ));
+        }
+        for address in [
+            "https://api.openai.com/v1/",
+            "https://api.openai.com/v1/other",
+            "https://api.openai.com:444/v1",
+            "https://other.example/v1",
+        ] {
+            options.endpoint = address.into();
+            let base = provider_base(&options.endpoint).unwrap();
+            assert!(matches!(
+                credential_source(&options, &base, Some(&named)),
+                Err(error) if error.code == "supervised_model_binding_unavailable"
+            ));
+        }
+        options.endpoint = "https://api.openai.com/v1".into();
+        options.protocol = ProviderProtocol::OpenAiCompatible;
+        assert!(matches!(
+            credential_source(&options, &base, Some(&named)),
+            Err(error) if error.code == "supervised_model_binding_unavailable"
+        ));
     }
 }

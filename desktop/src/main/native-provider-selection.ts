@@ -6,6 +6,7 @@ import {
 } from "@grida/ai-host";
 import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -14,6 +15,7 @@ import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeImageGeneration } from "./native-image-generation";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 
 export namespace NativeProviderSelection {
   type Settings = Readonly<{
@@ -50,11 +52,13 @@ export namespace NativeProviderSelection {
     network: () => Promise<NativeProviderNetwork>;
     imageRequest?: (init: RequestInit) => Promise<Response>;
     modelCatalogue?: ModelCatalogueSnapshot;
+    onOpenAiAuthenticationFailure?: () => void;
   }>;
 
   const builtInEndpoints = {
     openrouter: "https://openrouter.ai/api/v1",
     vercel: "https://ai-gateway.vercel.sh/v1",
+    [OPENAI_PROJECT_PROVIDER_ID]: ProviderNetworkPolicy.OPENAI_API_BASE,
   } as const;
   // The native CLI also owns these vendor keys in the shared store.
   const nativeVendorKeys = new Set(["openai", "anthropic", "google"]);
@@ -89,32 +93,40 @@ export namespace NativeProviderSelection {
   ): Promise<Launch & Readonly<{ credentialHome: string }>> {
     if (!isBuiltInByok(providerId))
       throw new Error("native_provider_byok_unavailable");
+    const isOpenAiProject = providerId === OPENAI_PROJECT_PROVIDER_ID;
     const binding =
       selected ??
-      ChatModels.resolve(
-        bundledModelCatalogue(),
-        { provider: providerId },
-        model
-      );
-    if (!binding || binding.modelId !== model)
+      (providerId !== OPENAI_PROJECT_PROVIDER_ID
+        ? ChatModels.resolve(
+            bundledModelCatalogue(),
+            { provider: providerId },
+            model
+          )
+        : undefined);
+    if (
+      !binding ||
+      binding.modelId !== model ||
+      (isOpenAiProject && binding.imageInput)
+    )
       throw new Error("native_provider_model_unavailable");
     const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
       throw new Error("native_provider_byok_key_missing");
     const custody = await capturedCredential(home, providerId, true);
     const endpoint = builtInEndpoints[providerId];
-    const target = `${endpoint}/chat/completions`;
+    const target = `${endpoint}/${isOpenAiProject ? "responses" : "chat/completions"}`;
     const network = await settings.network();
-    const imageGeneration = settings.imageRequest
-      ? NativeImageGeneration.forByok(
-          providerId,
-          endpoint,
-          settings.imageRequest,
-          settings.modelCatalogue
-        )
-      : undefined;
+    const imageGeneration =
+      settings.imageRequest && providerId !== OPENAI_PROJECT_PROVIDER_ID
+        ? NativeImageGeneration.forByok(
+            providerId,
+            endpoint,
+            settings.imageRequest,
+            settings.modelCatalogue
+          )
+        : undefined;
     return {
-      provider: "openai-compatible",
+      provider: isOpenAiProject ? "responses" : "openai-compatible",
       endpoint,
       model,
       wireModel: binding.wireModel,
@@ -126,11 +138,22 @@ export namespace NativeProviderSelection {
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         isCurrent: () => custody.isCurrent(network),
-        prepare: (url, headers) =>
-          url === target &&
-          /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
-            ? custody.prepare(network, url, headers)
-            : null,
+        prepare: (url, headers) => {
+          if (
+            (url !== target &&
+              (!isOpenAiProject || url !== `${target}/input_tokens`)) ||
+            !/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
+          )
+            return null;
+          const dispatch = custody.prepare(network, url, headers);
+          if (!dispatch || !isOpenAiProject) return dispatch;
+          return async (body, signal) => {
+            const response = await dispatch(body, signal);
+            if (response?.status === 401)
+              settings.onOpenAiAuthenticationFailure?.();
+            return response;
+          };
+        },
       },
     };
   }

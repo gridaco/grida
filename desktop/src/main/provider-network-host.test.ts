@@ -81,6 +81,38 @@ describe("ProviderNetworkHost", () => {
     expect(ordinary.getSubscriptionModels).toBeUndefined();
   });
 
+  it("issues the project model GET only from the dedicated Main grant", async () => {
+    const authority = new ProviderNetworkAuthority("https://gg.example.test");
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy: vi.fn<() => Promise<void>>(async () => {}),
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
+    mockEmptyProviderResponse();
+    const project = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID
+    );
+    const headers = new Headers({
+      authorization: "Bearer project-fixture",
+      accept: "application/json",
+    });
+    await project.getOpenAiModels!(headers, new AbortController().signal);
+    expect(net.request).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        url: ProviderNetworkPolicy.OPENAI_MODELS_URL,
+        method: "GET",
+        redirect: "manual",
+        credentials: "omit",
+      })
+    );
+    const builtIn = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
+    expect(builtIn.getOpenAiModels).toBeUndefined();
+    expect(project.getSubscriptionModels).toBeUndefined();
+  });
+
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {
     const pending = Promise.withResolvers<void>();
     const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
@@ -1347,4 +1379,46 @@ it("refuses even same-origin signed Tripo upload redirects without replaying byt
   expect((await harness.untilFrame("response.error")).code).toBe("denied");
   expect(fetch).toHaveBeenCalledTimes(1);
   harness.host.close();
+});
+
+it("never replays a paid OpenAI image POST after a same-route redirect", async () => {
+  const { OPENAI_IMAGE_URL, OPENAI_IMAGE_GRANT_ID } = ProviderNetworkPolicy;
+  const fetch = vi.fn<() => Promise<Response>>(async () =>
+    Response.redirect(OPENAI_IMAGE_URL, 307)
+  );
+  const harness = createHarness({ fetch });
+  try {
+    await harness.start();
+    const requestId = "req_openai_image";
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId,
+      grantId: OPENAI_IMAGE_GRANT_ID,
+      method: "POST",
+      url: OPENAI_IMAGE_URL,
+      headers: [
+        ["content-type", "application/json"],
+        ["authorization", "Bearer project-fixture"],
+      ],
+      hasBody: true,
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.chunk",
+      requestId,
+      sequence: 0,
+      data: Buffer.from("{}").toString("base64"),
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.end",
+      requestId,
+      sequence: 1,
+    });
+    expect((await harness.untilFrame("response.error")).code).toBe("denied");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    harness.host.close();
+  }
 });

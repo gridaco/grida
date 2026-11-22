@@ -4225,22 +4225,6 @@ impl Execution {
         let model_binding = supervised
             .as_ref()
             .and_then(|supervisor| supervisor.model_binding.clone());
-        if model_binding.is_some()
-            && !(options.protocol == ProviderProtocol::OpenAiCompatible
-                && options.credential_home.is_some()
-                && supervised
-                    .as_ref()
-                    .is_some_and(|host| host.configured_endpoint_key().is_none())
-                && matches!(
-                    options.endpoint.as_str(),
-                    "https://openrouter.ai/api/v1" | "https://ai-gateway.vercel.sh/v1"
-                ))
-        {
-            return Err(problem(
-                ErrorKind::InvalidInput,
-                "supervised_model_binding_unavailable",
-            ));
-        }
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
         let dispatch = bind(transport.clone());
         let wire_model = model_binding
@@ -4264,7 +4248,8 @@ impl Execution {
             |binding| binding.image_input && transport.supports_openrouter_png(),
         );
         let gemini_flash = transport.is_reviewed_gemini_flash();
-        let responses_png = transport.accepts_responses_png(&options.model);
+        let responses_png =
+            model_binding.is_none() && transport.accepts_responses_png(&options.model);
         let image_profile = if responses_png {
             Some("responses-image-tools-v1")
         } else if compatible_png {
@@ -4344,7 +4329,7 @@ impl Execution {
                     options.model.clone(),
                     ResponsesProfile {
                         capabilities,
-                        wire_model: options.model.clone(),
+                        wire_model: wire_model.unwrap_or_else(|| options.model.clone()),
                         reasoning_effort: None,
                     },
                 )]),

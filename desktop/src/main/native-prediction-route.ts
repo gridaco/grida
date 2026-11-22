@@ -10,6 +10,7 @@ import {
   ChatModels,
   TIER_MODEL_IDS,
 } from "@grida/ai/catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -95,6 +96,7 @@ export namespace NativePredictionRoute {
     if (
       !provider ||
       !NativeProviderSelection.isBuiltInByok(provider) ||
+      provider === OPENAI_PROJECT_PROVIDER_ID ||
       !source.credentialHome ||
       source.configuredEndpointKey
     )

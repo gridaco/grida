@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { MediaModelAvailability } from "./media-model-availability";
 import { catalog as models } from "@grida/ai/catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
 import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 
@@ -367,6 +368,69 @@ describe("MediaModelAvailability.ImageProviders", () => {
     expect(has).toHaveBeenCalledTimes(6);
     expect(listener).toHaveBeenCalledTimes(2);
     unsubscribe();
+  });
+
+  it("requires both the saved OpenAI project key and the host's text-to-image route", async () => {
+    const card = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const visual = [
+      {
+        id: card.id,
+        label: card.label,
+        providers: { [OPENAI_PROJECT_PROVIDER_ID]: { text: true as const } },
+      },
+    ];
+    let saved = true;
+    const has = vi.fn<(id: string) => Promise<boolean>>(
+      async (id) => id === OPENAI_PROJECT_PROVIDER_ID && saved
+    );
+    const oldHost = bridge(has);
+    await new MediaModelAvailability.ImageProviders(
+      oldHost,
+      async () => false
+    ).refresh(card);
+    expect(has).not.toHaveBeenCalledWith(OPENAI_PROJECT_PROVIDER_ID);
+
+    const chatOnlyHost = {
+      ...oldHost,
+      caps: { native: { ...oldHost.caps?.native, openai_api: true } },
+      providers: {
+        ...oldHost.providers,
+        visual_models: async () => ({
+          version: "test",
+          image: visual,
+          video: [],
+        }),
+      },
+    } as DesktopBridge;
+    const unsupported = await new MediaModelAvailability.ImageProviders(
+      chatOnlyHost,
+      async () => false
+    ).refresh(card, false, [], card.id, visual);
+    expect(has).not.toHaveBeenCalledWith(OPENAI_PROJECT_PROVIDER_ID);
+    expect(MediaModelAvailability.image(card, unsupported).available).toBe(
+      false
+    );
+
+    const host = {
+      ...chatOnlyHost,
+      caps: {
+        ...chatOnlyHost.caps,
+        media: { openai_images: true },
+      },
+    };
+    const store = new MediaModelAvailability.ImageProviders(
+      host,
+      async () => false
+    );
+    const legacy = await store.refresh(card);
+    expect(legacy.configured).toEqual([OPENAI_PROJECT_PROVIDER_ID]);
+    expect(MediaModelAvailability.image(card, legacy).available).toBe(false);
+
+    const ready = await store.refresh(card, false, [], card.id, visual);
+    expect(MediaModelAvailability.image(card, ready).available).toBe(true);
+    saved = false;
+    const removed = await store.refresh(card, false, [], card.id, visual);
+    expect(MediaModelAvailability.image(card, removed).available).toBe(false);
   });
 
   it("keeps old-host hosted submits working without treating a new empty bridge as old", async () => {

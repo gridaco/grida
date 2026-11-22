@@ -17,17 +17,22 @@ import {
   bundledModelCatalogue,
 } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import type { Workspace } from "@grida/daemon";
 import {
   ProtectedRoots,
   type WorkspaceDirectoryIdentity,
 } from "@grida/daemon/server";
-import type { NativeChatProfileSelection } from "@grida/desktop-bridge";
+import type {
+  NativeChatProfileCatalog,
+  NativeChatProfileSelection,
+} from "@grida/desktop-bridge";
 import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 import type { DesktopAccountSession } from "./account-session";
 import { servicesSidecarClient } from "./services-sidecar-client";
 import {
   nativeAgentGatewayConnection,
+  nativeAgentOpenAiOffer,
   nativeAgentSubscriptionSettings,
 } from "./services-sidecar-supervisor";
 import {
@@ -594,10 +599,11 @@ export class NativeDesktopAgent {
           workspace.id,
           workspace.root
         );
-        const [{ choices, subscriptionIssue }, saved] = await Promise.all([
-          this.availableProfiles(workspace.id),
-          NativeChatProfiles.read(directory),
-        ]);
+        const [{ choices, subscriptionIssue, openAiIssue }, saved] =
+          await Promise.all([
+            this.availableProfiles(workspace.id),
+            NativeChatProfiles.read(directory),
+          ]);
         requireCurrent();
         const available = new Set(choices.map(({ id }) => id));
         const defaultWindow = NativeChatProfiles.contextWindow(
@@ -609,6 +615,7 @@ export class NativeDesktopAgent {
             defaultGoalSpending: true as const,
           }),
           ...(subscriptionIssue && { subscriptionIssue }),
+          ...(openAiIssue && { openAiIssue }),
           ...subscriptionRecommendation(choices),
           ...(defaultWindow !== undefined && {
             defaultContextWindow: defaultWindow,
@@ -774,7 +781,7 @@ export class NativeDesktopAgent {
    */
   async welcomeProfiles() {
     this.requireProfiles();
-    const { subscription, builtIn, configured } =
+    const { subscription, builtIn, configured, openAiIssue } =
       await this.workspaceIndependentProfiles();
     const { subscriptionIssue } = subscription;
     const choices = [...subscription.choices, ...builtIn, ...configured];
@@ -787,6 +794,7 @@ export class NativeDesktopAgent {
         defaultGoalSpending: true as const,
       }),
       ...(subscriptionIssue && { subscriptionIssue }),
+      ...(openAiIssue && { openAiIssue }),
       ...subscriptionRecommendation(choices),
       ...(defaultWindow !== undefined && {
         defaultContextWindow: defaultWindow,
@@ -861,13 +869,21 @@ export class NativeDesktopAgent {
             ({ id }) => id === selection.id
           )
         : undefined;
-    const profile =
-      saved ??
-      (selection.kind !== "saved"
-        ? (await this.availableProfiles(workspace.id)).choices.find(
-            ({ id }) => id === selection.id
-          )
-        : undefined);
+    const matchesSelection = ({ id }: NativeChatProfiles.Saved) =>
+      id === selection.id;
+    let profile = saved;
+    if (!profile && selection.kind !== "saved") {
+      const { choices, openAiIssue } = await this.availableProfiles(
+        workspace.id
+      );
+      profile = choices.find(matchesSelection);
+      // A previously shown OpenAI choice can be selected during a refresh.
+      // Resolve it against the current offer after looking for other providers.
+      if (!profile && openAiIssue === "loading") {
+        const { builtIn } = await this.builtInProfiles(this.modelFacts(), true);
+        profile = builtIn.find(matchesSelection);
+      }
+    }
     const saveDirectory = !saved ? directory : undefined;
     if (!profile) throw new Error("native_chat_profile_unavailable");
     if (profile.providerId === CHATGPT_PROVIDER_ID) {
@@ -1077,22 +1093,62 @@ export class NativeDesktopAgent {
 
   private async workspaceIndependentProfiles() {
     const snapshot = this.modelFacts();
-    const [subscription, builtIn, configured] = await Promise.all([
-      this.subscriptionProfiles(snapshot),
-      NativeChatProfiles.builtInChoices(
-        snapshot,
-        servicesSidecarClient.nativeBuiltInByok
-      ),
-      servicesSidecarClient
-        .listProviderEndpoints()
-        .then((endpoints) =>
-          NativeChatProfiles.configuredChoices(
-            endpoints,
-            servicesSidecarClient.nativeConfiguredEndpoint
-          )
-        ),
-    ]);
-    return { subscription, builtIn, configured };
+    const [subscription, { builtIn, openAiIssue }, configured] =
+      await Promise.all([
+        this.subscriptionProfiles(snapshot),
+        this.builtInProfiles(snapshot),
+        servicesSidecarClient
+          .listProviderEndpoints()
+          .then((endpoints) =>
+            NativeChatProfiles.configuredChoices(
+              endpoints,
+              servicesSidecarClient.nativeConfiguredEndpoint
+            )
+          ),
+      ]);
+    return { subscription, builtIn, configured, openAiIssue };
+  }
+
+  private async builtInProfiles(
+    snapshot: ModelCatalogueSnapshot,
+    waitForOpenAi = false
+  ) {
+    const offer = await nativeAgentOpenAiOffer(waitForOpenAi).catch(
+      () => ({ status: "unavailable" }) as const
+    );
+    const models =
+      offer.status === "ready"
+        ? ChatModels.list(snapshot, {
+            provider: "openai",
+            models: offer.models,
+          })
+        : [];
+    const builtIn = await NativeChatProfiles.builtInChoices(
+      snapshot,
+      servicesSidecarClient.nativeBuiltInByok,
+      models
+    );
+    let openAiIssue: NativeChatProfileCatalog["openAiIssue"];
+    if (offer.status === "ready") {
+      if (!(await offer.isCurrent().catch(() => false))) {
+        return {
+          builtIn: builtIn.filter(
+            ({ providerId }) => providerId !== OPENAI_PROJECT_PROVIDER_ID
+          ),
+          openAiIssue: "unavailable" as const,
+        };
+      }
+      if (models.length === 0) openAiIssue = "noCompatibleModels";
+      else if (
+        !builtIn.some(
+          ({ providerId }) => providerId === OPENAI_PROJECT_PROVIDER_ID
+        )
+      )
+        openAiIssue = "unavailable";
+    } else if (offer.status !== "missing") {
+      openAiIssue = offer.status;
+    }
+    return { builtIn, openAiIssue };
   }
 
   private async subscriptionProfiles(
@@ -1133,7 +1189,7 @@ export class NativeDesktopAgent {
     return this.modelCatalogue?.view() ?? bundledModelCatalogue();
   }
 
-  private byokLaunch(
+  private async byokLaunch(
     provider: string,
     model: string,
     retained?: ChatModels.Retained
@@ -1141,6 +1197,28 @@ export class NativeDesktopAgent {
     if (!NativeProviderSelection.isBuiltInByok(provider))
       throw new Error("native_provider_byok_unavailable");
     const snapshot = this.modelFacts();
+    if (provider === OPENAI_PROJECT_PROVIDER_ID) {
+      const offer = retained ? undefined : await nativeAgentOpenAiOffer();
+      const binding = retained
+        ? ChatModels.resume(snapshot, { provider: "openai" }, model, retained)
+        : offer?.status === "ready"
+          ? ChatModels.resolve(
+              snapshot,
+              { provider: "openai", models: offer.models },
+              model
+            )
+          : undefined;
+      if (!binding) throw new Error("native_chat_profile_unavailable");
+      const launch = await servicesSidecarClient.nativeBuiltInByok(
+        provider,
+        model,
+        binding,
+        snapshot
+      );
+      if (offer?.status === "ready" && !(await offer.isCurrent()))
+        throw new Error("native_chat_profile_unavailable");
+      return launch;
+    }
     const binding = retained
       ? ChatModels.resume(snapshot, { provider }, model, retained)
       : ChatModels.resolve(snapshot, { provider }, model);
@@ -1200,23 +1278,25 @@ export class NativeDesktopAgent {
     const gatewayScope =
       this.owners?.gatewayScope(workspaceId) ??
       this.gatewayScopes.get(workspaceId);
-    const [{ subscription, builtIn, configured }, gateway] = await Promise.all([
-      this.workspaceIndependentProfiles(),
-      gatewayScope
-        ? servicesSidecarClient
-            .listGatewayModels()
-            .then((models) =>
-              NativeChatProfiles.gatewayChoices(
-                models,
-                gatewayScope,
-                DEFAULT_GATEWAY_MODEL
+    const [{ subscription, builtIn, configured, openAiIssue }, gateway] =
+      await Promise.all([
+        this.workspaceIndependentProfiles(),
+        gatewayScope
+          ? servicesSidecarClient
+              .listGatewayModels()
+              .then((models) =>
+                NativeChatProfiles.gatewayChoices(
+                  models,
+                  gatewayScope,
+                  DEFAULT_GATEWAY_MODEL
+                )
               )
-            )
-            .catch(() => [])
-        : [],
-    ]);
+              .catch(() => [])
+          : [],
+      ]);
     return {
       subscriptionIssue: subscription.subscriptionIssue,
+      openAiIssue,
       choices: [
         ...subscription.choices,
         ...(generation === this.accountGeneration &&

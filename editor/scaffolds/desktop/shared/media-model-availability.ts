@@ -1,7 +1,7 @@
 import { catalog as models, type VisualModels } from "@grida/ai/catalogue";
-import { byokProvidersFor } from "@grida/ai-host";
+import { byokProvidersFor, OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
 import type { CurrentGGModel } from "@/lib/desktop/gg-models";
-import type { DesktopBridge } from "@/lib/desktop/bridge";
+import { providers, type DesktopBridge } from "@/lib/desktop/bridge";
 
 type MediaModelCard = Readonly<{ id: string; deprecated?: boolean }>;
 
@@ -25,7 +25,7 @@ export namespace MediaModelAvailability {
     loaded: boolean;
     images: boolean;
     desktopVersion?: string;
-    configured: readonly models.image.ImageProvider[];
+    configured: readonly VisualModels.Provider[];
     hosted: boolean;
     /** null only for released binaries without the discovery bridge. */
     gg_models?: readonly CurrentGGModel[] | null;
@@ -120,6 +120,7 @@ export namespace MediaModelAvailability {
         reason: "Image generation is unavailable in this Desktop version",
       };
     const eligible = byokProvidersFor("image").filter((provider) => {
+      if (provider.id === OPENAI_PROJECT_PROVIDER_ID) return false;
       const id = provider.id as models.image.ImageProvider;
       return (
         models.image.binding(card, id) &&
@@ -251,9 +252,14 @@ export namespace MediaModelAvailability {
             .then(() => this.refreshHosted())
             .catch(() => false)
         : Promise.resolve(false);
+      const imageProviderIds: readonly VisualModels.Provider[] =
+        providers.supportsOpenAiImages(bridge) &&
+        typeof bridge?.providers?.visual_models === "function"
+          ? [...models.image.providers, OPENAI_PROJECT_PROVIDER_ID]
+          : models.image.providers;
       const presence = bridge?.images
         ? await Promise.all(
-            models.image.providers.map(async (id) => ({
+            imageProviderIds.map(async (id) => ({
               id,
               connected: await Promise.resolve()
                 .then(() => bridge.secrets.has(id))

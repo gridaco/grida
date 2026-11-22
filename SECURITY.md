@@ -1029,6 +1029,13 @@ pixels through this reader, with no additional filesystem or model grant.
   The built-in stored-key launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
   exercise built-in and configured keys and refusal after credential replacement.
+  [OpenAI project discovery](desktop/src/main/native-openai-models.ts) uses a
+  separate Main-only grant for the fixed model-list GET and the two Responses
+  POST routes. The picker receives model IDs and safe status. A discovery
+  result is published only while its captured key still matches.
+  The media sidecar uses a separate provider grant for the authenticated
+  OpenAI Images generation POST. The grant admits one fixed URL, refuses
+  redirects, and permits neither chat requests nor asset downloads.
   The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)
   accepts only a saved provider identity and model choice. The
   [workspace launcher](desktop/src/main/native-desktop-agent.ts) resolves
@@ -4311,6 +4318,12 @@ durable or discard unrelated OAuth records.
    to a different provider's operation. Stored OpenAI keys require the reviewed
    vendor base URL, while custom destinations require an explicit environment
    credential. Requests disable redirects and automatic retries.
+   The Desktop OpenAI connection owns a dedicated key slot outside the custom
+   endpoint ID range. The [endpoint settings route](packages/grida-ai-host/src/http/routes/providers.ts)
+   validates deletion as a custom endpoint operation before removing its key.
+   The supervised native route selects the dedicated slot only for the official
+   Responses base with an explicit model binding and no custom key. The ordinary
+   host's OpenAI slot and legacy endpoint identities keep their existing meaning.
 
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
@@ -4368,6 +4381,8 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [supervised provider transport](crates/grida-agent/src/supervised_provider.rs),
   [private Desktop broker](desktop/src/main/native-provider-egress.ts),
   [Desktop provider selection](desktop/src/main/native-provider-selection.ts),
+  [OpenAI project discovery](desktop/src/main/native-openai-models.ts),
+  [OpenAI discovery fixtures](desktop/src/main/native-openai-models.test.ts),
   [Desktop stored-key fixtures](desktop/src/main/native-provider-selection.test.ts),
   [provider broker fixtures](desktop/src/main/native-provider-egress.test.ts),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
