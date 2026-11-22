@@ -30,19 +30,22 @@ export type CameraOptions = {
  * variants (`'contain'`, `'pan-region'`) can be added without breaking
  * existing call sites — each future variant has its own payload shape.
  *
- * v1.1 ships only `'cover'`. CSS analogy: `object-fit: cover` — the
- * bounds rect covers the viewport edge-to-edge. Zoom is lower-bounded
- * at fit-with-padding; pan is clamped so the bounds always covers the
- * viewport. Use for slide / page / kiosk UX where the user should
- * never see past the artwork.
+ * The `'cover'` constraint limits zoom out relative to the padded fit.
+ * It centers the artwork on axes that fit and clamps pan on axes where
+ * the artwork is larger than the viewport.
  */
 export type CameraConstraints = {
-  /** Bounds cover viewport (viewport ⊆ bounds). Keynote / slide UX. */
+  /** Bounded pan and zoom for slide and page surfaces. */
   type: "cover";
   /** World-space rect, or `"<root>"` to resolve via BoundsResolver. */
   bounds: Rect | "<root>";
   /** Screen-pixel breathing room between bounds and viewport edge. */
   padding?: number;
+  /**
+   * Minimum zoom as a fraction of the padded fit scale. Defaults to 1.
+   * Values outside `(0, 1]` use the default.
+   */
+  min_fit_scale?: number;
   /**
    * Screen-pixel scroll slack past the bounds edge when zoomed in past fit.
    * Applies only on axes where the bounds strictly exceed the viewport
@@ -335,13 +338,9 @@ export class Camera {
 
 /**
  * Clamp a transform under a `'cover'` constraint:
- * - Zoom lower-bounded at fit-with-padding (the slide always fills the
- *   viewport edge-to-edge).
- * - When at min-zoom the slide is locked centered (bounds smaller than
- *   viewport on the constrained axis is impossible above min_zoom; below
- *   is impossible because zoom is clamped up).
- * - When zoomed in, pan is clamped so the slide always covers the viewport
- *   (no black bars).
+ * - Zoom lower-bounded by a fraction of the padded fit scale.
+ * - Pan centered on axes where the artwork fits.
+ * - Pan clamped to the artwork edges plus overshoot on scrollable axes.
  *
  * Returns the input transform unchanged when bounds can't be resolved or
  * are degenerate.
@@ -360,7 +359,10 @@ function clamp_cover(
   const eff_w = vp_w - 2 * padding;
   const eff_h = vp_h - 2 * padding;
   if (eff_w <= 0 || eff_h <= 0) return t;
-  const min_zoom = Math.min(eff_w / bounds.width, eff_h / bounds.height);
+  const fit_zoom = Math.min(eff_w / bounds.width, eff_h / bounds.height);
+  const min_fit_scale = c.min_fit_scale ?? 1;
+  const min_zoom =
+    fit_zoom * (min_fit_scale > 0 && min_fit_scale <= 1 ? min_fit_scale : 1);
   const s = Math.max(t[0][0], min_zoom);
   const sw = s * bounds.width;
   const sh = s * bounds.height;

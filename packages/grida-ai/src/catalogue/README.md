@@ -3,7 +3,7 @@
 `@grida/ai/catalogue` contains the lookup types and projections used by Grida's
 installed adapters and product defaults. It is not the public GG model inventory.
 
-- Model facts come from the exact published `@grida/ai-models` dependency.
+- The exact published `@grida/ai-models` dependency supplies the bundled seed.
 - `data/ai/presets.json` owns product membership, tiers, defaults and Library
   embedding storage choices.
 - `scripts/ai-catalogue/generate.mjs` produces the checked-in, immutable client
@@ -13,8 +13,39 @@ installed adapters and product defaults. It is not the public GG model inventory
 - Native adapters keep explicit input/output handling. A new transport or result
   contract requires implementation; an ordinary GG model addition does not.
 
-Current native/BYOK hosts use the immutable `catalog.snapshot.seed()` from the
-pinned release. They do not refresh those facts from the legacy HTTP catalogue.
+## Models V2 in Desktop
+
+- **Catalogue SDK.** `@grida/ai/model-catalogue` parses a matched set of Models V2
+  documents into read-only text, image, and video facts, provider bindings and agent
+  selectors. Callers supply the documents and exact release version. The API
+  preserves identifiers and agent tier names from the release and needs no
+  network, filesystem, Grida configuration, or provider credentials.
+- **Grida host service.** `@grida/ai-host/model-catalogue` owns release discovery,
+  manifest verification, version ordering and the last verified disk snapshot.
+  Desktop Main creates and starts one store for the app and supplies its
+  application-data directory.
+- **Grida chat.** `ChatModels.list` and `ChatModels.resolve` apply Grida’s installed
+  adapter capabilities and product policy to a snapshot and a connection. A
+  subscription also needs a matching account offer. Desktop Main supplies the
+  resolved choices over IPC for Welcome and workspace chat. The Grida Gateway
+  and configured endpoints supply their own inventory.
+
+- **Grida visual media.** `VisualModels` checks the installed image and video
+  adapters against exact public bindings. Desktop's retained media sidecar reads
+  Main’s verified cache without write access and supplies the resolved choices
+  to Settings and the generators. Generation resolves against the same
+  catalogue and verifies the provider key before dispatch. Default model IDs
+  are explicit product preferences.
+
+The host store restores the newest validated local V2 snapshot before serving chat and media.
+It checks jsDelivr's major-version resolver in the background at startup and
+hourly. Each newer version supplies an exact-version manifest, model facts and
+agent selectors. The store checks the asset lengths, SHA-256 hashes, schemas
+and references before atomically replacing the on-disk cache and publishing
+the snapshot. Failed or incomplete updates leave the previous snapshot usable.
+A first launch without network access uses the bundled seed. Setting
+`GRIDA_AGENT_DISABLE_MODELS_FETCH=1` disables public catalogue checks and
+keeps the validated local snapshot available.
 
 The `catalog.snapshot.legacy()` schema-1 entry is retained for older installed
 clients. It omits bindings whose opaque SKU pricing or missing coarse estimate

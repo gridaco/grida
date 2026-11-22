@@ -15,6 +15,7 @@ export namespace DesktopDaemon {
     user_data_path: string;
     provider_home?: string;
     media_root: string;
+    model_catalogue?: string;
     ordinary_native_chat_services?: boolean;
     workspace_catalog?: string;
     protected_file_roots?: readonly string[];
@@ -44,6 +45,7 @@ export namespace DesktopDaemon {
       user_data_path: opts.user_data_path,
       provider_home: opts.provider_home,
       media_root: opts.media_root,
+      model_catalogue: opts.model_catalogue,
       projects_root: opts.projects_root,
       workspace_catalog: opts.workspace_catalog,
       protected_file_roots: opts.protected_file_roots,

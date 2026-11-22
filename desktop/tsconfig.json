@@ -11,5 +11,6 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "jsx": "react-jsx"
-  }
+  },
+  "include": ["**/*", "../extensions/*/web-preview.ts"]
 }

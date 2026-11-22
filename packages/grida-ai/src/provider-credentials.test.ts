@@ -1,7 +1,11 @@
 // GRIDA-SEC-004 — first-party admission, fixed credential egress, bounded safe results.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderHttp } from "./http";
-import { ProviderCredentials, type ByokProviderId } from "./providers";
+import {
+  OPENAI_PROJECT_PROVIDER_ID,
+  ProviderCredentials,
+  type ByokProviderId,
+} from "./providers";
 
 const keys = {
   tripo: "synthetic-tripo-key",
@@ -9,6 +13,7 @@ const keys = {
   vercel: "vck_synthetic-short",
   fal: "synthetic-id:synthetic-secret",
   elevenlabs: "synthetic-opaque",
+  [OPENAI_PROJECT_PROVIDER_ID]: "sk-proj-synthetic",
 } satisfies Record<ByokProviderId, string>;
 
 const successes = {
@@ -207,14 +212,17 @@ describe("ProviderCredentials.check", () => {
     expect(transport).not.toHaveBeenCalled();
   });
 
-  it("reports ElevenLabs unsupported without any request", async () => {
-    const { client, transport, download } = setup();
-    await expect(check(client, "elevenlabs")).resolves.toEqual({
-      status: "not_supported",
-    });
-    expect(transport).not.toHaveBeenCalled();
-    expect(download).not.toHaveBeenCalled();
-  });
+  it.each(["elevenlabs", OPENAI_PROJECT_PROVIDER_ID] as const)(
+    "reports %s unsupported without any credential-check request",
+    async (provider) => {
+      const { client, transport, download } = setup();
+      await expect(check(client, provider)).resolves.toEqual({
+        status: "not_supported",
+      });
+      expect(transport).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
+    }
+  );
 
   it("accepts a Vercel AI Gateway legacy key only when the explicit check succeeds", async () => {
     const { client } = setup(async () => Response.json(successes.vercel));

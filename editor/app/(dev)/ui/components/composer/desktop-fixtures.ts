@@ -2,11 +2,54 @@ import type {
   NativeChatMessageAttachment,
   NativeChatQueueItem,
   NativeChatProfileCatalog,
+  WebPreview,
 } from "@grida/desktop-bridge";
 import type { ComposerCatalog } from "@/kits/composer";
+import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
+import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 
 /** Deterministic local examples; no native bridge, account or inference required. */
 export namespace DesktopComposerFixtures {
+  export async function loadWebPreview(
+    href: string,
+    signal: AbortSignal
+  ): Promise<WebPreview.Metadata | null> {
+    switch (new URL(href).pathname) {
+      case "/gallery":
+        return {
+          title: "Gallery tour",
+          description: "An exhibition guide with three stops.",
+          favicon: {
+            dataUrl:
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC",
+          },
+        };
+      case "/plan":
+        return {
+          title: "Gallery cover workflow",
+          productLabel: "FX Viewer",
+          description: "Browse workflow plans and runs.",
+        };
+      case "/print":
+        return new Promise((resolve) => {
+          const timer = window.setTimeout(() => {
+            signal.removeEventListener("abort", abort);
+            resolve({
+              title: "Print layout",
+              description: "A print-ready version of the gallery guide.",
+            });
+          }, 1800);
+          const abort = () => {
+            window.clearTimeout(timer);
+            resolve(null);
+          };
+          signal.addEventListener("abort", abort, { once: true });
+        });
+      default:
+        return null;
+    }
+  }
+
   export const imageUrl = "/images/abstract-placeholder.jpg";
   export const image: NativeChatMessageAttachment = {
     name: "reference.jpg",
@@ -101,4 +144,26 @@ export namespace DesktopComposerFixtures {
     if (!response.ok) throw new Error("Fixture image unavailable");
     return response.blob();
   }
+
+  const libraryImage = {
+    id: "gallery-cover",
+    title: "Gallery cover study",
+    mime: "image/jpeg",
+    url: imageUrl,
+  };
+  const loadLibraryPage: LibraryExplorerPageLoader = async (_, [start]) => ({
+    items: start === 0 ? [libraryImage] : [],
+    exactCount: 1,
+  });
+  export const libraryRequestSource = {
+    loadPage: loadLibraryPage,
+    async readPng(id: string, maxBytes: number) {
+      if (id !== libraryImage.id) throw new Error("Unknown Library reference");
+      const file = await readImage(image.previewId!);
+      return encodeLibraryPng(
+        { mime: libraryImage.mime, bytes: await file.arrayBuffer() },
+        maxBytes
+      );
+    },
+  };
 }

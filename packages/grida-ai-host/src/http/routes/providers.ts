@@ -20,6 +20,7 @@
 
 import type { Hono } from "hono";
 import {
+  isValidEndpointProviderId,
   parseEndpointBaseUrl,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
@@ -97,6 +98,8 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   app.post("/providers/endpoints/delete", async (c) => {
     const r = await body(c, { id: v.string });
     if (!r.ok) return r.res;
+    if (!isValidEndpointProviderId(r.data.id))
+      return c.json({ error: "Invalid custom endpoint ID." }, 400);
     await endpoints.delete(r.data.id);
     // The endpoint's key (if any) goes with it — see the deps doc. Both
     // deletes are idempotent, so a partial failure is safe to retry.

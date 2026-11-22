@@ -1,19 +1,21 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
-import { GG_PROVIDER_ID } from "@grida/ai-host";
+import { isDeepStrictEqual } from "node:util";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import {
+  NativeEditorSelection,
   NativeEditorSurfaces,
   NativeEditorSvgText,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
-import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
+import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
 import { NativeToolImages } from "./native-tool-images";
 import type {
+  DesktopComposerPredictionSettings,
   NativeChatAcceptance,
   NativeChatAttachment,
   NativeChatApproval,
@@ -38,6 +40,7 @@ import type {
   NativeChatProfileSelection,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatSingleQuestionAnswer,
   NativeChatQueueChange,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
@@ -47,8 +50,11 @@ import type {
   NativeChatRevisionTarget,
   NativeChatSideAttachment,
   NativeChatSnapshot,
+  NativeChatSpeed,
   NativeChatTurnSummary,
+  NativeChatTurnCapabilities,
   NativeChatUpdate,
+  NativeWelcomeTurnCapabilities,
   NativeEditorObservation,
   NativeHookInfo,
   NativeHookInspection,
@@ -76,7 +82,10 @@ import type {
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { RetainedFileExport } from "./retained-file-export";
 import { NativeChatProfiles } from "./native-chat-profiles";
-import type { NativeChatSelections } from "./native-chat-selections";
+import {
+  validateSpeed,
+  type NativeChatSelections,
+} from "./native-chat-selections";
 import type { DesktopBrowserTools } from "./desktop-browser-tools";
 
 const MAX_ATTACHMENTS = 16;
@@ -109,6 +118,7 @@ export type NativeWelcomeWorkspace = Readonly<{
 }>;
 
 type WelcomePermissionReview = {
+  mode: "approve_for_me" | "full_access";
   id: string;
   phase: "pending" | "confirmed" | "starting";
   workspace?: NativeWelcomeWorkspace;
@@ -116,6 +126,7 @@ type WelcomePermissionReview = {
     sessionId: string;
     profileId: string | null;
     effort: NativeChatEffort | undefined;
+    speed: NativeChatSpeed | undefined;
   };
   check(): void;
   stopExpiry(): void;
@@ -170,6 +181,9 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "reconsiderDenial"
+        | "withQuestionBatchPreference"
+        | "predictPrompt"
         | "messageActivityCatalog"
         | "archiveCatalog"
         | "unarchiveCatalog"
@@ -210,6 +224,7 @@ export type ActiveNativeChat = Readonly<{
         | "stopBackgroundProcesses"
         | "registerEditorSurfaces"
         | "acceptsEditorContext"
+        | "acceptsEditorToolContext"
         | "submitMessage"
         | "inspectHooks"
         | "reviewHook"
@@ -219,6 +234,7 @@ export type ActiveNativeChat = Readonly<{
         | "permissionMode"
         | "setPermissionMode"
         | "acceptsInputRoutes"
+        | "acceptsTurnCapabilities"
         | "acceptsSelection"
         | "selectionRequest"
         | "createSelected"
@@ -236,12 +252,17 @@ type PermissionReview = {
 
 type Attachment = {
   presented?: boolean;
+  /** The hosted renderer declared batch support on this attachment. */
+  acceptsQuestionBatches?: true;
   permissionReview?: PermissionReview;
   id: string;
   session: NativeChatSession;
   latestObservation?: NativeChatSnapshot;
   observations: Map<string, NativeChatSnapshot>;
-  approvals: Map<string, NativeApprovalReview>;
+  approvals: Map<
+    string,
+    { review: NativeApprovalReview; declineOnly: boolean }
+  >;
   questions: Map<string, NativeQuestionReview>;
   librarySelections: Map<string, NativeLibrarySelectionReview>;
   goals: Map<string, NativeGoalInspection>;
@@ -305,6 +326,11 @@ type Startup = {
 };
 
 export type NativeChatProfileOwner = Readonly<{
+  turnCapabilities?(
+    workspaceId: string,
+    profileId: string | null,
+    model: string
+  ): Promise<NativeChatTurnCapabilities>;
   list(workspaceId: string): Promise<Omit<NativeChatProfileCatalog, "active">>;
   select(
     workspaceId: string,
@@ -409,7 +435,14 @@ export class NativeChatIpc {
     WebContents,
     WelcomePermissionReview
   >();
-  private readonly svgTextReplies = new NativeEditorSvgTextReplies();
+  private readonly svgTextReplies = new NativeEditorSvgReplies(
+    NativeEditorSvgText.result,
+    "native_chat_svg_text_unverified"
+  );
+  private readonly svgSelectionReplies = new NativeEditorSvgReplies(
+    NativeEditorSelection.result,
+    "native_chat_svg_selection_unverified"
+  );
   /** Per window, the sessions it showed for each chat host. */
   private readonly shownSessions = new Map<
     WebContents,
@@ -455,7 +488,11 @@ export class NativeChatIpc {
     private readonly browserTools?: DesktopBrowserTools,
     private readonly resolveWelcomeWorkspace?: (
       workspaceId: string
-    ) => Promise<NativeWelcomeWorkspace>
+    ) => Promise<NativeWelcomeWorkspace>,
+    private readonly composerPredictions?: {
+      get(): Promise<DesktopComposerPredictionSettings>;
+      capture(revision: number): AbortSignal | undefined;
+    }
   ) {}
 
   async documentRequest<T>(
@@ -1049,10 +1086,88 @@ export class NativeChatIpc {
       : undefined;
   }
 
+  /** Look up a new chat's turn options without launching or attaching it. */
+  async welcomeTurnCapabilities(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    workspaceId: unknown,
+    profileId: unknown
+  ): Promise<NativeWelcomeTurnCapabilities | null> {
+    const href = frame?.url;
+    if (
+      !frame ||
+      !href ||
+      ipc_sender.pathname(href) !== "/desktop/welcome" ||
+      !this.frameCurrent(sender, frame, href)
+    )
+      throw new Error("native_chat_scope_changed");
+    if (
+      !validWelcomeWorkspaceId(workspaceId) ||
+      (profileId !== null && !NativeChatProfiles.validId(profileId))
+    )
+      throw new Error("native_chat_selection_invalid");
+    const capabilities = this.profilesOwner?.turnCapabilities;
+    const resolveWorkspace = this.resolveWelcomeWorkspace;
+    if (this.disabled || !this.selections || !resolveWorkspace) return null;
+
+    let current = true;
+    const stopWatching = ipc_sender.watchNavigation(sender, () => {
+      current = false;
+    });
+    const check = () => {
+      if (!current || !this.frameCurrent(sender, frame, href))
+        throw new Error("native_chat_scope_changed");
+    };
+    try {
+      const workspace = await resolveWorkspace(workspaceId);
+      check();
+      if (workspace.workspaceId !== workspaceId) return null;
+      const selected = await this.selections.resolveNewChatChoice(
+        workspaceId,
+        profileId
+      );
+      check();
+      const active = this.resolve(sender, workspaceId, profileId ?? undefined);
+      const offer =
+        capabilities && active?.chat.acceptsTurnCapabilities !== false
+          ? await capabilities(
+              workspaceId,
+              selected.connectionId,
+              selected.model
+            )
+          : { status: "unsupported" as const, speeds: [], webSearch: false };
+      check();
+      const latest = await resolveWorkspace(workspaceId);
+      check();
+      if (
+        latest.workspaceId !== workspaceId ||
+        !sameDirectory(latest.directoryIdentity, workspace.directoryIdentity)
+      )
+        return null;
+      return {
+        profileId: selected.connectionId,
+        modelId: selected.model,
+        ...offer,
+      };
+    } catch {
+      check();
+      return null;
+    } finally {
+      stopWatching();
+    }
+  }
+
   /** A Welcome frame may reserve a review, never attach or submit to a workspace. */
   async prepareWelcomeFullAccess(
-    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    event: IpcMainInvokeEvent,
     workspaceId: unknown
+  ): Promise<NativeChatPermissionReview> {
+    return this.prepareWelcomePermission(event, workspaceId, "full_access");
+  }
+
+  async prepareWelcomePermission(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    workspaceId: unknown,
+    mode: "approve_for_me" | "full_access"
   ): Promise<NativeChatPermissionReview> {
     const href = frame?.url;
     if (
@@ -1078,6 +1193,7 @@ export class NativeChatIpc {
     const expiresAt = Date.now() + PERMISSION_REVIEW_TTL_MS;
     let currentHref = href;
     const review: WelcomePermissionReview = {
+      mode,
       id: randomUUID(),
       phase: "pending",
       check: () => {
@@ -1181,9 +1297,15 @@ export class NativeChatIpc {
       throw new Error("native_chat_permission_mode_review_changed");
     if (!this.startup || !this.selections || !this.resolveWelcomeWorkspace)
       throw new Error("native_chat_permission_mode_unavailable");
-    const { workspaceId, profileId, effort } = welcomePermissionChoice(value);
+    const { workspaceId, profileId, effort, speed } =
+      welcomePermissionChoice(value);
     const prior = review.grant;
-    if (prior && (profileId !== prior.profileId || effort !== prior.effort))
+    if (
+      prior &&
+      (profileId !== prior.profileId ||
+        effort !== prior.effort ||
+        speed !== prior.speed)
+    )
       throw new Error("native_chat_permission_mode_review_changed");
     review.phase = "starting";
     try {
@@ -1234,6 +1356,8 @@ export class NativeChatIpc {
         !chat.setPermissionMode
       )
         throw new Error("native_chat_permission_mode_unavailable");
+      if (speed && speed !== "standard" && !chat.acceptsTurnCapabilities)
+        throw new Error("native_chat_selection_unsupported");
       const check = () => {
         review.check();
         if (
@@ -1258,6 +1382,7 @@ export class NativeChatIpc {
             profileId,
             effort:
               effort ?? this.selections.readDefaults()?.effort ?? "medium",
+            ...(speed && { speed }),
           },
           check
         );
@@ -1277,10 +1402,10 @@ export class NativeChatIpc {
           state.sessionId !== session.id ||
           state.revision !== 0 ||
           state.mode !== "restricted" ||
-          !state.available.includes("full_access")
+          !state.available.includes(review.mode)
         )
           throw new Error("native_chat_permission_mode_unavailable");
-        review.grant = { sessionId: session.id, profileId, effort };
+        review.grant = { sessionId: session.id, profileId, effort, speed };
       }
       // A current review authorizes exactly one revision-0 grant. Native can
       // replay its receipt using the same session and operation identities.
@@ -1288,13 +1413,13 @@ export class NativeChatIpc {
         session,
         0,
         review.id,
-        "full_access"
+        review.mode
       );
       check();
       if (
         updated.sessionId !== session.id ||
         updated.revision !== 1 ||
-        updated.mode !== "full_access"
+        updated.mode !== review.mode
       )
         throw new Error("native_chat_permission_mode_invalid_response");
       if (prior) {
@@ -1470,7 +1595,9 @@ export class NativeChatIpc {
       !Number.isSafeInteger(expectedRevision) ||
       (expectedRevision as number) < 0 ||
       !token(requestId) ||
-      (mode !== "restricted" && mode !== "full_access")
+      (mode !== "restricted" &&
+        mode !== "full_access" &&
+        mode !== "approve_for_me")
     )
       throw new Error("native_chat_permission_mode_invalid");
     const response = answer as
@@ -1539,6 +1666,52 @@ export class NativeChatIpc {
     }
   }
 
+  async turnCapabilities(
+    event: IpcMainInvokeEvent,
+    value: unknown
+  ): Promise<NativeChatTurnCapabilities> {
+    const { workspaceId, check } = this.selectionScope(event);
+    const target = selectionTarget(value);
+    // A packaged worker may predate these optional fields. Its normal
+    // selection support alone cannot establish support for either feature.
+    if (
+      this.scope(event.sender, event.senderFrame)?.chat
+        .acceptsTurnCapabilities === false
+    )
+      return { status: "unsupported", speeds: [], webSearch: false };
+    const read = () =>
+      this.selections!.read(
+        workspaceId,
+        "sessionId" in target ? target.sessionId : null,
+        "draftId" in target ? target.draftId : undefined,
+        check
+      );
+    const selected = await read();
+    check();
+    if (!selected.available || !selected.selection)
+      return { status: "unavailable", speeds: [], webSearch: false };
+    const capabilities = this.profilesOwner?.turnCapabilities;
+    if (!capabilities)
+      return { status: "unsupported", speeds: [], webSearch: false };
+    const result = await capabilities(
+      workspaceId,
+      selected.selection.profileId,
+      selected.selection.modelId
+    );
+    check();
+    // Switching a draft or session while discovery was in flight cannot publish
+    // an authorization preview for the previously selected route.
+    const latest = await read();
+    check();
+    if (
+      !latest.available ||
+      latest.revision !== selected.revision ||
+      !isDeepStrictEqual(latest.selection, selected.selection)
+    )
+      return { status: "unavailable", speeds: [], webSearch: false };
+    return result;
+  }
+
   async selection(event: IpcMainInvokeEvent, value: unknown) {
     const { workspaceId, check } = this.selectionScope(event);
     const target = selectionTarget(value);
@@ -1575,13 +1748,19 @@ export class NativeChatIpc {
       Array.isArray(choice)
     )
       throw new Error("native_chat_selection_invalid");
-    const selected = choice as { profileId?: unknown; effort?: unknown };
+    const selected = choice as {
+      profileId?: unknown;
+      effort?: unknown;
+      speed?: unknown;
+    };
     if (
-      Object.keys(selected).length !== 2 ||
+      Object.keys(selected).length !==
+        2 + Number(selected.speed !== undefined) ||
       (selected.profileId !== null &&
         !NativeChatProfiles.validId(selected.profileId))
     )
       throw new Error("native_chat_selection_invalid");
+    if (selected.speed !== undefined) validateSpeed(selected.speed);
     const effort = agentEffort(selected.effort);
     if (!effort) throw new Error("native_chat_selection_invalid");
     const result = await this.selections!.update(
@@ -1589,7 +1768,11 @@ export class NativeChatIpc {
       target,
       expectedRevision as number,
       operationId,
-      { profileId: selected.profileId as string | null, effort },
+      {
+        profileId: selected.profileId as string | null,
+        effort,
+        ...(selected.speed && { speed: selected.speed }),
+      },
       check
     );
     check();
@@ -1611,13 +1794,26 @@ export class NativeChatIpc {
       : undefined;
   }
 
-  async createFromDraft(event: IpcMainInvokeEvent, draftId: unknown) {
+  async createFromDraft(
+    event: IpcMainInvokeEvent,
+    draftId: unknown,
+    manualApproval?: unknown
+  ) {
     const { workspaceId, check } = this.selectionScope(event);
-    if (!token(draftId)) throw new Error("native_chat_selection_invalid");
+    if (
+      !token(draftId) ||
+      (manualApproval !== undefined && manualApproval !== true)
+    )
+      throw new Error("native_chat_selection_invalid");
+    const project =
+      ipc_sender.pathname(event.senderFrame?.url) === "/desktop/workspace" &&
+      !this.nestedDeckFrame(event.sender, event.senderFrame) &&
+      !this.documentFrame(event.sender, event.senderFrame);
     const creation = await this.selections!.prepareCreation(
       workspaceId,
       draftId,
-      check
+      check,
+      project ? (manualApproval ? "manual" : "automatic") : undefined
     );
     check();
     const active = this.scope(event.sender, event.senderFrame);
@@ -1631,15 +1827,102 @@ export class NativeChatIpc {
       selected !== creation.selection.connectionId
     )
       throw new Error("native_chat_selection_route_changed");
-    const attached = await this.attach(event, (chat) => {
+    const attached = await this.attach(event, async (chat, checkOwner) => {
       if (!chat.createSelected)
         throw new Error("native_chat_selection_unsupported");
-      return chat.createSelected(creation);
+      const session = await chat.createSelected(creation);
+      checkOwner();
+      if (project && creation.initialPermissionMode)
+        await this.applyInitialPermissionMode(
+          chat,
+          session,
+          creation.requestId,
+          creation.initialPermissionMode,
+          checkOwner
+        );
+      if (project && creation.verifyManualApproval) {
+        const state = chat.acceptsPermissionMode
+          ? await chat.permissionMode?.(session)
+          : undefined;
+        checkOwner();
+        if (state?.sessionId !== session.id || state.mode !== "restricted")
+          throw new Error("native_chat_permission_mode_initial_choice_changed");
+      }
+      return session;
     });
     check();
     await this.selections!.finishCreation(workspaceId, draftId);
     check();
     return { ...attached, firstInputId: creation.firstInputId };
+  }
+
+  private async applyInitialPermissionMode(
+    chat: ActiveNativeChat["chat"],
+    session: NativeChatSession,
+    requestId: string,
+    mode: "approve_for_me" | "restricted",
+    check: () => void
+  ): Promise<void> {
+    if (
+      !chat.acceptsPermissionMode ||
+      !chat.permissionMode ||
+      !chat.setPermissionMode
+    )
+      return;
+    let state = await chat.permissionMode(session);
+    check();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (state.sessionId !== session.id)
+        throw new Error("native_chat_permission_mode_invalid_response");
+      if (mode === "approve_for_me") {
+        if (
+          state.revision !== 0 ||
+          state.mode !== "restricted" ||
+          !state.available.includes(mode)
+        )
+          return;
+      } else if (state.mode === "restricted" && state.revision > 0) return;
+      // A deliberate Ask choice advances even revision zero. A delayed Auto
+      // update still expects revision zero and cannot undo it.
+      const operation =
+        mode === "restricted"
+          ? `manual/${requestId}/${state.revision}`
+          : requestId;
+      let updated: NativeChatPermissionState;
+      try {
+        updated = await chat.setPermissionMode(
+          session,
+          state.revision,
+          operation,
+          mode
+        );
+      } catch (error) {
+        check();
+        const current = await chat
+          .permissionMode(session)
+          .catch(() => undefined);
+        check();
+        if (
+          current?.sessionId !== session.id ||
+          current.revision <= state.revision
+        )
+          throw error;
+        // A lost reply or an explicit selection can advance native state.
+        // Never repeat the Auto default. Ask may narrow a racing Auto update.
+        if (mode === "approve_for_me" || current.mode === "restricted") return;
+        if (attempt === 1) throw error;
+        state = current;
+        continue;
+      }
+      check();
+      if (
+        updated.sessionId !== session.id ||
+        updated.revision !== state.revision + 1 ||
+        updated.mode !== mode
+      )
+        throw new Error("native_chat_permission_mode_invalid_response");
+      return;
+    }
   }
 
   private selectionScope({ sender, senderFrame: frame }: IpcMainInvokeEvent) {
@@ -1655,13 +1938,48 @@ export class NativeChatIpc {
     return { workspaceId, check };
   }
 
+  private async retryReceipt(
+    owner: Owner,
+    attachment: Attachment,
+    inputId: string,
+    webSearch: unknown
+  ): Promise<NativeChatAcceptance | null> {
+    if (webSearch !== undefined && webSearch !== true)
+      throw new Error("web_search_invalid");
+    try {
+      return await owner.active.chat.inputReceipt(
+        attachment.session,
+        inputId,
+        webSearch === true
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "input_unavailable")
+        return null;
+      throw error;
+    } finally {
+      this.revalidate(owner, attachment);
+    }
+  }
+
   private async selectionAdmission(
     owner: Owner,
     attachment: Attachment,
     inputId: string,
     selectionRevision: unknown,
-    image?: true
+    webSearch?: unknown,
+    image?: "inline" | "selected"
   ): Promise<NativeChatAcceptance | null> {
+    // A selected file's temporary custody can already be retired, independently
+    // of selection revisions, model support or a side chat's inherited route.
+    if (image === "selected") {
+      const prior = await this.retryReceipt(
+        owner,
+        attachment,
+        inputId,
+        webSearch
+      );
+      if (prior) return prior;
+    }
     if (attachment.sideOf) return null;
     if (selectionRevision === undefined) {
       const requested =
@@ -1682,11 +2000,15 @@ export class NativeChatIpc {
     )
       throw new Error("native_chat_selection_invalid");
     // An accepted retry observes its original capture before newer settings.
-    const accepted = await owner.active.chat
-      .inputReceipt(attachment.session, inputId)
-      .catch(() => null);
-    this.revalidate(owner, attachment);
-    if (accepted) return accepted;
+    if (image !== "selected") {
+      const prior = await this.retryReceipt(
+        owner,
+        attachment,
+        inputId,
+        webSearch
+      );
+      if (prior) return prior;
+    }
     const state = await this.selections.read(
       owner.active.workspaceId,
       attachment.session.id
@@ -1776,9 +2098,10 @@ export class NativeChatIpc {
   ): Promise<NativeChatRevisionReceipt> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const chat = owner.active.chat;
+    const revise = chat.revise;
     const input = record(value);
     if (
-      !chat.revise ||
+      !revise ||
       !input ||
       Object.keys(input).length !== (input.effort === undefined ? 3 : 4) ||
       !token(input.reviewId) ||
@@ -1786,17 +2109,21 @@ export class NativeChatIpc {
       (input.operatingRegime !== "act" && input.operatingRegime !== "plan")
     )
       throw new Error("native_chat_revision_unavailable");
+    const { reviewId, text, operatingRegime } = input;
     const effort = agentEffort(input.effort);
-    return chat.revise(
-      attachment,
-      attachment.session,
-      {
-        reviewId: input.reviewId,
-        text: input.text,
-        operatingRegime: input.operatingRegime,
-        ...(effort && { effort }),
-      },
-      (expected) => this.revalidateRevision(owner, attachment, expected)
+    return this.admit(owner, attachment, () =>
+      revise.call(
+        chat,
+        attachment,
+        attachment.session,
+        {
+          reviewId,
+          text,
+          operatingRegime,
+          ...(effort && { effort }),
+        },
+        (expected) => this.revalidateRevision(owner, attachment, expected)
+      )
     );
   }
 
@@ -2321,6 +2648,12 @@ export class NativeChatIpc {
     )
       throw new Error("native_chat_editor_surfaces_invalid");
     if (
+      snapshot.selection?.kind === "document" &&
+      snapshot.selection.placement?.boardPath === "/" &&
+      !deck
+    )
+      throw new Error("native_chat_editor_surfaces_invalid");
+    if (
       file &&
       (revision !== undefined ||
         snapshot.truncated ||
@@ -2329,7 +2662,7 @@ export class NativeChatIpc {
           : snapshot.open.length !== 1 ||
             (document
               ? snapshot.active !== DOCUMENT_SURFACE
-              : !snapshot.active.toLowerCase().endsWith(".svg"))))
+              : !NativeEditorSurfaces.isSvgPath(snapshot.active))))
     )
       throw new Error("native_chat_editor_surfaces_invalid");
     if (deck) attachment.deckEditorSurface = snapshot;
@@ -2348,7 +2681,7 @@ export class NativeChatIpc {
                 ...request,
               }),
         revision,
-        async (request) => {
+        async (request, signal) => {
           const slide = attachment.deckEditorSurface;
           if (deck && !slide?.active) return { kind: "unavailable" };
           if (file) await file.recheck();
@@ -2361,7 +2694,8 @@ export class NativeChatIpc {
                 attachmentId: attachment.id,
                 ...request,
               });
-            }
+            },
+            signal
           );
           if (file) await file.recheck();
           if (
@@ -2376,7 +2710,48 @@ export class NativeChatIpc {
           ? undefined
           : this.browserTools?.lease(owner.sender, owner.frame, () =>
               this.revalidate(owner, attachment)
-            )
+            ),
+        async (request, signal) => {
+          const slide = attachment.deckEditorSurface;
+          if (
+            deck &&
+            (!slide ||
+              (slide.selection
+                ? !NativeEditorSelection.sameSubject(
+                    slide.selection,
+                    request.subject
+                  )
+                : !slide.active || request.path !== slide.active))
+          )
+            return { kind: "stale" };
+          try {
+            if (file) await file.recheck();
+            this.revalidate(owner, attachment);
+          } catch {
+            return { kind: "stale" };
+          }
+          if (deck && attachment.deckEditorSurface !== slide)
+            return { kind: "stale" };
+          const result = await this.svgSelectionReplies.dispatch(
+            attachment.id,
+            request,
+            () =>
+              owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION, {
+                attachmentId: attachment.id,
+                ...request,
+              }),
+            signal
+          );
+          if (file) await file.recheck();
+          this.revalidate(owner, attachment);
+          if (
+            deck &&
+            (attachment.deckEditorSurface !== slide ||
+              ("path" in result && result.path !== request.path))
+          )
+            throw new Error("native_chat_svg_selection_unverified");
+          return result;
+        }
       );
     }
   }
@@ -2394,6 +2769,24 @@ export class NativeChatIpc {
         return this.svgTextReplies.respond(attachment.id, callId, null);
     }
     this.svgTextReplies.respond(attachment.id, callId, value);
+  }
+
+  replyEditorSvgSelection(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    callId: unknown,
+    value: unknown
+  ): void {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const result = NativeEditorSelection.result(value);
+    if (
+      result &&
+      "path" in result &&
+      this.documentFrame(owner.sender, owner.frame) &&
+      result.path !== DOCUMENT_SURFACE
+    )
+      return this.svgSelectionReplies.respond(attachment.id, callId, null);
+    this.svgSelectionReplies.respond(attachment.id, callId, result);
   }
 
   async captureEditorContext(
@@ -2452,6 +2845,43 @@ export class NativeChatIpc {
     return capture.observation;
   }
 
+  private editorToolContext(
+    owner: Owner,
+    inputId: string,
+    text: string,
+    mode: NativeChatOperatingRegime | undefined,
+    value: unknown
+  ) {
+    if (value === undefined) return;
+    const capture = NativeEditorSelection.capture(value);
+    const targetId = capture?.targetId ?? value;
+    if (
+      !NativeEditorSelection.isId(targetId) ||
+      mode !== "act" ||
+      typeof inputId !== "string" ||
+      !/^[A-Za-z0-9_.:@/-]{1,256}$/.test(inputId) ||
+      typeof text !== "string" ||
+      text.trim().length === 0
+    )
+      throw new Error("native_chat_editor_tool_context_invalid");
+    if (owner.active.chat.acceptsEditorToolContext)
+      return {
+        targetId,
+        inputId,
+        ...(capture && { subject: capture.subject }),
+      };
+  }
+
+  private admit<T>(owner: Owner, attachment: Attachment, action: () => T): T {
+    const { chat } = owner.active;
+    return chat.withQuestionBatchPreference
+      ? chat.withQuestionBatchPreference(
+          attachment.acceptsQuestionBatches === true,
+          action
+        )
+      : action();
+  }
+
   async submit(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -2461,17 +2891,28 @@ export class NativeChatIpc {
     effort?: unknown,
     svgTargetId?: unknown,
     selectionRevision?: unknown,
-    editorContextId?: unknown
+    editorContextId?: unknown,
+    editorToolContextId?: unknown,
+    webSearch?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
+    const context = this.editorToolContext(
+      owner,
+      inputId,
+      text,
+      mode,
+      editorToolContextId
+    );
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       inputId,
-      selectionRevision
+      selectionRevision,
+      webSearch
     );
-    if (prior) return prior;
-    const mode = operatingRegime(regime);
+    this.revalidate(owner, attachment);
+    if (prior && !owner.active.chat.acceptsEditorToolContext) return prior;
     if (
       svgTargetId !== undefined &&
       (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
@@ -2480,20 +2921,23 @@ export class NativeChatIpc {
     const selected = agentEffort(effort);
     const surfaces =
       mode === "act"
-        ? attachment.editorSurfaces?.selection(svgTargetId)
+        ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat.submit(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        selected,
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId)
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submit(
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          selected,
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId),
+          webSearch
+        )
       )
-    );
+    ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -2508,23 +2952,27 @@ export class NativeChatIpc {
     if (typeof data?.inputId !== "string")
       throw new Error("native_chat_message_context_invalid");
     const { chat } = owner.active;
-    if (!chat.submitMessage)
-      throw new Error("native_chat_message_context_unavailable");
+    const submit = chat.submitMessage;
+    if (!submit) throw new Error("native_chat_message_context_unavailable");
     // Apply the same route and provider choice checks as other submits. A
     // captured retry still reaches the host to verify its accepted context.
     await this.selectionAdmission(
       owner,
       attachment,
       data.inputId,
-      data.selectionRevision
+      data.selectionRevision,
+      data.webSearch
     );
     this.revalidate(owner, attachment);
-    const result = await chat.submitMessage(
-      attachment.session,
-      input,
-      data.operatingRegime === "act"
-        ? attachment.editorSurfaces?.selection()
-        : undefined
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(
+        chat,
+        attachment.session,
+        input,
+        data.operatingRegime === "act"
+          ? attachment.editorSurfaces?.selection()
+          : undefined
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2539,17 +2987,28 @@ export class NativeChatIpc {
     effort?: unknown,
     svgTargetId?: unknown,
     selectionRevision?: unknown,
-    editorContextId?: unknown
+    editorContextId?: unknown,
+    editorToolContextId?: unknown,
+    webSearch?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
+    const context = this.editorToolContext(
+      owner,
+      inputId,
+      text,
+      mode,
+      editorToolContextId
+    );
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       inputId,
-      selectionRevision
+      selectionRevision,
+      webSearch
     );
-    if (prior) return prior;
-    const mode = operatingRegime(regime);
+    this.revalidate(owner, attachment);
+    if (prior && !owner.active.chat.acceptsEditorToolContext) return prior;
     if (
       svgTargetId !== undefined &&
       (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
@@ -2558,20 +3017,23 @@ export class NativeChatIpc {
     const selected = agentEffort(effort);
     const surfaces =
       mode === "act"
-        ? attachment.editorSurfaces?.selection(svgTargetId)
+        ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat.enqueue(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        selected,
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId)
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.enqueue(
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          selected,
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId),
+          webSearch
+        )
       )
-    );
+    ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -2589,32 +3051,39 @@ export class NativeChatIpc {
     regime?: unknown,
     effort?: unknown,
     selectionRevision?: unknown,
-    editorContextId?: unknown
+    editorContextId?: unknown,
+    webSearch?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       inputId,
-      selectionRevision
+      selectionRevision,
+      webSearch
     );
     if (prior) return prior;
     const { chat } = owner.active;
-    if (!chat.acceptsLibrarySelection || !chat.submitWithLibrarySelection)
+    const submit = chat.submitWithLibrarySelection;
+    if (!chat.acceptsLibrarySelection || !submit)
       throw new Error("native_chat_library_selection_unavailable");
     const mode = operatingRegime(regime);
     const surfaces =
       mode === "act" ? attachment.editorSurfaces?.selection() : undefined;
-    const result = await chat.submitWithLibrarySelection(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        agentEffort(effort),
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId)
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(
+        chat,
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          agentEffort(effort),
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId),
+          webSearch
+        )
       )
     );
     this.revalidate(owner, attachment);
@@ -2736,7 +3205,7 @@ export class NativeChatIpc {
           owner.active.chat.acceptsPng ||
           owner.active.chat.acceptsSelectedImage === true
         );
-      return NativeChatProfiles.imageInput(GG_PROVIDER_ID, selection.modelId);
+      return NativeChatProfiles.gatewayImageInput(selection.modelId);
     }
     const catalogue = await this.profilesOwner?.list(owner.active.workspaceId);
     return (
@@ -2859,12 +3328,12 @@ export class NativeChatIpc {
       attachment,
       String(data?.inputId ?? ""),
       data?.selectionRevision,
-      true
+      data?.webSearch,
+      "inline"
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitImage(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitImage(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2881,27 +3350,13 @@ export class NativeChatIpc {
     const input = value as Record<string, unknown>;
     if (typeof input.inputId !== "string")
       throw new Error("native_chat_selected_image_unavailable");
-    // The original native receipt wins even for clients omitting revisions,
-    // after Main has retired accepted temporary custody or model support changed.
-    let accepted: NativeChatAcceptance | undefined;
-    try {
-      accepted = await owner.active.chat.inputReceipt(
-        attachment.session,
-        input.inputId
-      );
-    } catch (error) {
-      this.revalidate(owner, attachment);
-      if (!(error instanceof Error) || error.message !== "input_unavailable")
-        throw error;
-    }
-    this.revalidate(owner, attachment);
-    if (accepted) return accepted;
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       input.inputId,
       input.selectionRevision,
-      true
+      input.webSearch,
+      "selected"
     );
     if (prior) return prior;
     const chat = owner.active.chat;
@@ -2911,9 +3366,12 @@ export class NativeChatIpc {
       attachment.session.sideImageInput ??
       (routed || chat.acceptsSelectedImage);
     const transport = chat.supportsSelectedImage ?? chat.acceptsSelectedImage;
-    if (!modelAcceptsImage || !transport || !chat.submitSelectedImage)
+    const submit = chat.submitSelectedImage;
+    if (!modelAcceptsImage || !transport || !submit)
       throw new Error("image_input_unavailable");
-    const result = await chat.submitSelectedImage(attachment.session, input);
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(chat, attachment.session, input)
+    );
     this.revalidate(owner, attachment);
     return result;
   }
@@ -2929,12 +3387,12 @@ export class NativeChatIpc {
       owner,
       attachment,
       String(data?.inputId ?? ""),
-      data?.selectionRevision
+      data?.selectionRevision,
+      data?.webSearch
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitFile(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitFile(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2951,12 +3409,12 @@ export class NativeChatIpc {
       owner,
       attachment,
       String(data?.inputId ?? ""),
-      data?.selectionRevision
+      data?.selectionRevision,
+      data?.webSearch
     );
     if (prior) return prior;
-    const result = await owner.active.chat.submitFileReference(
-      attachment.session,
-      input
+    const result = await this.admit(owner, attachment, () =>
+      owner.active.chat.submitFileReference(attachment.session, input)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2983,6 +3441,42 @@ export class NativeChatIpc {
     const observationId = randomUUID();
     attachment.observations.set(observationId, snapshot);
     return { observationId, snapshot };
+  }
+
+  async predictPrompt(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<string | null> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const observed = requireObservation(attachment, observationId);
+    const preferences = this.composerPredictions;
+    const chat = owner.active.chat;
+    if (!preferences || !chat.predictPrompt) return null;
+
+    const current = () => {
+      this.revalidate(owner, attachment);
+      return (
+        attachment.presented === true &&
+        !observed.side &&
+        !observed.current &&
+        observed.queuedInputs === 0 &&
+        observed.latest?.disposition === "settled" &&
+        observed.latest.status === "succeeded" &&
+        !!attachment.latestObservation &&
+        sameBasis(observed, attachment.latestObservation)
+      );
+    };
+    if (!current()) return null;
+    const settings = await preferences.get();
+    const permission = preferences.capture(settings.revision);
+    if (!permission || !current()) return null;
+    const text = await chat.predictPrompt(
+      attachment.session,
+      observed,
+      permission
+    );
+    return permission.aborted || !current() ? null : text;
   }
 
   async turnSummary(
@@ -3335,11 +3829,10 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const change = queueChange(input);
     const snapshot = requireObservation(attachment, change.observationId);
-    const receipt = await owner.active.chat.editQueue(
-      attachment.session,
-      snapshot,
-      change,
-      () => this.revalidate(owner, attachment)
+    const receipt = await this.admit(owner, attachment, () =>
+      owner.active.chat.editQueue(attachment.session, snapshot, change, () =>
+        this.revalidate(owner, attachment)
+      )
     );
     this.revalidate(owner, attachment);
     return receipt;
@@ -3419,10 +3912,8 @@ export class NativeChatIpc {
       record(request)?.selectionRevision
     );
     if (prior) return prior;
-    const accepted = await owner.active.chat.startGoal(
-      attachment.session,
-      inputId,
-      request
+    const accepted = await this.admit(owner, attachment, () =>
+      owner.active.chat.startGoal(attachment.session, inputId, request)
     );
     this.revalidate(owner, attachment);
     return accepted;
@@ -3473,7 +3964,10 @@ export class NativeChatIpc {
   async approvals(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    acceptsCommandRetries?: unknown,
+    acceptsManagedOutbound?: unknown,
+    acceptsCommandSessions?: unknown
   ): Promise<readonly NativeChatApproval[]> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = requireObservation(attachment, observationId);
@@ -3483,12 +3977,63 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return reviews.slice(0, MAX_REVIEWS).map((review) => {
-      const reviewId = retainReview(attachment.approvals, review, sameApproval);
-      const { tool, root, relativePath, query } = review;
-      return {
+      const declineOnly =
+        review.tool === "exec_command" &&
+        (review.sandboxPermissions === "require_escalated"
+          ? acceptsCommandRetries !== true ||
+            (review.network?.kind === "managed" &&
+              acceptsManagedOutbound !== true)
+          : (review.process !== undefined || review.managedNetwork === true) &&
+            acceptsCommandSessions !== true);
+      // A wait whose displayed action changed needs a new decision.
+      for (const [id, previous] of attachment.approvals)
+        if (
+          previous.review.turnId === review.turnId &&
+          previous.review.waitId === review.waitId &&
+          !isDeepStrictEqual(previous.review, review)
+        )
+          attachment.approvals.delete(id);
+      const reviewId = retainReview(
+        attachment.approvals,
+        { review, declineOnly },
+        isDeepStrictEqual
+      );
+      const basis = {
         reviewId,
+        root: review.root,
+        ...(review.reviewFailure && { reviewFailure: review.reviewFailure }),
+      };
+      if (review.tool === "exec_command") {
+        const { tool, command, cwd, executable, scope } = review;
+        const common = { ...basis, tool, command, cwd, executable };
+        if (review.sandboxPermissions === "require_escalated") {
+          // An older card assumes any network object has an outbound host
+          // and enables Allow once whenever it sees a filesystem scope.
+          return {
+            ...common,
+            sandboxPermissions: review.sandboxPermissions,
+            justification: review.justification,
+            environmentNames: review.environmentNames,
+            ...(declineOnly
+              ? {}
+              : { access: review.access, network: review.network, scope }),
+          };
+        }
+        return {
+          ...common,
+          access: review.access,
+          network: review.network,
+          ...(review.process && { process: review.process }),
+          ...(review.managedNetwork && {
+            managedNetwork: review.managedNetwork,
+          }),
+          scope: declineOnly ? undefined : scope,
+        };
+      }
+      const { tool, relativePath, query } = review;
+      return {
+        ...basis,
         tool,
-        root,
         relativePath,
         ...(query === undefined ? {} : { query }),
       };
@@ -3512,8 +4057,16 @@ export class NativeChatIpc {
       reviewId: retainReview(attachment.questions, review, sameQuestion),
       style: review.style,
       ...(review.expiresWithTurn && { expiresWithTurn: true }),
-      question: review.question,
-      options: review.options,
+      ...("questions" in review
+        ? {
+            questions: review.questions,
+            // The installed app can load a hosted view with the old singleton card.
+            // Give it display-only text. The review still requires an exact batch.
+            question:
+              "Open this chat in the latest chat view to answer these questions.",
+            options: [],
+          }
+        : { question: review.question, options: review.options }),
     }));
   }
 
@@ -3528,7 +4081,7 @@ export class NativeChatIpc {
       ? attachment.questions.get(reviewId)
       : undefined;
     if (!review) throw new Error("native_chat_question_unavailable");
-    const answer = questionAnswer(input, review.options.length);
+    const answer = questionAnswer(input, review);
     const receipt = await owner.active.chat.answerQuestion(
       attachment.session,
       review,
@@ -3588,6 +4141,20 @@ export class NativeChatIpc {
     return receipt;
   }
 
+  async reconsiderDenial(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    turnId: string,
+    reviewId: string
+  ): Promise<void> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (!chat.reconsiderDenial)
+      throw new Error("native_chat_reconsideration_unavailable");
+    await chat.reconsiderDenial(attachment.session, turnId, reviewId);
+    this.revalidate(owner, attachment);
+  }
+
   async answerApproval(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -3597,13 +4164,14 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     if (decision !== "approve_once" && decision !== "decline")
       throw new Error("native_chat_approval_decision_invalid");
-    const review = token(reviewId)
+    const retained = token(reviewId)
       ? attachment.approvals.get(reviewId)
       : undefined;
-    if (!review) throw new Error("native_chat_approval_unavailable");
+    if (!retained || (retained.declineOnly && decision !== "decline"))
+      throw new Error("native_chat_approval_unavailable");
     const receipt = await owner.active.chat.answerApproval(
       attachment.session,
-      review,
+      retained.review,
       decision
     );
     this.revalidate(owner, attachment);
@@ -3652,7 +4220,8 @@ export class NativeChatIpc {
   subscribe(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    subscriptionId: string
+    subscriptionId: string,
+    acceptsQuestionBatches?: unknown
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     if (
@@ -3717,9 +4286,11 @@ export class NativeChatIpc {
           this.unsubscribeOwned(owner, subscriptionId);
         }
       });
-      if (owner.subscriptions.get(subscriptionId) === subscription)
+      if (owner.subscriptions.get(subscriptionId) === subscription) {
         subscription.stop = stop;
-      else stop();
+        if (acceptsQuestionBatches === true)
+          attachment.acceptsQuestionBatches = true;
+      } else stop();
     } catch (error) {
       this.unsubscribeOwned(owner, subscriptionId);
       throw error;
@@ -3741,14 +4312,19 @@ export class NativeChatIpc {
 
   private async attach(
     event: IpcMainInvokeEvent,
-    open: (chat: ActiveNativeChat["chat"]) => Promise<NativeChatSession>
+    open: (
+      chat: ActiveNativeChat["chat"],
+      check: () => void
+    ) => Promise<NativeChatSession>
   ): Promise<NativeChatAttachment> {
     const owner = this.owner(event);
     if (owner.pending + owner.attachments.size >= MAX_ATTACHMENTS)
       throw new Error("native_chat_attachment_limit");
     owner.pending += 1;
     try {
-      const session = await open(owner.active.chat);
+      const session = await open(owner.active.chat, () =>
+        this.revalidate(owner)
+      );
       this.revalidate(owner);
       if (
         owner.active.chat.ownsSession &&
@@ -4194,20 +4770,26 @@ function welcomePermissionChoice(value: unknown): {
   workspaceId: string;
   profileId: string | null;
   effort: NativeChatEffort | undefined;
+  speed: NativeChatSpeed | undefined;
 } {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("native_chat_permission_mode_invalid");
-  const { workspaceId, profileId, effort } = value as Record<string, unknown>;
+  const { workspaceId, profileId, effort, speed } = value as Record<
+    string,
+    unknown
+  >;
   if (
     Object.keys(value).some(
-      (key) => !["workspaceId", "profileId", "effort"].includes(key)
+      (key) => !["workspaceId", "profileId", "effort", "speed"].includes(key)
     ) ||
     !validWelcomeWorkspaceId(workspaceId) ||
     (Object.hasOwn(value, "effort") && effort === undefined) ||
+    (Object.hasOwn(value, "speed") && speed === undefined) ||
     (profileId !== null && !NativeChatProfiles.validId(profileId))
   )
     throw new Error("native_chat_permission_mode_invalid");
-  return { workspaceId, profileId, effort: agentEffort(effort) };
+  if (speed !== undefined) validateSpeed(speed);
+  return { workspaceId, profileId, effort: agentEffort(effort), speed };
 }
 
 function selectionTarget(value: unknown): NativeChatSelections.Target {
@@ -4249,31 +4831,23 @@ function retainReview<T>(
   return id;
 }
 
-function sameApproval(
-  left: NativeApprovalReview,
-  right: NativeApprovalReview
-): boolean {
-  return (
-    left.sessionId === right.sessionId &&
-    left.turnId === right.turnId &&
-    left.waitId === right.waitId &&
-    left.sessionRevision === right.sessionRevision &&
-    left.controlRevision === right.controlRevision &&
-    left.directory === right.directory &&
-    left.root === right.root &&
-    left.tool === right.tool &&
-    left.relativePath === right.relativePath &&
-    left.query === right.query
-  );
-}
-
 function sameQuestion(
   left: NativeQuestionReview,
   right: NativeQuestionReview
 ): boolean {
+  if (
+    left.task.requestId !== right.task.requestId ||
+    left.style !== right.style ||
+    left.expiresWithTurn !== right.expiresWithTurn
+  )
+    return false;
+  if ("questions" in left || "questions" in right)
+    return (
+      "questions" in left &&
+      "questions" in right &&
+      JSON.stringify(left.questions) === JSON.stringify(right.questions)
+    );
   return (
-    left.task.requestId === right.task.requestId &&
-    left.style === right.style &&
     left.question === right.question &&
     left.options.length === right.options.length &&
     left.options.every((option, index) => option === right.options[index])
@@ -4282,8 +4856,47 @@ function sameQuestion(
 
 function questionAnswer(
   input: unknown,
-  options: number
+  review: NativeQuestionReview
 ): NativeChatQuestionAnswer {
+  if (!("questions" in review))
+    return singleQuestionAnswer(input, review.options.length);
+
+  const batch = record(input);
+  if (
+    !batch ||
+    batch.kind !== "batch" ||
+    Object.keys(batch).length !== 2 ||
+    !Array.isArray(batch.answers) ||
+    batch.answers.length !== review.questions.length
+  )
+    throw new Error("native_chat_question_answer_invalid");
+
+  const byId = new Map<string, unknown>();
+  for (const value of batch.answers) {
+    const entry = record(value);
+    if (
+      !entry ||
+      Object.keys(entry).length !== 2 ||
+      typeof entry.id !== "string" ||
+      byId.has(entry.id)
+    )
+      throw new Error("native_chat_question_answer_invalid");
+    byId.set(entry.id, entry.answer);
+  }
+
+  return {
+    kind: "batch",
+    answers: review.questions.map(({ id, options }) => ({
+      id,
+      answer: singleQuestionAnswer(byId.get(id), options.length),
+    })),
+  };
+}
+
+function singleQuestionAnswer(
+  input: unknown,
+  options: number
+): NativeChatSingleQuestionAnswer {
   const answer = record(input);
   if (answer) {
     const fields = Object.keys(answer).length;
@@ -4355,13 +4968,25 @@ function submitSelections(
   surfaces: NativeEditorSurfaceSelection | undefined,
   effort: NativeChatEffort | undefined,
   selectionRevision?: unknown,
-  editorContext?: NativeEditorObservation
+  editorContext?: NativeEditorObservation,
+  webSearch?: unknown
 ): [
   surfaces?: NativeEditorSurfaceSelection,
   effort?: NativeChatEffort,
   selectionRevision?: number,
   editorContext?: NativeEditorObservation,
+  webSearch?: true,
 ] {
+  if (webSearch !== undefined) {
+    if (webSearch !== true) throw new Error("web_search_invalid");
+    return [
+      surfaces,
+      effort,
+      selectionRevision as number | undefined,
+      editorContext,
+      true,
+    ];
+  }
   if (editorContext)
     return [
       surfaces,
@@ -4373,6 +4998,21 @@ function submitSelections(
     return [surfaces, effort, selectionRevision as number];
   if (effort) return [surfaces, effort];
   return surfaces ? [surfaces] : [];
+}
+
+function receiptAfterBrowserChange(
+  error: unknown,
+  prior: NativeChatAcceptance | null
+): NativeChatAcceptance {
+  // The host verifies captured editor context before checking the live
+  // browser lease. Recover only the already accepted receipt in this case.
+  if (
+    prior &&
+    error instanceof Error &&
+    error.message === "submission_browser_tools_changed"
+  )
+    return prior;
+  throw error;
 }
 
 function requireObservation(

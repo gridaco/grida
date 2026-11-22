@@ -1,3 +1,5 @@
+import type { WebPreview } from "./web-preview";
+
 /**
  * GRIDA-SEC-016 — bounded native browser values and destination validation.
  * DTO validation establishes no caller or guest authority.
@@ -14,6 +16,15 @@ export namespace DesktopBrowser {
   export const MAX_THUMBNAIL_BYTES = 64 * 1024;
   export const MAX_FAVICON_EDGE = 256;
   export const MAX_FAVICON_BYTES = 64 * 1024;
+  export const MAX_LINK_IMAGE_EDGE = 640;
+  export const MAX_LINK_IMAGE_BYTES = 128 * 1024;
+  export const MAX_LINK_IMAGE_SOURCE_EDGE = 4096;
+  export const MAX_LINK_IMAGE_SOURCE_BYTES = 2 * 1024 * 1024;
+  export const LINK_IMAGE_SOURCE_MIME_TYPES = Object.freeze([
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+  ] as const);
   export const FAVICON_MIME_TYPES = Object.freeze([
     "image/png",
     "image/x-icon",
@@ -451,6 +462,19 @@ export namespace DesktopBrowser {
     thumbnail?(request: Target): Promise<Thumbnail | null>;
     /** Optional enrichment; stable reads do not emit another page outcome. */
     favicon?(request: Target): Promise<Favicon | null>;
+    /** Optional, document-bound loopback metadata for an on-screen link. */
+    preview?(request: WebPreview.Request): Promise<WebPreview.Metadata | null>;
+    cancelPreview?(request: WebPreview.Cancel): Promise<void>;
+    /** Optional, document-bound display text and raster images from a public link. */
+    previewPublicLink?(
+      request: WebPreview.Request
+    ): Promise<WebPreview.Metadata | null>;
+    cancelPublicLinkPreview?(request: WebPreview.Cancel): Promise<void>;
+    /** Optional on older hosts. Null means the lookup did not complete. */
+    lookupPreview?(
+      kind: WebPreview.Kind,
+      request: WebPreview.Request
+    ): Promise<WebPreview.Result | null>;
     /**
      * Native confirms clearing the app-wide browser profile from an admitted
      * workspace or Settings document, then rechecks its generation. False is
@@ -607,14 +631,15 @@ export namespace DesktopBrowser {
     const valid =
       mime === "image/x-icon" || mime === "image/vnd.microsoft.icon"
         ? ico(bytes)
-        : iconSize(
+        : boundedImageSize(
             mime === "image/png"
               ? pngSize(bytes)
               : mime === "image/jpeg"
                 ? jpegSize(bytes)
                 : mime === "image/webp"
                   ? webpSize(bytes)
-                  : gifSize(bytes)
+                  : gifSize(bytes),
+            MAX_FAVICON_EDGE
           );
     return valid ? Object.freeze({ dataUrl }) : null;
   }
@@ -639,15 +664,15 @@ export namespace DesktopBrowser {
 
   type ImageSize = { width: number; height: number };
 
-  function iconSize(size: ImageSize | null): boolean {
+  function boundedImageSize(size: ImageSize | null, maxEdge: number): boolean {
     return (
       size !== null &&
       Number.isInteger(size.width) &&
       Number.isInteger(size.height) &&
       size.width > 0 &&
       size.height > 0 &&
-      size.width <= MAX_FAVICON_EDGE &&
-      size.height <= MAX_FAVICON_EDGE
+      size.width <= maxEdge &&
+      size.height <= maxEdge
     );
   }
 
@@ -665,7 +690,10 @@ export namespace DesktopBrowser {
     return result;
   }
 
-  function pngSize(bytes: string): ImageSize | null {
+  function pngSize(
+    bytes: string,
+    maxEdge = MAX_FAVICON_EDGE
+  ): ImageSize | null {
     if (!bytes.startsWith("\x89PNG\r\n\x1a\n")) return null;
     let offset = 8;
     let size: ImageSize | null = null;
@@ -685,7 +713,7 @@ export namespace DesktopBrowser {
         const depth = bytes.charCodeAt(data + 8);
         const color = bytes.charCodeAt(data + 9);
         if (
-          !iconSize(size) ||
+          !boundedImageSize(size, maxEdge) ||
           !(
             (color === 0 && [1, 2, 4, 8, 16].includes(depth)) ||
             (color === 3 && [1, 2, 4, 8].includes(depth)) ||
@@ -834,7 +862,7 @@ export namespace DesktopBrowser {
     if (!["GIF87a", "GIF89a"].includes(bytes.slice(0, 6)) || bytes.length < 14)
       return null;
     const size = { width: uint(bytes, 6, 2), height: uint(bytes, 8, 2) };
-    if (!iconSize(size)) return null;
+    if (!boundedImageSize(size, MAX_FAVICON_EDGE)) return null;
     let offset = 13;
     if ((bytes.charCodeAt(10) & 0x80) !== 0)
       offset += 3 * (2 << (bytes.charCodeAt(10) & 7));
@@ -892,6 +920,37 @@ export namespace DesktopBrowser {
     return null;
   }
 
+  /** Header preflight before an untrusted banner is passed to a codec. */
+  export function isBoundedLinkImageSource(
+    mime: string,
+    bytes: string
+  ): boolean {
+    if (bytes.length > MAX_LINK_IMAGE_SOURCE_BYTES) return false;
+    const size =
+      mime === "image/png"
+        ? pngSize(bytes, MAX_LINK_IMAGE_SOURCE_EDGE)
+        : mime === "image/jpeg"
+          ? jpegSize(bytes)
+          : mime === "image/webp"
+            ? webpSize(bytes)
+            : null;
+    return boundedImageSize(size, MAX_LINK_IMAGE_SOURCE_EDGE);
+  }
+
+  /** Accepts only a bounded JPEG returned by the public link preview. */
+  export function parseLinkImage(value: unknown): WebPreview.LinkImage | null {
+    if (
+      !record(value) ||
+      !keys(value, ["dataUrl"]) ||
+      typeof value.dataUrl !== "string"
+    )
+      return null;
+    const size = jpegDataUrlSize(value.dataUrl, MAX_LINK_IMAGE_BYTES);
+    return boundedImageSize(size, MAX_LINK_IMAGE_EDGE)
+      ? Object.freeze({ dataUrl: value.dataUrl })
+      : null;
+  }
+
   /** Accepts a bounded JPEG projection and verifies its encoded dimensions. */
   export function parseThumbnail(value: unknown): Thumbnail | null {
     if (
@@ -908,37 +967,25 @@ export namespace DesktopBrowser {
       typeof value.dataUrl !== "string"
     )
       return null;
-    const prefix = "data:image/jpeg;base64,";
-    const maxBase64 = 4 * Math.ceil(MAX_THUMBNAIL_BYTES / 3);
-    if (
-      value.dataUrl.length > prefix.length + maxBase64 ||
-      !value.dataUrl.startsWith(prefix)
-    )
+    const size = jpegDataUrlSize(value.dataUrl, MAX_THUMBNAIL_BYTES);
+    if (!size || size.width !== value.width || size.height !== value.height)
       return null;
-    const encoded = value.dataUrl.slice(prefix.length);
-    if (
-      !encoded ||
-      encoded.length % 4 !== 0 ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-        encoded
-      )
-    )
-      return null;
-    try {
-      const bytes = atob(encoded);
-      if (bytes.length > MAX_THUMBNAIL_BYTES || btoa(bytes) !== encoded)
-        return null;
-      const size = jpegSize(bytes);
-      if (!size || size.width !== value.width || size.height !== value.height)
-        return null;
-    } catch {
-      return null;
-    }
     return Object.freeze({
       dataUrl: value.dataUrl,
       width: value.width,
       height: value.height,
     });
+  }
+
+  function jpegDataUrlSize(value: string, maxBytes: number): ImageSize | null {
+    const prefix = "data:image/jpeg;base64,";
+    if (
+      value.length > prefix.length + 4 * Math.ceil(maxBytes / 3) ||
+      !value.startsWith(prefix)
+    )
+      return null;
+    const bytes = imageBytes(value.slice(prefix.length), maxBytes);
+    return bytes ? jpegSize(bytes) : null;
   }
 
   /** Header validation for 8-bit baseline/progressive JPEG images. */

@@ -19,23 +19,22 @@ export type ChatGptAuthStart = {
 };
 
 /**
- * The closed Grida catalog projection supported by the ChatGPT subscription
- * adapter. Session and picker ids stay namespaced; the server-only adapter
- * maps them to the backend's bare wire names.
+ * Bundled ChatGPT subscription seed for clients without a newer snapshot.
+ * Session IDs use the canonical model and execution uses the agent selector.
  */
 /* generated:chatgpt-subscription:start */
-// Product membership: data/ai/chatgpt-subscription.json; wire bindings: @grida/ai-models@2.20261117.0.
+// Bundled selectors from agents.json and canonical text cards: @grida/ai-models@2.20261121.1.
 export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
   "openai/gpt-6.2-sol",
-  "openai/gpt-6.2-astra",
-  "openai/gpt-6.1-sol",
-  "openai/gpt-6-astra",
-  "openai/gpt-6.1-terra",
-  "openai/gpt-6-luna",
-  "openai/gpt-6-sol",
+  "openai/gpt-5.6-luna",
   "openai/gpt-5.6-sol",
   "openai/gpt-5.6-terra",
-  "openai/gpt-5.6-luna",
+  "openai/gpt-6-astra",
+  "openai/gpt-6-luna",
+  "openai/gpt-6-sol",
+  "openai/gpt-6.1-sol",
+  "openai/gpt-6.1-terra",
+  "openai/gpt-6.2-astra",
 ] as const;
 export const CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID =
   "openai/gpt-6.2-sol" as const;
@@ -45,38 +44,8 @@ export const CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS = [
   "openai/gpt-5.4",
 ] as const;
 export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = {
-  "openai/gpt-6.2-sol": {
-    label: "GPT-6.2 Sol",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6.2-astra": {
-    label: "GPT-6.2 Astra",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6.1-sol": {
-    label: "GPT-6.1 Sol",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6-astra": {
-    label: "GPT-6 Astra",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6.1-terra": {
-    label: "GPT-6.1 Terra",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6-luna": {
-    label: "GPT-6 Luna",
-    context_window: 1050000,
-    image_input: true,
-  },
-  "openai/gpt-6-sol": {
-    label: "GPT-6 Sol",
+  "openai/gpt-5.6-luna": {
+    label: "GPT-5.6 Luna",
     context_window: 1050000,
     image_input: true,
   },
@@ -90,23 +59,53 @@ export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = {
     context_window: 1050000,
     image_input: true,
   },
-  "openai/gpt-5.6-luna": {
-    label: "GPT-5.6 Luna",
+  "openai/gpt-6-astra": {
+    label: "GPT-6 Astra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6-luna": {
+    label: "GPT-6 Luna",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6-sol": {
+    label: "GPT-6 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.1-sol": {
+    label: "GPT-6.1 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.1-terra": {
+    label: "GPT-6.1 Terra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.2-astra": {
+    label: "GPT-6.2 Astra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.2-sol": {
+    label: "GPT-6.2 Sol",
     context_window: 1050000,
     image_input: true,
   },
 } as const;
 export const CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID = {
-  "openai/gpt-6.2-sol": "gpt-6.2-sol",
-  "openai/gpt-6.2-astra": "gpt-6.2-astra",
-  "openai/gpt-6.1-sol": "gpt-6.1-sol",
-  "openai/gpt-6-astra": "gpt-6-astra",
-  "openai/gpt-6.1-terra": "gpt-6.1-terra",
-  "openai/gpt-6-luna": "gpt-6-luna",
-  "openai/gpt-6-sol": "gpt-6-sol",
+  "openai/gpt-5.6-luna": "gpt-5.6-luna",
   "openai/gpt-5.6-sol": "gpt-5.6-sol",
   "openai/gpt-5.6-terra": "gpt-5.6-terra",
-  "openai/gpt-5.6-luna": "gpt-5.6-luna",
+  "openai/gpt-6-astra": "gpt-6-astra",
+  "openai/gpt-6-luna": "gpt-6-luna",
+  "openai/gpt-6-sol": "gpt-6-sol",
+  "openai/gpt-6.1-sol": "gpt-6.1-sol",
+  "openai/gpt-6.1-terra": "gpt-6.1-terra",
+  "openai/gpt-6.2-astra": "gpt-6.2-astra",
+  "openai/gpt-6.2-sol": "gpt-6.2-sol",
 } as const;
 /* generated:chatgpt-subscription:end */
 
@@ -124,6 +123,18 @@ export function isChatGptProviderId(
 ): id is typeof CHATGPT_PROVIDER_ID {
   return id === CHATGPT_PROVIDER_ID;
 }
+
+/** Current optional turn features on one captured subscription model. Standard
+ * inference works independently of discovery. No account identity is exposed. */
+export type ChatGptTurnCapabilities = Readonly<{
+  status:
+    | "available"
+    | "unsupported"
+    | "unavailable"
+    | "reauthenticationRequired";
+  speeds: readonly ("fast" | "ultrafast")[];
+  webSearch: boolean;
+}>;
 
 export type ChatGptSubscriptionAccount = {
   id?: string;

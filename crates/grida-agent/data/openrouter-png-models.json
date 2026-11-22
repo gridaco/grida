@@ -1,5 +1,5 @@
 {
-  "models_release": "2.20261117.0",
+  "models_release": "2.20261121.1",
   "models": [
     "anthropic/claude-fable-5",
     "anthropic/claude-fable-5.1",

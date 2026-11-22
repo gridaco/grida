@@ -16,6 +16,10 @@ class MemoryBlobs implements ComposerDraftBlobs {
   async delete(key: string) {
     this.items.delete(key);
   }
+  async transfer(key: string, value: ComposerDraftBlob, retiredKey: string) {
+    this.items.set(key, value);
+    this.items.delete(retiredKey);
+  }
 }
 
 class MemoryStorage implements Storage {
@@ -48,6 +52,224 @@ const doc = (text: string) => ({
 });
 
 describe("ComposerDrafts", () => {
+  it("recovers only the captured draft revision when staging crosses a restart", async () => {
+    const storage = new MemoryStorage();
+    const blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(storage, blobs);
+    const key = "w:chat";
+    const document = doc("Same words");
+    drafts.write(key, document);
+    const documentKey = ComposerDrafts.prefix + key;
+    const capturedRow = storage.getItem(documentKey)!;
+    const attachment = {
+      kind: "file" as const,
+      name: "brief.txt",
+      bytes: new ArrayBuffer(4),
+    };
+    await drafts.writeAttachment(key, attachment);
+    await drafts.stageOutgoing(
+      key,
+      {
+        inputId: "local-id",
+        text: "Same words",
+        mode: "submit",
+        allowLibrarySelection: false,
+        attachment,
+        outgoing: { id: "local-id", staged: true, document },
+      },
+      true,
+      attachment
+    );
+
+    // The pending transaction committed, but the old text survived a crash
+    // before the distinct local-storage document could be rotated.
+    storage.setItem(documentKey, capturedRow);
+    const interrupted = new ComposerDrafts(storage, blobs);
+    expect(await interrupted.readPending(key)).toMatchObject({
+      text: "Same words",
+      attachment,
+    });
+    expect(interrupted.read(key)).toBeNull();
+    expect(await interrupted.readAttachment(key)).toBeNull();
+
+    // Identical words entered in the next draft have their own revision.
+    const next = new ComposerDrafts(storage, blobs);
+    next.write(key, document);
+    await next.writeAttachment(key, attachment);
+    const reopened = new ComposerDrafts(storage, blobs);
+    await reopened.readPending(key);
+    expect(reopened.read(key)).toEqual(document);
+    expect(await reopened.readAttachment(key)).toEqual(attachment);
+  });
+
+  it.each(["before", "after"] as const)(
+    "keeps both drafts and their exact attachments when reloaded %s the capture transaction commits",
+    async (when) => {
+      const storage = new MemoryStorage(),
+        blobs = new MemoryBlobs();
+      const drafts = new ComposerDrafts(storage, blobs);
+      const key = "w:chat";
+      const document = doc("Same words");
+      const original = {
+        kind: "file" as const,
+        name: "same.txt",
+        bytes: new Uint8Array([1]).buffer,
+      };
+      drafts.write(key, document);
+      await drafts.writeAttachment(key, original);
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const transfer = blobs.transfer.bind(blobs);
+      vi.spyOn(blobs, "transfer").mockImplementation(async (...args) => {
+        if (when === "after") await transfer(...args);
+        started.resolve();
+        await release.promise;
+        if (when === "before") await transfer(...args);
+      });
+      const staged = drafts.stageOutgoing(
+        key,
+        {
+          inputId: "local-id",
+          text: "Same words",
+          mode: "submit",
+          allowLibrarySelection: false,
+          attachment: original,
+          outgoing: { id: "local-id", staged: true, document },
+        },
+        true,
+        original
+      );
+      try {
+        await started.promise;
+        drafts.write(key, null);
+        drafts.write(key, document);
+        // The restarted renderer sees only transactions completed at reload.
+        const disk = new MemoryBlobs(),
+          kept = new MemoryStorage();
+        for (const [name, value] of blobs.items) disk.items.set(name, value);
+        for (let i = 0; i < storage.length; i++) {
+          const name = storage.key(i)!;
+          kept.setItem(name, storage.getItem(name)!);
+        }
+        const reopened = new ComposerDrafts(kept, disk);
+        expect(reopened.isRecoveringRotation(key)).toBe(true);
+        expect(await reopened.readPending(key)).toMatchObject({
+          inputId: "local-id",
+          text: "Same words",
+          attachment: original,
+        });
+        expect(reopened.read(key)).toEqual(document);
+        expect(await reopened.readAttachment(key)).toBeNull();
+        const again = new ComposerDrafts(kept, disk);
+        expect(await again.readPending(key)).toMatchObject({
+          inputId: "local-id",
+          attachment: original,
+        });
+        expect(again.read(key)).toEqual(document);
+      } finally {
+        release.resolve();
+        await staged;
+      }
+    }
+  );
+
+  it("never borrows a replacement file with the captured name during interrupted staging", async () => {
+    const storage = new MemoryStorage(),
+      blobs = new MemoryBlobs();
+    const key = "w:chat",
+      drafts = new ComposerDrafts(storage, blobs);
+    const original = {
+      kind: "file" as const,
+      name: "same.txt",
+      bytes: new Uint8Array([1]).buffer,
+    };
+    const later = { ...original, bytes: new Uint8Array([2]).buffer };
+    await drafts.writeAttachment(key, original);
+    const rejected = vi
+      .spyOn(blobs, "transfer")
+      .mockRejectedValueOnce(new Error("capture aborted"));
+    await expect(
+      drafts.stageOutgoing(
+        key,
+        {
+          inputId: "local-id",
+          text: "Original",
+          mode: "submit",
+          allowLibrarySelection: false,
+          attachment: original,
+          outgoing: { id: "local-id", staged: true },
+        },
+        true,
+        original
+      )
+    ).rejects.toThrow("capture aborted");
+    rejected.mockRestore();
+    drafts.write(key, doc("Follow-up"));
+    await drafts.writeAttachment(key, later);
+    const reopened = new ComposerDrafts(storage, blobs);
+    const recovered = await reopened.readPending(key);
+    expect(recovered?.outgoing).toMatchObject({
+      id: "local-id",
+      missingAttachmentName: "same.txt",
+      retryBlocked: true,
+    });
+    expect(recovered?.attachment).toBeUndefined();
+    expect(await reopened.readAttachment(key)).toEqual(later);
+    expect(reopened.read(key)).toEqual(doc("Follow-up"));
+  });
+
+  it("keeps the missing reference with its draft through reload and promotion until removed or replaced", async () => {
+    const storage = new MemoryStorage(),
+      blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(storage, blobs),
+      source = "w:draft",
+      dest = "w:chat";
+    await drafts.writeAttachment(source, {
+      kind: "reference",
+      name: "local.mov",
+      file: new File([""], "local.mov"),
+    });
+    expect(await drafts.readMissingAttachment(source)).toBeNull();
+    const reopened = new ComposerDrafts(storage, blobs);
+    expect(await reopened.readAttachment(source)).toBeNull();
+    expect(await reopened.readMissingAttachment(source)).toBe("local.mov");
+    await reopened.move(source, dest);
+    const promoted = new ComposerDrafts(storage, blobs);
+    expect(await promoted.readMissingAttachment(source)).toBeNull();
+    expect(await promoted.readMissingAttachment(dest)).toBe("local.mov");
+    await promoted.writeAttachment(dest, null);
+    expect(
+      await new ComposerDrafts(storage, blobs).readMissingAttachment(dest)
+    ).toBeNull();
+    const withoutBlobs = new ComposerDrafts(storage, null);
+    await withoutBlobs.writeMissingAttachment(dest, "unavailable.txt");
+    expect(
+      await new ComposerDrafts(storage, null).readMissingAttachment(dest)
+    ).toBe("unavailable.txt");
+    await withoutBlobs.writeAttachment(dest, null);
+    expect(
+      await new ComposerDrafts(storage, null).readMissingAttachment(dest)
+    ).toBeNull();
+  });
+
+  it("keeps a selection made while the prior attachment is loading", async () => {
+    const blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(null, blobs);
+    const delayed = Promise.withResolvers<ComposerDraftBlob | null>();
+    vi.spyOn(blobs, "get").mockReturnValueOnce(delayed.promise);
+    const stale = drafts.readAttachment("w:c");
+    await Promise.resolve();
+    const selected = {
+      kind: "file" as const,
+      name: "new.txt",
+      bytes: new ArrayBuffer(2),
+    };
+    await drafts.writeAttachment("w:c", selected);
+    delayed.resolve({ ...selected, name: "old.txt" });
+    expect(await stale).toEqual(selected);
+    expect(await drafts.readAttachment("w:c")).toEqual(selected);
+  });
+
   it("keeps a selected original File with the draft across storage reopen", async () => {
     const blobs = new MemoryBlobs();
     const drafts = new ComposerDrafts(null, blobs);
@@ -83,6 +305,54 @@ describe("ComposerDrafts", () => {
     drafts.write("workspace:chat-a", null);
     expect(drafts.read("workspace:chat-a")).toBeNull();
     expect(drafts.read("workspace:chat-b")).toEqual(doc("Another chat"));
+  });
+
+  it("settles only the send that owns each chat's draft", () => {
+    const drafts = new ComposerDrafts(null);
+    const document = doc("The same text in both chats");
+    drafts.write("w:a", document);
+    drafts.write("w:b", document);
+    const earlierA = drafts.beginDocumentSend("w:a", document);
+    const sendB = drafts.beginDocumentSend("w:b", document);
+    const laterA = drafts.beginDocumentSend("w:a", document);
+
+    expect(drafts.settleDocumentSend(earlierA, true)).toBe(false);
+    expect(drafts.read("w:a")).toEqual(document);
+    expect(drafts.settleDocumentSend(laterA, true)).toBe(true);
+    expect(drafts.read("w:a")).toBeNull();
+    expect(drafts.read("w:b")).toEqual(document);
+
+    expect(drafts.settleDocumentSend(sendB, false)).toBe(true);
+    expect(drafts.read("w:b")).toEqual(document);
+    expect(drafts.settleDocumentSend(sendB, true)).toBe(false);
+  });
+
+  it("settles a promoted send without clearing edits under the old key", async () => {
+    const drafts = new ComposerDrafts(null);
+    const document = doc("Send from a new draft");
+    drafts.write("w:new", document);
+    const send = drafts.beginDocumentSend("w:new", document);
+
+    await drafts.move("w:new", "w:created");
+    drafts.write("w:new", document);
+    expect(drafts.settleDocumentSend(send, true)).toBe(true);
+    expect(drafts.read("w:created")).toBeNull();
+    expect(drafts.read("w:new")).toEqual(document);
+  });
+
+  it("keeps an existing destination draft and later edits to the sent draft", async () => {
+    const drafts = new ComposerDrafts(null);
+    const document = doc("The original send");
+    const edited = doc("New edits during the send");
+    drafts.write("w:new", document);
+    drafts.write("w:created", document);
+    const send = drafts.beginDocumentSend("w:new", document);
+
+    await drafts.move("w:new", "w:created");
+    drafts.write("w:new", edited);
+    expect(drafts.settleDocumentSend(send, true)).toBe(true);
+    expect(drafts.read("w:new")).toEqual(edited);
+    expect(drafts.read("w:created")).toEqual(document);
   });
 
   it("survives a new store, as after remounting the composer or restarting", () => {
@@ -250,6 +520,72 @@ describe("durable pending composer sends", () => {
     expect(await new ComposerDrafts(null, blobs).readPending("w:c")).toBeNull();
   });
 
+  it("retries a refused pending promotion before retiring the source capture", async () => {
+    const blobs = new MemoryBlobs(),
+      drafts = new ComposerDrafts(null, blobs);
+    await drafts.writePending("w:draft", pending);
+    const copy = vi
+      .spyOn(blobs, "put")
+      .mockRejectedValueOnce(new Error("copy failed"));
+    await expect(drafts.move("w:draft", "w:chat")).rejects.toThrow(
+      "copy failed"
+    );
+    expect(
+      (await new ComposerDrafts(null, blobs).readPending("w:draft"))?.inputId
+    ).toBe(pending.inputId);
+    await drafts.move("w:draft", "w:chat");
+    expect(copy).toHaveBeenCalledTimes(2);
+    const reopened = new ComposerDrafts(null, blobs);
+    expect(await reopened.readPending("w:draft")).toBeNull();
+    expect(await reopened.readPending("w:chat")).toEqual(pending);
+  });
+
+  it("reports durable Edit failures for the text and original bytes", async () => {
+    const storage = new MemoryStorage(),
+      blobs = new MemoryBlobs(),
+      drafts = new ComposerDrafts(storage, blobs);
+    storage.failWrites = true;
+    expect(() =>
+      drafts.write("w:c", doc("Original"), { requirePersistence: true })
+    ).toThrow("quota exceeded");
+    vi.spyOn(blobs, "put").mockRejectedValueOnce(new Error("quota exceeded"));
+    await expect(
+      drafts.writeAttachment("w:c", pending.attachment, {
+        requirePersistence: true,
+      })
+    ).rejects.toThrow("quota exceeded");
+    await expect(
+      new ComposerDrafts(storage, null).writeAttachment(
+        "w:c",
+        pending.attachment,
+        { requirePersistence: true }
+      )
+    ).rejects.toThrow("native_chat_retry_storage_unavailable");
+  });
+
+  it("restores a board selection with its original pin and token", async () => {
+    const blobs = new MemoryBlobs();
+    const draft = {
+      inputId: "board-message",
+      text: "Which pin is this?",
+      mode: "enqueue",
+      operatingRegime: "act",
+      allowLibrarySelection: false,
+      editorToolContextId: {
+        targetId: crypto.randomUUID(),
+        subject: {
+          kind: "document",
+          path: "/references.canvas/hero.svg",
+          placement: { boardPath: "/references.canvas", pinId: "hero" },
+        },
+      },
+    } as const;
+    await new ComposerDrafts(null, blobs).writePending("workspace:chat", draft);
+    expect(
+      await new ComposerDrafts(null, blobs).readPending("workspace:chat")
+    ).toEqual(draft);
+  });
+
   it("rejects an invalid retry row instead of treating it as a new send", async () => {
     const blobs = new MemoryBlobs();
     blobs.items.set("\0pending:w:c", {
@@ -285,6 +621,38 @@ describe("durable pending composer sends", () => {
       pending.attachment
     );
   });
+
+  it.each([JSON.stringify(["profile", "model"]), false] as const)(
+    "ignores the former draft search choice %j while retaining the frozen submission",
+    async (webSearch) => {
+      const storage = new MemoryStorage(),
+        blobs = new MemoryBlobs();
+      const drafts = new ComposerDrafts(storage, blobs);
+      storage.setItem(
+        ComposerDrafts.modesPrefix + "w:new",
+        JSON.stringify({ plan: true, webSearch })
+      );
+      expect(drafts.readModes("w:new")).toEqual({ plan: true });
+      const submission = {
+        ...pending,
+        ...(webSearch && { webSearch: true as const }),
+      };
+      await drafts.writePending("w:new", submission);
+      await drafts.move("w:new", "w:created");
+      const reopened = new ComposerDrafts(storage, blobs);
+      expect(reopened.readModes("w:another")).toEqual({});
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
+      expect(await reopened.readPending("w:created")).toEqual(submission);
+      await reopened.completePending("w:created", "unrelated");
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
+      await reopened.completePending("w:created", submission.inputId);
+      expect(new ComposerDrafts(storage, blobs).readModes("w:created")).toEqual(
+        {
+          plan: true,
+        }
+      );
+    }
+  );
 
   it("keeps a newer pending input when an older accepted send finishes", async () => {
     const drafts = new ComposerDrafts(null, new MemoryBlobs());
@@ -419,7 +787,7 @@ it("keeps the original attachment row when promotion storage refuses its copy, t
   await expect(drafts.move("w:draft/one", "w:chat")).rejects.toThrow(
     "copy quota"
   );
-  expect(blobs.items.get("w:draft/one")).toEqual(file);
+  expect(blobs.items.get("w:draft/one")).toMatchObject(file);
   expect(blobs.items.has("w:chat")).toBe(false);
   expect(drafts.read("w:draft/one")).toEqual(doc("Original draft"));
   expect(drafts.read("w:chat")).toBeNull();
@@ -479,4 +847,121 @@ it("moves the latest document and modes typed while an attachment copy is still 
     release.resolve();
     await moving;
   }
+});
+
+it.each(["replace", "remove"] as const)(
+  "carries a source attachment %s during asynchronous chat promotion",
+  async (edit) => {
+    const blobs = new MemoryBlobs(),
+      drafts = new ComposerDrafts(null, blobs);
+    const source = "w:draft",
+      dest = "w:chat";
+    const file = {
+      kind: "file" as const,
+      name: "notes.txt",
+      bytes: new Uint8Array([1]).buffer,
+    };
+    const later =
+      edit === "replace"
+        ? { ...file, bytes: new Uint8Array([2]).buffer }
+        : null;
+    await drafts.writeAttachment(source, file);
+    const writing = Promise.withResolvers<void>(),
+      release = Promise.withResolvers<void>();
+    const put = blobs.put.bind(blobs);
+    vi.spyOn(blobs, "put").mockImplementation(async (key, value) => {
+      if (key === dest) {
+        writing.resolve();
+        await release.promise;
+      }
+      await put(key, value);
+    });
+    const moving = drafts.move(source, dest);
+    try {
+      await writing.promise;
+      await drafts.writeAttachment(source, later);
+      release.resolve();
+      await moving;
+      const reopened = new ComposerDrafts(null, blobs);
+      expect(await reopened.readAttachment(dest)).toEqual(later);
+      expect(await reopened.readAttachment(source)).toBeNull();
+    } finally {
+      release.resolve();
+      await moving;
+    }
+  }
+);
+
+it("preserves a destination attachment already on disk while moving a cached source", async () => {
+  const blobs = new MemoryBlobs(),
+    drafts = new ComposerDrafts(null, blobs);
+  const file = {
+    kind: "file" as const,
+    name: "notes.txt",
+    bytes: new Uint8Array([1]).buffer,
+  };
+  const existing = { ...file, bytes: new Uint8Array([2]).buffer };
+  await drafts.writeAttachment("w:draft", file);
+  await new ComposerDrafts(null, blobs).writeAttachment("w:chat", existing);
+  await drafts.move("w:draft", "w:chat");
+  const reopened = new ComposerDrafts(null, blobs);
+  expect(await reopened.readAttachment("w:chat")).toEqual(existing);
+  expect(await reopened.readAttachment("w:draft")).toEqual(file);
+});
+
+it("resumes an interrupted promotion with the latest source attachment after reopening", async () => {
+  const blobs = new MemoryBlobs(),
+    drafts = new ComposerDrafts(null, blobs);
+  const source = "w:draft",
+    dest = "w:chat";
+  const file = {
+    kind: "file" as const,
+    name: "notes.txt",
+    bytes: new Uint8Array([1]).buffer,
+  };
+  const later = { ...file, bytes: new Uint8Array([2]).buffer };
+  await drafts.writeAttachment(source, file);
+  const writing = Promise.withResolvers<void>(),
+    release = Promise.withResolvers<void>();
+  let attempted = 0;
+  const put = blobs.put.bind(blobs);
+  vi.spyOn(blobs, "put").mockImplementation(async (key, value) => {
+    if (key === dest && ++attempted === 1) {
+      writing.resolve();
+      await release.promise;
+    } else if (key === dest && attempted === 2) {
+      throw new Error("copy aborted");
+    }
+    await put(key, value);
+  });
+  const moving = drafts.move(source, dest);
+  await writing.promise;
+  await drafts.writeAttachment(source, later);
+  release.resolve();
+  await expect(moving).rejects.toThrow("copy aborted");
+  const reopened = new ComposerDrafts(null, blobs);
+  await reopened.move(source, dest);
+  expect(await new ComposerDrafts(null, blobs).readAttachment(dest)).toEqual(
+    later
+  );
+  expect(await reopened.readAttachment(source)).toBeNull();
+});
+
+it("retains the source document when its destination cannot be saved", async () => {
+  const storage = new MemoryStorage(),
+    drafts = new ComposerDrafts(storage, new MemoryBlobs());
+  drafts.write("w:draft", doc("Follow-up draft"));
+  storage.failWrites = true;
+  await expect(drafts.move("w:draft", "w:chat")).rejects.toThrow(
+    "quota exceeded"
+  );
+  expect(drafts.read("w:chat")).toBeNull();
+  expect(new ComposerDrafts(storage, null).read("w:draft")).toEqual(
+    doc("Follow-up draft")
+  );
+  storage.failWrites = false;
+  await drafts.move("w:draft", "w:chat");
+  expect(new ComposerDrafts(storage, null).read("w:chat")).toEqual(
+    doc("Follow-up draft")
+  );
 });

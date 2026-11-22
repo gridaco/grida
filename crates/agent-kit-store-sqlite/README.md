@@ -12,7 +12,7 @@ transaction. Earlier turns are retained independently.
 ## Schema and opening
 
 The database carries this store's SQLite application identity and schema
-version 3. Opening an empty database installs the schema in one transaction.
+version 5. Opening an empty database installs the schema in one transaction.
 Opening a version 1 database verifies the original schema and owner profile,
 then adds the conversation catalog in one transaction. The upgrade recovers
 catalog membership from session configuration. Version 1 did not record
@@ -20,8 +20,14 @@ message timestamps, so those conversations have an unknown message time until
 new activity arrives. Version 2 upgrades add a durable read position per chat.
 Existing history starts read. A newly settled final reply records its ID in
 the same transaction as the turn outcome. Acknowledging its displayed revision
-or marking it unread updates only that position. Older binaries refuse the
-upgraded database. Unrecognized
+or marking it unread updates only that position. Version 4 retains context added while a session is idle, anchored after the last turn in the current history view. Adding context does not claim a turn.
+Version 5 retains a private context checkpoint per chat. Compatible review
+sessions can resume the last committed checkpoint. A parallel branch retains
+its initial snapshot through a restart, even when the shared checkpoint has
+advanced. Answering or withdrawing its wait releases that private seed. Closing
+the turn releases any remaining seeds. A changed history view or compatibility
+scope discards incompatible observations. Deleting the chat removes its
+checkpoint. Older binaries refuse the upgraded database. Unrecognized
 schemas, other applications’ files, and non-empty files at version 0 are
 refused unchanged.
 

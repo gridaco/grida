@@ -18,7 +18,7 @@
  */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { AlertCircleIcon } from "lucide-react";
 import {
   SvgEditorCanvas,
@@ -27,7 +27,7 @@ import {
 } from "@grida/svg-editor/react";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceFileSave } from "./use-workspace-file-save";
-import type { WorkspaceSvgText } from "./workspace-svg-text";
+import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import {
   DirtyBadge,
   SaveConflictDialog,
@@ -41,14 +41,14 @@ type LoadState =
 
 export function EditorPaneSvgEditor({
   workspaceId,
-  svgText,
+  bindSvgEditor,
   relPath,
   active,
   onDirtyChange,
   onSaved,
 }: {
   workspaceId: string;
-  svgText?: WorkspaceSvgText;
+  bindSvgEditor?: WorkspaceSurfaceHost["bindSvgEditor"];
   relPath: string;
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
@@ -97,7 +97,7 @@ export function EditorPaneSvgEditor({
     <SvgEditorProvider initialSvg={state.content}>
       <Surface
         workspaceId={workspaceId}
-        svgText={svgText}
+        bindSvgEditor={bindSvgEditor}
         relPath={relPath}
         active={active}
         initialMtime={state.mtime}
@@ -112,7 +112,7 @@ export function EditorPaneSvgEditor({
  * (the save hook's `useSvgEditor` / `useEditorState` throw outside it). */
 function Surface({
   workspaceId,
-  svgText,
+  bindSvgEditor,
   relPath,
   active,
   initialMtime,
@@ -120,7 +120,7 @@ function Surface({
   onSaved,
 }: {
   workspaceId: string;
-  svgText?: WorkspaceSvgText;
+  bindSvgEditor?: WorkspaceSurfaceHost["bindSvgEditor"];
   relPath: string;
   active: boolean;
   initialMtime: number;
@@ -128,9 +128,9 @@ function Surface({
   onSaved?: () => void;
 }) {
   const editor = useSvgEditor();
-  useEffect(
-    () => svgText?.register(relPath, editor),
-    [editor, relPath, svgText]
+  useLayoutEffect(
+    () => bindSvgEditor?.(relPath, relPath, editor),
+    [bindSvgEditor, editor, relPath]
   );
   const save = useWorkspaceFileSave({
     workspaceId,

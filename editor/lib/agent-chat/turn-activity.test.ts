@@ -476,6 +476,160 @@ describe("turn_activity compaction notes", () => {
   });
 });
 
+describe("turn_activity model changes", () => {
+  const recorded = (turnId: string, modelId?: string) => ({
+    turnId,
+    modelId,
+    status: "succeeded" as const,
+    startedAtMs: 0,
+    settledAtMs: 1,
+  });
+
+  it("marks only adjacent turns with known, different models", () => {
+    const records = [
+      recorded("a", "model-a"),
+      recorded("b", "model-a"),
+      recorded("c", "model-b"),
+      recorded("legacy"),
+      recorded("d", "model-c"),
+    ];
+    const blocks = turn_activity.group(
+      records.flatMap(({ turnId }) => turn(turnId)),
+      records,
+      null
+    );
+    expect(
+      blocks.map((block) => block.kind === "turn" && block.modelChange)
+    ).toEqual([
+      undefined,
+      undefined,
+      { from: "model-a", to: "model-b" },
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("uses the live turn's captured model before its first reply arrives", () => {
+    const [first, second] = turn_activity.group(
+      [...turn("a"), turn("b")[0]],
+      [recorded("a", "model-a")],
+      { turnId: "b", modelId: "model-b" }
+    );
+    expect(first).not.toHaveProperty("modelChange");
+    expect(second).toMatchObject({
+      kind: "turn",
+      turnId: "b",
+      finished: false,
+      modelChange: { from: "model-a", to: "model-b" },
+    });
+  });
+
+  it("only uses a snapshot's latest model for the turn it identifies", () => {
+    const messages = [...turn("a"), ...turn("b")];
+    const records = [recorded("a", "model-a")];
+    const latest = { modelId: "model-b", status: "succeeded" as const };
+    expect(
+      turn_activity.group(messages, records, null, {
+        ...latest,
+        turnId: "c",
+      })[1]
+    ).not.toHaveProperty("modelChange");
+    expect(
+      turn_activity.group(messages, records, null, {
+        ...latest,
+        turnId: "b",
+      })[1]
+    ).toMatchObject({ modelChange: { from: "model-a", to: "model-b" } });
+  });
+
+  it("adds the boundary when the previous page becomes visible after reopening", () => {
+    const first = recorded("a", "model-a");
+    const latest = recorded("b", "model-b");
+    expect(
+      turn_activity.group(turn("b"), [latest], null)[0]
+    ).not.toHaveProperty("modelChange");
+    expect(
+      turn_activity.group(
+        [...turn("a"), ...turn("b")],
+        [first, latest],
+        null
+      )[1]
+    ).toMatchObject({ modelChange: { from: "model-a", to: "model-b" } });
+  });
+
+  it("resets model comparison only at an unconfirmed page boundary", () => {
+    const blocks = turn_activity.group(
+      [...turn("a"), ...turn("c"), ...turn("d")],
+      [
+        recorded("a", "model-a"),
+        recorded("c", "model-c"),
+        recorded("d", "model-d"),
+      ],
+      null,
+      null,
+      "c-ask"
+    );
+    expect(blocks[1]).not.toHaveProperty("modelChange");
+    expect(blocks[2]).toMatchObject({
+      modelChange: { from: "model-c", to: "model-d" },
+    });
+  });
+
+  it("compares foreground turns around a compaction notice", () => {
+    const blocks = turn_activity.group(
+      [...turn("a"), ...turn("b")],
+      [
+        recorded("a", "model-a"),
+        {
+          ...recorded("compaction"),
+          compaction: { summary: "Earlier context", automatic: true },
+        },
+        recorded("b", "model-b"),
+      ],
+      null
+    );
+    expect(blocks[1]).toMatchObject({ kind: "compaction" });
+    expect(blocks[2]).toMatchObject({
+      turnId: "b",
+      modelChange: { from: "model-a", to: "model-b" },
+    });
+  });
+});
+
+describe("transcript time dividers", () => {
+  const at = (day: number, hour: number, minute: number) =>
+    new Date(2026, 10, day, hour, minute).getTime();
+  const records = [
+    { turnId: "a", startedAtMs: at(21, 23, 0), settledAtMs: at(21, 23, 20) },
+    { turnId: "b", startedAtMs: at(21, 23, 23), settledAtMs: at(21, 23, 33) },
+    { turnId: "c", startedAtMs: at(21, 23, 43), settledAtMs: at(21, 23, 58) },
+    { turnId: "d", startedAtMs: at(22, 0, 2) },
+  ].map((record) => ({ ...record, status: "succeeded" as const }));
+  const messages = records.flatMap(({ turnId }) => turn(turnId));
+
+  it("marks a ten-minute idle gap or a new local day between turns", () => {
+    const blocks = turn_activity.group(messages, records, null);
+    expect(
+      blocks.flatMap((block) =>
+        block.kind === "turn" ? [block.timeDividerAtMs] : []
+      )
+    ).toEqual([undefined, undefined, at(21, 23, 43), at(22, 0, 2)]);
+  });
+
+  it("skips an incomplete opening and comparisons across a history gap", () => {
+    const blocks = turn_activity.group(
+      messages.slice(1),
+      records,
+      null,
+      null,
+      "c-ask"
+    );
+    expect(blocks[0]).not.toHaveProperty("timeDividerAtMs");
+    expect(blocks[2]).not.toHaveProperty("timeDividerAtMs");
+    expect(blocks[3]).toHaveProperty("timeDividerAtMs", at(22, 0, 2));
+  });
+});
+
 describe("turn_activity.measuredContext", () => {
   it("uses the latest turn's reported size and resets after a compaction", () => {
     expect(

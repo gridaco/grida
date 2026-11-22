@@ -1025,6 +1025,7 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
     const owner = fixture();
     const connection = await NativeGatewayConnection.open(owner.options);
     const editor = "https://editor.fixture.invalid";
+    const paths = ["/ready.svg", "/unconfirmed.svg", "/lost.svg"];
     const send = vi.fn<(channel: string, payload: unknown) => void>();
     const frame = { url: `${editor}/desktop/workspace?id=workspace`, send };
     const contents = Object.assign(new EventEmitter(), {
@@ -1036,32 +1037,40 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
       sender: contents,
       senderFrame: frame,
     } as unknown as IpcMainInvokeEvent;
-    const original = NativeEditorSurfaceEndpoints.prototype.open;
-    let lostCallId: string | undefined;
-    const open = vi
-      .spyOn(NativeEditorSurfaceEndpoints.prototype, "open")
-      .mockImplementation(function (this: NativeEditorSurfaceEndpoints, value) {
-        const reply = original.call(this, value);
-        if (!reply?.requested) return reply;
-        const { path } = value as { path: string };
-        if (path === "/unconfirmed.svg")
-          return { ...reply, callId: randomUUID() };
-        if (path === "/lost.svg") lostCallId = reply.callId;
-        return reply;
-      });
+    const legacyOpen = vi.spyOn(NativeEditorSurfaceEndpoints.prototype, "open");
+    const desktopTools = vi.spyOn(
+      NativeEditorSurfaceEndpoints.prototype,
+      "desktopTools"
+    );
     const channel = NativeAgentProcess.prototype as unknown as {
-      write(message: { result?: { callId?: string } }): void;
+      tryWrite(bytes: Buffer): boolean;
     };
-    const sendFrame = channel.write;
+    const sendFrame = channel.tryWrite;
     let droppedAcks = 0;
+    let mismatchedAcks = 0;
     const write = vi
-      .spyOn(channel, "write")
-      .mockImplementation(function (this: NativeAgentProcess, message) {
-        if (lostCallId && message.result?.callId === lostCallId) {
+      .spyOn(channel, "tryWrite")
+      .mockImplementation(function (this: NativeAgentProcess, bytes) {
+        const message = JSON.parse(bytes.toString());
+        const result = message.result;
+        const ack = result?.message;
+        const path = ack?.result?.structuredContent?.path;
+        if (path === "/lost.svg") {
           droppedAcks++;
-          return;
+          return true;
         }
-        sendFrame.call(this, message);
+        if (path === "/unconfirmed.svg") {
+          mismatchedAcks++;
+          const unconfirmed = {
+            ...message,
+            result: { ...result, message: { ...ack, id: randomUUID() } },
+          };
+          return sendFrame.call(
+            this,
+            Buffer.from(JSON.stringify(unconfirmed) + "\n")
+          );
+        }
+        return sendFrame.call(this, bytes);
       });
     const providerInputs: {
       messages: { role: string; content: string }[];
@@ -1072,8 +1081,20 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
       const step = providerInputs.length;
       const chunk = (delta: unknown, reason: string | null) =>
         `data: ${JSON.stringify({ id: `presentation-${step}`, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+      const tool =
+        step === 1
+          ? { name: "tool_search", arguments: '{"query":"workbench_show"}' }
+          : {
+              name: "workbench_show",
+              arguments: JSON.stringify({
+                target: {
+                  kind: "file",
+                  path: paths[step - 2],
+                },
+              }),
+            };
       const reply =
-        step <= 3
+        step <= 4
           ? chunk(
               {
                 role: "assistant",
@@ -1082,14 +1103,7 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
                     index: 0,
                     id: `present-${step}`,
                     type: "function",
-                    function: {
-                      name: "surface_open",
-                      arguments: JSON.stringify({
-                        path: ["/ready.svg", "/unconfirmed.svg", "/lost.svg"][
-                          step - 1
-                        ],
-                      }),
-                    },
+                    function: tool,
                   },
                 ],
               },
@@ -1143,14 +1157,36 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
         },
         { timeout: 8000 }
       );
-      expect(providerInputs).toHaveLength(4);
+      expect(providerInputs).toHaveLength(5);
+      const initialTools = providerInputs[0].tools.map(
+        (tool) => tool.function.name
+      );
+      expect(initialTools).toContain("tool_search");
+      expect(initialTools).not.toContain("workbench_show");
       expect(
-        providerInputs[0].tools.map((tool) => tool.function.name)
-      ).toContain("surface_open");
-      const results = providerInputs[3].messages
+        providerInputs[1].tools.map((tool) => tool.function.name)
+      ).toContain("workbench_show");
+      expect(
+        providerInputs.flatMap((input) =>
+          input.tools.map((tool) => tool.function.name)
+        )
+      ).not.toContain("surface_open");
+      const results = providerInputs[4].messages
         .filter((message) => message.role === "tool")
         .map((message) => JSON.parse(message.content));
       expect(results).toEqual([
+        expect.objectContaining({
+          status: "succeeded",
+          structured: {
+            matches: expect.arrayContaining([
+              expect.objectContaining({
+                kind: "tool",
+                name: "workbench_show",
+                revision: 2,
+              }),
+            ]),
+          },
+        }),
         expect.objectContaining({
           status: "succeeded",
           structured: expect.objectContaining({
@@ -1162,7 +1198,7 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
         expect.objectContaining({ status: "uncertain" }),
       ]);
       expect(send.mock.calls).toEqual(
-        ["/ready.svg", "/unconfirmed.svg", "/lost.svg"].map((path) => [
+        paths.map((path) => [
           IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
           {
             attachmentId: id,
@@ -1172,15 +1208,41 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
           },
         ])
       );
-      expect(open).toHaveBeenCalledTimes(3);
+      expect(desktopTools.mock.calls.map(([params]) => params)).toEqual([
+        expect.objectContaining({
+          scope: { presentation: true, sources: true },
+          message: expect.objectContaining({ method: "tools/list" }),
+        }),
+        ...paths.map((path) =>
+          expect.objectContaining({
+            scope: { presentation: true, sources: true },
+            message: expect.objectContaining({
+              method: "tools/call",
+              params: expect.objectContaining({
+                name: "workbench_show",
+                arguments: { path },
+                _meta: expect.objectContaining({
+                  "co.grida/definitionRevision": 2,
+                  "co.grida/source": {
+                    id: "workbench",
+                    generation: expect.any(String),
+                  },
+                }),
+              }),
+            }),
+          })
+        ),
+      ]);
+      expect(legacyOpen).not.toHaveBeenCalled();
       expect(droppedAcks).toBe(1);
+      expect(mismatchedAcks).toBe(1);
       await expect(
         ipc.turnSummary(event, id, observed.observationId)
       ).resolves.toMatchObject({
         status: "succeeded",
         text: "Artifact work finished.",
         unresolvedOperations: 2,
-        toolActivity: { succeeded: 1, unresolved: 2 },
+        toolActivity: { succeeded: 2, unresolved: 2 },
       });
       expect(chat.acceptsSavedChatDeletion).toBe(true);
       const entry = await ipc.catalogEntry(event, id);
@@ -1190,7 +1252,8 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
       expect(send).toHaveBeenCalledTimes(3);
     } finally {
       write.mockRestore();
-      open.mockRestore();
+      desktopTools.mockRestore();
+      legacyOpen.mockRestore();
       try {
         await chat?.close();
       } finally {
@@ -1269,20 +1332,27 @@ it.skipIf(!resourcesPath)(
       owner.dispatch.mockImplementation(async (body) => {
         providerInputs.push(JSON.parse(body.toString()));
         const step = providerInputs.length;
-        if (step === 2)
+        if (step === 3)
           ipc.publishEditorSurfaces(
             first.event,
             parent.attachmentId,
             snapshot(open[1])
           );
-        if (step === 3) {
+        if (step === 4) {
           await accepted.promise;
           first.contents.emit("did-start-navigation", { isMainFrame: true });
         }
         const event = (delta: unknown, reason: string | null) =>
           `data: ${JSON.stringify({ id: `step-${step}`, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+        const tool =
+          step === 1
+            ? {
+                name: "tool_search",
+                arguments: '{"query":"workbench_list_tabs"}',
+              }
+            : { name: "workbench_list_tabs", arguments: "{}" };
         const reply =
-          step <= 3
+          step <= 4
             ? event(
                 {
                   role: "assistant",
@@ -1291,7 +1361,7 @@ it.skipIf(!resourcesPath)(
                       index: 0,
                       id: `read-${step}`,
                       type: "function",
-                      function: { name: "surface_list_open", arguments: "{}" },
+                      function: tool,
                     },
                   ],
                 },
@@ -1325,14 +1395,36 @@ it.skipIf(!resourcesPath)(
         },
         { timeout: 5000 }
       );
-      expect(providerInputs).toHaveLength(4);
+      expect(providerInputs).toHaveLength(5);
+      const initialTools = providerInputs[0].tools.map(
+        (tool) => tool.function.name
+      );
+      expect(initialTools).toContain("tool_search");
+      expect(initialTools).not.toContain("workbench_list_tabs");
       expect(
-        providerInputs[0].tools.map((tool) => tool.function.name)
-      ).toContain("surface_list_open");
-      const results = providerInputs[3].messages
+        providerInputs[1].tools.map((tool) => tool.function.name)
+      ).toContain("workbench_list_tabs");
+      expect(
+        providerInputs.flatMap((input) =>
+          input.tools.map((tool) => tool.function.name)
+        )
+      ).not.toContain("surface_list_open");
+      const results = providerInputs[4].messages
         .filter((message) => message.role === "tool")
         .map((message) => JSON.parse(message.content));
       expect(results).toEqual([
+        expect.objectContaining({
+          status: "succeeded",
+          structured: {
+            matches: expect.arrayContaining([
+              expect.objectContaining({
+                kind: "tool",
+                name: "workbench_list_tabs",
+                revision: 2,
+              }),
+            ]),
+          },
+        }),
         expect.objectContaining({
           status: "succeeded",
           structured: { interactive: true, ...snapshot(open[0]) },

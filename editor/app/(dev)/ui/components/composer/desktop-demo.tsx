@@ -1,562 +1,327 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
-import { SquareIcon } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Button } from "@app/ui/components/button";
 import { TooltipProvider } from "@app/ui/components/tooltip";
+import { NativeAgentPane } from "@/scaffolds/desktop/workbench/native-agent-pane";
+import type { Browser } from "@/lib/desktop/browser";
+import { PagePreviews } from "@/lib/desktop/page-previews";
 import {
-  ComposerAttachmentCard,
-  ComposerDropArea,
-  type ComposerTransfer,
-  type ComposerController,
-} from "@/kits/composer";
-import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
-import { ContextMeter } from "@/scaffolds/desktop/shared/context-meter";
-import { NativeComposerQueue } from "@/scaffolds/desktop/workbench/native-composer-tray";
-import type {
-  NativeChatEffort,
-  NativeChatMessage,
-} from "@grida/desktop-bridge";
-import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
-import { DesktopQueueFixture } from "./desktop-queue-fixture";
-import { DesktopSubmissionFixture } from "./desktop-submission-fixture";
-import { DesktopConversation } from "./desktop-conversation";
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
+import type { SubagentPlacement } from "@/scaffolds/desktop/workbench/subagent-placement";
+import { DesktopChatFixture } from "./desktop-chat-fixture";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
+import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
+import type { DesktopRequestFixture } from "./desktop-request-fixture";
 
-/** The production composer and preview surfaces, backed by local fixture state. */
-export function DesktopComposerDemo() {
-  const [generation, setGeneration] = useState(0);
-  const [home, setHome] = useState(false);
-  const [narrow, setNarrow] = useState(false);
-  const [image, setImage] = useState(false);
-  const [fileAttachment, setFileAttachment] = useState(false);
-  const [plan, setPlan] = useState(false);
-  const [goal, setGoal] = useState(false);
-  const [modeNotice, setModeNotice] = useState<string | null>(null);
-  const [active, setActive] = useState<string | null>(fixtures.profiles.active);
-  const [effort, setEffort] = useState<NativeChatEffort>("high");
-  const [queue] = useState(() => new DesktopQueueFixture());
-  const [submission] = useState(() => new DesktopSubmissionFixture());
-  const submissionView = useSyncExternalStore(
-    submission.subscribe,
-    submission.read,
-    submission.read
+const sideChats = { present() {}, withdraw() {} };
+const suggestionPreferences = {
+  get: async () => ({ enabled: true, revision: 1 }),
+  onChange: () => () => {},
+};
+const inlineSubagents: SubagentPlacement = {
+  present: (presentation) => presentation.close(),
+  withdraw() {},
+};
+
+export function DesktopComposerDemo({
+  scenario = "text",
+  queued = false,
+}: {
+  scenario?: conversations.Scenario;
+  queued?: boolean;
+}) {
+  const [fixture, setFixture] = useState(
+    () => new DesktopChatFixture(scenario, queued)
   );
-  const queueView = useSyncExternalStore(
-    queue.subscribe,
-    queue.read,
-    queue.read
+  const [streaming, setStreaming] = useState(scenario === "streaming");
+  const running = useSyncExternalStore(
+    fixture.subscribeRunning,
+    fixture.readRunning,
+    fixture.readRunning
   );
-  const busy = !home && queueView.running;
-  const pendingGoal =
-    !home && queueView.queue.items.some((item) => item.goalStart);
-  const canStartGoal = !image && !fileAttachment && !pendingGoal;
-  const selectGoal = () => {
-    if (!canStartGoal) {
-      setModeNotice(
-        pendingGoal
-          ? "A goal is already waiting in the queue."
-          : "Send or remove the attachment before starting a goal."
-      );
-      return;
-    }
-    setModeNotice(null);
-    setGoal(true);
-  };
-  const [scenario, setScenario] = useState<conversations.Scenario>("text");
-  const [svgTextSelected, setSvgTextSelected] = useState(true);
-  const selectionContext =
-    !home &&
-    scenario === "svg-selection" &&
-    svgTextSelected &&
-    !plan &&
-    !goal &&
-    !image &&
-    !fileAttachment
-      ? "svg-text"
-      : undefined;
-  const [messages, setMessages] = useState<readonly NativeChatMessage[]>(
-    () => conversations.get("text").messages
+  const [narrow, setNarrow] = useState(scenario === "multiple-questions");
+  const selected = useSyncExternalStore(
+    fixture.subscribeSvgSelection,
+    fixture.readSvgSelected,
+    fixture.readSvgSelected
   );
-  const [edit, setEdit] = useState<{
-    messageId: string;
-    text: string;
-    submitting: boolean;
-    error?: string;
+  const submission = useSyncExternalStore(
+    fixture.submission.subscribe,
+    fixture.submission.read,
+    fixture.submission.read
+  );
+  const compaction = useSyncExternalStore(
+    fixture.compaction.subscribe,
+    fixture.compaction.read,
+    fixture.compaction.read
+  );
+  const question = scenario === "question";
+  const webPreview = scenario === "web-preview";
+  const previews = useMemo(
+    () =>
+      new PagePreviews.Controller(async (href, signal) => ({
+        metadata: await fixtures.loadWebPreview(href, signal),
+      })),
+    [fixture]
+  );
+  const [openRequest, setOpenRequest] = useState<{
+    url: string;
+    destination?: Browser.OpenDestination;
   } | null>(null);
-  const laterMessages = edit
-    ? messages.length -
-      messages.findIndex((message) => message.messageId === edit.messageId) -
-      1
-    : 0;
-  const submitEdit = async () => {
-    if (!edit || edit.submitting || !edit.text.trim()) return;
-    const { messageId, text } = edit;
-    setEdit({ ...edit, submitting: true, error: undefined });
-    try {
-      await submission.wait();
-      setMessages((current) => {
-        const index = current.findIndex(
-          (message) => message.messageId === messageId
-        );
-        if (index < 0) return current;
-        return [
-          ...current.slice(0, index),
-          { ...current[index], text, svgTextSelection: undefined },
-        ];
-      });
-      setEdit(null);
-    } catch (error) {
-      setEdit((current) =>
-        current ? { ...current, submitting: false, error: String(error) } : null
-      );
-    }
-  };
-  const draft = useRef<Pick<ComposerController, "appendText" | "focus">>(null);
-  const reset = () => {
-    setGeneration((value) => value + 1);
-    setHome(false);
-    setNarrow(false);
-    setImage(false);
-    setFileAttachment(false);
-    setPlan(false);
-    setGoal(false);
-    setModeNotice(null);
-    setActive(fixtures.profiles.active);
-    setEffort("high");
-    submission.reset();
-    queue.reset();
-    setScenario("text");
-    setSvgTextSelected(true);
-    setMessages(conversations.get("text").messages);
-    setEdit(null);
-  };
-  const submit = async (text: string) => {
-    await submission.wait();
-    if (busy) {
-      queue.enqueue(
-        text,
-        image ? [fixtures.image] : fileAttachment ? [fixtures.file] : undefined,
-        {
-          ...(plan && { operatingRegime: "plan" }),
-          ...(effort === "ultra" && { effort: "ultra" }),
-          ...(goal && {
-            goalStart: {
-              objective: text,
-              criteria: [text],
-              automatic: true,
-              operatingRegime: plan ? "plan" : "act",
-              effort,
-            },
-          }),
-        }
-      );
-    } else {
-      setMessages((current) => [
-        ...current,
-        {
-          messageId: crypto.randomUUID(),
-          role: "user",
-          text,
-          ...(selectionContext && { svgTextSelection: true }),
-          ...(image
-            ? { attachments: [fixtures.image] }
-            : fileAttachment
-              ? { attachments: [fixtures.file] }
-              : {}),
-        },
-      ]);
-    }
-    setImage(false);
-    setFileAttachment(false);
-    setGoal(false);
-    setModeNotice(null);
-  };
+  const openWeb = useCallback<Browser.OpenHandler>((url, destination) => {
+    setOpenRequest({ url, destination });
+    return true;
+  }, []);
 
-  const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
-    if (
-      queueView.queueDraft ||
-      submissionView.pending ||
-      resources.length === 0
-    )
-      return;
-    if (resources.length !== 1) {
-      setModeNotice("Attach one file at a time.");
-      return;
-    }
-    if (goal) {
-      setModeNotice("Remove the goal intent to attach a file.");
-      return;
-    }
-    const resource = resources[0];
-    const raster =
-      resource.kind === "file" &&
-      /^image\/(?:png|jpeg|webp|gif)$/.test(resource.file.type);
-    setImage(raster);
-    setFileAttachment(!raster);
-    setModeNotice(null);
+  useEffect(() => {
+    if (scenario !== "question" || !streaming) return;
+    const text = conversations.question.progress;
+    let length = 0;
+    const timer = window.setInterval(() => {
+      length += 6;
+      fixture.publishProgress(text.slice(0, length));
+      if (length >= text.length) setStreaming(false);
+    }, 150);
+    return () => window.clearInterval(timer);
+  }, [fixture, scenario, streaming]);
+
+  const reset = () => {
+    fixture.resetRequests();
+    setFixture(new DesktopChatFixture(scenario, queued));
+    setStreaming(scenario === "streaming");
+    setOpenRequest(null);
   };
 
   return (
     <TooltipProvider>
-      <main
-        data-testid="desktop-composer-playground"
-        className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6"
-      >
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            Surface
-            <select
-              aria-label="Composer surface"
-              value={home ? "home" : "workspace"}
-              disabled={edit?.submitting}
-              className="h-8 rounded-md border bg-background px-2 text-sm"
-              onChange={(event) => {
-                queue.closeQueueDraft();
-                setEdit(null);
-                setHome(event.currentTarget.value === "home");
-              }}
-            >
-              <option value="workspace">Workspace</option>
-              <option value="home">Home</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2">
-            Conversation
-            <select
-              aria-label="Conversation example"
-              value={scenario}
-              disabled={edit?.submitting}
-              className="h-8 rounded-md border bg-background px-2 text-sm"
-              onChange={(event) => {
-                const next = event.currentTarget
-                  .value as conversations.Scenario;
-                setScenario(next);
-                setEdit(null);
-                setMessages(conversations.get(next).messages);
-                if (next === "svg-selection") {
-                  setSvgTextSelected(true);
-                  queue.setRunning(false);
-                }
-              }}
-            >
-              {conversations.scenarios.map((example) => (
-                <option key={example.id} value={example.id}>
-                  {example.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!home && scenario === "svg-selection" && (
+      <div data-testid="desktop-composer-playground" className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {webPreview && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!running}
+                onClick={() => fixture.setRunning(false)}
+              >
+                Finish reply
+              </Button>
+              {openRequest && (
+                <span
+                  role="status"
+                  className="min-w-0 break-all text-muted-foreground"
+                >
+                  {openRequest.destination === "system"
+                    ? "System browser requested for"
+                    : "Workbench browser requested for"}{" "}
+                  {openRequest.url}
+                </span>
+              )}
+            </>
+          )}
+          {(scenario === "question" || scenario === "streaming") && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={svgTextSelected}
-                onChange={(event) => setSvgTextSelected(event.target.checked)}
+                checked={streaming}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setStreaming(enabled);
+                  if (scenario === "streaming") fixture.setRunning(enabled);
+                }}
               />
-              SVG text selected
+              Streaming
             </label>
           )}
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={busy}
-              disabled={home || !!edit}
-              onChange={(event) => queue.setRunning(event.target.checked)}
-            />
-            Running turn (send to queue)
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={narrow}
-              onChange={(event) => setNarrow(event.target.checked)}
-            />
-            Narrow composer
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={submissionView.hold}
-              disabled={submissionView.pending}
-              onChange={(event) => submission.hold(event.target.checked)}
-            />
-            Hold submission
-          </label>
-          {submissionView.pending && (
+          {(question || scenario === "multiple-questions") && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={narrow}
+                onChange={(event) => setNarrow(event.target.checked)}
+              />
+              Compact pane
+            </label>
+          )}
+          {scenario === "svg-selection" && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(event) =>
+                  fixture.setSvgSelected(event.target.checked)
+                }
+              />
+              Slide item selected
+            </label>
+          )}
+          {queued && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={running}
+                onChange={(event) => fixture.setRunning(event.target.checked)}
+              />
+              Running turn
+            </label>
+          )}
+          {(scenario === "text" || question) && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={submission.hold}
+                disabled={submission.pending}
+                onChange={(event) =>
+                  fixture.submission.hold(event.target.checked)
+                }
+              />
+              {question ? "Hold answer" : "Hold submission"}
+            </label>
+          )}
+          {submission.pending && (
             <>
-              <Button size="sm" variant="outline" onClick={submission.accept}>
-                Accept submission
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={fixture.submission.accept}
+              >
+                {question ? "Accept answer" : "Accept submission"}
               </Button>
-              <Button size="sm" variant="outline" onClick={submission.refuse}>
-                Refuse submission
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={fixture.submission.refuse}
+              >
+                {question ? "Refuse answer" : "Refuse submission"}
               </Button>
             </>
           )}
-          <Button size="sm" variant="outline" onClick={reset}>
-            Reset examples
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Type / or @, use the + menu, click outside or press Escape. Hover or
-          focus a queued message to read it. Drag its handle to reorder, or
-          focus the handle and use Space, arrow keys, then Space. Sends stay on
-          this page.
-        </p>
-        <ComposerDropArea
-          data-testid="desktop-composer-surface"
-          role="region"
-          aria-label={home ? "Home composer surface" : "Chat composer surface"}
-          onTransfer={transferAttachment}
-          className={`mx-auto flex h-[min(44rem,80vh)] min-h-[32rem] w-full flex-col rounded-xl border bg-background p-3 ${narrow ? "max-w-sm" : "max-w-3xl"}`}
-        >
-          {home ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-              <h2 className="text-xl font-medium">
-                What would you like to make?
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Home uses the same composer. Pick a model, effort and intent, or
-                attach a reference before starting.
-              </p>
-            </div>
-          ) : (
-            <DesktopConversation
-              key={`${generation}-${scenario}`}
-              scenario={scenario}
-              messages={messages}
-              running={busy}
-              onEdit={
-                !busy &&
-                !edit &&
-                !queueView.queueDraft &&
-                !submissionView.pending
-                  ? (messageId) => {
-                      const message = messages.find(
-                        (entry) => entry.messageId === messageId
-                      );
-                      if (message)
-                        setEdit({
-                          messageId,
-                          text: message.text ?? "",
-                          submitting: false,
-                        });
-                    }
-                  : undefined
-              }
-              edit={
-                edit
-                  ? {
-                      ...edit,
-                      note: edit.error ? (
-                        <span role="alert">{edit.error}</span>
-                      ) : (
-                        <p>
-                          {laterMessages > 0
-                            ? `Replaces this and ${laterMessages} later ${laterMessages === 1 ? "message" : "messages"}.`
-                            : "Replaces this message."}{" "}
-                          Completed work isn’t undone.
-                        </p>
-                      ),
-                      onChange: (text) => setEdit({ ...edit, text }),
-                      onCancel: () => setEdit(null),
-                      onSubmit: () => void submitEdit(),
-                    }
-                  : undefined
-              }
+          {question && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fixture.expireQuestions()}
+            >
+              Expire question
+            </Button>
+          )}
+          {scenario === "loading" && (
+            <>
+              <ReadControls label="Model read" fixture={fixture.modelsRead} />
+              <ReadControls label="Access read" fixture={fixture.accessRead} />
+            </>
+          )}
+          {scenario === "reconnect" && (
+            <ReadControls
+              label="Reconnection"
+              fixture={fixture.reconnect}
+              disconnect={() => fixture.disconnect()}
             />
           )}
-          {!home && queueView.steered.length > 0 && (
-            <div
-              role="status"
-              aria-label="Steering preview"
-              className="space-y-1"
+          {scenario === "compaction" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!compaction.pending}
+              onClick={fixture.compaction.accept}
             >
-              <p className="text-xs font-medium text-muted-foreground">
-                Steered into the running turn (local preview)
-              </p>
-              <p className="whitespace-pre-wrap break-words">
-                {queueView.steered.at(-1)}
-              </p>
-            </div>
+              Finish compaction
+            </Button>
           )}
-          {!home && queueView.count > 0 && (
-            <div className="mx-2 shrink-0 divide-y overflow-hidden rounded-t-xl border border-b-0 bg-background text-sm">
-              <NativeComposerQueue
-                controller={queue}
-                view={queueView}
-                queue={queueView.queue}
-                count={queueView.count}
-                onReturnedText={(text) => {
-                  void draft.current?.appendText(text, 512 * 1024);
-                  draft.current?.focus();
-                }}
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={reset}>
+            Reset
+          </Button>
+        </div>
+        <div
+          className={`flex w-full flex-col overflow-hidden rounded-xl border bg-background ${
+            narrow
+              ? "h-[36rem] max-w-[23rem]"
+              : scenario === "streaming"
+                ? "h-[30rem]"
+                : "h-[min(42rem,80vh)] min-h-[36rem]"
+          }`}
+        >
+          <BrowserOpen value={webPreview ? openWeb : null}>
+            <BrowserPreview value={webPreview ? previews : null}>
+              <NativeAgentPane
+                key={fixture.sessionId}
+                bridge={fixture.bridge}
+                predictionPreferences={
+                  scenario === "suggested-prompt"
+                    ? suggestionPreferences
+                    : undefined
+                }
+                initialSession={fixture.sessionId}
+                editorSurfaces={
+                  scenario === "svg-selection"
+                    ? fixture.editorSurfaces
+                    : undefined
+                }
+                sideChatPlacement={sideChats}
+                libraryRequestSource={
+                  scenario === "library-request"
+                    ? fixtures.libraryRequestSource
+                    : undefined
+                }
+                subagentPlacement={
+                  scenario === "subagents" ? inlineSubagents : undefined
+                }
+                autofocus={false}
               />
-            </div>
-          )}
-          {modeNotice && (
-            <p
-              role="status"
-              className="px-1 pb-1 text-xs text-muted-foreground"
-            >
-              {modeNotice}
-            </p>
-          )}
-          <AgentComposer
-            key={generation}
-            selectionContext={selectionContext}
-            editing={
-              queueView.queueDraft
-                ? {
-                    id: `${generation}:${queueView.queueDraft.inputId}`,
-                    text: queueView.queueDraft.text,
-                    label: "Editing queued message",
-                    busy: queueView.acting,
-                    allowEmpty: queueView.queueDraft.allowEmpty,
-                    onSave: (text) => queue.saveQueueDraft(text),
-                    onCancel: () => queue.closeQueueDraft(),
-                  }
-                : undefined
-            }
-            catalog={{
-              commands: [],
-              mentions: fixtures.catalog.mentions,
-            }}
-            draftRef={draft}
-            autofocus={false}
-            isStreaming={false}
-            busy={busy}
-            className="@container"
-            canSubmit={!edit && (!goal || canStartGoal)}
-            emptyAction={
-              busy
-                ? {
-                    label: "Pause",
-                    icon: <SquareIcon className="size-3.5" />,
-                    onClick: () => queue.setRunning(false),
-                    confirmWithEscape: true,
-                  }
-                : undefined
-            }
-            awaitSubmission
-            submissionScope={generation}
-            onSubmit={submit}
-            onStop={() => queue.setRunning(false)}
-            allowEmptySubmit={image || fileAttachment}
-            commands={[
-              {
-                id: "plan",
-                run: () => {
-                  setPlan(true);
-                  setModeNotice(null);
-                },
-              },
-              { id: "goal", run: selectGoal },
-              ...(!home
-                ? [
-                    {
-                      id: "compact" as const,
-                      run: () =>
-                        setModeNotice("Compaction is a local preview here."),
-                    },
-                    {
-                      id: "fork" as const,
-                      run: () =>
-                        setModeNotice("Forking is a local preview here."),
-                    },
-                  ]
-                : []),
-            ]}
-            onAttachmentTransfer={transferAttachment}
-            attachments={
-              image ? (
-                <ComposerAttachmentCard
-                  attachment={{
-                    kind: "file",
-                    id: "fixture-image",
-                    name: fixtures.image.name,
-                    mime: "image/jpeg",
-                    url: fixtures.imageUrl,
-                  }}
-                  onRemove={() => {
-                    setImage(false);
-                    setModeNotice(null);
-                  }}
-                />
-              ) : fileAttachment ? (
-                <ComposerAttachmentCard
-                  attachment={{
-                    kind: "file",
-                    id: "fixture-file",
-                    name: fixtures.file.name,
-                    mime: "text/markdown",
-                  }}
-                  onRemove={() => {
-                    setFileAttachment(false);
-                    setModeNotice(null);
-                  }}
-                />
-              ) : null
-            }
-            actions={{
-              files: {
-                disabled: goal,
-                onSelect: () => {
-                  setFileAttachment(true);
-                  setImage(false);
-                },
-              },
-              image: {
-                disabled: goal,
-                onSelect: () => {
-                  setImage(true);
-                  setFileAttachment(false);
-                },
-              },
-              goal: {
-                active: goal,
-                disabled: !canStartGoal,
-                onChange: (enabled) => {
-                  if (enabled) selectGoal();
-                  else {
-                    setGoal(false);
-                    setModeNotice(null);
-                  }
-                },
-              },
-              plan: { active: plan, onChange: setPlan },
-            }}
-            modelLeading={
-              !home && (
-                <ContextMeter
-                  usage={{
-                    usedTokens: 18000,
-                    maxTokens: 128000,
-                    percent: 18000 / 128000,
-                    breakdown: {
-                      user: 4000,
-                      assistant: 10000,
-                      tools: 4000,
-                      other: 0,
-                    },
-                  }}
-                />
-              )
-            }
-            model={{
-              profiles: { ...fixtures.profiles, active },
-              busy: false,
-              onSelect: (selection) =>
-                setActive(selection.kind === "default" ? null : selection.id),
-              onRefresh: () => {},
-              effort,
-              onEffort: setEffort,
-              ultraAvailable: true,
-              goal,
-            }}
-          />
-        </ComposerDropArea>
-      </main>
+            </BrowserPreview>
+          </BrowserOpen>
+        </div>
+      </div>
     </TooltipProvider>
+  );
+}
+
+function ReadControls({
+  label,
+  fixture,
+  disconnect,
+}: {
+  label: string;
+  fixture: DesktopRequestFixture;
+  disconnect?: () => void;
+}) {
+  const { pending, hold } = useSyncExternalStore(
+    fixture.subscribe,
+    fixture.read,
+    fixture.read
+  );
+  if (!hold && disconnect)
+    return (
+      <Button size="sm" variant="outline" onClick={disconnect}>
+        Disconnect
+      </Button>
+    );
+  if (!pending) return null;
+  return (
+    <div role="group" aria-label={label} className="flex items-center gap-2">
+      <span>{label}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          fixture.hold(false);
+          fixture.accept();
+        }}
+      >
+        Complete
+      </Button>
+      <Button size="sm" variant="outline" onClick={fixture.refuse}>
+        Fail
+      </Button>
+    </div>
   );
 }

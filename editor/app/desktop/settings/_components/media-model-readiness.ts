@@ -47,20 +47,17 @@ export namespace MediaModelReadiness {
     currentHosted?: boolean
   ): boolean | null {
     const providers = model.providers;
-    if (!providers) return false;
+    const hostedAllowed =
+      currentHosted ??
+      (providers !== undefined && Object.hasOwn(providers, "vercel"));
+    if (hostedAllowed && hostedActive === true) return true;
+    if (!providers) return hostedAllowed ? hostedActive : false;
 
     if (
       connectedByokProviderIds &&
       [...connectedByokProviderIds].some((providerId) =>
         Object.prototype.hasOwnProperty.call(providers, providerId)
       )
-    ) {
-      return true;
-    }
-    if (
-      hostedActive === true &&
-      (currentHosted ??
-        Object.prototype.hasOwnProperty.call(providers, "vercel"))
     ) {
       return true;
     }

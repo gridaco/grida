@@ -16,6 +16,14 @@ pub struct Launch {
     pub task: Task,
     #[cfg(target_os = "linux")]
     pub host_namespaces: [u64; 5],
+    /// A single finite launch through the host-mounted SOCKS broker.
+    #[cfg(target_os = "linux")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub broker_password: Option<String>,
+    /// Authentication for the command's host-owned HTTP proxy.
+    #[cfg(target_os = "linux")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_proxy_password: Option<String>,
 }
 
 /// Required in every frame: missing or unknown posture must fail closed.
@@ -110,6 +118,10 @@ mod tests {
             task: Task::Probe,
             #[cfg(target_os = "linux")]
             host_namespaces: [1; 5],
+            #[cfg(target_os = "linux")]
+            broker_password: None,
+            #[cfg(target_os = "linux")]
+            http_proxy_password: None,
         };
         let mut encoded = serde_json::to_value(launch).unwrap();
         assert_eq!(encoded["enforcement"], "unconfined");

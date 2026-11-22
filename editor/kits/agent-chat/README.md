@@ -20,7 +20,28 @@ messages.map((m, i) => (
 
 ## What it renders
 
-- **Text** parts → `MessageResponse` (Streamdown Markdown).
+- **Editor selection** → the live composer supplies the selected layer’s label,
+  such as its shape type or a short text preview. A sent message with captured
+  selection context shows a passive marker.
+- **User text** → renders the composer’s formatting, such as bold, lists,
+  links, quotes, and code. Unsupported Markdown such as headings and tables
+  appears as source text. Answers to question prompts use the same treatment.
+- **Assistant text** → `MessageResponse` (Streamdown Markdown). Web links share the
+  composer's blue style and destination icons. Grida, GitHub, Figma, Linear,
+  Slack, and Notion have their own marks. Google Docs, Sheets, and Drive share
+  the Drive mark. Other web links use a globe.
+  When the containing surface supplies a page preview service, hovering a web
+  or local link opens a card that can show its favicon, image, title,
+  description, and product label. The domain and **Open** action are available
+  immediately. Inline links use the favicon from the shared page snapshot
+  when available. A surface can omit the service to render ordinary links.
+- **Response cards** → the client supplies a footer for a finished answer.
+  `ResponseCards` derives the display data from the retained answer. The
+  containing surface supplies the opener for cards, Markdown web links, and
+  reference links.
+  It may also supply the same page preview service. A visible card can show a title,
+  description, icon, and product label, and releases a pending lookup when
+  it leaves view.
 - **User attachments** → a separate row outside the text bubble. Raster images
   show only a natural-aspect, bounded thumbnail that opens fullscreen; their
   filename stays in accessible and download metadata. Videos, ordinary files
@@ -43,13 +64,17 @@ messages.map((m, i) => (
   Group icons and summary clauses share a ranking by action frequency, with
   the most recently occurring action winning ties. File totals still count
   distinct files; expanding a group keeps its calls in their original order.
+  A shell command with host-supplied actions can show its read, search, or
+  listing target. Each command has one row with the shell command in its
+  details, even when the host reports several actions.
 - **`question` tool** parts → only a passive record in the transcript ("asked you
   …" + the answered summary). The interactive prompt is **session-global**, not a
   transcript card — see below.
 
 Transcript-level indicators (rendered by the surface around the turn list, not
 per message): `PendingTurnIndicator` (labelled **Thinking**, immediately before
-first output and after 1.5 seconds of later quiet) and `CompactionNotice` (where
+first output and after 1.5 seconds of later quiet), `CompactionProgress` (while
+the Desktop `/compact` request is pending), and `CompactionNotice` (where
 earlier context was summarized). Pass a `progress` identity that changes only
 when streamed text or tool activity changes. Progress hides the pending indicator
 immediately and restarts its quiet delay; polling and history replay must not
@@ -91,22 +116,34 @@ loading pixels. Legacy inline `{ok, mime, data}` results remain displayable.
 ## Questions and replies
 
 The surface pins pending questions above the owning chat's composer.
+When space is limited, choices scroll within each prompt while the question,
+write-in, and actions stay in view. The write-in starts on one line and grows as
+the answer wraps. The prompt stack can scroll if several open questions exceed
+the pane's available height.
 A required question waits for an answer or an explicit skip. An optional
-question allows independent work to continue. Close and Skip return it to an
-**Answer question** button in the transcript. The person can reopen their
-draft until the question is answered or the turn ends. Earlier hosts keep
-their explicit skip behavior.
+question allows independent work to continue. Close or Skip puts a single
+optional question back in the transcript as an **Answer question** action.
+Escape puts an optional batch back as **Answer questions**. The person can
+reopen the draft until the question is answered or the turn ends.
 
 `QuestionPrompt` owns its in-progress form selections (the same kind of
 transient UI state as the collapsibles); the **committed** answer leaves through
 `onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
 the agent. `submitDisabled` gates the submission while the surface refreshes
-the review. Draft controls stay editable. Enter in the custom field invokes
-Next or Submit, and Shift+Enter inserts a line break. The kit never touches the
-transport. A native reply carries the host-attributed question and displays it
-above the person's answer in one bubble. The finished turn's **Worked**
-disclosure contains the reply. Survey-shaped tool outputs keep their
-read-only `AnsweredQuestionSummary`.
+the review. In a batch, the arrows in the question counter stay available
+while the review refreshes. Next preserves an answer or skips a blank question.
+Skip and the header’s close button clear the current answer and move forward
+when possible. On the last question, Submit, Skip, and double-clicking a
+choice all request submission.
+The card asks for confirmation if any questions are still unanswered.
+Picking a single choice advances to the next question when there is one.
+Keys 1–9 activate numbered choices. Enter confirms the selected answer.
+Shift+Enter adds a line in a write-in. The kit never touches the transport.
+A native reply displays the host-attributed question above the person's
+answer in one bubble.
+The finished turn's **Worked** disclosure contains the reply. The question
+tool row starts collapsed. Expand it to see the read-only
+`AnsweredQuestionSummary` when the tool recorded an answer.
 
 ## Contract (kit rules)
 
@@ -119,6 +156,7 @@ read-only `AnsweredQuestionSummary`.
     (`PendingTurnIndicator`, `CompactionNotice`).
   - The session-global question prompt: `QuestionPrompt`,
     `AnsweredQuestionSummary`, and the `QuestionAnswerOutput` type.
+  - `AgentPromptCard` for floating requests above the composer.
   - `workspace_links`, the Markdown link handling for workspace paths.
   - The `ChatMessage` / `ChatMessageActions` / `ToolCallEntry` types.
     `toolDisplay` (label/summary formatting) is internal.

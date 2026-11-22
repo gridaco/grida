@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — credential-free host discovery projection for installed clients.
+import type { VisualModels } from "@grida/ai/catalogue";
 import type { GGModel, GGOperation } from "@grida/ai";
 export type GGModelsView = {
   revision: string;
@@ -14,3 +15,10 @@ export type GGModelsView = {
   /** Includes model-less structured features such as typed rig eligibility. */
   endpoint_ids: string[];
 };
+
+/** Renderer-safe choices resolved by the same adapter policy as generation. */
+export type VisualModelCatalogueView = Readonly<{
+  version: string;
+  image: readonly VisualModels.Choice[];
+  video: readonly VisualModels.Choice[];
+}>;

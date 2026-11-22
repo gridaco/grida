@@ -170,6 +170,26 @@ fn command() -> Command {
                         .hide(true),
                 )
                 .arg(
+                    Arg::new("supervised-wire-model")
+                        .long("supervised-wire-model")
+                        .value_name("SELECTOR")
+                        .requires("supervised-provider")
+                        .conflicts_with_all([
+                            "supervised-gateway-scope",
+                            "supervised-configured-endpoint-key",
+                            "credential-env",
+                            "listen",
+                        ])
+                        .hide(true),
+                )
+                .arg(
+                    Arg::new("supervised-image-input")
+                        .long("supervised-image-input")
+                        .requires("supervised-wire-model")
+                        .action(ArgAction::SetTrue)
+                        .hide(true),
+                )
+                .arg(
                     Arg::new("supervised-configured-endpoint-key")
                         .long("supervised-configured-endpoint-key")
                         .value_name("ENDPOINT_ID")
@@ -394,6 +414,20 @@ fn launch(command: Command) -> Command {
                 .value_name("PRIVATE_JSON")
                 .value_parser(value_parser!(PathBuf))
                 .help("Trusted launch profile for explicitly selected workspace roots"),
+        )
+        .arg(
+            Arg::new("allow-scoped-approvals")
+                .long("allow-scoped-approvals")
+                .action(ArgAction::SetTrue)
+                .requires("permission-profile")
+                .help("Offer one-action file approvals, supported command networking and the automatic reviewer for newly accepted work"),
+        )
+        .arg(
+            Arg::new("allow-reviewed-command-retry")
+                .long("allow-reviewed-command-retry")
+                .action(ArgAction::SetTrue)
+                .requires("permission-profile")
+                .help("Allow Act commands to request a reviewed retry with additional sandbox permissions"),
         )
         .arg(
             Arg::new("headless-surface")
@@ -752,7 +786,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             "revision": view.revision,
             "admission_paused": view.admission_paused,
             "input_needed": view.current.as_ref().is_some_and(|turn| !turn.controls.cancelled
-                && grida_agent::host::needs_user_input(&turn.pending_request_schemas)),
+                && grida_agent::host::needs_user_input(&turn.pending_request_schemas, Some(turn.disposition))),
             "current": view.current,
             "latest": view.latest,
         }))
@@ -820,11 +854,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let permissions = args
         .get_one::<PathBuf>("permission-profile")
         .map(|path| {
-            grida_agent::launch_permissions::load_permission_profile_excluding(
+            grida_agent::launch_permissions::load_launch_permission_profile(
                 path,
                 state_dir,
                 provider.credential_home.as_deref(),
                 &launch_secrets,
+                args.get_flag("allow-scoped-approvals"),
+                args.get_flag("allow-reviewed-command-retry"),
             )
         })
         .transpose()?;
@@ -842,7 +878,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             match args.get_one::<String>("supervised-configured-endpoint-key") {
                 Some(key) => grida_agent::SupervisedProvider::for_configured_endpoint(key)?,
                 None => grida_agent::SupervisedProvider::default(),
-            },
+            }
+            .with_model_binding(
+                args.get_one::<String>("supervised-wire-model")
+                    .map(ModelId::new)
+                    .transpose()?,
+                args.get_flag("supervised-image-input"),
+            )?,
         )
     } else {
         None

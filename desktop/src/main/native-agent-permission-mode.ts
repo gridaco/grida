@@ -66,7 +66,7 @@ export class NativeAgentPermissionModes {
       !validMode(result.mode) ||
       !Array.isArray(result.available) ||
       result.available.length < 1 ||
-      result.available.length > 2 ||
+      result.available.length > 3 ||
       !result.available.every(validMode) ||
       new Set(result.available).size !== result.available.length ||
       !result.available.includes(result.mode)
@@ -82,5 +82,9 @@ export class NativeAgentPermissionModes {
 }
 
 function validMode(value: unknown): value is NativeChatPermissionMode {
-  return value === "restricted" || value === "full_access";
+  return (
+    value === "restricted" ||
+    value === "approve_for_me" ||
+    value === "full_access"
+  );
 }

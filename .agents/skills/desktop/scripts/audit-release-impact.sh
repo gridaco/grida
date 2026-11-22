@@ -46,6 +46,7 @@ readonly -a release_paths=(
   turbo.json
   desktop
   skills
+  extensions
   packages/grida-ai-host
   packages/grida-ai
   packages/grida-daemon

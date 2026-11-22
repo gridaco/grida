@@ -57,6 +57,7 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
         session: session.clone(),
         parts: vec![PromptPart::Text { text: text.into() }],
         questions: false,
+        question_batches: false,
         operating_regime: None,
         effort: None,
         reasoning: Default::default(),

@@ -18,6 +18,12 @@ fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Subm
         return Err(problem(ErrorKind::Conflict, "queued_text_not_editable"));
     }
     let prompt = decode_input::<StoredPrompt>(original)?;
+    if prompt.editor_tool_context_id.is_some() && text.trim().is_empty() {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "editor_tool_context_requires_attached_act_text",
+        ));
+    }
     let mut inserted = false;
     let mut parts = Vec::with_capacity(prompt.parts.len() + 1);
     for part in prompt.parts {
@@ -34,11 +40,15 @@ fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Subm
         parts.insert(0, PromptPart::Text { text });
     }
     validate_prompt_record(&parts)?;
-    // Change only the parts member. Unknown captured fields and all existing
-    // settings/authority values survive without recapturing current defaults.
-    let mut value: serde_json::Value = decode_input(original)?;
-    value["parts"] = serde_json::to_value(parts)
-        .map_err(|_| problem(ErrorKind::InvalidState, "input_encoding_failed"))?;
+    // Keep captured settings. The edited words were supplied while this input
+    // was queued, so they cannot inherit the original reply's ordering evidence.
+    let mut value: serde_json::Map<String, serde_json::Value> = decode_input(original)?;
+    value.remove("preceding_turn");
+    value.insert(
+        "parts".into(),
+        serde_json::to_value(parts)
+            .map_err(|_| problem(ErrorKind::InvalidState, "input_encoding_failed"))?,
+    );
     Ok(Submission {
         id,
         payload: Envelope::new(
@@ -115,7 +125,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn text_transformation_preserves_every_other_captured_field_and_refuses_special_inputs() {
+    async fn text_edit_preserves_captured_settings_and_clears_reply_context() {
         let root = tempfile::tempdir().unwrap();
         let host = Host::open(
             &root.path().join("state"),
@@ -154,6 +164,7 @@ mod tests {
                 },
             ],
             questions: true,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: None,
@@ -165,6 +176,7 @@ mod tests {
             .unwrap();
         let mut captured: serde_json::Value = decode_input(&original).unwrap();
         captured["future_capture"] = serde_json::json!({"opaque":"must survive"});
+        captured["preceding_turn"] = serde_json::json!(Fingerprint::of("earlier turn").unwrap());
         original.payload = Envelope::new(
             original.payload.schema().clone(),
             original.payload.version(),
@@ -186,6 +198,7 @@ mod tests {
             ])
         );
         captured.as_object_mut().unwrap().remove("parts");
+        captured.as_object_mut().unwrap().remove("preceding_turn");
         assert_eq!(changed, captured);
         let empty = replacement(&original, ChangeId::new("empty").unwrap(), String::new()).unwrap();
         let empty = decode_input::<StoredPrompt>(&empty).unwrap();

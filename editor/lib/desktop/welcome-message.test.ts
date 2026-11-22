@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { welcome_message } from "./welcome-message";
+import { describe, expect, it, vi } from "vitest";
+import { welcome_message, type WelcomeDraftTransfer } from "./welcome-message";
 import { workflowMessageContext } from "./workflow-message-context";
 import { slidesTemplateMessageContext } from "./slides-message-context";
 
@@ -38,6 +38,168 @@ describe("welcome_message", () => {
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
+  it("does not let an older pane consume a replacement handoff", () => {
+    const storage = memoryStorage();
+    const message = { text: "Look this up", profileId: PROFILE };
+    welcome_message.stash("workspace-a", message, storage);
+    const older = welcome_message.pending("workspace-a", storage)!;
+    expect(older.waiting()).toBe(true);
+    welcome_message.stash("workspace-a", message, storage);
+    expect(older.waiting()).toBe(false);
+    expect(older.peek()).toBeNull();
+    expect(older.take()).toBeNull();
+    const replacement = welcome_message.pending("workspace-a", storage)!;
+    const preview = replacement.peek();
+    expect(preview).toMatchObject({
+      ...message,
+      requestId: expect.any(String),
+    });
+    expect(replacement.peek()).toBe(preview);
+    const claimed = replacement.take();
+    expect(claimed).toMatchObject(preview!);
+    expect(replacement.take()).toBeNull();
+    expect(replacement.peek()).toBe(preview);
+    claimed?.commit?.();
+    expect(replacement.peek()).toBeNull();
+  });
+
+  it("carries the captured request identity and same-window draft transfer into the destination", () => {
+    const storage = memoryStorage();
+    const requestId = crypto.randomUUID();
+    const transferNextDraft = vi.fn<WelcomeDraftTransfer>();
+    const message = {
+      text: "Look this up",
+      profileId: PROFILE,
+      requestId,
+      transferNextDraft,
+    };
+    expect(welcome_message.stash("workspace-a", message, storage)).toBe(true);
+    const pending = welcome_message.pending("workspace-a", storage)!;
+    expect(pending.peek()).toEqual(message);
+    expect(storage.entries.values().next().value).not.toContain(
+      "transferNextDraft"
+    );
+    const claimed = pending.take();
+    expect(claimed).toMatchObject(message);
+    expect(welcome_message.pending("workspace-a", storage)?.peek()).toEqual(
+      message
+    );
+    claimed?.commit?.();
+    expect(welcome_message.pending("workspace-a", storage)).toBeNull();
+  });
+
+  it("allows one window claimant and releases an abandoned request without consuming it", () => {
+    const storage = memoryStorage();
+    const message = {
+      text: "One first message",
+      profileId: PROFILE,
+      requestId: crypto.randomUUID(),
+    };
+    welcome_message.stash("workspace-release", message, storage);
+    const firstPane = welcome_message.pending("workspace-release", storage)!;
+    const remount = welcome_message.pending("workspace-release", storage)!;
+    const claimed = firstPane.take()!;
+    expect(remount.peek()?.requestId).toBe(message.requestId);
+    expect(remount.waiting()).toBe(false);
+    expect(remount.take()).toBeNull();
+    claimed.release?.();
+    expect(remount.waiting()).toBe(true);
+    const replacement = remount.take()!;
+    expect(() => claimed.commit?.()).toThrow("The Home message changed");
+    expect(remount.peek()?.requestId).toBe(message.requestId);
+    replacement.commit?.();
+    expect(remount.peek()).toBeNull();
+  });
+
+  it.each(["read", "remove", "no-op removal"] as const)(
+    "blocks handoff commit on %s failure and permits an exact explicit retry",
+    (failure) => {
+      const storage = memoryStorage();
+      const workspaceId = `workspace-${failure}`;
+      const message = { text: "Keep this message", profileId: PROFILE };
+      welcome_message.stash(workspaceId, message, storage);
+      const pending = welcome_message.pending(workspaceId, storage)!;
+      const claimed = pending.take()!;
+      const operation = failure === "read" ? "getItem" : "removeItem";
+      const failing = vi.spyOn(storage, operation);
+      if (failure === "no-op removal") failing.mockImplementation(() => null);
+      else
+        failing.mockImplementation(() => {
+          throw new Error("storage denied");
+        });
+
+      expect(() => claimed.commit?.()).toThrow(
+        "Couldn't verify the Home message handoff"
+      );
+      failing.mockRestore();
+      expect(pending.peek()?.text).toBe(message.text);
+      claimed.release?.();
+      expect(pending.waiting()).toBe(true);
+      claimed.commit?.();
+      expect(pending.peek()).toBeNull();
+    }
+  );
+
+  it("keeps a replacement Home message when a stale claimant tries to commit", () => {
+    const storage = memoryStorage();
+    welcome_message.stash(
+      "workspace",
+      { text: "Earlier message", profileId: PROFILE },
+      storage
+    );
+    const claimed = welcome_message.pending("workspace", storage)!.take()!;
+    welcome_message.stash(
+      "workspace",
+      { text: "Newer message", profileId: PROFILE },
+      storage
+    );
+
+    expect(() => claimed.commit?.()).toThrow("The Home message changed");
+    expect(welcome_message.pending("workspace", storage)?.peek()?.text).toBe(
+      "Newer message"
+    );
+    claimed.release?.();
+  });
+
+  it("requires a successful read after a claimed handoff was removed", () => {
+    const storage = memoryStorage();
+    welcome_message.stash(
+      "workspace",
+      { text: "Keep this message", profileId: PROFILE },
+      storage
+    );
+    const claimed = welcome_message.pending("workspace", storage)!.take()!;
+    const read = storage.getItem;
+    const failing = vi
+      .spyOn(storage, "getItem")
+      .mockImplementationOnce(read)
+      .mockImplementationOnce(() => {
+        throw new Error("storage denied");
+      });
+
+    expect(() => claimed.commit?.()).toThrow(
+      "Couldn't verify the Home message handoff"
+    );
+    failing.mockRestore();
+    expect(welcome_message.pending("workspace", storage)).toBeNull();
+    claimed.release?.();
+    expect(() => claimed.commit?.()).not.toThrow();
+    expect(() => claimed.commit?.()).not.toThrow();
+  });
+
+  it("keeps the explicit manual approval choice through navigation", () => {
+    const storage = memoryStorage();
+    const message = {
+      text: "Check this",
+      profileId: PROFILE,
+      manualApproval: true as const,
+    };
+    welcome_message.stash("workspace-a", message, storage);
+    expect(welcome_message.takeMessage("workspace-a", storage)).toEqual(
+      message
+    );
+  });
+
   it("hands over settings and the original selected File once", () => {
     const storage = memoryStorage();
     const file = new File(["notes"], "notes.txt", { type: "text/plain" });
@@ -45,9 +207,16 @@ describe("welcome_message", () => {
       text: "Read these notes",
       profileId: PROFILE,
       effort: "high" as const,
+      turnOptions: {
+        profileId: PROFILE,
+        modelId: "subscription-model",
+        speed: "fast" as const,
+        webSearch: true as const,
+      },
       operatingRegime: "plan" as const,
       goal: false,
       preparedSessionId: "abf7864b-6bd5-4d77-9159-7d17ddbed879",
+      preparedMode: "approve_for_me" as const,
       attachment: { kind: "file" as const, file },
     };
     expect(welcome_message.stash("settings", message, storage)).toBe(true);
@@ -110,6 +279,21 @@ describe("welcome_message", () => {
     JSON.stringify({ text: "Ask", profileId: null, effort: "maximum" }),
     JSON.stringify({
       text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { profileId: PROFILE, modelId: "model", speed: "fastest" },
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { profileId: PROFILE, modelId: "model", webSearch: false },
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { modelId: "model", webSearch: true },
+    }),
+    JSON.stringify({
+      text: "Ask",
       profileId: null,
       operatingRegime: "unknown",
     }),
@@ -117,8 +301,14 @@ describe("welcome_message", () => {
     JSON.stringify({
       text: "Ask",
       profileId: null,
+      preparedMode: "approve_for_me",
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
       preparedSessionId: "not-a-session",
     }),
+    JSON.stringify({ text: "Ask", profileId: null, manualApproval: false }),
     JSON.stringify({ text: "Ask", profileId: null, attachment: { token: 4 } }),
     JSON.stringify({
       text: "Ask",

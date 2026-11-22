@@ -11,18 +11,33 @@ import {
 } from "./providers/chatgpt-credentials";
 import {
   ChatGptProvider,
+  type ChatGptModelBinding,
   type ChatGptProviderConfig,
   type ChatGptProviderRuntime,
 } from "./providers/chatgpt";
+import {
+  ChatGptModels,
+  noSubscriptionFeatures,
+} from "./providers/chatgpt-models";
 import { ProviderHttp } from "./providers/http";
 
-export type { ChatGptProviderConfig } from "./providers/chatgpt";
+export type {
+  ChatGptModelBinding,
+  ChatGptModelInventory,
+  ChatGptProviderConfig,
+} from "./providers/chatgpt";
 
 const MAX_CEREMONY_BYTES = 32 * 1024;
 
 type HostOptions = Readonly<{
   userDataPath: string;
   configuration: ChatGptProviderConfig;
+  turnPreferences?: ChatGptProviderRuntime["turnPreferences"];
+  getModels?: (
+    target: string,
+    headers: Headers,
+    signal: AbortSignal
+  ) => Promise<Response | null>;
   post: (
     target: string,
     headers: Headers,
@@ -39,7 +54,13 @@ export class ChatGptSubscriptionHost {
   private readonly inFlight = new Set<Promise<unknown>>();
   private closed = false;
 
-  constructor({ userDataPath, configuration, post }: HostOptions) {
+  constructor({
+    userDataPath,
+    configuration,
+    post,
+    getModels,
+    turnPreferences,
+  }: HostOptions) {
     if (
       !path.isAbsolute(userDataPath) ||
       path.resolve(userDataPath) !== userDataPath
@@ -49,8 +70,24 @@ export class ChatGptSubscriptionHost {
     ChatGptProvider.validate(config);
     const token = new URL(config.oauth.token_url).href;
     const responses = new URL(config.responses_url).href;
+    const models = ChatGptProvider.modelsUrl(config);
     this.http = new ProviderHttp({
       request: async (target, init) => {
+        if (
+          models &&
+          target === models &&
+          init?.method === "GET" &&
+          init.signal &&
+          init.body == null
+        ) {
+          return (
+            (await getModels?.(
+              models,
+              new Headers(init.headers),
+              init.signal
+            )) ?? new Response(null, { status: 503 })
+          );
+        }
         if (
           typeof target !== "string" ||
           init?.method !== "POST" ||
@@ -79,7 +116,12 @@ export class ChatGptSubscriptionHost {
       this.http,
       config.oauth
     );
-    this.runtime = { config, credentials: this.credentials };
+    this.runtime = {
+      config,
+      credentials: this.credentials,
+      catalog: new ChatGptModels(),
+      turnPreferences,
+    };
   }
 
   /** Mint PKCE state for one sign-in through the given loopback callback. */
@@ -113,15 +155,30 @@ export class ChatGptSubscriptionHost {
     return this.ceremony([], () => this.credentials.signOut());
   }
 
-  async capture(modelId: string) {
-    if (this.closed) throw new Error("chatgpt_host_closed");
-    const connection = await ChatGptProvider.captureNative(
-      this.runtime,
-      modelId,
-      this.http
+  scope() {
+    return this.ceremony([], () =>
+      ChatGptProvider.scope(this.runtime, this.http)
     );
+  }
+
+  inventory() {
+    return this.ceremony([], () =>
+      ChatGptProvider.inventory(this.runtime, this.http)
+    );
+  }
+
+  async capture(modelId: string, binding?: ChatGptModelBinding) {
+    if (this.closed) throw new Error("chatgpt_host_closed");
+    const connection = await this.track(
+      ChatGptProvider.captureNative(this.runtime, modelId, this.http, binding)
+    );
+    if (this.closed) throw new Error("chatgpt_host_closed");
     return Object.freeze({
       ...connection,
+      capabilities: () =>
+        this.closed
+          ? Promise.resolve(noSubscriptionFeatures("unavailable"))
+          : this.track(connection.capabilities()),
       request: (body: Uint8Array, signal: AbortSignal) =>
         this.closed
           ? Promise.resolve(null)

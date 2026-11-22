@@ -50,6 +50,7 @@ struct Enqueue {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
     message_context: Option<MessageContext>,
 }
@@ -86,6 +87,8 @@ struct QueueBasis {
 #[request(method = "_co.grida/session/replace", response = QueueResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Replace {
+    #[serde(rename = "_meta")]
+    meta: Option<Meta>,
     queue: QueueBasis,
     input_id: ChangeId,
     replacement_input_id: ChangeId,
@@ -220,6 +223,7 @@ pub(super) fn handlers(
                         request.editor_presentation,
                         request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
+                        request.editor_tool_context_id.as_ref(),
                         false,
                     )?;
                     let mut parts = identified_prompt(
@@ -233,6 +237,8 @@ pub(super) fn handlers(
                     )?;
                     append_editor_context(&mut parts, request.editor_context, &enqueue.1)?;
                     append_message_context(&mut parts, request.message_context, &enqueue.1)?;
+                    let (questions, question_batches) =
+                        questions::support(&enqueue.1, request.meta.as_ref())?;
                     let accepted = enqueue
                         .0
                         .enqueue_with_context(
@@ -240,7 +246,8 @@ pub(super) fn handlers(
                                 id: request.input_id,
                                 session: request.session_id,
                                 parts,
-                                questions: questions::available(&enqueue.1),
+                                questions,
+                                question_batches,
                                 operating_regime: operating_regime(
                                     &enqueue.1,
                                     request.operating_regime,
@@ -249,6 +256,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &enqueue.1,
+                                )?,
                                 initial_title: initial_title(&enqueue.1, request.initial_title)?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),
@@ -258,6 +269,7 @@ pub(super) fn handlers(
                                 editor_presentation: request.editor_presentation,
                                 editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
+                                editor_tool_context_id: request.editor_tool_context_id,
                                 ..SubmissionContext::default()
                             },
                         )
@@ -301,11 +313,14 @@ pub(super) fn handlers(
             async move |request: Replace, responder, _| {
                 let result = async {
                     require(&replace.1, REPLACE, Some(&request.queue.session_id))?;
+                    let (questions, question_batches) =
+                        questions::support(&replace.1, request.meta.as_ref())?;
                     let edit = QueueEdit::Replace {
                         input: request.input_id,
                         replacement: request.replacement_input_id,
                         parts: prompt_parts(request.prompt, image_intake, false)?,
-                        questions: questions::available(&replace.1),
+                        questions,
+                        question_batches,
                     };
                     edit_queue(&replace.0, request.queue, edit).await
                 }

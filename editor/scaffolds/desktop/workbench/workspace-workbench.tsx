@@ -20,8 +20,8 @@
  * The workbench owns the small amount of cross-pane state: which tabs
  * are open, which is active, and a refresh counter that the file tree pane
  * reads when one pane mutates the filesystem (a save in the editor,
- * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
- * context, no store — because nothing else needs to subscribe.
+ * an mkdir/cp/git-mv from the agent pane). It also supplies its browser opener
+ * to the primary chat and the side chats rendered as tabs.
  *
  * Tabs are files or panels (`workbench-tab.ts`). Each of the agent pane's
  * side chats opens as its own panel tab through `SideChatTabPlacement`,
@@ -84,6 +84,11 @@ import { FileTreePane } from "./file-tree-pane";
 import { EditorPane, WorkspaceExplorerToggleButton } from "./editor-pane";
 import { WorkspaceTitleMenu } from "./workspace-title-menu";
 import { AgentPane } from "./agent-pane";
+import { Browser } from "@/lib/desktop/browser";
+import {
+  BrowserOpen,
+  BrowserPreview,
+} from "@/lib/desktop/browser-open-context";
 import { WorkspaceUtilities } from "./workspace-utilities";
 import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
@@ -113,14 +118,12 @@ const FILE_TREE_PANE_MAX = "360px";
 const AGENT_PANE_DEFAULT = "30%";
 const AGENT_PANE_MIN = "320px";
 const EDITOR_PANE_MIN = "360px";
-const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS =
-  "h-full min-h-0 pb-3 pl-1.5 pr-3 pt-1.5";
+const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS = "h-full min-h-0 pt-1.5 pr-3 pb-3";
 const FLOATING_UTILITY_SURFACE_CLASS =
   "relative h-full min-h-0 overflow-hidden rounded-lg border border-border/60 bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]";
 const RESIZE_HANDLE_HIGHLIGHT_CLASS =
   "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 data-[separator=hover]:before:opacity-100 data-[separator=active]:before:via-foreground/70 data-[separator=active]:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
-// The hit box overlaps each pane by 8px and occupies the original 6px gap.
-const CHAT_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-2 w-[22px] cursor-col-resize bg-transparent after:pointer-events-none ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
+const CHAT_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 cursor-col-resize bg-transparent after:pointer-events-none ${RESIZE_HANDLE_HIGHLIGHT_CLASS} ${styles.chatSeparator}`;
 const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 // Bottom utility panel (VSCode-style). Collapsible: dragging it under
@@ -192,6 +195,10 @@ export function WorkspaceWorkbench({
     [workspace.id]
   );
   const { group, browsers } = browserSession;
+  const openWeb = useMemo(
+    () => Browser.opener(browsers.openOrFocus),
+    [browsers]
+  );
   const [browserUIOwner] = useState(() => ({}));
   useLayoutEffect(
     () => browserSession.bindUI(browserUIOwner),
@@ -223,6 +230,8 @@ export function WorkspaceWorkbench({
   // tab only when it is a file.
   const activeRelPath = WorkbenchTab.relPath(activeTab);
   const [restoreSettled, setRestoreSettled] = useState(false);
+  const previews =
+    restoreSettled && browsers.canLoadPreview() ? browsers.previews : null;
 
   useEffect(() => {
     if (restoreSettled)
@@ -364,12 +373,8 @@ export function WorkspaceWorkbench({
     [group, bumpTreeRefresh]
   );
 
-  // ⌘B / Ctrl+B toggles the file tree pane. We intentionally don't
-  // scope this to a particular focused element — the shortcut is
-  // global within the workspace window, matching VSCode. Editable
-  // children that need ⌘B for their own action (rich-text bold, etc.)
-  // would have to consume the event before bubbling, but none of the
-  // current viewers do.
+  // Workspace shortcuts run on bubble so focused controls can claim a chord
+  // with preventDefault() before the workspace handles it.
   //
   // The same listener also dispatches the three file actions
   // (Reveal in Finder / Copy path / Copy relative path) against the
@@ -380,6 +385,8 @@ export function WorkspaceWorkbench({
   // entries being unavailable on an empty viewer).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
+
       // ctrl+` toggles the terminal pane (VSCode). The terminal pane's
       // xterm key handler deliberately lets this chord bubble up here,
       // so the toggle works even while the shell has focus. Key-repeat
@@ -519,9 +526,12 @@ export function WorkspaceWorkbench({
       <WindowContentMarker workspaceId={workspace.id} surface="workbench" />
       <div
         data-testid="workspace-workbench"
-        className="h-screen w-screen overflow-hidden"
+        className={`h-screen w-screen overflow-hidden ${styles.workbench}`}
       >
-        <ResizablePanelGroup className={styles.decorativeOverflow}>
+        <ResizablePanelGroup
+          className={styles.decorativeOverflow}
+          resizeTargetMinimumSize={{ fine: 10, coarse: 10 }}
+        >
           {/* The title bar belongs to the agent column. This keeps the right
               region vertically uninterrupted while retaining the workspace
               identity, navigation, and utility controls exactly where the
@@ -561,20 +571,22 @@ export function WorkspaceWorkbench({
                   <WorkspaceTitleMenu workspace={workspace} />
                 </div>
               </TitleBar>
-              <div className="min-h-0 flex-1">
-                <AgentPane
-                  workspace={workspace}
-                  surfaceHost={surfaceHost}
-                  sideChatPlacement={sideChatPlacement}
-                  subagentPlacement={subagentPlacement}
-                  onProcessesChange={setProcesses}
-                />
+              <div className={`min-h-0 flex-1 ${styles.chatPane}`}>
+                <BrowserOpen value={openWeb}>
+                  <BrowserPreview value={previews}>
+                    <AgentPane
+                      workspace={workspace}
+                      surfaceHost={surfaceHost}
+                      sideChatPlacement={sideChatPlacement}
+                      subagentPlacement={subagentPlacement}
+                      onProcessesChange={setProcesses}
+                    />
+                  </BrowserPreview>
+                </BrowserOpen>
               </div>
             </div>
           </ResizablePanel>
 
-          {/* A generous, invisible gutter preserves resizing without putting
-              a divider back into the visual hierarchy. */}
           <ResizableHandle
             aria-label="Resize chat and document"
             className={CHAT_PANE_RESIZE_HANDLE_CLASS}
@@ -602,30 +614,38 @@ export function WorkspaceWorkbench({
                     orientation="vertical"
                   >
                     <ResizablePanel data-workbench-decorative-overflow>
-                      <EditorPane
-                        workspace={workspace}
-                        svgText={surfaceHost.svgText}
-                        panels={panels}
-                        browsers={browsers}
-                        openTabs={openTabs}
-                        activeTab={activeTab}
-                        dirtyPaths={dirtyPaths}
-                        onTabDirtyChange={onTabDirtyChange}
-                        onSelectTab={activateTab}
-                        onMoveTab={moveTab}
-                        onCloseTab={closeTab}
-                        onReopenClosedTab={reopenClosedTab}
-                        showStart={showStart}
-                        onOpenFileExplorer={openTree}
-                        onCreateCanvas={createCanvas}
-                        treeVisible={showTree}
-                        onToggleTree={toggleTree}
-                        hasBottomPane={utilityView.mounted && utilitiesVisible}
-                        utilitiesVisible={utilitiesVisible}
-                        onToggleUtilities={toggleUtilities}
-                        onSaved={bumpTreeRefresh}
-                        onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-                      />
+                      <BrowserOpen value={openWeb}>
+                        <BrowserPreview value={previews}>
+                          <EditorPane
+                            workspace={workspace}
+                            surfaceHost={surfaceHost}
+                            panels={panels}
+                            browsers={browsers}
+                            openTabs={openTabs}
+                            activeTab={activeTab}
+                            dirtyPaths={dirtyPaths}
+                            onTabDirtyChange={onTabDirtyChange}
+                            onSelectTab={activateTab}
+                            onMoveTab={moveTab}
+                            onCloseTab={closeTab}
+                            onReopenClosedTab={reopenClosedTab}
+                            showStart={showStart}
+                            onOpenFileExplorer={openTree}
+                            onCreateCanvas={createCanvas}
+                            treeVisible={showTree}
+                            onToggleTree={toggleTree}
+                            hasBottomPane={
+                              utilityView.mounted && utilitiesVisible
+                            }
+                            utilitiesVisible={utilitiesVisible}
+                            onToggleUtilities={toggleUtilities}
+                            onSaved={bumpTreeRefresh}
+                            onFileTrashed={(rp) =>
+                              handleEntryTrashed(rp, false)
+                            }
+                          />
+                        </BrowserPreview>
+                      </BrowserOpen>
                     </ResizablePanel>
                     {utilityView.mounted && (
                       <>

@@ -128,6 +128,12 @@ promotion, the hosted layout gives older installations an update screen.
 - Exercise **Check for Updates…**, including available, current, and
   unavailable results. Reopen after installation and confirm that an
   open document can be saved before a user-initiated restart.
+- When the Models seed or discovery bridge changes, check the packaged build
+  with a fresh profile and `GRIDA_AGENT_DISABLE_MODELS_FETCH=1`. Verify that
+  the bundled choices are available for configured BYOK connections. Ordinary
+  compatible Models V2 publications reach installed Desktop through its
+  background refresh. Adapter and bridge changes follow the Desktop release
+  process. [Catalogue seed and generation](https://github.com/gridaco/grida/blob/main/data/ai/README.md)
 
 ### Roll back the hosted editor
 

@@ -241,7 +241,7 @@ export namespace MediaOperations {
     | "text-to-speech"
     | "three-d";
   export type Provider =
-    | ImageClient.Provider
+    | models.image.ImageProvider
     | VideoClient.Provider
     | "elevenlabs"
     | "tripo";

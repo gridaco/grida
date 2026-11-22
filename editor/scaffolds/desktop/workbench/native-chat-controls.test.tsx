@@ -7,7 +7,7 @@ import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 
 const settings = vi.hoisted(() => ({
   supported: true,
-  open: vi.fn<() => Promise<void>>(),
+  open: vi.fn<(section?: "models") => Promise<void>>(),
 }));
 const commands = vi.hoisted(() => new Map<string, (value: string) => void>());
 
@@ -276,6 +276,36 @@ describe("native model catalogue refresh", () => {
     expect(html).toContain(">Retry<");
     expect(html).not.toContain("Refresh models");
   });
+
+  it.each([
+    ["unavailable", "Couldn’t load OpenAI API models."],
+    ["keyRejected", "OpenAI rejected the project key. Replace it in Settings."],
+    [
+      "modelsForbidden",
+      "The OpenAI project key needs permission to list models.",
+    ],
+    ["noCompatibleModels", "This OpenAI project has no compatible models."],
+  ] as const)(
+    "shows the OpenAI discovery issue %s alongside other providers and retry",
+    (openAiIssue, message) => {
+      const html = renderToStaticMarkup(
+        <NativeModelPicker
+          profiles={{
+            ...profiles,
+            subscriptionIssue: "unavailable",
+            openAiIssue,
+          }}
+          busy={false}
+          onSelect={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+      expect(html).toContain("Text model");
+      expect(html).toContain("Couldn’t load ChatGPT models.");
+      expect(html).toContain(message);
+      expect(html).toContain(">Retry<");
+    }
+  );
 });
 
 describe("native model shortlist", () => {
@@ -288,7 +318,7 @@ describe("native model shortlist", () => {
     { id: "other", connection: "Other provider", model: "Other model" },
   ];
 
-  it("opens the native Settings window from Manage models", () => {
+  it("opens LLM Providers in native Settings from Manage models", () => {
     renderToStaticMarkup(
       <NativeModelPicker
         profiles={{ active: null, choices, saved: [] }}
@@ -298,7 +328,7 @@ describe("native model shortlist", () => {
       />
     );
     commands.get("Manage models")!("Manage models");
-    expect(settings.open).toHaveBeenCalledExactlyOnceWith();
+    expect(settings.open).toHaveBeenCalledExactlyOnceWith("models");
   });
 
   it("withholds Manage models on older native hosts", () => {
@@ -327,7 +357,7 @@ describe("native model shortlist", () => {
     );
     commands.get("Manage models")!("Manage models");
     await Promise.resolve();
-    expect(settings.open).toHaveBeenCalledExactlyOnceWith();
+    expect(settings.open).toHaveBeenCalledExactlyOnceWith("models");
   });
 
   it.each([0, 7])(

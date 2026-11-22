@@ -3,7 +3,6 @@
 
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
-import type { models } from "./catalogue";
 import type { ImageClient } from "./image-client";
 import {
   assertAllowedUrl,
@@ -12,8 +11,11 @@ import {
   safeText,
 } from "./fetch-helpers";
 import { ProviderHttp } from "./http";
+import { MediaInputs } from "./media-inputs";
+import { MediaRequest } from "./media-request";
+import { OPENAI_PROJECT_PROVIDER_ID } from "./provider-ids";
 
-type ImageProvider = models.image.ImageProvider;
+type ImageProvider = ImageClient.ByokProvider;
 
 // Internal per-provider builders — the public entry is makeImageModelFor.
 function makeOpenRouterImageModel(
@@ -65,6 +67,9 @@ export function makeImageModelFor(
     case "fal":
       model = makeFalImageModel(apiKey, id, providerHttp);
       break;
+    case OPENAI_PROJECT_PROVIDER_ID:
+      model = new OpenAiProjectImageModel(apiKey, id, providerHttp);
+      break;
   }
   // Resolution has already checked the exact route's catalogue declaration.
   // Capture its explicit intent outside caller-owned providerOptions: a later
@@ -72,6 +77,114 @@ export function makeImageModelFor(
   return background && background !== "auto"
     ? new BackgroundImageModel(model, provider, background)
     : model;
+}
+
+const OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_IMAGE_RESPONSE_BYTES =
+  4 * Math.ceil(MediaInputs.limits.image / 3) + 64 * 1024;
+
+class OpenAiProjectImageModel implements ImageModelV3 {
+  readonly specificationVersion = "v3" as const;
+  readonly provider = OPENAI_PROJECT_PROVIDER_ID;
+  readonly maxImagesPerCall = 4;
+
+  constructor(
+    private readonly apiKey: string,
+    readonly modelId: string,
+    private readonly http: ProviderHttp
+  ) {}
+
+  async doGenerate(options: ImageModelV3CallOptions) {
+    const {
+      prompt,
+      n,
+      size,
+      aspectRatio,
+      seed,
+      files,
+      mask,
+      abortSignal,
+      providerOptions,
+    } = options;
+    if (
+      aspectRatio !== undefined ||
+      seed !== undefined ||
+      files !== undefined ||
+      mask !== undefined ||
+      gridaReferences(providerOptions)
+    )
+      throw new Error("Unsupported OpenAI image request");
+    const { quality, background } = providerOptions?.[this.provider] ?? {};
+    if (
+      (quality !== undefined &&
+        !["auto", "low", "medium", "high", "xhigh", "max"].some(
+          (value) => value === quality
+        )) ||
+      (background !== undefined &&
+        background !== "opaque" &&
+        background !== "transparent")
+    )
+      throw new Error("Unsupported OpenAI image option");
+
+    const request = new MediaRequest(this.http, abortSignal);
+    try {
+      const response = await request.request(
+        OPENAI_IMAGE_URL,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${this.apiKey}`,
+            "content-type": "application/json",
+            accept: "application/json",
+          },
+          redirect: "error",
+          credentials: "omit",
+          body: JSON.stringify({
+            model: this.modelId,
+            prompt,
+            n,
+            output_format: "png",
+            ...(size && { size }),
+            ...(quality !== undefined && { quality }),
+            ...(background !== undefined && { background }),
+          }),
+        },
+        OPENAI_IMAGE_RESPONSE_BYTES
+      );
+      if (
+        !response.ok ||
+        response.redirected ||
+        (response.url && response.url !== OPENAI_IMAGE_URL)
+      )
+        throw new Error("OpenAI image request failed");
+      const result: unknown = await request.wait(response.json());
+      const data = (result as { data?: unknown } | null)?.data;
+      if (!Array.isArray(data) || data.length !== n)
+        throw new Error("Invalid OpenAI image response");
+      const images = data.map((item: { b64_json?: unknown } | null) => {
+        const encoded = item?.b64_json;
+        if (
+          typeof encoded !== "string" ||
+          !encoded.startsWith("iVBORw0KGgo") ||
+          encoded.length % 4 !== 0 ||
+          !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+        )
+          throw new Error("Invalid OpenAI image response");
+        return encoded;
+      });
+      return {
+        images,
+        warnings: [],
+        response: {
+          timestamp: new Date(),
+          modelId: this.modelId,
+          headers: undefined,
+        },
+      };
+    } finally {
+      request.dispose();
+    }
+  }
 }
 
 /** Immutable request intent over a route admitted by the resolver. */

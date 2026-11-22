@@ -4,12 +4,8 @@ import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { ButtonGroup } from "@app/ui/components/button-group";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@app/ui/components/resizable";
-import { HierarchyPanel } from "../../../_components/hierarchy-panel";
+import { HierarchyPanel } from "@/scaffolds/svg-editor/hierarchy-panel";
+import { SlideSidebar } from "@/scaffolds/svg-editor/slide-sidebar";
 import { SlideListFocusScope, SlideRow } from "./slide-row";
 import { TemplatePicker } from "./template-picker";
 import type { SlidePage } from "./types";
@@ -88,8 +84,8 @@ export function SlidesNav({
 
   return (
     <SlideListFocusScope className="h-full">
-      <ResizablePanelGroup orientation="vertical" className="flex-1">
-        <ResizablePanel defaultSize={60} minSize={20}>
+      <SlideSidebar
+        slides={
           <div className="h-full flex flex-col min-h-0">
             <div className="px-3 pt-2 pb-2 shrink-0 border-b border-border">
               <ButtonGroup className="w-full">
@@ -151,19 +147,9 @@ export function SlidesNav({
               ))}
             </div>
           </div>
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel defaultSize={40} minSize={10}>
-          <div className="h-full flex flex-col min-h-0">
-            <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-4 pt-2 pb-1 shrink-0">
-              Layers
-            </h2>
-            <div className="flex-1 overflow-auto px-2 pb-2 min-h-0">
-              <HierarchyPanel />
-            </div>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        }
+        layers={<HierarchyPanel />}
+      />
     </SlideListFocusScope>
   );
 }

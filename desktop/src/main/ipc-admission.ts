@@ -56,6 +56,14 @@ const WORKBENCH_LIBRARY_CHANNELS = new Set<IpcChannel>([
  * in {@link DesktopEntryWindow.ipcRoleFor} and never reach this policy.
  */
 export namespace ipc_admission {
+  export function isVoiceComposer(pathname: string | null): boolean {
+    return (
+      pathname === "/desktop/welcome" ||
+      pathname === "/desktop/workspace" ||
+      pathname === "/desktop/file"
+    );
+  }
+
   export function allows({
     role,
     channel,
@@ -71,6 +79,44 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (
+          channel === IPC_CHANNELS.VOICE_TRANSCRIBE ||
+          channel === IPC_CHANNELS.VOICE_CANCEL
+        )
+          return isVoiceComposer(pathname);
+        if (
+          channel === IPC_CHANNELS.VOICE_SETTINGS_GET ||
+          channel === IPC_CHANNELS.VOICE_SETTINGS_CHANGED
+        )
+          return pathname === "/desktop/settings" || isVoiceComposer(pathname);
+        if (channel.startsWith("grida:voice:"))
+          return pathname === "/desktop/settings";
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
+          return (
+            pathname === "/desktop/workspace" &&
+            !nestedDeck &&
+            !selectedDocument
+          );
+        if (
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_SET ||
+          channel === IPC_CHANNELS.PERSONALIZATION_SET
+        )
+          return pathname === "/desktop/settings";
+        if (
+          channel === IPC_CHANNELS.PERSONALIZATION_GET ||
+          channel === IPC_CHANNELS.PERSONALIZATION_CHANGED ||
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_GET ||
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED
+        )
+          return (
+            pathname === "/desktop/settings" ||
+            pathname === "/desktop/workspace" ||
+            pathname === "/desktop/file"
+          );
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW)
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         if (channel === IPC_CHANNELS.CHAT_CATALOG_READ)
           return pathname === "/desktop/workspace";
         if (
@@ -138,7 +184,9 @@ export namespace ipc_admission {
         // no workspace attachment or input capability.
         if (
           channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES ||
           channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW ||
           channel === IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS ||
           channel === IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS
         ) {

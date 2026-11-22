@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { MediaStore, RecentStore } from "@grida/daemon/server";
+import { isDesktopVoiceReady } from "@grida/desktop-bridge";
 import create_menu, {
   focus_or_open_canvas_window,
   open_or_focus_settings,
@@ -53,8 +54,12 @@ import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
+import { VoiceService } from "./main/voice";
+import { installVoiceMicrophonePolicy } from "./main/voice-microphone";
 import { NativeChatSelections } from "./main/native-chat-selections";
+import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
+import { NativeAgentProcess } from "./main/native-agent-process";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
@@ -732,6 +737,17 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  const catalogueDirectory = path.join(
+    (nativeProfile && NativeDesktopProfile.agentData()) ||
+      app.getPath("userData"),
+    "model-catalogue"
+  );
+  const modelCatalogue = new ModelCatalogueStore({
+    directory: catalogueDirectory,
+    fetch: net.fetch,
+    offline: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
+  });
+  app.once("will-quit", () => modelCatalogue.dispose());
   if (!IS_DEV && !IS_INSIDERS && !nativeProfile) {
     const version = app.getVersion();
     desktopUpdates = new DesktopUpdates({
@@ -874,6 +890,7 @@ app.on("ready", async () => {
               });
             },
           chatTitles: true,
+          modelCatalogue,
         };
         nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
           accountSession,
@@ -952,6 +969,7 @@ app.on("ready", async () => {
             onLifecycle: onNativeLifecycle,
             openExternal: (url) => shell.openExternal(url),
             chatTitles: true,
+            modelCatalogue,
           }
         );
         nativeDocuments = ordinarySelectedSvgFiles(
@@ -968,6 +986,7 @@ app.on("ready", async () => {
       }
     }
   }
+  await modelCatalogue.start();
   let desktopPreferences: DesktopPreferences;
   let chatSelections: NativeChatSelections | undefined;
   try {
@@ -1046,6 +1065,19 @@ app.on("ready", async () => {
   } catch {
     console.warn("[grida] browser history is unavailable");
   }
+  const voice = new VoiceService(desktopPreferences);
+  installVoiceMicrophonePolicy({
+    session: session.defaultSession,
+    editorOrigin: new URL(EDITOR_BASE_URL).origin,
+    admitted: (sender) => {
+      const window = BrowserWindow.fromWebContents(sender);
+      return (
+        window?.webContents === sender &&
+        entryWindow?.ipcRoleFor(window) === "main"
+      );
+    },
+    ready: () => isDesktopVoiceReady(voice.getSettings()),
+  });
   browserHost = registerIpcHandlers({
     on_native_chat: (chat) => {
       chatIpc = chat;
@@ -1059,7 +1091,9 @@ app.on("ready", async () => {
       app.getPath("downloads")
     ),
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
-    open_settings: () => open_or_focus_settings(app, windowAdmission),
+    open_settings: (section) =>
+      open_or_focus_settings(app, windowAdmission, section),
+    voice,
     archives: createDesktopArchives(
       native,
       NativeDesktopProfile.resourcesPath(app)
@@ -1071,6 +1105,7 @@ app.on("ready", async () => {
     open_restored_chat: (workspaceId, sessionId) =>
       focusNativeChat(workspaceId, { sessionId }, windowAdmission),
     global_hooks: native?.globalHooks,
+    personalization: native?.personalization,
     recent_files: recentFiles,
     native_chat_disabled: !native,
     native_chat_selections: chatSelections,
@@ -1084,6 +1119,8 @@ app.on("ready", async () => {
         native.currentForWindow(workspaceId, profileId),
       ensure_native_chat: (workspaceId, requireCurrent) =>
         native.ensure(workspaceId, requireCurrent),
+      supports_automatic_approval_review: () =>
+        NativeAgentProcess.supportsScopedApprovals(nativeResources),
       resolve_welcome_chat_workspace: (workspaceId) =>
         native.welcomeWorkspace(workspaceId),
       forget_native_workspace: (workspaceId) =>
@@ -1114,6 +1151,8 @@ app.on("ready", async () => {
       native_chat_profiles: native.selectableProfiles
         ? {
             list: (workspaceId) => native.profiles(workspaceId),
+            turnCapabilities: (workspaceId, profileId, model) =>
+              native.turnCapabilities(workspaceId, profileId, model),
             select: (workspaceId, selection, requireCurrent) =>
               native.selectProfile(workspaceId, selection, requireCurrent),
             fallback: () => native.fallbackProfile(),
@@ -1166,7 +1205,8 @@ app.on("ready", async () => {
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
       servicesSidecarInfo = await startServicesSidecar(
-        workspaceCatalog?.directory
+        workspaceCatalog?.directory,
+        catalogueDirectory
       );
       console.log(
         `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`

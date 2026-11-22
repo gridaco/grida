@@ -44,7 +44,12 @@ export function classify(paths) {
       known = true;
       for (const name of names) selected[name] = true;
     };
-    if (cargo.test(file)) select("rust", "conformance", "native", "docs");
+    if (
+      cargo.test(file) ||
+      /^(extensions|skills)\//.test(file) ||
+      file === "desktop/src/main/desktop-workbench-tools.json"
+    )
+      select("rust", "conformance", "native", "docs");
     if (rustFixtures.test(file)) select("rust", "conformance", "docs");
     if (packaging.test(file))
       select("conformance", "native", "docs", "tooling");

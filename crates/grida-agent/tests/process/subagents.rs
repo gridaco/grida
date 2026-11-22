@@ -2,6 +2,7 @@
 
 use super::approvals::Stdio as PrivateStdio;
 use super::lifecycle::task_basis;
+use super::prediction::{ECONOMY_MODEL, ECONOMY_ROUTE};
 use super::summaries::reported_usage_answer;
 use super::*;
 use std::collections::BTreeSet;
@@ -74,6 +75,7 @@ async fn supervised_children_use_supported_protocols_without_a_provider_name_gat
         let ready = client.request("initialize", initialize).await;
         for capability in [
             "co.grida/session/effort",
+            "co.grida/session/predict-prompt",
             "co.grida/goal/funded-review",
             "co.grida/goal/named-child",
         ] {
@@ -116,8 +118,10 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
             meta[&key[1..]] = 1.into();
         }
         meta["co.grida/provider/egress"] = 1.into();
+        meta["co.grida/provider/prediction-route"] = 1.into();
         for capability in [
             "co.grida/session/effort",
+            "co.grida/session/predict-prompt",
             "co.grida/goal/start",
             "co.grida/goal/funded-review",
             "co.grida/goal/named-child",
@@ -148,11 +152,13 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         method: &str,
         request: Value,
         endpoint: &str,
+        prediction_route: Option<Value>,
     ) -> Value {
         let ultra = request["effort"] == "ultra";
         let id = client.send(method, request).await;
         let mut chunk = Some(STANDARD.encode(concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Done.\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":2,\"prompt_tokens_details\":{\"cached_tokens\":8}}}\n\n",
             "data: [DONE]\n\n"
         )));
         let mut result = None;
@@ -161,6 +167,20 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
             let frame = client.read_frame().await;
             let params = &frame["params"];
             match frame["method"].as_str() {
+                Some("_co.grida/provider/resolve") => {
+                    assert_eq!(
+                        params,
+                        &json!({"connectionId":null,"model":"fixture-model","purpose":"composerPrediction"})
+                    );
+                    client
+                        .respond(
+                            &frame["id"],
+                            prediction_route
+                                .clone()
+                                .expect("a prediction was requested"),
+                        )
+                        .await;
+                }
                 Some("_co.grida/provider/exchange") => {
                     let reply = match params["action"].as_str() {
                         Some("open") => {
@@ -175,7 +195,22 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
                                 .decode(params["initial"].as_str().unwrap())
                                 .unwrap();
                             let body: Value = serde_json::from_slice(&body).unwrap();
-                            assert_eq!(body["model"], "fixture-model");
+                            let expected_model = if prediction_route.is_some() {
+                                ECONOMY_MODEL
+                            } else {
+                                "fixture-model"
+                            };
+                            assert_eq!(body["model"], expected_model);
+                            if method == "_co.grida/session/predict-prompt" {
+                                assert_eq!(params["routeId"], ECONOMY_ROUTE);
+                                assert!(body["tools"].is_null(), "{body}");
+                                assert!(body["messages"].to_string().contains("Done."));
+                                assert!(
+                                    body["messages"]
+                                        .to_string()
+                                        .contains("Predict the single short next message")
+                                );
+                            }
                             for tool in ["delegate_review", "collect_review"] {
                                 assert_eq!(
                                     body["tools"].as_array().is_some_and(|tools| tools
@@ -232,18 +267,41 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         );
         let prompt = json!({"sessionId":parent,"prompt":[{"type":"text","text":"Parent"}]});
         assert_eq!(
-            infer(&mut client, "session/prompt", prompt, endpoint).await["stopReason"],
+            infer(&mut client, "session/prompt", prompt, endpoint, None).await["stopReason"],
             "end_turn"
         );
         let snapshot = client
             .request("_co.grida/session/snapshot", json!({"sessionId":parent}))
             .await;
         let turn = snapshot["result"]["latest"]["turnId"].as_str().unwrap();
+        let prediction = infer(
+            &mut client,
+            "_co.grida/session/predict-prompt",
+            json!({"sessionId":parent,"turnId":turn}),
+            endpoint,
+            Some(
+                json!({"kind":"http","routeId":ECONOMY_ROUTE,"model":ECONOMY_MODEL,
+                "endpoint":endpoint,"protocol":"openai-compatible","credentialHome":home}),
+            ),
+        )
+        .await;
+        assert_eq!(prediction["text"], "Done.", "{provider}: {prediction}");
+        assert_eq!(prediction["modelId"], ECONOMY_MODEL);
+        assert!(prediction.get("gatewayBilling").is_none());
+        let counts = prediction["tokenUsage"]["reported"].as_array().unwrap();
+        for (category, tokens) in [("input", "15"), ("output", "2"), ("cached_input", "8")] {
+            assert!(
+                counts
+                    .iter()
+                    .any(|row| row["category"] == category && row["tokens"] == tokens),
+                "{provider}: {counts:?}"
+            );
+        }
         let created = client.request(CREATE, create(&parent)).await;
         let child = created["result"]["childId"].as_str().unwrap();
         let work = assign(&parent, child, turn, "child-input", "Investigate");
         assert_eq!(
-            infer(&mut client, ASSIGN, work.clone(), endpoint).await["disposition"]["kind"],
+            infer(&mut client, ASSIGN, work.clone(), endpoint, None).await["disposition"]["kind"],
             "queued"
         );
         let completed = wait_for(&mut client, &parent, child, "child-input", |view| {
@@ -258,6 +316,7 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
                 "prompt":[{"type":"text","text":"Review this draft"}]
             }),
             endpoint,
+            None,
         )
         .await;
         assert_eq!(ultra["inputId"], "ordinary-ultra");
@@ -401,6 +460,8 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             meta[&key[1..]] = 1.into();
         }
         meta["co.grida/provider/egress"] = 1.into();
+        meta["co.grida/session/predict-prompt"] = 1.into();
+        meta["co.grida/provider/prediction-route"] = 1.into();
         if child_billing {
             meta[GATEWAY_CHILD_BILLING] = 1.into();
         }
@@ -416,6 +477,7 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
         client: &mut PrivateStdio,
         method: &str,
         request: Value,
+        scope: &str,
         provider_id: &str,
         amount: Option<&str>,
     ) -> Value {
@@ -436,6 +498,15 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             let frame = client.read_frame().await;
             let params = &frame["params"];
             match frame["method"].as_str() {
+                Some("_co.grida/provider/resolve") => {
+                    assert_eq!(method, "_co.grida/session/predict-prompt");
+                    assert_eq!(
+                        params,
+                        &json!({"connectionId":null,"model":"openai/gpt-5.6-sol","purpose":"composerPrediction"})
+                    );
+                    client.respond(&frame["id"], json!({"kind":"gateway","routeId":ECONOMY_ROUTE,
+                        "endpoint":"https://grida.co/api/v1/ai","scope":scope,"model":ECONOMY_MODEL,"gatewayBilling":true})).await;
+                }
                 Some("_co.grida/provider/exchange") => {
                     let result = match params["action"].as_str() {
                         Some("open") => {
@@ -444,6 +515,16 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
                                 params["target"],
                                 "https://grida.co/api/v1/ai/chat/completions"
                             );
+                            let body = STANDARD
+                                .decode(params["initial"].as_str().unwrap())
+                                .unwrap();
+                            let body: Value = serde_json::from_slice(&body).unwrap();
+                            if method == "_co.grida/session/predict-prompt" {
+                                assert_eq!(params["routeId"], ECONOMY_ROUTE);
+                                assert_eq!(body["model"], ECONOMY_MODEL);
+                            } else {
+                                assert_eq!(body["model"], "openai/gpt-5.6-sol");
+                            }
                             exchange = Some(params["id"].clone());
                             json!({"status":"accepted"})
                         }
@@ -463,6 +544,17 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
                     assert_eq!(exchange.as_ref(), Some(&params["id"]));
                     assert!(chunk.is_none());
                     finished = true;
+                }
+                Some("_co.grida/gateway/read-job-billing") => {
+                    assert_eq!(method, "_co.grida/session/predict-prompt");
+                    assert_eq!(params["routeId"], ECONOMY_ROUTE, "{frame}");
+                    assert_eq!(params["requestId"], provider_id, "{frame}");
+                    client
+                        .respond(
+                            &frame["id"],
+                            json!({"kind":"settled","chargedMills":"0.125"}),
+                        )
+                        .await;
                 }
                 None if frame["id"] == id => {
                     assert!(frame.get("error").is_none(), "{frame}");
@@ -492,6 +584,7 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             &mut first,
             "session/prompt",
             prompt,
+            &scope,
             &format!("req_parent_{turn}"),
             Some("1"),
         )
@@ -505,9 +598,51 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             .unwrap()
             .to_owned();
         parent_turns.push(parent_turn.clone());
+        {
+            let method = "_co.grida/session/predict-prompt";
+            let request = json!({"sessionId":parent,"turnId":parent_turn});
+            if turn == "first" {
+                let id = first.send(method, request.clone()).await;
+                let resolve = first.read_reply().await;
+                assert_eq!(resolve["method"], "_co.grida/provider/resolve");
+                assert_eq!(resolve["params"]["purpose"], "composerPrediction");
+                first.respond(&resolve["id"], json!({"kind":"gateway","routeId":ECONOMY_ROUTE,
+                    "endpoint":"https://grida.co/api/v1/ai","scope":"b".repeat(64),"model":ECONOMY_MODEL,"gatewayBilling":true})).await;
+                let skipped = first.read_reply().await;
+                assert_eq!(
+                    skipped["id"], id,
+                    "a different payer must never receive an exchange: {skipped}"
+                );
+                assert!(
+                    skipped["error"].is_null()
+                        && skipped["result"]["text"].is_null()
+                        && skipped["result"]["modelId"].is_null(),
+                    "{skipped}"
+                );
+            }
+            let prediction = inference(
+                &mut first,
+                method,
+                request,
+                &scope,
+                &format!("req_prediction_{turn}"),
+                if turn == "first" { None } else { Some("0.375") },
+            )
+            .await;
+            assert_eq!(prediction["modelId"], ECONOMY_MODEL);
+            assert_eq!(
+                prediction["gatewayBilling"],
+                json!({"kind":"settled","chargedMills":if turn == "first" { "0.125" } else { "0.375" }})
+            );
+        }
         let summary = first
             .request(SUMMARY, json!({"sessionId":parent,"turnId":parent_turn}))
             .await;
+        let direct = summary["result"]["gatewayBilling"]["attempts"]
+            .as_array()
+            .unwrap();
+        assert_eq!(direct.len(), 1, "{summary}");
+        assert_eq!(direct[0]["chargedMills"], "1");
         assert_eq!(
             summary["result"]["gatewayBilling"]["children"],
             json!({"assignments":[],"coverageIncomplete":false})
@@ -522,6 +657,7 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             &mut first,
             ASSIGN,
             work,
+            &scope,
             &format!("req_child_{turn}"),
             amount,
         )

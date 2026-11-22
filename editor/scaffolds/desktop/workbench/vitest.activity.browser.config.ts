@@ -39,6 +39,8 @@ export default defineConfig(async () => {
         "clsx",
         "tailwind-merge",
         "next/image",
+        "next/link",
+        "nanoid",
         "streamdown",
         "@streamdown/cjk",
         "@streamdown/code",
@@ -57,6 +59,7 @@ export default defineConfig(async () => {
     },
     test: {
       include: [
+        "app/desktop/settings/_components/personalization-settings.browser.tsx",
         "scaffolds/desktop/workbench/conversation-scrollbar.browser.tsx",
         "scaffolds/desktop/workbench/native-chat-focus.browser.tsx",
         "scaffolds/desktop/workbench/native-chat-recovery.browser.tsx",
@@ -66,6 +69,7 @@ export default defineConfig(async () => {
         "scaffolds/desktop/workbench/native-agent-activity.browser.tsx",
         "scaffolds/desktop/workbench/native-activity-timeline.browser.tsx",
         "scaffolds/desktop/workbench/workspace-utilities.browser.tsx",
+        "scaffolds/desktop/workbench/workspace-shortcuts.browser.tsx",
         "scaffolds/desktop/workbench/subagent-tab-placement.browser.tsx",
       ],
       browser: {

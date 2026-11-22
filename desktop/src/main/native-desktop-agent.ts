@@ -8,20 +8,31 @@ import path from "node:path";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
-  isChatGptSubscriptionModelId,
+  type ChatGptTurnCapabilities,
 } from "@grida/ai-host";
-import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import {
+  AGENT_DEFAULT_TIER,
+  TIER_MODEL_IDS,
+  ChatModels,
+  bundledModelCatalogue,
+} from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import type { Workspace } from "@grida/daemon";
 import {
   ProtectedRoots,
   type WorkspaceDirectoryIdentity,
 } from "@grida/daemon/server";
-import type { NativeChatProfileSelection } from "@grida/desktop-bridge";
+import type {
+  NativeChatProfileCatalog,
+  NativeChatProfileSelection,
+} from "@grida/desktop-bridge";
 import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 import type { DesktopAccountSession } from "./account-session";
 import { servicesSidecarClient } from "./services-sidecar-client";
 import {
   nativeAgentGatewayConnection,
+  nativeAgentOpenAiOffer,
   nativeAgentSubscriptionSettings,
 } from "./services-sidecar-supervisor";
 import {
@@ -31,12 +42,15 @@ import {
 import { NativeChatStore } from "./native-chat-store";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
+import type { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeImagePlacement } from "./native-image-placement";
 import type { ImageReferenceReview } from "./native-image-generation";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
+import { DesktopPersonalization } from "./desktop-personalization";
+import { NativePredictionRoute } from "./native-prediction-route";
 import {
   NativeDeckGrant,
   type NativeNestedDeckGrant,
@@ -69,6 +83,7 @@ type SelectedWorkspace = Pick<Workspace, "id" | "root"> & {
 type ProviderProfile = {
   id: string;
   model: string;
+  binding?: NativeProviderRouteLaunch;
   prepare(signal: AbortSignal): Promise<PreparedProviderRoute>;
   commit?(): Promise<void>;
 };
@@ -90,6 +105,7 @@ type LaunchOptions = Readonly<{
   ) => ImageReferenceReview;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
+  modelCatalogue?: Pick<ModelCatalogueStore, "view">;
   /**
    * Title untitled chats from their first request. The app always does; the
    * option keeps scripted test providers free of the extra request.
@@ -134,6 +150,7 @@ export class NativeDesktopAgent {
     private readonly store: NativeChatStore,
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
+    readonly personalization: DesktopPersonalization,
     private readonly subscription?: Subscription,
     private readonly workspaceCatalogRoot?: string,
     private readonly workspaceGrant?: LaunchOptions["workspaceGrant"],
@@ -144,7 +161,8 @@ export class NativeDesktopAgent {
     private readonly imagePlacement?: LaunchOptions["imagePlacement"],
     private readonly reviewImageReference?: LaunchOptions["reviewImageReference"],
     private readonly ordinaryWorkspaceChat = false,
-    private readonly chatTitles = false
+    private readonly chatTitles = false,
+    private readonly modelCatalogue?: LaunchOptions["modelCatalogue"]
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -206,7 +224,10 @@ export class NativeDesktopAgent {
     account: DesktopAccountSession,
     resourcesPath: string,
     protectedPaths: readonly string[],
-    options: Pick<LaunchOptions, "openExternal" | "onLifecycle" | "chatTitles">
+    options: Pick<
+      LaunchOptions,
+      "openExternal" | "onLifecycle" | "chatTitles" | "modelCatalogue"
+    >
   ) {
     return this.compose(
       await NativeChatStore.prepareOrdinary(protectedPaths),
@@ -224,11 +245,21 @@ export class NativeDesktopAgent {
     options?: LaunchOptions,
     ordinaryWorkspaceChat = false
   ) {
+    const personalization = new DesktopPersonalization(
+      path.join(store.hooksHome, "config.toml")
+    );
     let subscription: Subscription | undefined;
     if (options && (options.provider === "chatgpt" || ordinaryWorkspaceChat)) {
       const { userDataPath, network } = await nativeAgentSubscriptionSettings();
       const { NativeChatGptHost } = await import("./native-chatgpt-host");
-      const host = new NativeChatGptHost(userDataPath, network);
+      const host = new NativeChatGptHost(userDataPath, network, () =>
+        personalization.getPersonalization().then(
+          ({ webSearch }) => ({
+            webSearchAllowed: webSearch !== "disabled",
+          }),
+          () => ({ webSearchAllowed: false })
+        )
+      );
       const oauth = createChatGptOAuthCoordinator({
         ceremony: host,
         open_external: options.openExternal,
@@ -239,6 +270,7 @@ export class NativeDesktopAgent {
       store,
       account,
       resourcesPath,
+      personalization,
       subscription,
       options?.workspaceCatalogRoot,
       options?.workspaceGrant,
@@ -249,7 +281,8 @@ export class NativeDesktopAgent {
       options?.imagePlacement,
       options?.reviewImageReference,
       ordinaryWorkspaceChat,
-      options?.chatTitles
+      options?.chatTitles,
+      options?.modelCatalogue
     );
   }
 
@@ -501,6 +534,7 @@ export class NativeDesktopAgent {
   async fallbackProfile(): Promise<string | null> {
     this.requireProfiles();
     const builtIn = await NativeChatProfiles.builtInChoices(
+      this.modelFacts(),
       servicesSidecarClient.nativeBuiltInByok
     );
     return (
@@ -508,6 +542,52 @@ export class NativeDesktopAgent {
       builtIn[0]?.id ??
       null
     );
+  }
+
+  async turnCapabilities(
+    workspaceId: string,
+    profileId: string | null,
+    model: string
+  ): Promise<ChatGptTurnCapabilities> {
+    const unsupported = {
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    } as const;
+    if (!profileId || !this.subscription) return unsupported;
+    return this.withWorkspace(workspaceId, async (_workspace, check) => {
+      try {
+        const binding = await this.subscriptionLaunch(
+          model,
+          undefined,
+          profileId
+        );
+        check();
+        const offer = await binding.subscriptionCapabilities();
+        check();
+        return offer;
+      } catch (error) {
+        check();
+        const code =
+          error instanceof Error
+            ? "code" in error
+              ? error.code
+              : error.message
+            : undefined;
+        if (
+          code === "native_chat_profile_changed" ||
+          code === "native_chat_profile_unavailable" ||
+          code === "chatgpt_not_signed_in" ||
+          code === "chatgpt_credential_changed"
+        )
+          return unsupported;
+        const status =
+          code === "chatgpt_reauthentication_required"
+            ? "reauthenticationRequired"
+            : "unavailable";
+        return { status, speeds: [], webSearch: false } as const;
+      }
+    });
   }
 
   async profiles(workspaceId: string) {
@@ -519,10 +599,11 @@ export class NativeDesktopAgent {
           workspace.id,
           workspace.root
         );
-        const [choices, saved] = await Promise.all([
-          this.availableProfiles(workspace.id),
-          NativeChatProfiles.read(directory),
-        ]);
+        const [{ choices, subscriptionIssue, openAiIssue }, saved] =
+          await Promise.all([
+            this.availableProfiles(workspace.id),
+            NativeChatProfiles.read(directory),
+          ]);
         requireCurrent();
         const available = new Set(choices.map(({ id }) => id));
         const defaultWindow = NativeChatProfiles.contextWindow(
@@ -533,6 +614,8 @@ export class NativeDesktopAgent {
           ...(this.provider === "gateway" && {
             defaultGoalSpending: true as const,
           }),
+          ...(subscriptionIssue && { subscriptionIssue }),
+          ...(openAiIssue && { openAiIssue }),
           ...subscriptionRecommendation(choices),
           ...(defaultWindow !== undefined && {
             defaultContextWindow: defaultWindow,
@@ -545,6 +628,7 @@ export class NativeDesktopAgent {
             return {
               ...publicProfile({
                 ...profile,
+                ...current,
                 contextWindow: current?.contextWindow,
               }),
               available: available.has(profile.id),
@@ -568,7 +652,7 @@ export class NativeDesktopAgent {
     return this.withWorkspace(workspaceId, async (_workspace, check) => {
       if (profileId === null)
         return { connectionId: null, model: DEFAULT_GATEWAY_MODEL };
-      const choices = await this.availableProfiles(workspaceId);
+      const { choices } = await this.availableProfiles(workspaceId);
       check();
       const choice = choices.find(({ id }) => id === profileId);
       if (!choice) throw new Error("native_chat_selection_unavailable");
@@ -697,9 +781,10 @@ export class NativeDesktopAgent {
    */
   async welcomeProfiles() {
     this.requireProfiles();
-    const { subscription, builtIn, configured } =
+    const { subscription, builtIn, configured, openAiIssue } =
       await this.workspaceIndependentProfiles();
-    const choices = [...subscription, ...builtIn, ...configured];
+    const { subscriptionIssue } = subscription;
+    const choices = [...subscription.choices, ...builtIn, ...configured];
     const defaultWindow = NativeChatProfiles.contextWindow(
       DEFAULT_GATEWAY_MODEL
     );
@@ -708,6 +793,8 @@ export class NativeDesktopAgent {
       ...(this.provider === "gateway" && {
         defaultGoalSpending: true as const,
       }),
+      ...(subscriptionIssue && { subscriptionIssue }),
+      ...(openAiIssue && { openAiIssue }),
       ...subscriptionRecommendation(choices),
       ...(defaultWindow !== undefined && {
         defaultContextWindow: defaultWindow,
@@ -768,7 +855,8 @@ export class NativeDesktopAgent {
   private async providerProfile(
     workspace: SelectedWorkspace,
     selection: { kind: "new" | "saved" | "capture"; id: string },
-    check: () => void
+    check: () => void,
+    retained?: ChatModels.Retained
   ): Promise<ProviderProfile> {
     check();
     const directory = await this.store.workspaceDirectory(
@@ -781,25 +869,36 @@ export class NativeDesktopAgent {
             ({ id }) => id === selection.id
           )
         : undefined;
-    const profile =
-      saved ??
-      (selection.kind !== "saved"
-        ? (await this.availableProfiles(workspace.id)).find(
-            ({ id }) => id === selection.id
-          )
-        : undefined);
+    const matchesSelection = ({ id }: NativeChatProfiles.Saved) =>
+      id === selection.id;
+    let profile = saved;
+    if (!profile && selection.kind !== "saved") {
+      const { choices, openAiIssue } = await this.availableProfiles(
+        workspace.id
+      );
+      profile = choices.find(matchesSelection);
+      // A previously shown OpenAI choice can be selected during a refresh.
+      // Resolve it against the current offer after looking for other providers.
+      if (!profile && openAiIssue === "loading") {
+        const { builtIn } = await this.builtInProfiles(this.modelFacts(), true);
+        profile = builtIn.find(matchesSelection);
+      }
+    }
     const saveDirectory = !saved ? directory : undefined;
     if (!profile) throw new Error("native_chat_profile_unavailable");
     if (profile.providerId === CHATGPT_PROVIDER_ID) {
-      return this.subscriptionProfile(workspace, profile, saveDirectory, check);
+      return this.subscriptionProfile(
+        workspace,
+        profile,
+        saveDirectory,
+        check,
+        retained
+      );
     }
     if (profile.providerId === GG_PROVIDER_ID) {
       return this.gatewayProfile(workspace, profile, saveDirectory, check);
     }
     const builtIn = NativeProviderSelection.isBuiltInByok(profile.providerId);
-    const launchProfile = builtIn
-      ? servicesSidecarClient.nativeBuiltInByok
-      : servicesSidecarClient.nativeConfiguredEndpoint;
     const generation = this.accountGeneration;
     const requireRoute = () => {
       if (this.closed || generation !== this.accountGeneration)
@@ -807,7 +906,12 @@ export class NativeDesktopAgent {
       workspace.requireDirectoryCurrent?.();
     };
     const resolve = async () => {
-      const launch = await launchProfile(profile.providerId, profile.modelId);
+      const launch = builtIn
+        ? await this.byokLaunch(profile.providerId, profile.modelId, retained)
+        : await servicesSidecarClient.nativeConfiguredEndpoint(
+            profile.providerId,
+            profile.modelId
+          );
       requireRoute();
       if (builtIn) {
         if (
@@ -836,9 +940,10 @@ export class NativeDesktopAgent {
       }
       throw new Error("native_chat_profile_changed");
     };
-    await resolve();
+    const binding = await resolve();
     check();
     return {
+      binding,
       id: profile.id,
       model: profile.modelId,
       ...(saveDirectory && {
@@ -859,14 +964,17 @@ export class NativeDesktopAgent {
     workspace: SelectedWorkspace,
     profile: NativeChatProfiles.Saved,
     saveDirectory: string | undefined,
-    check: () => void
+    check: () => void,
+    retained?: ChatModels.Retained
   ): Promise<ProviderProfile> {
-    const host = this.subscription?.host;
-    if (!host || !isChatGptSubscriptionModelId(profile.modelId))
-      throw new Error("native_chat_profile_unavailable");
     const generation = this.accountGeneration;
     const resolve = async (signal?: AbortSignal) => {
-      const launch = await host.launch(profile.modelId, signal);
+      const launch = await this.subscriptionLaunch(
+        profile.modelId,
+        signal,
+        profile.id,
+        retained
+      );
       if (this.closed || generation !== this.accountGeneration)
         throw new Error("native_workspace_closing");
       workspace.requireDirectoryCurrent?.();
@@ -880,9 +988,10 @@ export class NativeDesktopAgent {
         throw new Error("native_chat_profile_changed");
       return launch;
     };
-    await resolve();
+    const binding = await resolve();
     check();
     return {
+      binding,
       id: profile.id,
       model: profile.modelId,
       ...(saveDirectory && {
@@ -983,38 +1092,185 @@ export class NativeDesktopAgent {
   }
 
   private async workspaceIndependentProfiles() {
-    const [subscription, builtIn, configured] = await Promise.all([
-      this.subscriptionProfiles(),
-      NativeChatProfiles.builtInChoices(
-        servicesSidecarClient.nativeBuiltInByok
-      ),
-      servicesSidecarClient
-        .listProviderEndpoints()
-        .then((endpoints) =>
-          NativeChatProfiles.configuredChoices(
-            endpoints,
-            servicesSidecarClient.nativeConfiguredEndpoint
-          )
-        ),
-    ]);
-    return { subscription, builtIn, configured };
+    const snapshot = this.modelFacts();
+    const [subscription, { builtIn, openAiIssue }, configured] =
+      await Promise.all([
+        this.subscriptionProfiles(snapshot),
+        this.builtInProfiles(snapshot),
+        servicesSidecarClient
+          .listProviderEndpoints()
+          .then((endpoints) =>
+            NativeChatProfiles.configuredChoices(
+              endpoints,
+              servicesSidecarClient.nativeConfiguredEndpoint
+            )
+          ),
+      ]);
+    return { subscription, builtIn, configured, openAiIssue };
   }
 
-  private async subscriptionProfiles(): Promise<NativeChatProfiles.Saved[]> {
-    if (!this.subscription || this.closed || this.transitions > 0) return [];
+  private async builtInProfiles(
+    snapshot: ModelCatalogueSnapshot,
+    waitForOpenAi = false
+  ) {
+    const offer = await nativeAgentOpenAiOffer(waitForOpenAi).catch(
+      () => ({ status: "unavailable" }) as const
+    );
+    const models =
+      offer.status === "ready"
+        ? ChatModels.list(snapshot, {
+            provider: "openai",
+            models: offer.models,
+          })
+        : [];
+    const builtIn = await NativeChatProfiles.builtInChoices(
+      snapshot,
+      servicesSidecarClient.nativeBuiltInByok,
+      models
+    );
+    let openAiIssue: NativeChatProfileCatalog["openAiIssue"];
+    if (offer.status === "ready") {
+      if (!(await offer.isCurrent().catch(() => false))) {
+        return {
+          builtIn: builtIn.filter(
+            ({ providerId }) => providerId !== OPENAI_PROJECT_PROVIDER_ID
+          ),
+          openAiIssue: "unavailable" as const,
+        };
+      }
+      if (models.length === 0) openAiIssue = "noCompatibleModels";
+      else if (
+        !builtIn.some(
+          ({ providerId }) => providerId === OPENAI_PROJECT_PROVIDER_ID
+        )
+      )
+        openAiIssue = "unavailable";
+    } else if (offer.status !== "missing") {
+      openAiIssue = offer.status;
+    }
+    return { builtIn, openAiIssue };
+  }
+
+  private async subscriptionProfiles(
+    snapshot: ModelCatalogueSnapshot
+  ): Promise<{
+    choices: NativeChatProfiles.Saved[];
+    subscriptionIssue?: "unavailable" | "reauthenticationRequired";
+  }> {
+    if (!this.subscription || this.closed || this.transitions > 0)
+      return { choices: [] };
     const generation = this.accountGeneration;
-    // Capture checks the stored connection without refreshing credentials or
-    // sending inference. Execution recaptures and verifies the same lineage.
-    const launch = await this.subscription.host
-      .launch(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id)
-      .catch(() => null);
+    const host = this.subscription.host;
+    const status = await host.status().catch(() => undefined);
+    if (!status) return { choices: [], subscriptionIssue: "unavailable" };
     if (
-      !launch?.subscriptionScope ||
-      this.closed ||
-      generation !== this.accountGeneration
+      !status.signed_in ||
+      generation !== this.accountGeneration ||
+      this.closed
     )
-      return [];
-    return NativeChatProfiles.subscriptionChoices(launch.subscriptionScope);
+      return { choices: [] };
+    const offer = await host.inventory();
+    if (this.closed || generation !== this.accountGeneration)
+      return { choices: [] };
+    if (offer.status !== "available")
+      return { choices: [], subscriptionIssue: offer.status };
+    return {
+      choices: NativeChatProfiles.subscriptionChoices(
+        offer.scope,
+        ChatModels.list(snapshot, {
+          provider: "chatgpt",
+          selectors: offer.selectors,
+        })
+      ),
+    };
+  }
+
+  private modelFacts() {
+    return this.modelCatalogue?.view() ?? bundledModelCatalogue();
+  }
+
+  private async byokLaunch(
+    provider: string,
+    model: string,
+    retained?: ChatModels.Retained
+  ) {
+    if (!NativeProviderSelection.isBuiltInByok(provider))
+      throw new Error("native_provider_byok_unavailable");
+    const snapshot = this.modelFacts();
+    if (provider === OPENAI_PROJECT_PROVIDER_ID) {
+      const offer = retained ? undefined : await nativeAgentOpenAiOffer();
+      const binding = retained
+        ? ChatModels.resume(snapshot, { provider: "openai" }, model, retained)
+        : offer?.status === "ready"
+          ? ChatModels.resolve(
+              snapshot,
+              { provider: "openai", models: offer.models },
+              model
+            )
+          : undefined;
+      if (!binding) throw new Error("native_chat_profile_unavailable");
+      const launch = await servicesSidecarClient.nativeBuiltInByok(
+        provider,
+        model,
+        binding,
+        snapshot
+      );
+      if (offer?.status === "ready" && !(await offer.isCurrent()))
+        throw new Error("native_chat_profile_unavailable");
+      return launch;
+    }
+    const binding = retained
+      ? ChatModels.resume(snapshot, { provider }, model, retained)
+      : ChatModels.resolve(snapshot, { provider }, model);
+    if (!binding) throw new Error("native_chat_profile_unavailable");
+    return servicesSidecarClient.nativeBuiltInByok(
+      provider,
+      model,
+      binding,
+      snapshot
+    );
+  }
+
+  private async subscriptionLaunch(
+    modelId: string,
+    signal?: AbortSignal,
+    profileId?: string,
+    retained?: ChatModels.Retained
+  ) {
+    const host = this.subscription?.host;
+    if (!host) throw new Error("native_chat_profile_unavailable");
+    const scope = await host.scope();
+    if (
+      profileId &&
+      NativeChatProfiles.subscriptionBinding(scope, modelId) !== profileId
+    )
+      throw new Error("native_chat_profile_changed");
+    const offer = await host.inventory();
+    if (offer.status !== "available")
+      throw new Error(
+        offer.status === "reauthenticationRequired"
+          ? "chatgpt_reauthentication_required"
+          : "chat_turn_capabilities_unavailable"
+      );
+    if (offer.scope !== scope) throw new Error("native_chat_profile_changed");
+    const facts = this.modelFacts();
+    const connection = {
+      provider: "chatgpt",
+      selectors: offer.selectors,
+    } as const;
+    const binding = retained
+      ? ChatModels.resume(facts, connection, modelId, retained)
+      : ChatModels.resolve(facts, connection, modelId);
+    if (!binding) throw new Error("native_chat_profile_unavailable");
+    return {
+      ...(await host.launch(modelId, signal, {
+        scope,
+        wireModel: binding.wireModel,
+        speeds: binding.speeds,
+      })),
+      imageInput: binding.imageInput,
+      subscriptionSpeeds: binding.speeds,
+    };
   }
 
   private async availableProfiles(workspaceId: string) {
@@ -1022,32 +1278,37 @@ export class NativeDesktopAgent {
     const gatewayScope =
       this.owners?.gatewayScope(workspaceId) ??
       this.gatewayScopes.get(workspaceId);
-    const [{ subscription, builtIn, configured }, gateway] = await Promise.all([
-      this.workspaceIndependentProfiles(),
-      gatewayScope
-        ? servicesSidecarClient
-            .listGatewayModels()
-            .then((models) =>
-              NativeChatProfiles.gatewayChoices(
-                models,
-                gatewayScope,
-                DEFAULT_GATEWAY_MODEL
+    const [{ subscription, builtIn, configured, openAiIssue }, gateway] =
+      await Promise.all([
+        this.workspaceIndependentProfiles(),
+        gatewayScope
+          ? servicesSidecarClient
+              .listGatewayModels()
+              .then((models) =>
+                NativeChatProfiles.gatewayChoices(
+                  models,
+                  gatewayScope,
+                  DEFAULT_GATEWAY_MODEL
+                )
               )
-            )
-            .catch(() => [])
-        : [],
-    ]);
-    return [
-      ...subscription,
-      ...(generation === this.accountGeneration &&
-      gatewayScope ===
-        (this.owners?.gatewayScope(workspaceId) ??
-          this.gatewayScopes.get(workspaceId))
-        ? gateway
-        : []),
-      ...builtIn,
-      ...configured,
-    ];
+              .catch(() => [])
+          : [],
+      ]);
+    return {
+      subscriptionIssue: subscription.subscriptionIssue,
+      openAiIssue,
+      choices: [
+        ...subscription.choices,
+        ...(generation === this.accountGeneration &&
+        gatewayScope ===
+          (this.owners?.gatewayScope(workspaceId) ??
+            this.gatewayScopes.get(workspaceId))
+          ? gateway
+          : []),
+        ...builtIn,
+        ...configured,
+      ],
+    };
   }
 
   private async withWorkspace<T>(
@@ -1186,6 +1447,10 @@ export class NativeDesktopAgent {
             return {
               launch: {
                 ...provider,
+                lookupPredictionRoute: this.predictionRouteLookup(
+                  workspace.id,
+                  workspace.requireCurrent
+                ),
                 subagents: undefined,
                 resourcesPath: this.resourcesPath,
               },
@@ -1241,7 +1506,7 @@ export class NativeDesktopAgent {
   ): NativeProviderRouteLaunch {
     const maxOutputTokens =
       provider.maxOutputTokens ??
-      (provider.gatewayScope || provider.subscriptionScope
+      (provider.gatewayScope || provider.subscriptionScope || provider.wireModel
         ? undefined
         : NativeChatProfiles.outputLimit(provider.model));
     return {
@@ -1280,6 +1545,10 @@ export class NativeDesktopAgent {
       subagents: true as const,
       ...(this.chatTitles && { chatTitles: true as const }),
       workspaceConfiguration,
+      lookupPredictionRoute: this.predictionRouteLookup(
+        id,
+        workspace.requireDirectoryCurrent
+      ),
       ...(workspaceConfiguration && {
         lookupProviderRoute: this.inputRouteLookup(workspace),
       }),
@@ -1296,6 +1565,7 @@ export class NativeDesktopAgent {
           ...(identity && { identity }),
         },
         additionalReadRoots: [],
+        ...(!nestedProtectedPaths && { allowScopedAccess: true as const }),
         protectedPaths: [
           ...this.store.protectedPaths,
           ...(this.workspaceCatalogRoot ? [this.workspaceCatalogRoot] : []),
@@ -1305,11 +1575,52 @@ export class NativeDesktopAgent {
     };
   }
 
+  private predictionRouteLookup(
+    workspaceId: string,
+    requireCurrent?: () => void
+  ): NativeProviderRoutes.PredictionLookup {
+    const generation = this.accountGeneration;
+    return async (source, signal) => {
+      const check = () => {
+        signal.throwIfAborted();
+        if (
+          this.closed ||
+          this.transitions ||
+          this.accountGeneration !== generation ||
+          this.workspaceActivity.get(workspaceId)?.retired
+        )
+          throw new Error("native_workspace_closing");
+        requireCurrent?.();
+      };
+      check();
+      const host = this.subscription?.host;
+      const target = await NativePredictionRoute.resolve(source, signal, {
+        subscription: host
+          ? (model, signal) =>
+              this.subscriptionLaunch(
+                model,
+                signal,
+                NativeChatProfiles.subscriptionBinding(
+                  source.subscriptionScope!,
+                  model
+                )
+              )
+          : undefined,
+        snapshot: this.modelFacts(),
+        endpoints: servicesSidecarClient.listProviderEndpoints,
+        gateway: servicesSidecarClient.listGatewayModels,
+      });
+      if (target) await this.store.requireProviderIsolation(target);
+      check();
+      return target;
+    };
+  }
+
   private inputRouteLookup(
     workspace: SelectedWorkspace
   ): NativeProviderRoutes.Lookup {
     const generation = this.accountGeneration;
-    return async (connectionId, model, signal) => {
+    return async (connectionId, model, signal, retained) => {
       const check = () => {
         signal.throwIfAborted();
         if (
@@ -1326,7 +1637,8 @@ export class NativeDesktopAgent {
           ? await this.providerProfile(
               workspace,
               { kind: "capture", id: connectionId },
-              check
+              check,
+              retained
             )
           : undefined;
       check();
@@ -1338,6 +1650,7 @@ export class NativeDesktopAgent {
       )
         throw new Error("native_chat_profile_changed");
       return {
+        binding: profile?.binding,
         prepare: async () => {
           const prepared: PreparedProviderRoute = profile
             ? await profile.prepare(signal)
@@ -1383,7 +1696,7 @@ export class NativeDesktopAgent {
       const { kind, id, model } = this.provider;
       const provider =
         kind === "byok"
-          ? await servicesSidecarClient.nativeBuiltInByok(id, model)
+          ? await this.byokLaunch(id, model)
           : await servicesSidecarClient.nativeConfiguredEndpoint(id, model);
       signal.throwIfAborted();
       return { provider, release: undefined };
@@ -1410,11 +1723,13 @@ export class NativeDesktopAgent {
 function subscriptionRecommendation(
   choices: readonly NativeChatProfiles.Saved[]
 ) {
-  const recommendedProfileId = choices.find(
-    (choice) =>
-      choice.providerId === CHATGPT_PROVIDER_ID &&
-      choice.modelId === CHATGPT_SUBSCRIPTION_CONFIG.default_model_id
-  )?.id;
+  const recommendedProfileId =
+    choices.find(
+      (choice) =>
+        choice.providerId === CHATGPT_PROVIDER_ID &&
+        choice.modelId === CHATGPT_SUBSCRIPTION_CONFIG.default_model_id
+    )?.id ??
+    choices.find((choice) => choice.providerId === CHATGPT_PROVIDER_ID)?.id;
   return recommendedProfileId ? { recommendedProfileId } : {};
 }
 
@@ -1425,20 +1740,29 @@ function publicProfile({
   providerId,
   modelId,
   contextWindow,
+  imageInput,
+  reasoning,
 }: NativeChatProfiles.Saved) {
   const window =
-    contextWindow ?? NativeChatProfiles.contextWindow(modelId, providerId);
+    contextWindow ??
+    (providerId === CHATGPT_PROVIDER_ID ||
+    NativeProviderSelection.isBuiltInByok(providerId)
+      ? undefined
+      : NativeChatProfiles.contextWindow(modelId));
   return {
     id,
     connection,
     model,
     ...(providerId === GG_PROVIDER_ID && { goalSpending: true as const }),
-    ...(NativeChatProfiles.imageInput(providerId, modelId) && {
+    ...((imageInput ||
+      (providerId === GG_PROVIDER_ID &&
+        NativeChatProfiles.gatewayImageInput(modelId))) && {
       imageInput: true as const,
     }),
     ...(window !== undefined && { contextWindow: window }),
-    ...((providerId === CHATGPT_PROVIDER_ID ||
-      NativeChatProfiles.reasons(providerId, modelId)) && {
+    ...((reasoning ||
+      (providerId === GG_PROVIDER_ID &&
+        NativeChatProfiles.reasons(providerId, modelId))) && {
       reasoning: true as const,
     }),
     // The native harness owns independent review on every model connection.

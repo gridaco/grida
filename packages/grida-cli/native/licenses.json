@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "cargo-about 0.8.2",
-  "cargo_lock_sha256": "69e98cf7f6722f2d5e3b27b8ff48af4bfeb5c0c7195f56e20d8f83c73ec9e05f",
+  "cargo_lock_sha256": "f64fa8dabf648e8b5871a2fe99b4331c3bb19be73e57b22e9f64759ef7c584b9",
   "targets": [
     "x86_64-apple-darwin",
     "aarch64-apple-darwin",
@@ -1466,6 +1466,12 @@
       "repository": "https://github.com/storyyeller/stable_deref_trait"
     },
     {
+      "name": "streaming-iterator",
+      "version": "0.1.9",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/sfackler/streaming-iterator"
+    },
+    {
       "name": "strsim",
       "version": "0.11.1",
       "license": "MIT",
@@ -1680,6 +1686,24 @@
       "version": "0.1.44",
       "license": "MIT",
       "repository": "https://github.com/tokio-rs/tracing"
+    },
+    {
+      "name": "tree-sitter-bash",
+      "version": "0.25.1",
+      "license": "MIT",
+      "repository": "https://github.com/tree-sitter/tree-sitter-bash"
+    },
+    {
+      "name": "tree-sitter-language",
+      "version": "0.1.9",
+      "license": "MIT",
+      "repository": "https://github.com/tree-sitter/tree-sitter"
+    },
+    {
+      "name": "tree-sitter",
+      "version": "0.25.10",
+      "license": "MIT",
+      "repository": "https://github.com/tree-sitter/tree-sitter"
     },
     {
       "name": "try-lock",

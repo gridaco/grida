@@ -650,6 +650,7 @@ fn public_facts(message: &Message) -> Vec<String> {
     if super::message_context::has_context(message)
         || message.content.iter().any(|part| {
             matches!(part, Content::Text(text) if !text.is_empty())
+                || matches!(part, Content::ProviderEvidence(_))
                 || (message.role == Role::User && matches!(part, Content::Media(_)))
         })
     {
@@ -722,6 +723,13 @@ impl Publisher {
                 update: InferenceUpdate::TextDelta { message, text },
                 ..
             } if !text.is_empty() => {
+                self.state
+                    .record_message(&self.binding.session, &self.binding.turn, message);
+            }
+            TurnUpdate::Inference {
+                update: InferenceUpdate::ProviderEvidence { message, .. },
+                ..
+            } => {
                 self.state
                     .record_message(&self.binding.session, &self.binding.turn, message);
             }

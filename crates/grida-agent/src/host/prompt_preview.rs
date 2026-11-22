@@ -50,8 +50,16 @@ fn prepared_requests(
         .operations()
         .iter()
         .filter_map(|(id, operation)| match &operation.record.input {
-            OperationInput::Inference(request) => Some((id, request, operation.attempts.len())),
-            OperationInput::Tool(_) => None,
+            OperationInput::Inference(request)
+                if !grida_agent_master::approval_review::is_scoped_assessment(
+                    request.request(),
+                ) && !grida_agent_master::approval_review::is_configured_read_review(
+                    operation,
+                ) =>
+            {
+                Some((id, request, operation.attempts.len()))
+            }
+            _ => None,
         })
 }
 
@@ -185,6 +193,7 @@ pub async fn bake(
                 text: "Preview this prompt.".into(),
             }],
             questions,
+            question_batches: questions,
             operating_regime: Some(regime),
             effort: Some(effort),
             reasoning: None,

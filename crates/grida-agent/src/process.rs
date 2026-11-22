@@ -318,6 +318,7 @@ async fn admit_run(
             session,
             parts,
             questions: options.questions,
+            question_batches: options.questions,
             operating_regime: None,
             effort: None,
             reasoning: options.reasoning,

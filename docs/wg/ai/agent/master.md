@@ -53,17 +53,11 @@ which eligible actions require another decision. The reviewer is a person or
 a separately configured automatic reviewer. Product presets can combine these
 selections while preserving their individual meanings.
 
-New Desktop chats default to asking the user before granting additional access.
-Previously granted scope remains subject to its existing constraints. Automatic
-review requires an explicit selection and its own eligibility policy.
-
-An automatic-review mode delegates eligible decisions within host policy. The
-master supplies review policy, reviewer selection, evidence preparation, resource
-allowance, and fallback behavior. Host-mandated denials and human decisions remain
-effective. The host authorization adapter owns the review lifecycle and validates
-the decision against the exact action. Runtime enforces the resulting grant and
-current controls before dispatch. Review timeout, denial, and unavailable
-reviewer remain distinguishable outcomes.
+The master selects evidence, assessment policy, resource limits and fallback
+for automatic review. The host supervises the review, records its decision
+and verifies the exact action and current authority before execution. The
+permission policy owns the [preset defaults](./permissions.md#presets) and
+the [automatic review contract](./permissions.md#automatic-review).
 
 Plan/Act and Standard/Ultra remain separate from these permission selections.
 Planning constrains the allowed work, effort constrains allocation, and approval
@@ -244,6 +238,38 @@ Discovery describes operations independently of the current selection. Optional 
 non-interactive disposition. Missing essential execution capabilities remain
 explicit. The [tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 defines the concrete bindings.
+
+### Product instructions and extension guidance
+
+The master owns the agent's default behavior in each product surface.
+It derives surface awareness from host-provided context and conditions
+action guidance on the current mode and available capabilities. In Grida
+Desktop, presenting a useful artifact while work continues is a product
+default. Its scope and checkpoints follow the
+[workspace presentation policy](../grida/workspace-surfaces.md#agent-presentation-policy).
+The rule applies regardless of which extension produced the artifact.
+
+Extension discovery describes what an extension helps a person do. The
+master prefers an explicitly requested extension when it fits the task and is
+available. A named workflow may define its own default among eligible
+capabilities. General discovery ranks by task fit. The contribution type and
+number of tools do not confer priority. Full skills supply workflow guidance
+on selection. Tool definitions follow the
+[tool discovery policy](./mcp.md#lazy-materialization).
+
+The product may opt in to short usage notes from individually reviewed
+extensions. Each note describes how or when to use its own capability. The
+master includes it only when that capability is selected and eligible for
+the current task. The note retains its source and version, and grants no
+authority. Product instruction precedence, mode, execution grants, and
+approval remain host-controlled. Installation, enablement, and an extension's
+self-reported identity are insufficient to admit its text as product guidance.
+
+The master applies both per-note and combined context budgets. It preserves
+complete notes, reports invalid contributions, and records the included notes
+with the prepared request. Changes affect later prepared requests. An
+extension cannot supply base policy through skill metadata, discovery
+instructions, or tool results. Those inputs retain their source and trust.
 
 ### Failures, retries, and fallback
 

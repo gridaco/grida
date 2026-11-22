@@ -20,8 +20,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub use execution::{OpenedTurn, Runtime, Turn, TurnObserver, TurnOperations};
-pub use step::MALFORMED_ARGUMENTS;
+pub use execution::{OpenedTurn, Runtime, Turn, TurnObserver, TurnOperations, WeakTurnOperations};
+pub use step::{MALFORMED_ARGUMENTS, tool_result_message_id};
 
 /// A logical operation name supplied by the master and retained across restart.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

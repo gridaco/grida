@@ -13,24 +13,13 @@ budgets input automatically, and the ring beside the model picker shows how
 full the context is.
 [See how full the context is](./models-and-usage.md#see-how-full-the-context-is)
 
-The context budget lives in the workspace's `config.toml`. To change this budget,
-ask the agent or edit that file yourself. Global hooks have their own user-wide
-`~/.grida/config.toml` source and are inspected in **Settings → Hooks**.
-[Configure hooks](./hooks.md) · [Desktop settings](./desktop-settings.md)
+The context budget lives in the workspace's `config.toml`. Edit the file
+while Desktop is closed. The host loads it when you reopen the workspace.
+Changes apply to new messages. Previously accepted work keeps the settings
+it started with.
 
-## Ask the agent
-
-On macOS and Linux, ask in an Act message, for example “cap the context input
-at 64000 tokens for future messages.” The agent reads and edits its settings
-file like any other file, and every change to it asks for your approval in the
-chat, even though the agent edits project files without asking. **Allow once**
-covers that one change; the next change asks again. **Decline** leaves the file
-as it was.
-
-The agent saves only valid settings. If the new content is invalid, it reports
-why and the file stays unchanged. A saved change applies to messages you send
-from then on; work that is already running, paused or queued keeps the value it
-started with.
+Global hooks use a separate user-wide `~/.grida/config.toml` and appear in
+**Settings → Hooks**. [Configure hooks](./hooks.md) · [Desktop settings](./desktop-settings.md)
 
 ## Edit the file yourself
 
@@ -67,7 +56,7 @@ the error names the problem.
 
 ## Change it from a client
 
-Source-built headless runs read the same file from the state directory you
-choose, and the agent can edit it under a permission profile that allows file
-writes. ACP clients can also inspect, change and reload the limit.
+Source-built headless runs read the file from the state directory you choose.
+A trusted ACP client with the configuration capability can inspect, set,
+reset, and reload the limit.
 [Agent configuration reference](../reference/agent-configuration.md)

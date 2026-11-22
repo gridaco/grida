@@ -8,6 +8,7 @@
  * channels. The retained process has no model command or direct network owner.
  * Windows keeps its explicitly unconfined non-agent services.
  */
+import { mkdir } from "node:fs/promises";
 import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
@@ -28,6 +29,7 @@ import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
 import { ProviderEndpointConsent } from "./provider-endpoint-consent";
 import { MediaTransport } from "@grida/ai-host/media-transport";
+import { NativeOpenAiModels } from "./native-openai-models";
 
 export type ServicesSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -53,6 +55,7 @@ export type NativeChatPaths = Readonly<{
 }>;
 
 export class ServicesSidecarSupervisor {
+  private openAiModels?: NativeOpenAiModels;
   private servicesStarted = false;
   private nativeChat?: NativeChatPaths;
   private ordinaryNativeChat = false;
@@ -72,6 +75,7 @@ export class ServicesSidecarSupervisor {
   private nativeSandbox?: RetainedServiceSandbox;
   private sandboxReady = false;
   private workspaceCatalog?: string;
+  private catalogueDirectory?: string;
   private protectedStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
   private endpointConsent?: ProviderEndpointConsent;
@@ -126,15 +130,21 @@ export class ServicesSidecarSupervisor {
     });
   }
 
-  async start(workspaceCatalog?: string): Promise<ServicesSidecarInfo> {
+  async start(
+    workspaceCatalog?: string,
+    catalogueDirectory?: string
+  ): Promise<ServicesSidecarInfo> {
     if (this.isShuttingDown) throw new Error("services_sidecar_shutting_down");
     if (
       (workspaceCatalog &&
         (!this.nativeChat || !RetainedServiceSandbox.isSupportedPlatform())) ||
-      (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
+      (this.sandboxReady &&
+        (workspaceCatalog !== this.workspaceCatalog ||
+          catalogueDirectory !== this.catalogueDirectory))
     )
       throw new Error("workspace_catalog_scope_invalid");
     this.workspaceCatalog = workspaceCatalog;
+    this.catalogueDirectory = catalogueDirectory;
     this.servicesStarted = true;
     if (this.info) return this.info.connection;
     if (this.restartTimer) {
@@ -142,6 +152,8 @@ export class ServicesSidecarSupervisor {
       this.restartTimer = null;
     }
     if (!this.sandboxReady) {
+      if (catalogueDirectory)
+        await mkdir(catalogueDirectory, { recursive: true, mode: 0o700 });
       await this.initSandbox();
     }
     return await this.spawn();
@@ -218,15 +230,29 @@ export class ServicesSidecarSupervisor {
     return this.endpointConsent;
   }
 
-  nativeByokSettings() {
+  nativeByokSettings(openAiProject = false) {
     return {
       credentialHome: this.provider_home,
       network: () =>
         ProviderNetworkHost.nativeProviderNetwork(
           this.networkAuthority,
-          ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+          openAiProject
+            ? ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID
+            : ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
         ),
+      ...(openAiProject && {
+        onOpenAiAuthenticationFailure: () => this.openAiModels?.invalidate(),
+      }),
     };
+  }
+
+  async nativeOpenAiOffer(
+    waitForDiscovery: boolean
+  ): Promise<NativeOpenAiModels.Offer> {
+    if (!this.nativeChat || this.isShuttingDown) return { status: "missing" };
+    const { credentialHome, network } = this.nativeByokSettings(true);
+    this.openAiModels ??= new NativeOpenAiModels(credentialHome, network);
+    return await this.openAiModels.offer(waitForDiscovery);
   }
 
   // GRIDA-SEC-008 — the selected native chat paths name the sole OAuth home.
@@ -306,6 +332,7 @@ export class ServicesSidecarSupervisor {
     if (!RetainedServiceSandbox.isSupportedPlatform()) {
       if (chat) throw new Error("native_retained_sidecar_sandbox_unavailable");
       this.protectedFileRoots = [
+        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
         ProviderEndpointConsent.directory(app.getPath("userData")),
         path.join(
           app.getPath("userData"),
@@ -350,6 +377,7 @@ export class ServicesSidecarSupervisor {
     this.protectedFileRoots = [
       ...new Set([
         ...this.protectedStateRoots,
+        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
         nativeStateRoot,
         ProviderEndpointConsent.directory(app.getPath("userData")),
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
@@ -364,6 +392,7 @@ export class ServicesSidecarSupervisor {
         ...protectedPolicyRoots,
         ProviderEndpointConsent.directory(app.getPath("userData")),
       ],
+      catalogueDirectory: this.catalogueDirectory,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
@@ -430,6 +459,9 @@ export class ServicesSidecarSupervisor {
       `--user-data=${this.user_data_path}`,
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
+      ...(this.catalogueDirectory
+        ? [`--model-catalogue=${this.catalogueDirectory}`]
+        : []),
       `--agent=${mode}`,
       ...(this.ordinaryNativeChat ? ["--ordinary-native-chat-services=1"] : []),
       ...(this.workspaceCatalog
@@ -732,9 +764,10 @@ function sidecar(): ServicesSidecarSupervisor {
 }
 
 export function startServicesSidecar(
-  workspaceCatalog?: string
+  workspaceCatalog?: string,
+  catalogueDirectory?: string
 ): Promise<ServicesSidecarInfo> {
-  return sidecar().start(workspaceCatalog);
+  return sidecar().start(workspaceCatalog, catalogueDirectory);
 }
 
 export function selectNativeChat(ordinary = false): NativeChatPaths {
@@ -753,8 +786,16 @@ export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
   return sidecar().nativeEndpointNetwork(id, baseUrl);
 }
 
-export function nativeAgentByokSettings() {
-  return sidecar().nativeByokSettings();
+export function nativeAgentByokSettings(openAiProject?: boolean) {
+  return sidecar().nativeByokSettings(openAiProject);
+}
+
+export async function nativeAgentOpenAiOffer(
+  waitForDiscovery = true
+): Promise<NativeOpenAiModels.Offer> {
+  return supervisor
+    ? await supervisor.nativeOpenAiOffer(waitForDiscovery)
+    : { status: "missing" };
 }
 
 export function nativeAgentSubscriptionSettings() {

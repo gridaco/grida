@@ -38,6 +38,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
+use grida_agent_master::discovery::{self, Catalog, ToolSource};
 use grida_agent_master::effort::{Policy as EffortPolicy, Preset};
 use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage, WorkOutcome};
 use grida_agent_master::hooks::{
@@ -123,6 +124,7 @@ enum Script {
     Failure(FailureKind),
     DeadlineCut,
     ToolThenAnswer,
+    DiscoverThenCall,
     ToolAndDeferred,
     Tools,
     /// One reply that makes this many tool calls, then an answer.
@@ -193,9 +195,13 @@ impl Provider for ScriptProvider {
     fn capabilities(&self, _: &ModelId) -> Result<ModelCapabilities> {
         Ok(self.capabilities.lock().unwrap().clone())
     }
-    fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
+    fn prepare(&self, mut request: InferenceRequest) -> Result<PreparedRequest> {
         if let Some(error) = self.prepare_failure.lock().unwrap().clone() {
             return Err(error);
+        }
+        if matches!(self.script, Script::DiscoverThenCall) {
+            // The same offered definitions can have a provider-specific order.
+            request.tools.sort_by(|left, right| right.id.cmp(&left.id));
         }
         let capabilities = self.capabilities(&request.model)?;
         PreparedRequest::from_validated(
@@ -263,6 +269,25 @@ impl Provider for ScriptProvider {
         } else {
             vec![Content::Text("Finished".into())]
         };
+        if matches!(self.script, Script::DiscoverThenCall) && index < 2 {
+            let echo = Content::ToolCall(ToolCall {
+                id: ToolCallId::new(format!("echo-{index}"))?,
+                tool: tool_id(),
+                arguments: ToolArguments::Json(serde_json::json!({"value": "echoed"})),
+            });
+            content = if index == 0 {
+                vec![
+                    Content::ToolCall(ToolCall {
+                        id: ToolCallId::new("find-echo")?,
+                        tool: ToolId::new(discovery::TOOL)?,
+                        arguments: ToolArguments::Json(serde_json::json!({"query": "echo"})),
+                    }),
+                    echo,
+                ]
+            } else {
+                vec![echo]
+            };
+        }
         if matches!(self.script, Script::Malformed)
             || matches!(self.script, Script::MalformedThenAnswer) && index < 2
         {
@@ -525,6 +550,33 @@ struct EchoTool {
     definition: ToolDefinition,
     calls: AtomicUsize,
     uncertain: AtomicBool,
+}
+
+struct SearchTool {
+    catalog: Catalog,
+    definition: ToolDefinition,
+}
+
+impl Tool for SearchTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+        match arguments {
+            ToolArguments::Json(value) => Catalog::validate(value),
+            _ => Err(Error::new(ErrorKind::InvalidInput, "search_arguments")),
+        }
+    }
+
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            match invocation.arguments() {
+                ToolArguments::Json(value) => self.catalog.search(value),
+                _ => ToolOutcome::failed("search_arguments"),
+            }
+        })
+    }
 }
 impl EchoTool {
     fn new() -> Self {
@@ -894,6 +946,7 @@ impl Fixture {
     }
     fn master_in(&self, steps: u32, instructions: &str, regime: OperatingRegime) -> Master {
         let mut config = MasterConfig {
+            request_options: Default::default(),
             model: ModelId::new("model").unwrap(),
             instructions: instructions.into(),
             max_steps: steps,
@@ -910,6 +963,7 @@ impl Fixture {
                 tools: match self.provider.script {
                     Script::Answer => BTreeMap::new(),
                     Script::GoalReport { .. }
+                    | Script::DiscoverThenCall
                     | Script::EffortReview
                     | Script::GeneralDelegation { .. }
                     | Script::DelegationResourceRecovery
@@ -1507,6 +1561,73 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     let requests = fixture.provider.requests.lock().unwrap();
     assert!(requests[1].messages.iter().flat_map(|message| &message.content).any(|part| matches!(part, Content::ToolResult(result) if result.status == OutcomeStatus::Succeeded && result.content == vec![ResultContent::Text("echoed".into())])));
+}
+
+#[tokio::test]
+async fn search_activates_only_the_next_request_even_after_interrupted_publication() {
+    let mut fixture = Fixture::new(Script::DiscoverThenCall);
+    let catalog = Catalog::new(
+        vec![ToolSource {
+            name: "fixture".into(),
+            description: "A fixture that echoes a supplied value.".into(),
+            offers: fixture.inventory.offers().unwrap(),
+        }],
+        Vec::new(),
+    );
+    let search = Arc::new(SearchTool {
+        catalog: catalog.clone(),
+        definition: Catalog::definition().unwrap(),
+    });
+    let mut inventory = Inventory::new();
+    inventory.insert(fixture.tool.clone()).unwrap();
+    inventory.insert(search.clone()).unwrap();
+    fixture.inventory = inventory
+        .snapshot(&[tool_id(), search.definition.id.clone()])
+        .unwrap();
+
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime()
+        .open(interrupted(claim.lease))
+        .await
+        .unwrap();
+    assert!(
+        fixture
+            .master(4, "Use tools")
+            .with_discovery(catalog.clone())
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
+    drop(store);
+    let reopened = fixture.reopen().await;
+    let claim = fixture.recover(&reopened).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Use tools")
+        .with_discovery(catalog)
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert_eq!(requests.len(), 3);
+    assert_eq!(requests[0].tools.len(), 1);
+    assert_eq!(requests[0].tools[0].id.as_str(), discovery::TOOL);
+    assert_eq!(
+        requests[1]
+            .tools
+            .iter()
+            .map(|offer| offer.id.as_str())
+            .collect::<Vec<_>>(),
+        [discovery::TOOL, "echo"]
+    );
 }
 
 #[test]
@@ -2261,7 +2382,7 @@ struct NeverApproves;
 
 impl approval_review::Reviewer for NeverApproves {
     fn review<'a>(
-        &'a self,
+        self: Arc<Self>,
         _: &'a TurnOperations,
         _: &'a TurnView,
         _: &'a [WaitId],

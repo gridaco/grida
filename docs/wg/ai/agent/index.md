@@ -53,9 +53,10 @@ The [ACP integration contract](./acp.md) defines the shared client vocabulary
 and how custom presentation and durable controls extend it.
 The [hooks contract](./hooks.md) defines configurable lifecycle automation and
 its boundaries against observers, permissions, and completion. The
-[permission policy](./permissions.md) defines presets, scoped rules, and
-approval, and [Workspaces](./workspace.md) defines folder binding and
-authority during work.
+[permission policy](./permissions.md) defines presets and scoped rules.
+Its [automatic review contract](./permissions.md#automatic-review) defines
+who can decide an action and what private evidence the reviewer can reuse.
+[Workspaces](./workspace.md) defines folder binding and authority during work.
 
 ## Design ownership
 

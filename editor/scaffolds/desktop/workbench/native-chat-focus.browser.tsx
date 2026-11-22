@@ -4,12 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { toast } from "sonner";
 import { Toaster } from "@app/ui/components/sonner";
+import { DESKTOP_BRIDGE_PROTOCOL } from "@grida/desktop-bridge";
 import type {
   DesktopNativeChat,
+  DesktopPersonalizationSettings,
   NativeChatCatalogEntry,
   NativeChatMessage,
   NativeChatPage,
   NativeChatProfileCatalog,
+  NativeChatTurnCapabilities,
+  NativeChatTurnRecord,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import {
@@ -35,11 +39,35 @@ afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   for (const side of sides.splice(0)) side.disconnect();
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
 });
+
+function enableAutomaticSearch() {
+  vi.stubGlobal("grida", {
+    protocol: DESKTOP_BRIDGE_PROTOCOL,
+    window: {},
+    personalization: {
+      get: async (): Promise<DesktopPersonalizationSettings> => ({
+        suggestedPrompts: false,
+        webSearch: "live",
+        revision: 1,
+      }),
+      onChange: () => () => {},
+    },
+  });
+}
 
 async function setup(
   overrides: Partial<DesktopNativeChat> = {},
-  { waitForHistory = true, sideChat = false } = {}
+  {
+    waitForHistory = true,
+    sideChat = false,
+    workingDirectory,
+  }: {
+    waitForHistory?: boolean;
+    sideChat?: boolean;
+    workingDirectory?: string;
+  } = {}
 ) {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -179,6 +207,7 @@ async function setup(
             <NativeAgentPane
               bridge={bridge}
               initialSession={initialSession}
+              workingDirectory={workingDirectory}
               sideChatPlacement={{ present() {}, withdraw() {} }}
             />
           )}
@@ -220,6 +249,46 @@ async function click(name: string) {
     page.getByRole("button", { name, exact: true }).click()
   );
 }
+
+it("copies the saved chat ID and workspace path and forks through the existing command", async () => {
+  const workingDirectory = "/projects/fixture";
+  const runCommand = vi
+    .fn<NonNullable<DesktopNativeChat["runCommand"]>>()
+    .mockResolvedValue({ command: "fork", sessionId: crypto.randomUUID() });
+  const { first } = await setup(
+    { commands: async () => ["fork"], runCommand },
+    { workingDirectory }
+  );
+  const clipboard = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue();
+  try {
+    for (const item of ["Copy chat ID", "Copy working directory"]) {
+      await click("Chat options");
+      await act(async () => {
+        await page.getByRole("menuitem", { name: "Copy", exact: true }).click();
+        await page.getByRole("menuitem", { name: item, exact: true }).click();
+      });
+    }
+    expect(clipboard.mock.calls).toEqual([[first], [workingDirectory]]);
+
+    await click("Chat options");
+    await act(async () =>
+      page.getByRole("menuitem", { name: "Fork chat" }).click()
+    );
+    await expect
+      .element(page.getByRole("button", { name: "Open fork" }))
+      .toBeVisible();
+    expect(runCommand).toHaveBeenCalledExactlyOnceWith(
+      first,
+      "fork",
+      expect.any(String)
+    );
+    await expect.element(page.getByText("First saved request")).toBeVisible();
+  } finally {
+    clipboard.mockRestore();
+  }
+});
 
 it("shows an unread reply in another chat, acknowledges it on display, and preserves a manual mark until revisited", async () => {
   let invalidate!: () => void;
@@ -312,7 +381,7 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
 
   await click("Chat options");
   await act(async () =>
-    page.getByRole("menuitem", { name: "Mark unread" }).click()
+    page.getByRole("menuitem", { name: "Mark as unread" }).click()
   );
   await expect
     .poll(() => change.mock.lastCall)
@@ -375,7 +444,7 @@ it.each(["file window", "archived chat"] as const)(
       .element(page.getByRole("menuitem", { name: "Rename" }))
       .toBeVisible();
     await expect
-      .element(page.getByRole("menuitem", { name: "Mark unread" }))
+      .element(page.getByRole("menuitem", { name: "Mark as unread" }))
       .not.toBeInTheDocument();
     expect(receipt).not.toHaveBeenCalled();
   }
@@ -415,7 +484,9 @@ it("clears a manual unread mark on an empty chat only after its retained history
 it("keeps a plain Welcome message available through workspace startup retries", async () => {
   const f = await setup();
   const open = vi.fn<NonNullable<DesktopNativeChat["startWorkspaceChat"]>>(
-    async () => ({ readiness: "native-unavailable" })
+    async () => ({
+      readiness: "native-unavailable",
+    })
   );
   const take = vi.fn<() => { text: string }>(() => ({ text: "Make a poster" }));
   await act(async () =>
@@ -744,7 +815,584 @@ it.each(["main", "side"])(
   }
 );
 
+it("shows review progress and its decision in the open chat while the turn keeps running", async () => {
+  const turnId = "review-turn";
+  const action = "/outside/schedule.txt";
+  let journalPosition = 1;
+  let controlRevision = 1;
+  let inputNeeded = false;
+  let approvalReviews: NativeChatTurnRecord["approvalReviews"] = [];
+  const transcript = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>(
+    async () => ({
+      view: 0,
+      older: null,
+      messages: [
+        {
+          messageId: "request",
+          turnId,
+          role: "user",
+          text: "First saved request",
+        },
+      ],
+      turns: [{ turnId, startedAtMs: 1000, status: null, approvalReviews }],
+    })
+  );
+  await setup({
+    observe: async (id) => ({
+      observationId: `review-${journalPosition}`,
+      snapshot: {
+        sessionId: id,
+        sessionRevision: 0,
+        queuedInputs: 0,
+        admissionPaused: false,
+        latest: null,
+        current: {
+          turnId,
+          epoch: 1,
+          journalPosition,
+          controlRevision,
+          inputNeeded,
+          historyPosition: 1,
+          paused: false,
+          cancelled: false,
+          disposition: "running",
+          status: null,
+        },
+      },
+    }),
+    transcriptPage: transcript,
+  });
+  const waitForReplay = () => {
+    const reads = transcript.mock.calls.length;
+    return act(async () => {
+      await expect
+        .poll(() => transcript.mock.calls.length)
+        .toBeGreaterThan(reads);
+    });
+  };
+  // A wait may exist for a poll before the reviewer has started.
+  inputNeeded = true;
+  controlRevision++;
+  journalPosition++;
+  await waitForReplay();
+  approvalReviews = [{ decision: "reviewing", action }];
+  journalPosition++;
+  await waitForReplay();
+  const reviewing = page.getByText(`Reviewing access for "${action}"`);
+  await expect.element(reviewing).toBeVisible();
+  approvalReviews = [{ decision: "approved", action }];
+  inputNeeded = false;
+  controlRevision++;
+  journalPosition++;
+  await waitForReplay();
+  await expect
+    .element(page.getByText(`Automatically approved "${action}"`))
+    .not.toBeInTheDocument();
+  await expect.element(reviewing).not.toBeInTheDocument();
+  // A second review opens and resolves entirely between two observations.
+  approvalReviews = [
+    ...approvalReviews,
+    { decision: "declined", action: "second.txt" },
+  ];
+  controlRevision += 2;
+  journalPosition += 4;
+  await waitForReplay();
+  await expect
+    .element(page.getByText('Automatically declined "second.txt"'))
+    .toBeVisible();
+});
+
+it("selects ChatGPT speed, offers web search automatically, and reopens the answer’s sources", async () => {
+  enableAutomaticSearch();
+  let speed: "standard" | "fast" | "ultrafast" = "standard";
+  let revision = 1;
+  const savedSpeedDiscovery = Promise.withResolvers<"unavailable">();
+  const recheckSpeed = vi.fn<() => void>();
+  let receive: (update: NativeChatUpdate) => void = () => {};
+  let firstSession: string | undefined;
+  let running = false;
+  let restored = false;
+  const turn = {
+    turnId: "turn",
+    epoch: 1,
+    historyPosition: 1,
+    journalPosition: 1,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+  };
+  const search = {
+    callId: "search",
+    kind: "search",
+    source: "provider",
+    title: "web_search",
+    input: { type: "search", query: "forecast" },
+  } as const;
+  const citation = {
+    url: "https://example.org/forecast",
+    title: "Forecast",
+    startIndex: 0,
+    endIndex: 5,
+  };
+  const update = vi.fn<NonNullable<DesktopNativeChat["updateSelection"]>>(
+    async (target, expected, _operation, choice) => {
+      expect(expected).toBe(revision);
+      speed = choice.speed ?? speed;
+      return {
+        target,
+        revision: ++revision,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "chatgpt",
+          effort: choice.effort,
+          speed,
+        },
+      };
+    }
+  );
+  const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => {
+      running = true;
+      return {
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn",
+      };
+    }
+  );
+  const f = await setup({
+    profiles: async () => ({ active: null, saved: [], choices: [] }),
+    selectProfile: vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(),
+    selection: async (target) => ({
+      target,
+      revision,
+      available: true,
+      selection: {
+        profileId: null,
+        modelId: "chatgpt",
+        effort: "medium",
+        speed,
+      },
+    }),
+    updateSelection: update,
+    turnCapabilities: async () => {
+      if (revision === 2 && recheckSpeed.mock.calls.length === 0) {
+        recheckSpeed();
+        return {
+          status: await savedSpeedDiscovery.promise,
+          speeds: [],
+          webSearch: false,
+        };
+      }
+      return {
+        status: "available",
+        speeds: ["fast", "ultrafast"],
+        webSearch: true,
+      };
+    },
+    submitInRegime: submit,
+    subscribe: async (_id, listener) => {
+      receive = listener;
+      return "subscription";
+    },
+    observe: async (id) => ({
+      observationId: "observing-" + id,
+      snapshot: {
+        sessionId: id,
+        sessionRevision: 0,
+        queuedInputs: 0,
+        admissionPaused: false,
+        current:
+          running && firstSession === id
+            ? { ...turn, disposition: "running", status: null }
+            : null,
+        latest:
+          restored && firstSession === id
+            ? { ...turn, disposition: "settled", status: "succeeded" }
+            : null,
+      },
+    }),
+    transcriptPage: async (id) => {
+      firstSession ??= id;
+      if (firstSession !== id)
+        return {
+          view: 0,
+          older: null,
+          messages: [
+            { messageId: "other", role: "user", text: "Second saved request" },
+          ],
+        };
+      return {
+        view: 0,
+        older: null,
+        turns: [
+          {
+            turnId: "turn",
+            startedAtMs: 1000,
+            ...(restored
+              ? { status: "succeeded" as const, settledAtMs: 2000 }
+              : { status: null }),
+          },
+        ],
+        messages: [
+          {
+            messageId: "request",
+            role: "user",
+            turnId: "turn",
+            text: "First saved request",
+          },
+          ...(restored
+            ? [
+                {
+                  messageId: "search-message",
+                  role: "assistant" as const,
+                  turnId: "turn",
+                  text: "",
+                  activity: [{ ...search, outcome: "succeeded" as const }],
+                },
+                {
+                  messageId: "answer",
+                  turnId: "turn",
+                  role: "assistant" as const,
+                  phase: "answer" as const,
+                  text: "Sunny tomorrow.",
+                  citations: [citation],
+                },
+              ]
+            : []),
+        ],
+      };
+    },
+  });
+  await act(async () =>
+    page.getByRole("combobox", { name: "Model connection" }).click()
+  );
+  const picker = page.getByRole("combobox", {
+    name: /^(Model connection|Select effort)$/,
+  });
+  await expect.element(picker).not.toHaveAttribute("aria-description");
+  const speedButton = page.getByRole("button", { name: "Response speed" });
+  const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
+  const ultrafast = page.getByRole("menuitemradio", { name: /^Ultrafast/ });
+  await expect.element(speedButton).toBeEnabled();
+  const bolt = speedButton
+    .element()
+    .querySelector("svg path")
+    ?.getAttribute("d");
+  expect(bolt).toBeTruthy();
+  const effortPanel = page.getByTestId("native-effort-panel");
+  const triggerBounds = speedButton.element().getBoundingClientRect();
+  const panelBounds = effortPanel.element().getBoundingClientRect();
+  expect(triggerBounds.left - panelBounds.left).toBeLessThan(24);
+  expect(triggerBounds.top - panelBounds.top).toBeLessThan(24);
+  await act(async () => speedButton.click());
+  await expect
+    .element(page.getByRole("menu", { name: "Response speed" }))
+    .toHaveAttribute("data-side", "right");
+  await expect
+    .element(page.getByRole("menuitemradio", { name: /^Standard/ }))
+    .toHaveAttribute("aria-checked", "true");
+  await expect.element(ultrafast).toBeEnabled();
+  await act(async () => fast.click());
+  await expect.poll(() => speed).toBe("fast");
+  await expect
+    .element(picker)
+    .toHaveAttribute("aria-description", "Fast response speed");
+  expect(picker.element().querySelectorAll("svg")).toHaveLength(1);
+  expect(picker.element().querySelector("svg path")?.getAttribute("d")).toBe(
+    bolt
+  );
+  await expect.poll(() => recheckSpeed.mock.calls.length).toBeGreaterThan(0);
+  const availabilityError = page.getByText(
+    /couldn’t verify these ChatGPT options/i
+  );
+  const resetSpeed = page.getByRole("button", { name: "Use Standard" });
+  await expect.element(availabilityError).not.toBeInTheDocument();
+  await expect.element(resetSpeed).not.toBeInTheDocument();
+  await expect.element(fast).not.toBeInTheDocument();
+  await act(async () => speedButton.click());
+  await expect.element(fast).toHaveAttribute("aria-checked", "true");
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await expect.element(fast).not.toBeInTheDocument();
+  await expect.element(speedButton).toHaveFocus();
+  await expect.element(effortPanel).toBeVisible();
+  await act(async () => savedSpeedDiscovery.resolve("unavailable"));
+  await expect.element(availabilityError).toBeVisible();
+  await expect.element(resetSpeed).toBeEnabled();
+  await act(async () =>
+    effortPanel.getByRole("button", { name: "Default model" }).click()
+  );
+  await expect
+    .element(page.getByPlaceholder("Search all models…"))
+    .toBeVisible();
+  await expect.element(speedButton).not.toBeInTheDocument();
+  await expect.element(resetSpeed).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("button", { name: "Retry availability" }))
+    .not.toBeInTheDocument();
+  await click("Back to effort");
+  await expect.element(speedButton).toBeDisabled();
+  await click("Retry availability");
+  await expect.element(speedButton).toBeEnabled();
+  await expect.element(availabilityError).not.toBeInTheDocument();
+  await act(async () => speedButton.click());
+  await act(async () => ultrafast.click());
+  await expect.poll(() => speed).toBe("ultrafast");
+  await expect
+    .element(speedButton)
+    .toHaveAttribute("aria-description", "Ultrafast response speed");
+  const layers = speedButton.element().querySelectorAll("svg path");
+  expect(layers).toHaveLength(2);
+  const rearBolt = layers[0].getAttribute("d");
+  expect(rearBolt).toBeTruthy();
+  expect(bolt).toContain(rearBolt);
+  expect(rearBolt).not.toBe(bolt);
+  expect(layers[1].getAttribute("d")).toBe(bolt);
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await expect
+    .element(picker)
+    .toHaveAttribute("aria-description", "Ultrafast response speed");
+  expect(picker.element().querySelectorAll("svg")).toHaveLength(1);
+  expect(picker.element().querySelectorAll("svg path")).toHaveLength(2);
+  await act(async () => {
+    await userEvent.fill(f.composer, "Find the forecast");
+    f.composer.focus();
+    await userEvent.keyboard("{Enter}");
+  });
+  await expect.poll(() => submit.mock.calls.length).toBe(1);
+  expect(submit.mock.calls[0]?.[10]).toBe(true);
+  const emitSearch = (outcome: "running" | "succeeded") =>
+    act(async () =>
+      receive({
+        kind: "activity",
+        messageId: "search-message",
+        turnId: "turn",
+        activity: { ...search, outcome },
+      })
+    );
+  await emitSearch("running");
+  await expect.element(page.getByText(/searching the web/i)).toBeVisible();
+  await emitSearch("succeeded");
+  await expect.element(page.getByText(/searched the web/i)).toBeVisible();
+  await act(async () =>
+    receive({
+      kind: "text",
+      role: "assistant",
+      turnId: "turn",
+      messageId: "answer",
+      offsetBytes: 0,
+      replace: true,
+      text: "Sunny tomorrow.",
+      citations: [citation],
+    })
+  );
+  const source = page.getByRole("link", { name: "Forecast" });
+  await expect.element(source).toHaveAttribute("href", citation.url);
+  restored = true;
+  running = false;
+  await f.render(f.second);
+  await expect.element(page.getByText("Second saved request")).toBeVisible();
+  await f.render(f.first);
+  await expect.element(source).toHaveAttribute("href", citation.url);
+  await click("Worked for 1s");
+  await expect.element(page.getByText(/searched the web/i)).toBeVisible();
+  await act(async () => {
+    await userEvent.fill(f.composer, "Thank you");
+    f.composer.focus();
+    await userEvent.keyboard("{Enter}");
+  });
+  await expect.poll(() => submit.mock.calls.length).toBe(2);
+  expect(submit.mock.calls[1]?.[10]).toBe(true);
+});
+
+it("keeps automatic search out of the composer and speed independent of the search preference", async () => {
+  let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+  const prefs = {
+    webSearch: "live",
+    suggestedPrompts: false,
+    revision: 1,
+  } as const;
+  vi.stubGlobal("grida", {
+    protocol: DESKTOP_BRIDGE_PROTOCOL,
+    personalization: {
+      get: async () => prefs,
+      onChange(listener: typeof receive) {
+        receive = listener;
+        return () => {};
+      },
+    },
+  });
+  try {
+    const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_mode, sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn",
+      })
+    );
+    const f = await setup({
+      selection: async (target) => ({
+        target,
+        revision: 1,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "gpt-6.2-sol",
+          effort: "medium",
+          speed: "fast",
+        },
+      }),
+      turnCapabilities: async () => ({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: true,
+      }),
+      submitInRegime: submit,
+    });
+    await click("Add to message");
+    await expect
+      .element(page.getByRole("option", { name: /Plan mode/ }))
+      .toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: /Web search/i }))
+      .not.toBeInTheDocument();
+    await act(async () => userEvent.keyboard("{Escape}"));
+    await act(async () =>
+      receive({ ...prefs, revision: 2, webSearch: "disabled" })
+    );
+    await act(async () => {
+      await userEvent.fill(f.composer, "Search the web for the forecast");
+      f.composer.focus();
+      await userEvent.keyboard("{Enter}");
+    });
+    await expect.poll(() => submit.mock.calls.length).toBe(1);
+    expect(submit.mock.calls[0][10]).toBeUndefined();
+    await act(async () =>
+      page.getByRole("combobox", { name: "Model connection" }).click()
+    );
+    const speedButton = page.getByRole("button", { name: "Response speed" });
+    const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
+    await expect.element(speedButton).toBeEnabled();
+    await act(async () => speedButton.click());
+    await expect.element(fast).toHaveAttribute("aria-checked", "true");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 describe("Composer control loading", () => {
+  it("waits quietly for availability when opening a saved Fast chat", async () => {
+    const availability = Promise.withResolvers<NativeChatTurnCapabilities>();
+    const f = await setup({
+      selection: async (target) => ({
+        target,
+        revision: 1,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "gpt-6.2-sol",
+          effort: "medium",
+          speed: "fast",
+        },
+      }),
+      turnCapabilities: () => availability.promise,
+    });
+    await act(async () => userEvent.fill(f.composer, "Keep writing"));
+    const send = page.getByRole("button", { name: "Send", exact: true });
+    await expect.element(send).toBeDisabled();
+    await expect
+      .element(page.getByText(/couldn’t verify these ChatGPT options/i))
+      .not.toBeInTheDocument();
+
+    await act(async () =>
+      page.getByRole("combobox", { name: "Model connection" }).click()
+    );
+    const speed = page.getByRole("button", { name: "Response speed" });
+    await expect.element(speed).toBeDisabled();
+    await expect
+      .element(page.getByRole("button", { name: "Use Standard" }))
+      .not.toBeInTheDocument();
+
+    await act(async () =>
+      availability.resolve({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: false,
+      })
+    );
+    await expect.element(send).toBeEnabled();
+    await expect.element(speed).toBeEnabled();
+    await act(async () => speed.click());
+    await expect
+      .element(page.getByRole("menuitemradio", { name: /^Fast Faster/ }))
+      .toHaveAttribute("aria-checked", "true");
+  });
+
+  it("retries unavailable ChatGPT options, ignores a stale response, and disables speed on unsupported models", async () => {
+    enableAutomaticSearch();
+    const pending = Promise.withResolvers<void>();
+    let mode: "unavailable" | "pending" | "offered" | "unsupported" =
+      "unavailable";
+    const read = vi.fn<NonNullable<DesktopNativeChat["turnCapabilities"]>>(
+      async () => {
+        if (mode === "unavailable")
+          return { status: "unavailable", speeds: [], webSearch: false };
+        if (mode === "offered")
+          return { status: "available", speeds: ["fast"], webSearch: true };
+        if (mode === "pending") await pending.promise;
+        return { status: "unsupported", speeds: [], webSearch: false };
+      }
+    );
+    await setup({
+      profiles: async () => ({ active: null, saved: [], choices: [] }),
+      turnCapabilities: read,
+      submitInRegime: vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(),
+    });
+    await expect.poll(() => read.mock.calls.length).toBeGreaterThan(0);
+    const open = () =>
+      act(async () =>
+        page.getByRole("combobox", { name: "Model connection" }).click()
+      );
+    const close = () => act(async () => userEvent.keyboard("{Escape}"));
+    mode = "pending";
+    const initial = read.mock.calls.length;
+    await open();
+    await expect.poll(() => read.mock.calls.length).toBeGreaterThan(initial);
+    const retry = page.getByRole("button", { name: "Retry availability" });
+    await expect.element(retry).toBeVisible();
+    const speedButton = page.getByRole("button", { name: "Response speed" });
+    await expect.element(speedButton).toBeDisabled();
+    mode = "offered";
+    await act(async () => retry.click());
+    await expect.element(speedButton).toBeEnabled();
+    await act(async () => speedButton.click());
+    const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
+    await expect.element(fast).toBeEnabled();
+    await act(async () => pending.resolve());
+    await expect.element(fast).toBeEnabled();
+    await expect
+      .element(page.getByRole("menuitemradio", { name: /^Ultrafast/ }))
+      .toBeDisabled();
+    await close();
+    await expect.element(speedButton).toHaveFocus();
+    await act(async () =>
+      page.getByRole("combobox", { name: "Select effort" }).click()
+    );
+    await expect.element(speedButton).not.toBeInTheDocument();
+
+    mode = "unsupported";
+    await open();
+    await expect.element(page.getByTestId("native-effort-panel")).toBeVisible();
+    await expect.element(speedButton).toBeDisabled();
+    await expect.element(fast).not.toBeInTheDocument();
+    await close();
+  });
+
   it("waits for the saved selection even when the catalog has already loaded empty", async () => {
     const initial = Promise.withResolvers<void>();
     const retry = Promise.withResolvers<void>();
@@ -849,7 +1497,9 @@ describe("Composer control loading", () => {
         return "subscription";
       },
     });
-    const defaultAccess = page.getByRole("button", { name: "Access: Default" });
+    const defaultAccess = page.getByRole("button", {
+      name: "Access: Ask for approval",
+    });
     const width = (element: Element) => element.getBoundingClientRect().width;
     await expect.element(defaultAccess).toBeVisible();
     const wideWidth = width(defaultAccess.element());
@@ -865,7 +1515,7 @@ describe("Composer control loading", () => {
     f.container.style.removeProperty("width");
     expect(width(checking.element())).toBeCloseTo(wideWidth);
     await expect
-      .element(page.getByRole("button", { name: "Access: Default" }))
+      .element(page.getByRole("button", { name: "Access: Ask for approval" }))
       .not.toBeInTheDocument();
     expect(f.composer.isContentEditable).toBe(true);
     await act(async () => pending.resolve());

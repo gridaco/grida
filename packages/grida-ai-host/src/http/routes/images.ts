@@ -10,11 +10,9 @@ import type { GGDiscoveryStore } from "@grida/ai";
  *   - Reads `_getKey` internally (legal — sidecar only). The response carries
  *     base64 image bytes + provider id only: never the key, never the raw
  *     upstream JSON.
- *   - `model_id` is a closed catalog lookup (curated `listed` cards only) and
- *     `provider` is `oneOf` the fixed image providers — there is NO
- *     user-supplied base URL, so this opens no new egress beyond the three
- *     fixed provider hosts (unlike the endpoint routes, whose base URL the
- *     user configures).
+ *   - The installed image operation resolves `model_id` through its catalogue.
+ *     `provider` is `oneOf` the fixed image providers. Each adapter owns its
+ *     destination.
  *
  * Billing contract (GRIDA-SEC-006): the BYOK arms NEVER
  * enter the web Grida-billed image seam (`editor/lib/ai/server.ts`) — the
@@ -39,9 +37,16 @@ import { mediaGenerationError } from "./media-generation-errors";
 import { body, v } from "@grida/daemon/server";
 import type { ProviderHttp } from "../../providers/http";
 import type { ImageGeneratedImage } from "../../protocol/images";
+import { OPENAI_PROJECT_PROVIDER_ID } from "../../protocol/provider-ids";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 
-const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
+const IMAGE_PROVIDERS = [
+  "vercel",
+  "fal",
+  "openrouter",
+  OPENAI_PROJECT_PROVIDER_ID,
+  "gg",
+] as const satisfies readonly ImageClient.Provider[];
 const RETAINED_IMAGE_TYPE = "application/vnd.grida.retained-image+json";
 const RETAINED_IMAGE_FIELDS = new Set([
   "model_id",
@@ -69,6 +74,7 @@ export type ImagesRoutesDeps = {
   media?: MediaPersistence | null;
   /** Image catalogue for resolution; absent ⇒ the bundled one. */
   catalog?: ModelCatalogStore;
+  runtime_catalogue?: ImageClient.Options["runtime_catalogue"];
   gg_catalog?: GGDiscoveryStore;
   // GRIDA-GG: provider — the optional hosted image arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
@@ -78,7 +84,15 @@ export type ImagesRoutesDeps = {
 };
 
 export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
-  const { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog } = deps;
+  const {
+    secrets,
+    gg,
+    gg_base_url,
+    provider_http,
+    catalog,
+    runtime_catalogue,
+    gg_catalog,
+  } = deps;
 
   app.post("/images/generate", async (c) => {
     const r = await body(c, {
@@ -158,6 +172,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
           gg_base_url,
           provider_http,
           catalog,
+          runtime_catalogue,
           gg_catalog,
         },
         model_id,

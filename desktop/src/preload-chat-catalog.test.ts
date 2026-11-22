@@ -64,3 +64,111 @@ it("follows same-document navigation for catalog updates and read actions", asyn
   );
   expect(ipc.invoke).not.toHaveBeenCalled();
 });
+
+it("forwards speed-independent turn options in their original IPC slots, including a one-message search", async () => {
+  vi.resetModules();
+  ipc.expose.mockClear();
+  ipc.invoke.mockClear();
+  const location = new URL("https://example.test/desktop/workspace/fixture");
+  vi.stubGlobal("location", location);
+  vi.stubGlobal("window", {
+    location,
+    history: { pushState() {}, replaceState() {} },
+    addEventListener() {},
+  });
+  ipc.invoke.mockResolvedValue({});
+  await import("./preload");
+  const chat = ipc.expose.mock.calls[0][1].nativeChat!;
+  const send = chat.submitInRegime!;
+  await send("submit", "chat", "input", "Hi", "act");
+  expect(ipc.invoke).toHaveBeenLastCalledWith(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+    "chat",
+    "input",
+    "Hi",
+    "act"
+  );
+  await send(
+    "enqueue",
+    "chat",
+    "queued",
+    "Search",
+    "act",
+    "high",
+    undefined,
+    2,
+    undefined,
+    undefined,
+    true
+  );
+  expect(ipc.invoke).toHaveBeenLastCalledWith(
+    IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
+    "chat",
+    "queued",
+    "Search",
+    "act",
+    "high",
+    undefined,
+    2,
+    undefined,
+    undefined,
+    true
+  );
+  await send(
+    "submit",
+    "chat",
+    "input",
+    "Hi",
+    "act",
+    undefined,
+    "svg",
+    3,
+    "observation",
+    "tools",
+    undefined
+  );
+  expect(ipc.invoke).toHaveBeenLastCalledWith(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+    "chat",
+    "input",
+    "Hi",
+    "act",
+    undefined,
+    "svg",
+    3,
+    "observation",
+    "tools"
+  );
+  const library = chat.submitWithLibrarySelection!;
+  await library("chat", "input", "Choose", "act", "high", 4);
+  expect(ipc.invoke).toHaveBeenLastCalledWith(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+    "chat",
+    "input",
+    "Choose",
+    "act",
+    "high",
+    4
+  );
+  await library(
+    "chat",
+    "input",
+    "Search",
+    "act",
+    undefined,
+    4,
+    undefined,
+    true
+  );
+  expect(ipc.invoke).toHaveBeenLastCalledWith(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+    "chat",
+    "input",
+    "Search",
+    "act",
+    undefined,
+    4,
+    undefined,
+    true
+  );
+});

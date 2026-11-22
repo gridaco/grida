@@ -1,8 +1,82 @@
 import { describe, expect, it } from "vitest";
+import { getSchema } from "@tiptap/core";
 import { ComposerCore } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
 
 describe("ComposerTiptap", () => {
+  it("preserves ordered list starts, nested bullets, code, and inline references in Markdown", () => {
+    const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
+    const doc = schema.nodeFromJSON({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "**Review notes**" }],
+        },
+        {
+          type: "orderedList",
+          attrs: { start: 3 },
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    { type: "text", text: "Check " },
+                    {
+                      type: "composerMention",
+                      attrs: {
+                        id: "readme",
+                        label: "README",
+                        path: "README.md",
+                      },
+                    },
+                    { type: "hardBreak" },
+                    { type: "text", text: "One more note" },
+                  ],
+                },
+                {
+                  type: "bulletList",
+                  content: [
+                    {
+                      type: "listItem",
+                      content: [
+                        {
+                          type: "paragraph",
+                          content: [
+                            {
+                              type: "text",
+                              text: "verify",
+                              marks: [{ type: "code" }],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(ComposerTiptap.formattedMarkdown(doc)).toBe(
+      [
+        "**Review notes**",
+        "",
+        "3. Check @README\\",
+        "   One more note",
+        "   - `verify`",
+      ].join("\n")
+    );
+    expect(
+      ComposerTiptap.formattedMarkdown(schema.node("doc", null, doc.child(0)))
+    ).toBeUndefined();
+  });
+
   it("maps Tiptap command, mention, file ref, list, and code nodes to composer document nodes", () => {
     expect(
       ComposerTiptap.toDocument({

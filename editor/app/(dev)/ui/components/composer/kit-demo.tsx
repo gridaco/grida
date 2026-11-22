@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@app/ui/components/button";
-import { ArrowUpIcon } from "lucide-react";
+import { isDesktopVoiceReady } from "@grida/desktop-bridge";
+import {
+  ArrowUpIcon,
+  LoaderCircleIcon,
+  MicIcon,
+  SquareIcon,
+} from "lucide-react";
 import {
   type DragEvent,
   type RefObject,
@@ -22,8 +28,14 @@ import {
   type ComposerMessage,
 } from "@/kits/composer";
 import {
+  DictationActivity,
+  DictationButton,
+  useComposerVoice,
+} from "@/scaffolds/desktop/shared/composer-dictation-controls";
+import {
   demoAttachmentFilters,
   demoCatalog,
+  demoStartingAttachments,
   mockFileDragType,
   readMockItem,
   resolveDropMode,
@@ -33,6 +45,7 @@ import {
   type DropMode,
   type MockItem,
 } from "./demo-data";
+import { DemoAttachmentCard } from "./demo-attachment-card";
 import { FileSidebar } from "./demo-file-sidebar";
 import { type DemoMessage, MessageLog } from "./demo-message-log";
 
@@ -52,8 +65,16 @@ function ComposerDemo() {
   const [isDraggingOverComposer, setIsDraggingOverComposer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const objectUrls = useRef<string[]>([]);
+  const seededAttachments = useRef(false);
+  const { addAttachment } = composer;
 
   const selectedItem = sidebarItems.find((item) => item.id === selectedItemId);
+
+  useEffect(() => {
+    if (seededAttachments.current) return;
+    seededAttachments.current = true;
+    for (const attachment of demoStartingAttachments) addAttachment(attachment);
+  }, [addAttachment]);
 
   const revokeTrackedObjectUrl = (url: string | undefined) => {
     if (!url || !objectUrls.current.includes(url)) return;
@@ -117,43 +138,34 @@ function ComposerDemo() {
   };
 
   return (
-    <main className="flex h-[100svh] w-full flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-border px-6 py-4">
-        <h1 className="font-semibold text-2xl">Composer</h1>
-        <p className="text-muted-foreground text-sm">
-          Demo for the reusable Tiptap prompt composer kit.
-        </p>
-      </header>
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="flex min-h-0 flex-col border-r border-border">
-          <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
-            <MessageLog messages={messages} />
-            <DemoComposerInput
-              addLocalFiles={addLocalFiles}
-              fileInputRef={fileInputRef}
-              isDraggingOverComposer={isDraggingOverComposer}
-              onRemoveAttachment={(attachment) =>
-                revokeTrackedObjectUrl(
-                  attachment.kind === "directory" ? undefined : attachment.url
-                )
-              }
-              onDrop={onComposerDrop}
-              onSubmit={submit}
-              setIsDraggingOverComposer={setIsDraggingOverComposer}
-            />
-          </div>
-        </section>
-
-        <FileSidebar
-          dropMode={dropMode}
-          selectedItem={selectedItem}
-          selectedItemId={selectedItemId}
-          setDropMode={setDropMode}
-          setSelectedItemId={setSelectedItemId}
-        />
+    <div className="grid h-[36rem] grid-cols-1 grid-rows-2 overflow-hidden rounded-xl border bg-background md:grid-cols-[minmax(0,1fr)_17rem] md:grid-rows-1">
+      <div className="flex min-h-0 min-w-0 flex-col border-b border-border md:border-r md:border-b-0">
+        <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
+          <MessageLog messages={messages} />
+          <DemoComposerInput
+            addLocalFiles={addLocalFiles}
+            fileInputRef={fileInputRef}
+            isDraggingOverComposer={isDraggingOverComposer}
+            onRemoveAttachment={(attachment) =>
+              revokeTrackedObjectUrl(
+                attachment.kind === "directory" ? undefined : attachment.url
+              )
+            }
+            onDrop={onComposerDrop}
+            onSubmit={submit}
+            setIsDraggingOverComposer={setIsDraggingOverComposer}
+          />
+        </div>
       </div>
-    </main>
+
+      <FileSidebar
+        dropMode={dropMode}
+        selectedItem={selectedItem}
+        selectedItemId={selectedItemId}
+        setDropMode={setDropMode}
+        setSelectedItemId={setSelectedItemId}
+      />
+    </div>
   );
 }
 
@@ -174,6 +186,18 @@ function DemoComposerInput({
   onSubmit: (message?: ComposerMessage | null) => void;
   setIsDraggingOverComposer: (value: boolean) => void;
 }) {
+  const composer = useComposer();
+  const { voice, state } = useComposerVoice();
+  const phase = state.state.phase;
+  const canStop = phase === "starting" || phase === "recording";
+  const finishing = phase === "finishing";
+  const showDictationProgress = finishing && !state.sendPending;
+
+  function requestSubmit() {
+    if (state.active) voice.stopAndSend(() => onSubmit());
+    else onSubmit();
+  }
+
   return (
     <div className="shrink-0 p-4 pt-0">
       <ComposerMenuAnchor
@@ -197,69 +221,132 @@ function DemoComposerInput({
           event.stopPropagation();
         }}
         onDropCapture={onDrop}
+        onKeyDownCapture={(event) => {
+          if (
+            !canStop ||
+            event.key !== "Escape" ||
+            event.defaultPrevented ||
+            event.repeat ||
+            event.nativeEvent.isComposing ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey ||
+            composer.trigger ||
+            (event.target instanceof Element &&
+              event.target.closest("[data-composer-formatting]"))
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          voice.stop();
+        }}
       >
         <ComposerTriggerMenu />
         <ComposerAttachmentCards
-          className="px-2 pt-2"
+          className="flex-nowrap items-end gap-2.5 overflow-x-auto overscroll-x-contain px-2.5 pt-2.5 pb-0.5 [scrollbar-width:none] [&>[data-composer-attachment]]:shrink-0"
           onRemoveAttachment={onRemoveAttachment}
+          renderAttachment={(attachment, { remove }) => (
+            <DemoAttachmentCard attachment={attachment} onRemove={remove} />
+          )}
         />
         <ComposerContent
-          autofocus
-          onSubmitRequest={() => onSubmit()}
+          onSubmitRequest={requestSubmit}
           placeholder="Type / for commands"
         />
-        <ComposerFooter
-          addLocalFiles={addLocalFiles}
-          fileInputRef={fileInputRef}
-          onSubmit={onSubmit}
-        />
+        {state.notice && (
+          <p role="status" className="px-3 pb-1 text-xs text-muted-foreground">
+            {state.notice.text}
+          </p>
+        )}
+        <div className="flex items-center gap-1 px-2 pt-0 pb-2">
+          <input
+            className="hidden"
+            multiple
+            onChange={(event) => {
+              if (event.currentTarget.files) {
+                addLocalFiles(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }
+            }}
+            ref={fileInputRef}
+            type="file"
+          />
+          {state.active ? (
+            <DictationActivity
+              state={state.state}
+              cancel={() => {
+                voice.cancel();
+                composer.focus();
+              }}
+            />
+          ) : (
+            <ComposerActionMenu
+              items={[
+                {
+                  id: "files",
+                  title: "Files",
+                  description: "Attach a file from this device",
+                  onSelect: () => fileInputRef.current?.click(),
+                },
+              ]}
+            />
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            {isDesktopVoiceReady(state.settings) && (
+              <DictationButton
+                label={
+                  showDictationProgress
+                    ? "Transcribing…"
+                    : state.active
+                      ? "Stop dictation"
+                      : "Dictate"
+                }
+                escapeShortcut={canStop}
+                aria-disabled={finishing || undefined}
+                className="aria-disabled:opacity-50"
+                disabled={!state.active && !composer.ready}
+                onClick={() => {
+                  if (canStop) voice.stop();
+                  else if (!state.active)
+                    void voice.start(false, (text) =>
+                      composer.appendText(
+                        text,
+                        Number.POSITIVE_INFINITY,
+                        "inline"
+                      )
+                    );
+                }}
+              >
+                {showDictationProgress ? (
+                  <LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
+                ) : state.active ? (
+                  <SquareIcon className="size-3 fill-current" />
+                ) : (
+                  <MicIcon className="size-4" />
+                )}
+              </DictationButton>
+            )}
+            <Button
+              aria-label={state.sendPending ? "Sending…" : "Submit"}
+              aria-busy={state.sendPending || undefined}
+              aria-disabled={
+                state.sendPending || phase === "starting" || undefined
+              }
+              className="rounded-full"
+              onClick={requestSubmit}
+              size="icon-sm"
+              type="button"
+            >
+              {state.sendPending ? (
+                <LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <ArrowUpIcon className="size-4" />
+              )}
+            </Button>
+          </div>
+        </div>
       </ComposerMenuAnchor>
-    </div>
-  );
-}
-
-function ComposerFooter({
-  addLocalFiles,
-  fileInputRef,
-  onSubmit,
-}: {
-  addLocalFiles: (files: FileList | File[]) => void;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-1 px-2 pb-2 pt-0">
-      <input
-        className="hidden"
-        multiple
-        onChange={(event) => {
-          if (event.currentTarget.files) {
-            addLocalFiles(event.currentTarget.files);
-            event.currentTarget.value = "";
-          }
-        }}
-        ref={fileInputRef}
-        type="file"
-      />
-      <ComposerActionMenu
-        items={[
-          {
-            id: "files",
-            title: "Files",
-            description: "Attach a file from this device",
-            onSelect: () => fileInputRef.current?.click(),
-          },
-        ]}
-      />
-      <Button
-        aria-label="Submit"
-        className="ml-auto rounded-full"
-        onClick={() => onSubmit()}
-        size="icon-sm"
-        type="button"
-      >
-        <ArrowUpIcon className="size-4" />
-      </Button>
     </div>
   );
 }

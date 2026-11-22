@@ -42,6 +42,20 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
+`browser.preview()` and `browser.previewPublicLink()` return the same
+`WebPreview.Metadata` shape to a live workspace attachment. Fields are
+optional and can include a title, description, favicon, Open Graph image, and
+declared product label. Each operation has its own cancellation method and is
+optional on older hosts. The favicon and image contain display-only raster
+data URLs. The image is JPEG, up to 640 pixels per edge and 128 KiB of decoded
+bytes. Unavailable metadata resolves to `null`. Loopback previews require a
+non-default HTTP(S) port. Public previews use the standard HTTP(S) ports and
+drop URL fragments. The optional `browser.lookupPreview(kind, request)`
+operation reuses those same lanes and cancellation methods. It returns
+`{ metadata }` for a completed lookup, including `{ metadata: null }` when
+the page has no preview metadata. A top-level `null` means no result was
+published. Main owns destination checks, caching, and request lifetime.
+
 `providers.set_endpoint()` is the explicit Connect/Save consent action for the
 displayed destination on new hosts. Detect the optional `endpoint_authorization`
 and `update_endpoint_models` methods before relying on this behavior. Consent
@@ -59,6 +73,9 @@ the same action as the app's Settings menu. It accepts no arguments and leaves
 the calling window mounted. Check that this optional method exists before
 offering the action: older protocol-1 hosts do not expose it. Native Main owns
 the destination and authenticated window admission.
+`window.open_llm_provider_settings()` uses the same window and selects
+**LLM Providers** whether the window is new or already open. The method
+is optional. Callers on older hosts can use the general Settings action.
 
 `window.navigation` describes one adjacent entry in each direction in the
 Desktop window's own history. Back and Forward take that exact step when the
@@ -79,6 +96,22 @@ readiness values.
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
+
+With `nativeChat.editorSelectionContext`, an editor surface publication can
+include a typed `selection` subject. An editable SVG can be the active SVG tab
+or a document in the active `.canvas` tab. A selected SVG placement on a board
+is identified by its SVG path, board path, and pin ID. The tab inventory
+continues to report the bundle path. In a dedicated board window the empty
+inventory and board path `/` identify the admitted bundle root. The host binds
+the full subject to the accepted capture and includes it when dispatching a
+request. The editor verifies that identity before applying an operation.
+
+The SVG selection can be inspected, edited for opacity, or used to read and
+replace eligible plain text. A board placement can be inspected as one whole
+document with its layout. Hosts that expose only `nativeChat.svgSelectionContext`
+accept `activeSvg` for the older editable SVG subject. Publish just the tab
+inventory when neither capability is present.
+
 The optional catalogue flag `inputRoutes` means the live workspace host can
 accept inputs on different saved connections. After saving the chat selection,
 submit or enqueue with its revision on the existing attachment. An accepted
@@ -93,6 +126,11 @@ On the Welcome screen, `welcomeProfiles()` lists the saved-endpoint and
 built-in provider-key connections a first chat can choose before its
 workspace opens. It starts nothing; the opened workspace selects the choice
 as a new connection.
+The optional `welcomeTurnCapabilities(workspaceId, profileId)` previews
+response speed and search availability for that destination and route. It
+reports the effective connection and model or returns null when the route
+cannot be resolved. It grants no chat access. The workspace verifies the
+current route and capabilities when applying the first message's choices.
 When all three optional Welcome Full access methods exist, the app can
 prepare an expiring review for one new chat in the selected registered
 workspace. Answer it in the same Welcome frame. With
@@ -101,10 +139,22 @@ navigation that changes only the `preset` query parameter. An omitted flag
 means navigation revokes the review. Confirmed reservations
 survive the review timeout and can be revoked before use. Answering creates no
 chat. Start consumes the confirmation once, applies Full access to the
-returned chat with the requested model and effort, and sends no input. Open
+returned chat with the requested model, effort, and optional per-chat speed,
+and sends no input. Open
 that exact session in the selected workspace to attach and submit through the
 ordinary API. The confirmation does not authorize another window, workspace,
 or chat.
+
+For automatic review, call `acceptsAutomaticApprovalReview()` to check the
+installed executable before showing the choice on Home or in a new workspace
+draft. With `defaultsToAutomaticReview`, new project chats start in Auto
+when their live worker supports it. Pass `true` as the second argument to
+`createFromDraft` to keep a new chat in manual approval mode.
+If supported, `prepareWelcomeAutomaticReview(workspaceId)` reserves
+that mode. The same frame-bound answer and start methods consume it. The
+receiving workspace verifies the exact mode and chat before sending the first
+message. An attached chat reports its choices through `permissionMode`.
+
 An unknown result after startup is unavailable. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.
@@ -279,8 +329,9 @@ and attachment boundaries. Inspection remains read-only and starts no work.
 New hosts optionally expose `acceptsPermissionMode()`, `permissionMode(attachmentId)`
 and `setPermissionMode(attachmentId, expectedRevision, requestId, mode, review)`. Offer
 Full access only when the capability is true and the native state includes
-`full_access` in its available modes. Default (`restricted`) keeps its existing
-filesystem and command-network restrictions. Full access deliberately removes
+`full_access` in its available modes. **Ask for approval** (`restricted`) and
+**Auto** (`approve_for_me`) keep the filesystem and command-network restrictions.
+Full access deliberately removes
 command confinement and ordinary approval prompts; OS-user file permissions
 still apply. `reviewPermissionMode` issues a short-lived intent for the exact
 attached chat, revision and request. The owned React confirmation shows the
@@ -288,12 +339,24 @@ native chat title and friendly project name, then answers that intent. Cancel
 returns null and changes nothing. Main rechecks the attachment and the native
 host performs revision admission; a navigated or foreign frame cannot finish
 the grant. This is confirmation in the trusted app UI, not an independent OS
-user-presence proof against a compromised eligible renderer. The native owner persists this per-chat
-choice separately from model/effort defaults; new chats begin restricted.
-Changing access requires accepted work and background processes to finish or
-stop. Stable request IDs bind retries to the original decision. Queries and
-changes start no inference. Older hosts omit methods or return false; keep
-the Default presentation and withhold the selection action.
+user-presence proof against a compromised eligible renderer. The native owner
+persists this per-chat choice separately from model and effort defaults. New
+Desktop project chats use **Auto** where the host offers it and **Ask for
+approval** otherwise. Existing chats with no saved choice stay in **Ask for
+approval**.
+Current hosts apply changes to newly accepted work. Running and queued work
+keep their captures. Some older hosts report a busy chat. Stable request IDs bind retries to the original decision. Queries and
+changes start no inference. Older hosts that omit methods or return false use
+the **Ask for approval** presentation without a selection action.
+
+An attached chat can offer **Auto** when its available modes contain
+`approve_for_me`. Selecting it delegates eligible individual decisions and
+preserves command confinement. Main issues a review token when the host
+requests a human decision. A live network handoff has its own wait ID.
+Pending approvals may carry `reviewFailure`.
+A command includes its filesystem reach and environment names. A persistent process or interactive terminal carries its process type, and managed network access is disclosed at launch. An older renderer that cannot present the captured scope offers only Decline.
+The transcript's optional `approvalReviews` records the review decisions and
+their bounded action descriptions, optional risk level, user authorization, rationale and failure. A supporting host exposes a `reviewId` on an eligible denial. The optional `reconsiderDenial(attachmentId, turnId, reviewId)` records the user’s request to review that exact action again. The transcript reports `reconsidered: true` after acknowledgment. This call starts no work and grants no permission.
 
 New hosts optionally expose `selection(target)`, `updateSelection(...)`, and
 `createFromDraft(draftId)`. A target names exactly one saved `sessionId` or

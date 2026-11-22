@@ -2,6 +2,8 @@
 
 import {
   mediaModelChoices,
+  newestMediaModels,
+  promptModels,
   type CurrentGGModel,
 } from "@/lib/desktop/gg-models";
 import { MediaModelAvailability } from "../shared/media-model-availability";
@@ -32,10 +34,14 @@ export function VideoModelPicker({
   current: readonly CurrentGGModel[] | null;
   providers: MediaModelAvailability.VideoProviderState;
 }) {
-  const listed = mediaModelChoices(
-    models.video.listed_models(),
-    current,
-    "video"
+  const listed = newestMediaModels(
+    mediaModelChoices(
+      providers.visual_models
+        ? promptModels(providers.visual_models)
+        : models.video.listed_models(),
+      current,
+      "video"
+    )
   );
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

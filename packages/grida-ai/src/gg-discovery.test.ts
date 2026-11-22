@@ -467,6 +467,9 @@ it("parses representative released public discovery documents together", async (
   });
   const snapshot = await store.ready();
   expect(snapshot?.models).toHaveLength(publicWire.models.data.length);
+  expect(
+    snapshot?.models.find(({ id }) => id === "openai/gpt-image-2.6-flare")
+  ).toMatchObject({ release_date: "2026-11-04" });
   for (const operation of snapshot!.operations)
     expect(supportsGGPromptOperation(operation)).toBe(true);
   expect(snapshot?.operations.map((operation) => operation.model_id)).toEqual(

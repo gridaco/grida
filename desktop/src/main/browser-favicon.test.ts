@@ -23,14 +23,19 @@ function fixture() {
     async () => new Response(null, { status: 404 })
   );
   const changed = vi.fn<() => void>();
+  const decode = vi.fn<
+    ConstructorParameters<typeof BrowserFavicon>[0]["decode"]
+  >(async (dataUrl) => DesktopBrowser.parseFavicon({ dataUrl }));
   const icons = new BrowserFavicon({
     session: { fetch },
+    decode,
     current: () => current,
     changed,
   });
   return {
     icons,
     fetch,
+    decode,
     changed,
     revoke: () => {
       current = false;
@@ -64,26 +69,49 @@ it("uses the supplied guest Session for public raster bytes and keeps getter rea
   f.revoke();
 });
 
-it("accepts bounded inline raster icons without networking and rejects SVG inline content", async () => {
+it("routes inline raster and SVG through the decoder without networking", async () => {
   const f = fixture();
   f.icons.update([icon.dataUrl], "https://example.com/page");
-  expect(f.icons.get()).toEqual(icon);
-  expect(f.fetch).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(f.icons.get()).toEqual(icon));
+  f.decode.mockResolvedValueOnce(icon);
   f.icons.update(
-    ["data:image/svg+xml;base64,PHN2Zy8+"],
+    ["data:image/svg+xml,%3Csvg%2F%3E"],
     "https://example.com/page"
   );
-  await vi.waitFor(() => expect(f.fetch).toHaveBeenCalledOnce());
-  expect(f.fetch.mock.calls[0]![0]).toBe("https://example.com/favicon.ico");
+  await vi.waitFor(() =>
+    expect(f.decode).toHaveBeenLastCalledWith(
+      "data:image/svg+xml;base64,PHN2Zy8+",
+      expect.any(AbortSignal)
+    )
+  );
+  expect(f.fetch).not.toHaveBeenCalled();
   f.revoke();
 });
 
-it("uses one conventional same-page-origin fallback when only SVG or unsafe candidates are advertised", async () => {
+it("honors no-store when a document switches back to an earlier icon", async () => {
+  const f = fixture();
+  f.fetch.mockImplementation(
+    async () =>
+      new Response(png, {
+        headers: { "Cache-Control": "no-store, max-age=60" },
+      })
+  );
+  const a = "https://example.com/a.png";
+  const b = "https://example.com/b.png";
+  for (const [index, url] of [a, b, a].entries()) {
+    f.icons.update([url], "https://example.com/page");
+    await vi.waitFor(() => expect(f.decode).toHaveBeenCalledTimes(index + 1));
+  }
+  expect(f.fetch.mock.calls.map(([url]) => url)).toEqual([a, b, a]);
+  f.revoke();
+});
+
+it("uses the conventional same-page-origin fallback after unsafe or unsupported candidates", async () => {
   const f = fixture();
   f.fetch.mockResolvedValue(response());
   f.icons.update(
     [
-      "https://example.com/icon.svg",
+      { url: "https://example.com/unsupported.tiff", type: "image/tiff" },
       "file:///private/icon.ico",
       "https://user:pass@example.com/icon.png",
     ],
@@ -160,13 +188,15 @@ it("caps advertised candidates and redirect work independently of website list l
     ),
     "https://example.com/page"
   );
-  await vi.waitFor(() => expect(f.fetch).toHaveBeenCalledTimes(12));
+  await vi.waitFor(() => expect(f.fetch).toHaveBeenCalledTimes(36));
   expect(
     new Set(f.fetch.mock.calls.map(([url]) => String(url).replace(/x+$/, "")))
   ).toEqual(
     new Set([
-      "https://example.com/icon-0",
-      "https://example.com/icon-1",
+      ...Array.from(
+        { length: 8 },
+        (_, index) => `https://example.com/icon-${index}`
+      ),
       "https://example.com/favicon.ico",
     ])
   );

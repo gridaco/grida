@@ -14,15 +14,26 @@ export namespace native_tool_parts {
   /** Native tool names the kit knows under another name. */
   const NAMES: Readonly<Record<string, string>> = {
     search_text: "grep_files",
+    read_scoped_file: "read_file",
   };
 
   export function entry(call: NativeChatActivity): ToolCallEntry {
-    const name = NAMES[call.title] ?? call.title;
+    const name =
+      call.source === "provider" && call.kind === "search"
+        ? "web_search"
+        : (NAMES[call.title] ?? call.title);
     const input = normalizeInput(call.title, record(call.input));
     const base = {
       type: `tool-${name}`,
       toolCallId: call.callId,
       input,
+      ...(call.title === "exec_command" &&
+        call.commandActions?.length && {
+          commandActivity: {
+            actions: call.commandActions,
+            outcome: call.outcome,
+          },
+        }),
     };
     if (call.outcome === "running")
       return { ...base, state: "input-available" } as ToolCallEntry;
@@ -82,6 +93,7 @@ export namespace native_tool_parts {
           omittedImages: output.omittedImages,
         };
       case "read_file":
+      case "read_scoped_file":
         return { content: output.text, truncated: output.truncated };
       case "edit_file":
         return {

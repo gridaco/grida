@@ -251,6 +251,10 @@ pub(super) struct Prepared {
     /// Canonical protected paths carved out of the granted locations.
     protected: Vec<(PathBuf, DeniedAccess)>,
     disk_read: bool,
+    broker_socket: Option<PathBuf>,
+    #[cfg(target_os = "macos")]
+    http_proxy_port: Option<u16>,
+    listen_port: Option<std::num::NonZeroU16>,
     placeholders: process::Placeholders,
 }
 
@@ -370,6 +374,12 @@ impl Installation {
         spec: Option<ProcessSpec>,
         unconfined: bool,
     ) -> Result<Prepared> {
+        if scope.listen_port.is_some() && (unconfined || cfg!(not(target_os = "macos"))) {
+            return Err(refused(
+                ErrorKind::Unsupported,
+                "sandbox_tcp_listener_unavailable",
+            ));
+        }
         let support = if unconfined {
             ordinary_user()?;
             if scope.termination == Termination::AllDescendants {
@@ -527,6 +537,10 @@ impl Installation {
             private_temp: temporary.path().to_owned(),
             task,
             #[cfg(target_os = "linux")]
+            broker_password: None,
+            #[cfg(target_os = "linux")]
+            http_proxy_password: None,
+            #[cfg(target_os = "linux")]
             host_namespaces: wire::namespaces()
                 .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_namespace_unavailable"))?,
         };
@@ -548,6 +562,10 @@ impl Installation {
             revision: scope.revision.clone(),
             protected,
             disk_read: scope.disk_read,
+            broker_socket: None,
+            #[cfg(target_os = "macos")]
+            http_proxy_port: None,
+            listen_port: scope.listen_port,
             placeholders: process::Placeholders::default(),
         };
         prepared.measure_setup_frame()?;
@@ -618,6 +636,7 @@ fn unconfined_scope(scope: &UnconfinedScope) -> ExecutionScope {
         temporary_parent: scope.temporary_parent.clone(),
         termination: scope.termination,
         disk_read: true,
+        listen_port: None,
     }
 }
 
@@ -746,6 +765,57 @@ impl Prepared {
         check_executable(bound, executable, file).map_err(|_| changed())
     }
 
+    fn resolved_command_paths(&self) -> Result<(&Path, &Path)> {
+        let process = self
+            .process
+            .as_ref()
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
+        Ok((process.executable.path(), process.cwd.path()))
+    }
+
+    pub(super) fn filesystem_grants(&self) -> Result<FilesystemGrants> {
+        if self.support.backend == Backend::Unconfined {
+            return Err(refused(
+                ErrorKind::Unsupported,
+                "sandbox_unconfined_filesystem",
+            ));
+        }
+        let (executable, cwd) = self.resolved_command_paths()?;
+        let mut grants = FilesystemGrants {
+            disk_read: self.disk_read,
+            read_roots: Vec::new(),
+            write_roots: Vec::new(),
+            runtime_roots: Vec::new(),
+            resolved_executable: executable.to_owned(),
+            resolved_cwd: cwd.to_owned(),
+        };
+        for location in &self.locations {
+            let bound = location.bound.path();
+            if bound == self.temporary.path() {
+                continue;
+            }
+            let paths = match location.access {
+                Access::Read => &mut grants.read_roots,
+                Access::Write => &mut grants.write_roots,
+                Access::Runtime => &mut grants.runtime_roots,
+            };
+            paths.push(bound.to_owned());
+            #[cfg(target_os = "linux")]
+            if bound != location.destination {
+                paths.push(location.destination.clone());
+            }
+        }
+        for paths in [
+            &mut grants.read_roots,
+            &mut grants.write_roots,
+            &mut grants.runtime_roots,
+        ] {
+            paths.sort();
+            paths.dedup();
+        }
+        Ok(grants)
+    }
+
     pub(super) fn capture_fingerprint(&self) -> Result<Fingerprint> {
         let Task::Command {
             executable,
@@ -811,7 +881,7 @@ impl Prepared {
             Backend::Bubblewrap => "bubblewrap",
             Backend::Unconfined => "unconfined",
         };
-        Fingerprint::of(&(
+        let capture = Fingerprint::of(&(
             semantic_input,
             posture,
             self.disk_read,
@@ -834,10 +904,17 @@ impl Prepared {
             launchers,
             &self.grants,
             &self.revision,
-        ))
+        ))?;
+        match self.listen_port {
+            Some(port) => Fingerprint::of(&(capture, "tcp-service-v1", port)),
+            None => Ok(capture),
+        }
     }
 
     pub(super) fn validate_working_root(&self, root: &File) -> Result<()> {
+        if self.support.backend == Backend::Unconfined {
+            return self.validate_working_directory(root);
+        }
         let Task::Command { cwd, .. } = &self.launch.task else {
             return Err(refused(
                 ErrorKind::InvalidState,
@@ -848,18 +925,13 @@ impl Prepared {
             .metadata()
             .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_working_root_unavailable"))?;
         if metadata.is_dir()
-            && ((self.support.backend == Backend::Unconfined
-                && self.process.as_ref().is_some_and(|process| {
-                    process.cwd.identity.device == metadata.dev()
-                        && process.cwd.identity.inode == metadata.ino()
-                }))
-                || self.locations.iter().any(|location| {
-                    location.access != Access::Runtime
-                        && location.bound.path() != self.temporary.path()
-                        && location.bound.identity.device == metadata.dev()
-                        && location.bound.identity.inode == metadata.ino()
-                        && location.bound.includes(cwd)
-                }))
+            && self.locations.iter().any(|location| {
+                location.access != Access::Runtime
+                    && location.bound.path() != self.temporary.path()
+                    && location.bound.identity.device == metadata.dev()
+                    && location.bound.identity.inode == metadata.ino()
+                    && location.bound.includes(cwd)
+            })
         {
             Ok(())
         } else {
@@ -867,9 +939,155 @@ impl Prepared {
         }
     }
 
+    pub(super) fn validate_working_directory(&self, directory: &File) -> Result<()> {
+        let process = self
+            .process
+            .as_ref()
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
+        let metadata = directory
+            .metadata()
+            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_working_root_unavailable"))?;
+        if metadata.is_dir()
+            && process.cwd.identity.device == metadata.dev()
+            && process.cwd.identity.inode == metadata.ino()
+        {
+            Ok(())
+        } else {
+            Err(refused(ErrorKind::Conflict, "sandbox_working_root_changed"))
+        }
+    }
+
+    // Only the trusted host can add this broker after its admission barrier.
+    // Retain every filesystem denial and grant connect only to its exact vnode path.
+    pub(super) fn spawn_with_proxy(
+        mut self,
+        socket: &Path,
+        expected_socket: &Path,
+        password: &str,
+        cancellation: CancellationToken,
+    ) -> Result<Running> {
+        use std::os::unix::fs::FileTypeExt;
+        let invalid = || refused(ErrorKind::Unavailable, "sandbox_network_broker_unavailable");
+        let target = socket.canonicalize().map_err(|_| invalid())?;
+        if self.support.backend == Backend::Unconfined
+            || self.listen_port.is_some()
+            || target != expected_socket
+            || !self
+                .protected
+                .iter()
+                .any(|(p, access)| *access == DeniedAccess::ReadWrite && target.starts_with(p))
+            || !fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_socket())
+            || !socket.to_str().is_some_and(|s| {
+                s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"/_-.".contains(&b))
+            })
+            || password.len() != 32
+            || !password.bytes().all(|v| v.is_ascii_hexdigit())
+        {
+            return Err(invalid());
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let Task::Command { environment, .. } = &mut self.launch.task else {
+                return Err(invalid());
+            };
+            let url = format!("socks5h://grida:{password}@localhost{}", socket.display());
+            environment.retain(|key, _| !key.to_ascii_lowercase().ends_with("_proxy"));
+            for key in [
+                "all_proxy",
+                "ALL_PROXY",
+                "http_proxy",
+                "HTTPS_PROXY",
+                "https_proxy",
+            ] {
+                environment.insert(key.into(), url.clone());
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.launch.broker_password = Some(password.to_owned());
+        }
+        self.broker_socket = Some(target);
+        self.measure_setup_frame()?;
+        self.spawn(cancellation)
+    }
+
     pub(super) fn spawn(self, cancellation: CancellationToken) -> Result<Running> {
         self.validate_spawn(&cancellation)?;
         process::spawn(self, cancellation, process::Supervision::Finite(None))
+    }
+
+    pub(super) fn with_http_proxy(mut self, proxy: &HttpProxy) -> Result<Self> {
+        let invalid = || refused(ErrorKind::Unavailable, "sandbox_network_broker_unavailable");
+        if self.support.backend == Backend::Unconfined || self.listen_port.is_some() {
+            return Err(invalid());
+        }
+        let password = match proxy {
+            #[cfg(target_os = "macos")]
+            HttpProxy::Loopback { password, .. } => password,
+            #[cfg(target_os = "linux")]
+            HttpProxy::Unix { password, .. } => password,
+        };
+        if password.len() != 32 || !password.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(invalid());
+        }
+        match proxy {
+            #[cfg(target_os = "macos")]
+            HttpProxy::Loopback { port, .. } => {
+                let Task::Command { environment, .. } = &mut self.launch.task else {
+                    return Err(invalid());
+                };
+                if *port == 0 {
+                    return Err(invalid());
+                }
+                crate::proxy_environment::configure(environment, *port, password);
+                self.http_proxy_port = Some(*port);
+            }
+            #[cfg(target_os = "linux")]
+            HttpProxy::Unix { socket, .. } => {
+                use std::os::unix::fs::FileTypeExt;
+                let target = socket.canonicalize().map_err(|_| invalid())?;
+                if !matches!(self.launch.task, Task::Command { .. })
+                    || &target != socket
+                    || !self.protected.iter().any(|(path, access)| {
+                        *access == DeniedAccess::ReadWrite && target.starts_with(path)
+                    })
+                    || !fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_socket())
+                {
+                    return Err(invalid());
+                }
+                self.launch.http_proxy_password = Some(password.clone());
+                self.broker_socket = Some(target);
+            }
+        }
+        self.measure_setup_frame()?;
+        Ok(self)
+    }
+
+    pub(super) fn spawn_with_input(
+        mut self,
+        input: Vec<u8>,
+        cancellation: CancellationToken,
+    ) -> Result<Running> {
+        if input.len() > MAX_INPUT {
+            return Err(refused(ErrorKind::LimitExceeded, "sandbox_process_limit"));
+        }
+        if self.support.backend == Backend::Unconfined
+            || self.process.is_none()
+            || self.disk_read
+            || self.broker_socket.is_some()
+            || !self.stdin.is_empty()
+            || self.locations.iter().any(|location| {
+                location.access == Access::Write && location.bound.path() != self.temporary.path()
+            })
+        {
+            return Err(refused(
+                ErrorKind::InvalidInput,
+                "sandbox_scoped_input_requires_read_only_pipes",
+            ));
+        }
+        self.stdin = input;
+        self.spawn(cancellation)
     }
 
     pub(super) fn spawn_session(

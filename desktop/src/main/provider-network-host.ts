@@ -10,11 +10,13 @@ import {
   type IncomingMessage,
   type Session,
 } from "electron";
+import { CHATGPT_MODELS_URL } from "../chatgpt-configuration";
 import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { ServicesSidecarChannel } from "../services-sidecar-channel";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { NativeGatewayJobNetwork } from "./native-gateway-connection";
+import type { GptTranscription } from "@grida/ai/providers";
 
 const READY_TIMEOUT_MS = 15_000;
 const GRANT_ACK_TIMEOUT_MS = 5_000;
@@ -130,7 +132,25 @@ export class ProviderNetworkHost {
     grantId: string
   ): Promise<NativeProviderNetwork> {
     const networkSession = await ProviderNetworkHost.networkSession();
+    const getModels =
+      (url: string) => (headers: Headers, signal: AbortSignal) => {
+        const approved = ProviderNetworkPolicy.authorize(
+          authority.nativeGrants(),
+          { grant_id: grantId, method: "GET", url, headers: [...headers] }
+        );
+        return requestThroughSession(networkSession, approved.url.href, {
+          method: approved.method,
+          headers: approved.headers,
+          signal,
+        });
+      };
     return {
+      ...(grantId === ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID && {
+        getSubscriptionModels: getModels(CHATGPT_MODELS_URL),
+      }),
+      ...(grantId === ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID && {
+        getOpenAiModels: getModels(ProviderNetworkPolicy.OPENAI_MODELS_URL),
+      }),
       isCurrent: () =>
         authority.nativeGrants().some((grant) => grant.id === grantId),
       prepare: (target, headers) => {
@@ -182,6 +202,43 @@ export class ProviderNetworkHost {
       return await requestThroughSession(networkSession, approved.url.href, {
         method: approved.method,
         headers: approved.headers,
+        signal,
+      });
+    };
+  }
+
+  /** GRIDA-SEC-004 — fixed Main-only egress for the dedicated Voice key. */
+  static voiceTranscriptionNetwork(): GptTranscription.Dispatch {
+    let initialization: Promise<Session> | undefined;
+    return async (provider, headers, body, signal) => {
+      signal.throwIfAborted();
+      const route = ProviderNetworkPolicy.voiceRoutes[provider];
+      const approved = ProviderNetworkPolicy.authorize(
+        ProviderNetworkPolicy.mainOnlyGrants(),
+        {
+          grant_id: route.grantId,
+          method: "POST",
+          url: route.url,
+          headers: [...headers],
+        }
+      );
+      if (
+        body.byteLength === 0 ||
+        body.byteLength > ProviderNetworkPolicy.maxRequestBodyBytes(approved)
+      )
+        throw new Error("Voice request exceeds its upload bound");
+      if (!initialization) {
+        const pending = ProviderNetworkHost.networkSession();
+        initialization = pending;
+        void pending.catch(() => {
+          if (initialization === pending) initialization = undefined;
+        });
+      }
+      const networkSession = await sessionWhenReady(initialization, signal);
+      return requestThroughSession(networkSession, approved.url.href, {
+        method: approved.method,
+        headers: approved.headers,
+        body,
         signal,
       });
     };
@@ -733,6 +790,7 @@ export class ProviderNetworkHost {
       await response.body?.cancel().catch(() => undefined);
       if (
         current.grant.id === ProviderNetworkPolicy.TRIPO_UPLOAD_GRANT_ID ||
+        current.grant.id === ProviderNetworkPolicy.OPENAI_IMAGE_GRANT_ID ||
         redirects >= MAX_REDIRECTS
       )
         throw deniedError();

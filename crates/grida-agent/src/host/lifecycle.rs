@@ -61,6 +61,7 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -211,6 +212,7 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -249,12 +251,18 @@ mod tests {
             let (view, _, resume) = host.inspect_snapshot(session.clone()).await.unwrap();
             assert!(view.current.is_none() && !view.admission_paused);
             assert_eq!(view.queued[0].input.id.as_str(), "next");
+            let queued: StoredPrompt = decode_input(&view.queued[0].input).unwrap();
+            assert!(queued.preceding_turn.is_none());
+            assert!(settled_predecessor(&view).unwrap().is_none());
             assert!(!resume);
             drop(drain);
             sponsorship::tests::synthetic_reply(&provider).await;
             loop {
                 let view = host.store.inspect(session.clone()).await.unwrap();
                 if view.current.is_none() && view.queued.is_empty() {
+                    let latest = &view.latest.as_ref().unwrap().binding.turn;
+                    let expected = preceding_turn_fingerprint(&session, latest).unwrap();
+                    assert_eq!(settled_predecessor(&view).unwrap(), Some(expected));
                     break;
                 }
                 tokio::task::yield_now().await;
@@ -570,6 +578,43 @@ mod tests {
         assert_eq!(stored.editor_endpoint.as_ref(), Some(&endpoint));
         assert!(stored.editor_presentation);
         assert!(stored.editor_svg_target.is_none());
+
+        let prepare = |input: &Submission| {
+            host.prepare_input(
+                host.execution().unwrap(),
+                &session,
+                root.path(),
+                input,
+                None,
+                false,
+                InputAuthority::RequireCaptured,
+            )
+            .unwrap()
+            .config
+            .instructions
+        };
+        let captured = stored.editor_instructions.as_deref().unwrap();
+        assert!(captured.contains("Observe the viewer"));
+        let current = prepare(&view.input);
+        assert!(current.contains(captured));
+
+        // Checkpoints fingerprint the entire configuration. Inputs accepted before
+        // Desktop began retaining this text must rebuild their original prompt.
+        let mut legacy: serde_json::Value =
+            serde_json::from_slice(view.input.payload.bytes()).unwrap();
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("editor_instructions");
+        let legacy = Submission {
+            id: view.input.id.clone(),
+            payload: encode(INPUT_SCHEMA, INPUT_VERSION, &legacy).unwrap(),
+        };
+        let old = prepare(&legacy);
+        assert!(
+            old.contains("Treat presentation as optional and verify the artifact independently.")
+        );
+        assert!(!old.contains(captured));
         let _ = host.shutdown().await;
     }
 
@@ -650,6 +695,33 @@ mod tests {
             selected.execution().unwrap(),
             birth
         ));
+        let id = input.id.clone();
+        original.store.submit(session.clone(), input).await.unwrap();
+        let revision = original
+            .store
+            .inspect(session.clone())
+            .await
+            .unwrap()
+            .revision;
+        let turn = TurnId::new("legacy-turn").unwrap();
+        let claim = new_claim(session.clone(), turn.clone(), revision, vec![id]).unwrap();
+        let owner = original.store.claim(claim).await.unwrap();
+        assert!(
+            original
+                .captured_turn_model(&session, &turn)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            original
+                .transcript_input_facts(session, &[turn])
+                .await
+                .unwrap()
+                .models
+                .is_empty()
+        );
+        drop(owner);
         original.shutdown().await.unwrap();
         selected.shutdown().await.unwrap();
     }
@@ -731,6 +803,7 @@ pub enum QueueEdit {
         replacement: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        question_batches: bool,
     },
     Withdraw {
         input: ChangeId,
@@ -768,6 +841,9 @@ pub struct InputSettings {
     pub allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub allow_library_selection: bool,
+    /// Permission captured when this input was accepted, including on receipt-only retries.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub web_search: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_start: Option<GoalRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -839,6 +915,7 @@ impl InputSettings {
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,
                     allow_library_selection: stored.allow_library_selection,
+                    web_search: stored.request_options.web_search,
                     goal_start: match stored.goal {
                         Some(goals::GoalInput::Start(goal)) => Some(goal),
                         _ => None,
@@ -949,9 +1026,7 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let host = self
-            .for_selection(&request.session, context.selection_revision)
-            .await?;
+        let (host, options) = self.for_foreground(&request.session, &context).await?;
         let admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
@@ -966,6 +1041,7 @@ impl Host {
         }
         let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
+        policy.request_options = options;
         host.bind_editor(&mut policy, &request, &context)?;
         let title = host.title_candidate(&view, &request.parts, context.initial_title)?;
         let input = host
@@ -1004,16 +1080,16 @@ impl Host {
             .await?
             .ok_or_else(|| problem(ErrorKind::Unavailable, "input_unavailable"))?;
         let (settings, mut parts) = InputSettings::with_parts(&view.input)?;
+        let mut selected = settings.skills.iter();
         for part in &mut parts {
+            // The snapshot retains explicit selections in input order. Two
+            // packages can contribute the same local name.
             if let PromptPart::Skill { reference } = part
+                && let Some(skill) = selected.next()
                 && reference.uri().is_none()
-                && let Some(selected) = settings
-                    .skills
-                    .iter()
-                    .find(|skill| skill.name == reference.name())
             {
                 *reference =
-                    crate::skills::SkillReference::from_uri(&selected.uri)?.ok_or_else(|| {
+                    crate::skills::SkillReference::from_uri(&skill.uri)?.ok_or_else(|| {
                         problem(ErrorKind::InvalidState, "invalid_captured_skill_reference")
                     })?;
             }
@@ -1078,6 +1154,7 @@ impl Host {
                 replacement,
                 parts,
                 questions,
+                question_batches,
             } => {
                 validate_prompt_parts(&parts)?;
                 let original = self.store.input(session.clone(), input.clone()).await?;
@@ -1145,15 +1222,21 @@ impl Host {
                         .is_some_and(|input| input.allow_image_placement);
                     let spending = stored.as_ref().and_then(|input| input.spending.clone());
                     let reasoning = stored.as_ref().and_then(|input| input.reasoning);
+                    let options = stored
+                        .as_ref()
+                        .map(|input| input.request_options)
+                        .unwrap_or_default();
                     let effort = stored.and_then(|input| input.effort);
                     host.capture_input(
                         &view,
                         replacement,
                         parts,
                         SubmissionPolicy {
+                            request_options: options,
                             selection_revision: None,
                             selection_goal: false,
                             questions,
+                            question_batches,
                             allow_wakeups: false,
                             allow_library_selection: false,
                             allow_host_tools,
@@ -1163,6 +1246,7 @@ impl Host {
                             editor_presentation: false,
                             editor_browser_tools: false,
                             editor_svg_target: None,
+                            editor_tool_context_id: None,
                             operating_regime,
                             subagent: None,
                             effort,

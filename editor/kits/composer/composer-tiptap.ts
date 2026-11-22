@@ -1,7 +1,28 @@
+import Link, { isAllowedUri } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Node, mergeAttributes, type JSONContent } from "@tiptap/core";
+import {
+  InputRule,
+  Node,
+  PasteRule,
+  getMarkRange,
+  mergeAttributes,
+  posToDOMRect,
+  type JSONContent,
+} from "@tiptap/core";
+import {
+  MarkdownSerializer,
+  defaultMarkdownSerializer,
+} from "@tiptap/pm/markdown";
+import type {
+  MarkType,
+  Node as ProseMirrorNode,
+  ResolvedPos,
+} from "@tiptap/pm/model";
+import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { chatWebLinkIcon } from "@/components/chat-web-link";
 import {
   ComposerCore,
   type ComposerCommand,
@@ -120,14 +141,173 @@ const ComposerFileReferenceNode = Node.create({
   },
 });
 
+export function composerLinkDestination(href: string): string {
+  return href.trim().replace(/[\s<>]/g, encodeURIComponent);
+}
+
+function linkAt(position: ResolvedPos, type: MarkType) {
+  const mark =
+    type.isInSet(position.nodeAfter?.marks ?? []) ??
+    type.isInSet(position.nodeBefore?.marks ?? []);
+  if (!mark) return null;
+  const href = mark.attrs.href;
+  if (typeof href !== "string" || !href || !isAllowedUri(href)) return null;
+  const range = getMarkRange(position, type, mark.attrs);
+  return range ? { ...range, href } : null;
+}
+
+function markdownLinks(text: string) {
+  if (!text.includes("](")) return [];
+  return fromMarkdown(text).children.flatMap((block) => {
+    if (block.type !== "paragraph") return [];
+    return block.children.flatMap((node) => {
+      if (node.type !== "link" || !node.url || !isAllowedUri(node.url))
+        return [];
+      const index = node.position?.start.offset;
+      const end = node.position?.end.offset;
+      const [label] = node.children;
+      if (
+        index === undefined ||
+        end === undefined ||
+        text[index] !== "[" ||
+        node.children.length !== 1 ||
+        label?.type !== "text" ||
+        !label.value.trim()
+      ) {
+        return [];
+      }
+      return [
+        {
+          index,
+          text: text.slice(index, end),
+          data: {
+            label: label.value,
+            href: composerLinkDestination(node.url),
+            title: node.title ?? null,
+          },
+        },
+      ];
+    });
+  });
+}
+
+function applyMarkdownLink(type: MarkType): InputRule["handler"] {
+  return ({ state, range: { from, to }, match }) => {
+    // The text matcher can see a chip's label. Its document range must still
+    // contain only text so the rule never replaces an inline reference.
+    if (
+      from < 1 ||
+      from > to ||
+      state.doc.textBetween(from, to, "\n", "\ufffc").includes("\ufffc") ||
+      state.doc.rangeHasMark(from, to, state.schema.marks.code)
+    )
+      return null;
+
+    const { label, href, title } = match.data!;
+    const link = type.create({ href, title });
+    state.tr
+      .replaceWith(from, to, state.schema.text(label, [link]))
+      .removeStoredMark(type);
+  };
+}
+
+const ComposerLink = Link.extend({
+  addAttributes() {
+    return { ...this.parent?.(), title: { default: null } };
+  },
+  renderHTML(props) {
+    return this.parent!({
+      ...props,
+      HTMLAttributes: mergeAttributes(props.HTMLAttributes, {
+        "data-chat-web-link": chatWebLinkIcon(props.HTMLAttributes.href),
+      }),
+    });
+  },
+  addInputRules() {
+    return [
+      new InputRule({
+        find(text) {
+          if (!text.endsWith(")")) return null;
+          const match = markdownLinks(text).at(-1);
+          return match && match.index + match.text.length === text.length
+            ? match
+            : null;
+        },
+        handler: applyMarkdownLink(this.type),
+      }),
+    ];
+  },
+  addPasteRules() {
+    return [
+      new PasteRule({
+        find: markdownLinks,
+        handler: applyMarkdownLink(this.type),
+      }),
+    ];
+  },
+}).configure({
+  autolink: false,
+  linkOnPaste: false,
+  openOnClick: false,
+  HTMLAttributes: { class: "composer-link" },
+});
+
+const markdownMarks = {
+  code: defaultMarkdownSerializer.marks.code,
+  link: defaultMarkdownSerializer.marks.link,
+  bold: defaultMarkdownSerializer.marks.strong,
+  italic: defaultMarkdownSerializer.marks.em,
+};
+
+const hasMarkdownMark = (node: ProseMirrorNode) =>
+  node.marks.some((mark) => Object.hasOwn(markdownMarks, mark.type.name));
+
+const markdown = new MarkdownSerializer(
+  {
+    paragraph: defaultMarkdownSerializer.nodes.paragraph,
+    blockquote: defaultMarkdownSerializer.nodes.blockquote,
+    listItem: defaultMarkdownSerializer.nodes.list_item,
+    hardBreak: defaultMarkdownSerializer.nodes.hard_break,
+    codeBlock: defaultMarkdownSerializer.nodes.code_block,
+    bulletList(state, node) {
+      state.renderList(node, "  ", () => "- ");
+    },
+    orderedList(state, node) {
+      const start: number = node.attrs.start ?? 1;
+      const markerWidth = String(start + node.childCount - 1).length + 2;
+      state.renderList(node, " ".repeat(markerWidth), (index) =>
+        `${start + index}. `.padStart(markerWidth)
+      );
+    },
+    text(state, node, parent, index) {
+      if (hasMarkdownMark(node)) {
+        defaultMarkdownSerializer.nodes.text(state, node, parent, index);
+        return;
+      }
+      // People can also write Markdown directly in a composer paragraph.
+      state.text(node.text ?? "", false);
+    },
+    composerCommand(state, node) {
+      state.text(`/${node.attrs.id}`, false);
+    },
+    composerMention(state, node) {
+      state.text(`@${node.attrs.label || node.attrs.id}`, false);
+    },
+    composerFileReference(state, node) {
+      state.text(node.attrs.name || node.attrs.path, false);
+    },
+  },
+  markdownMarks,
+  { hardBreakNodeName: "hardBreak" }
+);
+
 export namespace ComposerTiptap {
   const selecting = new WeakSet<Editor>();
 
   export function extensions(input: { placeholder: string }) {
     return [
       StarterKit.configure({
-        blockquote: false,
-        bold: false,
+        blockquote: { HTMLAttributes: { class: "composer-blockquote" } },
         bulletList: {
           HTMLAttributes: {
             class: "composer-list-node composer-list-node-bullet",
@@ -147,7 +327,6 @@ export namespace ComposerTiptap {
         gapcursor: false,
         heading: false,
         horizontalRule: false,
-        italic: false,
         orderedList: {
           HTMLAttributes: {
             class: "composer-list-node composer-list-node-ordered",
@@ -161,6 +340,7 @@ export namespace ComposerTiptap {
         strike: false,
       }),
       Placeholder.configure({ placeholder: input.placeholder }),
+      ComposerLink,
       ComposerCommandNode,
       ComposerMentionNode,
       ComposerFileReferenceNode,
@@ -175,10 +355,107 @@ export namespace ComposerTiptap {
     inspectCore(core, editor);
   }
 
+  /** Serialize structured formatting while preserving the ordinary text path. */
+  export function formattedMarkdown(doc: ProseMirrorNode): string | undefined {
+    let formatted = false;
+    doc.descendants((node) => {
+      formatted ||=
+        node.type.name === "bulletList" ||
+        node.type.name === "orderedList" ||
+        node.type.name === "blockquote" ||
+        node.type.name === "codeBlock" ||
+        hasMarkdownMark(node);
+      return !formatted;
+    });
+    return formatted
+      ? markdown.serialize(doc, { tightLists: true })
+      : undefined;
+  }
+
+  export function selectionRect(editor: Editor): DOMRect {
+    const { view } = editor;
+    const { $from, $to } = editor.state.selection;
+    // Select All reaches the document edges. Measure the inline range instead.
+    const { from, to } = TextSelection.between($from, $to);
+    const start = view.domAtPos(from, 1);
+    const end = view.domAtPos(to, -1);
+    const range = view.dom.ownerDocument.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    const rect = range.getBoundingClientRect();
+    return rect.height ? rect : posToDOMRect(view, from, to);
+  }
+
+  export function linkTarget(editor: Editor) {
+    const { doc, selection, schema } = editor.state;
+    const { $from, $to, from, to } = selection;
+    if (!$from.sameParent($to) || $from.parent.type.spec.code) return null;
+
+    const link = linkAt($from, schema.marks.link);
+    if (link && to <= link.to) return link;
+
+    const text = doc.textBetween(from, to, "\n", "\ufffc");
+    if (
+      !text.trim() ||
+      text.includes("\ufffc") ||
+      doc.rangeHasMark(from, to, schema.marks.code)
+    )
+      return null;
+    return { from, to, href: "" };
+  }
+
+  export function selectPressedLink(
+    editor: Editor,
+    event: MouseEvent
+  ): boolean {
+    if (
+      !editor.isEditable ||
+      event.button !== 0 ||
+      event.shiftKey ||
+      !(event.target instanceof Element)
+    )
+      return false;
+    const anchor = event.target.closest("a.composer-link");
+    const {
+      view,
+      state: { doc, schema },
+    } = editor;
+    if (!anchor || !view.dom.contains(anchor)) return false;
+    const link = linkAt(
+      doc.resolve(view.posAtDOM(anchor, 0)),
+      schema.marks.link
+    );
+    return !!link && editor.commands.setTextSelection(link);
+  }
+
+  export function replaceLinkText(
+    editor: Editor,
+    range: { from: number; to: number },
+    text: string
+  ): void {
+    const { doc, schema } = editor.state;
+    if (doc.textBetween(range.from, range.to) === text) return;
+    let marks = doc.resolve(range.from).nodeAfter?.marks ?? [];
+    doc.nodesBetween(range.from, range.to, (node) => {
+      if (node.isText) marks = marks.filter((mark) => mark.isInSet(node.marks));
+    });
+    editor.commands.insertContentAt(range, schema.text(text, marks).toJSON());
+  }
+
   export function inspectCore(core: ComposerCore, editor: Editor): void {
     const { from } = editor.state.selection;
     const textBeforeCursor = editor.state.doc.textBetween(0, from, "\n", "\n");
     core.inspectCursor(textBeforeCursor, from);
+  }
+
+  /** A single untouched paragraph can display an inline prompt. */
+  export function hasEmptyParagraph(editor: Editor): boolean {
+    const { doc } = editor.state;
+    return (
+      doc.childCount === 1 &&
+      doc.firstChild?.type.name === "paragraph" &&
+      doc.firstChild.content.size === 0
+    );
   }
 
   export function handleKeyDown(input: {
@@ -188,14 +465,35 @@ export namespace ComposerTiptap {
     triggerIndex: number;
     moveTriggerIndex: (delta: number) => void;
     submit: () => void;
+    suggestion?: { text: string; take(text: string): boolean };
     onCommandSelect?: (command: ComposerCommand) => boolean;
   }): boolean {
-    if (isComposing(input.event)) {
+    if (isComposing(input.event) || input.editor?.view.composing) {
       return false;
     }
 
     const trigger = input.core.getSnapshot().trigger;
     const triggerItemsCount = trigger?.items.length ?? 0;
+
+    const { editor, event, suggestion } = input;
+    if (
+      event.key === "Tab" &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.repeat &&
+      !event.defaultPrevented &&
+      !trigger &&
+      suggestion &&
+      editor?.isEditable &&
+      hasEmptyParagraph(editor) &&
+      suggestion.take(suggestion.text)
+    ) {
+      event.preventDefault();
+      editor.view.dispatch(editor.state.tr.insertText(suggestion.text));
+      return true;
+    }
 
     if (trigger && input.event.key === "Escape") {
       input.event.preventDefault();
@@ -229,13 +527,29 @@ export namespace ComposerTiptap {
       }
     }
 
-    if (input.event.key === "Enter" && !input.event.shiftKey) {
-      input.event.preventDefault();
-      input.submit();
-      return true;
+    if (input.event.key !== "Enter") return false;
+
+    if (input.event.shiftKey) {
+      const { editor, event } = input;
+      if (!editor || event.altKey || event.ctrlKey || event.metaKey) {
+        return false;
+      }
+      // Start a new text block on Shift+Enter so shortcuts
+      // like "- " and "1. " can start at the next paragraph.
+      const handled = editor.commands.first(({ commands }) => [
+        () => commands.newlineInCode(),
+        () => commands.splitListItem("listItem"),
+        () => commands.createParagraphNear(),
+        () => commands.liftEmptyBlock(),
+        () => commands.splitBlock(),
+      ]);
+      if (handled) event.preventDefault();
+      return handled;
     }
 
-    return false;
+    input.event.preventDefault();
+    input.submit();
+    return true;
   }
 
   function isComposing(event: KeyboardEvent): boolean {
@@ -302,21 +616,47 @@ export namespace ComposerTiptap {
   export function appendText(
     editor: Editor,
     text: string,
-    maxBytes: number
+    maxBytes: number,
+    placement: "paragraph" | "inline" = "paragraph"
   ): boolean {
     if (editor.isDestroyed || !text) return false;
-    const draft = editor.getText({ blockSeparator: "\n" });
-    if (new TextEncoder().encode(`${draft}\n${text}`).length > maxBytes)
-      return false;
-    const paragraphs = text.split("\n").map((line) => ({
+    const empty = hasEmptyParagraph(editor);
+    const current = empty ? "" : editor.getText({ blockSeparator: "\n" });
+    const doc = editor.state.doc;
+    const last = doc.lastChild;
+    const inline = placement === "inline" && last?.type.name === "paragraph";
+    const separator = inline
+      ? last.content.size > 0 && !/\s$/.test(current) && !/^\s/.test(text)
+        ? " "
+        : ""
+      : empty
+        ? ""
+        : "\n";
+    const next = `${current}${separator}${text}`;
+    if (new TextEncoder().encode(next).length > maxBytes) return false;
+
+    const lines = text.split("\n");
+    const end = doc.content.size;
+    const chain = editor.chain();
+    let insertAt: number | { from: number; to: number } = empty
+      ? { from: 0, to: end }
+      : end;
+    if (inline) {
+      const first = `${separator}${lines.shift() ?? ""}`;
+      if (first) {
+        chain.command(({ tr }) => {
+          tr.insert(end - 1, editor.schema.text(first));
+          return true;
+        });
+      }
+      insertAt = end + first.length;
+    }
+    const paragraphs = lines.map((line) => ({
       type: "paragraph",
       content: line ? [{ type: "text", text: line }] : [],
     }));
-    return editor
-      .chain()
-      .insertContentAt(editor.state.doc.content.size, paragraphs)
-      .focus("end")
-      .run();
+    if (paragraphs.length > 0) chain.insertContentAt(insertAt, paragraphs);
+    return chain.focus("end").run();
   }
 
   export function toDocument(json: JSONContent): ComposerDocument.Root {

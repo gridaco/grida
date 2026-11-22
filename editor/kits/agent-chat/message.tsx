@@ -27,8 +27,10 @@ import {
   type Ref,
 } from "react";
 import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import type { NativeChatQuestionReply } from "@grida/desktop-bridge";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
+import markdownStyles from "@/components/chat-markdown.module.css";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
@@ -48,9 +50,11 @@ import {
   ImagesIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  MonitorIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
+  ScrollTextIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
@@ -66,6 +70,7 @@ import {
   MessageResponse,
 } from "@app/ui/ai-elements/message";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
+import { Source } from "@app/ui/ai-elements/sources";
 import { ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
@@ -95,6 +100,7 @@ import { EditorSelectionIndicator } from "./editor-selection-indicator";
 import { MessageContextParts } from "./message-context-parts";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import { WorkingIndicator } from "./working-indicator";
+import { userMessageRemarkPlugins } from "./user-message-markdown";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -108,7 +114,7 @@ const CHAT_TEXT = "text-[14px] leading-[23px]";
 
 const markdown = {
   // Markdown uses the shared chat reading size; see CHAT_TEXT.
-  className: `grida-ai-response-markdown ${CHAT_TEXT}`,
+  className: cn(markdownStyles.markdown, markdownStyles.agent, CHAT_TEXT),
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
@@ -117,6 +123,26 @@ const markdown = {
   rehypePlugins: workspace_links.rehypePlugins,
   components: workspace_links.components,
 } as const;
+
+function UserMessageText({ text }: { text: string }) {
+  return (
+    <MessageResponse
+      className={cn(
+        markdownStyles.user,
+        "wrap-anywhere [&_p]:whitespace-pre-wrap"
+      )}
+      mode="static"
+      controls={false}
+      lineNumbers={false}
+      plugins={markdown.plugins}
+      remarkPlugins={userMessageRemarkPlugins}
+      rehypePlugins={markdown.rehypePlugins}
+      components={markdown.components}
+    >
+      {text}
+    </MessageResponse>
+  );
+}
 
 /**
  * Shared class string for the hover/focus-revealed action rows. The
@@ -148,6 +174,24 @@ export type ChatMessageActions = {
   hidden?: boolean;
 };
 
+function isQuestionBatchReply(
+  value: unknown
+): value is NativeChatQuestionReply {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "waitId" in value &&
+    typeof value.waitId === "string" &&
+    "question" in value &&
+    typeof value.question === "string" &&
+    "answer" in value &&
+    typeof value.answer === "string" &&
+    (!("skipped" in value) || value.skipped === true)
+  );
+}
+
 export function ChatMessageView({
   ref,
   message,
@@ -156,6 +200,7 @@ export function ChatMessageView({
   edit,
   loadAttachmentPreview,
   loadToolImage,
+  responseFooter,
 }: {
   ref?: Ref<HTMLDivElement>;
   message: ChatMessage;
@@ -168,6 +213,8 @@ export function ChatMessageView({
   loadAttachmentPreview?: AttachmentImagePreview.Loader;
   /** Captured tool-result images, with authority kept separate from user attachments. */
   loadToolImage?: AttachmentImagePreview.Loader;
+  /** Client-supplied display after a final assistant response. */
+  responseFooter?: ReactNode;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
   // `data-compaction` part) renders as a divider with an expandable
@@ -188,9 +235,21 @@ export function ChatMessageView({
     const questionReply = message.parts.find(
       (part) => part.type === chat_vocabulary.CONTEXT_PARTS.questionReply
     );
+    const questionReplyData =
+      questionReply && "data" in questionReply ? questionReply.data : undefined;
+    const questionReplies =
+      Array.isArray(questionReplyData) &&
+      questionReplyData.every(isQuestionBatchReply)
+        ? questionReplyData
+        : undefined;
     const svgTextSelection = message.parts.some(
       (part) =>
         part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
+        part.data === true
+    );
+    const svgSelection = message.parts.some(
+      (part) =>
+        part.type === chat_vocabulary.CONTEXT_PARTS.svgSelection &&
         part.data === true
     );
     const messageContext = message.parts.find(
@@ -209,8 +268,11 @@ export function ChatMessageView({
     );
     return (
       <Message from="user" ref={ref}>
-        {svgTextSelection && !edit && (
-          <EditorSelectionIndicator kind="svg-text" className="self-end" />
+        {(svgSelection || svgTextSelection) && !edit && (
+          <EditorSelectionIndicator
+            label={svgSelection ? "Selection" : "Text selection"}
+            className="self-end"
+          />
         )}
         {messageContext &&
           "data" in messageContext &&
@@ -234,21 +296,32 @@ export function ChatMessageView({
               role="group"
               aria-label="Message text"
             >
-              {questionReply &&
-                "data" in questionReply &&
-                typeof questionReply.data === "string" && (
-                  <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
-                    {questionReply.data}
-                  </blockquote>
-                )}
               <CollapsibleBubbleBody>
-                <MessageResponse
-                  plugins={markdown.plugins}
-                  rehypePlugins={markdown.rehypePlugins}
-                  components={markdown.components}
-                >
-                  {text}
-                </MessageResponse>
+                {questionReplies ? (
+                  <div className="space-y-3">
+                    {questionReplies.map((reply) => (
+                      <div key={reply.id}>
+                        <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                          {reply.question}
+                        </blockquote>
+                        {reply.skipped ? (
+                          <span className="text-muted-foreground">Skipped</span>
+                        ) : (
+                          <UserMessageText text={reply.answer} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {typeof questionReplyData === "string" && (
+                      <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                        {questionReplyData}
+                      </blockquote>
+                    )}
+                    <UserMessageText text={text} />
+                  </>
+                )}
               </CollapsibleBubbleBody>
             </MessageContent>
           )
@@ -292,7 +365,10 @@ export function ChatMessageView({
   // a document. Matches the web panel's `w-full max-w-none` on
   // `<Message from="assistant">`.
   const groups = groupMessageParts(message);
-  const hasVisibleContent = groups.length > 0;
+  const sources = message.parts
+    .filter((part) => part.type === "source-url")
+    .filter((source) => /^https?:\/\//i.test(source.url));
+  const hasVisibleContent = groups.length > 0 || sources.length > 0;
   // Copyable response = the assistant's visible text only (non-text parts are
   // excluded). Multiple text parts can be split by tool
   // calls, so rejoin them with blank lines to preserve paragraph breaks.
@@ -310,6 +386,7 @@ export function ChatMessageView({
                 key={group.key}
                 className={markdown.className}
                 controls={markdown.controls}
+                lineNumbers={false}
                 plugins={markdown.plugins}
                 rehypePlugins={markdown.rehypePlugins}
                 components={markdown.components}
@@ -326,10 +403,28 @@ export function ChatMessageView({
             />
           );
         })}
+        {sources.length > 0 && (
+          <ul
+            aria-label="Sources"
+            className="flex flex-wrap gap-2 text-xs text-muted-foreground"
+          >
+            {sources.map((source) => (
+              <li key={source.sourceId}>
+                <Source
+                  href={source.url}
+                  className="underline underline-offset-2"
+                >
+                  {source.title || source.url}
+                </Source>
+              </li>
+            ))}
+          </ul>
+        )}
         {isStreaming && !hasVisibleContent && (
           <Shimmer className="text-xs">Thinking</Shimmer>
         )}
       </MessageContent>
+      {responseFooter}
       {/* Copy mirrors the user-bubble affordance but left-aligned under the
           assistant response. Shown only once the turn has settled with real
           text — never over a half-streamed or tool-only (text-less) turn. */}
@@ -703,23 +798,18 @@ const ELAPSED_REVEAL_AFTER_MS = 10000;
  * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
  * operation settles before a timer grows, and only a wait long enough to feel
  * slow surfaces the elapsed time as reassurance.
- *
- * The counter is a sibling of the `Shimmer`, not its child: `Shimmer` requires a
- * string child and recreates its motion element whenever that child changes, so
- * feeding it the ticking label would restart the shimmer every second.
  */
 function ShimmerWithElapsed({ label }: { label: string }) {
   const elapsed = useElapsedSeconds();
+  const text =
+    elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS
+      ? `${label} · ${formatElapsed(elapsed)}`
+      : label;
+
   return (
-    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-      <Shimmer as="span">{label}</Shimmer>
-      {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
-        <>
-          <span aria-hidden>·</span>
-          <span className="tabular-nums">{formatElapsed(elapsed)}</span>
-        </>
-      )}
-    </span>
+    <Shimmer as="span" className="whitespace-nowrap text-xs tabular-nums">
+      {text}
+    </Shimmer>
   );
 }
 
@@ -759,11 +849,19 @@ export function PendingTurnIndicator({
   );
 }
 
-// The settled compaction affordance (RFC `session / compaction`: "the user
-// sees a one-line affordance"). A divider reading "Conversation compacted";
-// clicking the label expands the summary the model now sees in place of the
-// hidden turns.
-/** A divider where earlier context was summarized, with the summary inside. */
+const compactionRowClassName =
+  "flex w-fit items-center gap-2 text-sm text-muted-foreground";
+
+export function CompactionProgress() {
+  return (
+    <div role="status" className={cn(compactionRowClassName, "select-none")}>
+      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+      <Shimmer as="span">Compacting context</Shimmer>
+    </div>
+  );
+}
+
+/** A transcript disclosure for the summary the model now reads. */
 export function CompactionNotice({
   summary,
   auto,
@@ -772,14 +870,19 @@ export function CompactionNotice({
   auto: boolean;
 }) {
   return (
-    <details className="group/compaction my-3 w-full">
-      <summary className="flex w-full cursor-pointer list-none items-center gap-3 px-1 text-muted-foreground">
-        <span aria-hidden className="h-px flex-1 bg-border" />
-        <span className="flex items-center gap-1.5 whitespace-nowrap text-xs transition-colors hover:text-foreground">
-          {auto ? "Conversation auto-compacted" : "Conversation compacted"}
-          <ChevronDownIcon className="size-3 shrink-0 opacity-50 transition-transform group-open/compaction:rotate-180" />
-        </span>
-        <span aria-hidden className="h-px flex-1 bg-border" />
+    <details className="group/compaction w-full">
+      <summary
+        className={cn(
+          compactionRowClassName,
+          "cursor-pointer list-none transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
+        )}
+      >
+        <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+        {auto ? "Conversation auto-compacted" : "Conversation compacted"}
+        <ChevronRightIcon
+          aria-hidden
+          className="size-3 shrink-0 opacity-0 transition-[opacity,rotate] group-open/compaction:rotate-90 group-open/compaction:opacity-100 group-hover/compaction:opacity-100 group-focus-within/compaction:opacity-100"
+        />
       </summary>
       <div className="mt-2 whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs leading-5 text-foreground/80">
         {summary}
@@ -918,33 +1021,48 @@ function ToolCallView({
 }
 
 function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
+  if (entry.state === "input-streaming") return null;
   const description = toolDisplay.describe(entry);
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
-  if (entry.state === "input-streaming") return null;
   const waitingForAnswer =
     entry.state === "input-available" && getToolName(entry) === "question";
-  // A `question` part can be `output-error` — a headless host's fixed refusal
-  // (RFC §question), or any tool error. Surface its text rather than the empty
-  // answered summary, so the refusal/error isn't silently swallowed.
   const errored = entry.state === "output-error";
-  return (
-    <div className="w-full">
+  const output = entry.state === "output-available" ? entry.output : undefined;
+  const hasAnswerSummary =
+    output !== null &&
+    typeof output === "object" &&
+    (("answers" in output && Array.isArray(output.answers)) ||
+      ("skipped" in output && output.skipped === true));
+
+  // An optional question can register without a result to disclose.
+  if (!waitingForAnswer && !errored && !hasAnswerSummary) {
+    return (
       <div className="flex items-center gap-2 text-muted-foreground text-xs">
         <MessageCircleQuestionIcon className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </div>
-      {waitingForAnswer ? (
-        <p className="mt-1 text-xs text-muted-foreground/80">
-          Awaiting your answer below.
-        </p>
-      ) : errored ? (
-        <ToolOutput output={undefined} errorText={entry.errorText} />
-      ) : (
-        <AnsweredQuestionSummary entry={entry} />
-      )}
-    </div>
+    );
+  }
+
+  return (
+    <Task defaultOpen={false} className="w-full">
+      <TaskTrigger title={title}>
+        {triggerRow(MessageCircleQuestionIcon, title)}
+      </TaskTrigger>
+      <TaskContent>
+        {waitingForAnswer ? (
+          <p className="text-xs text-muted-foreground/80">
+            Awaiting your answer below.
+          </p>
+        ) : errored ? (
+          <ToolOutput output={undefined} errorText={entry.errorText} />
+        ) : (
+          <AnsweredQuestionSummary entry={entry} />
+        )}
+      </TaskContent>
+    </Task>
   );
 }
 
@@ -957,7 +1075,10 @@ function triggerRow(
   options?: { busy?: boolean; shimmer?: boolean }
 ) {
   return (
-    <div className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground">
+    <button
+      type="button"
+      className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-left text-muted-foreground text-xs transition-colors hover:text-foreground"
+    >
       {options?.busy ? (
         <ToolActivitySpinner className="size-3.5 shrink-0" />
       ) : (
@@ -973,7 +1094,7 @@ function triggerRow(
         )}
       </span>
       <ChevronRightIcon className="size-3 shrink-0 opacity-0 transition-[opacity,transform] duration-150 group-hover/tool-trigger:opacity-50 group-focus-visible/tool-trigger:opacity-50 group-data-[state=open]/tool-trigger:rotate-90 motion-reduce:transition-none" />
-    </div>
+    </button>
   );
 }
 
@@ -1008,7 +1129,9 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return FilePlus2Icon;
     case "list":
       return FolderTreeIcon;
+    case "web_search":
     case "search":
+    case "tool_search":
       return SearchIcon;
     case "pick_references":
       return ImagesIcon;
@@ -1029,6 +1152,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return AppWindowIcon;
     case "list_tabs":
       return PanelsTopLeftIcon;
+    case "desktop_tool":
+      return MonitorIcon;
     case "tool":
       return WrenchIcon;
   }

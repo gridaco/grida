@@ -138,6 +138,7 @@ if (
 // (`~/Documents/Grida Projects`). The supervisor owns the path fact and forwards it;
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
 const projectsRoot = getCliArg("projects-root");
+const modelCatalogue = getCliArg("model-catalogue");
 async function main() {
   const network = new ServicesSidecarNetwork(process.stdin, process.stdout);
   let daemonSockets: ServicesSidecarDaemonSockets | null = null;
@@ -179,6 +180,7 @@ async function main() {
     user_data_path: requiredUserDataPath,
     provider_home: providerHome,
     media_root: requiredMediaRoot,
+    model_catalogue: modelCatalogue,
     ordinary_native_chat_services: ordinaryNativeChatServices === "1",
     workspace_catalog: workspaceCatalog,
     protected_file_roots: protectedFileRoots.length

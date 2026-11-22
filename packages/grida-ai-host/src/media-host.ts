@@ -6,10 +6,10 @@ import type { DaemonServices } from "@grida/daemon/server";
 import {
   GridaGatewaySessionStore,
   GGDiscoveryStore,
-  ModelCatalogStore,
   ProviderHttp,
 } from "@grida/ai";
-import { catalog as models } from "@grida/ai/catalogue";
+import { VisualModels } from "@grida/ai/catalogue";
+import { ModelCatalogueStore } from "./model-catalogue";
 import type { MediaTenantOptions } from "./media-server";
 import type { EndpointProvidersStore } from "./providers/endpoints";
 import { registerSecretsRoutes } from "./http/routes/secrets";
@@ -27,7 +27,7 @@ import { registerTextToSpeechRoutes } from "./http/routes/text-to-speech";
 export class MediaHost {
   readonly providerHttp: ProviderHttp;
   readonly gridaSession = new GridaGatewaySessionStore();
-  readonly modelCatalog: ModelCatalogStore;
+  private readonly readCatalogue?: VisualModels.Read;
   readonly ggCatalog: GGDiscoveryStore;
   readonly gridaGatewayBaseUrl: string | undefined;
   readonly capabilities;
@@ -58,22 +58,29 @@ export class MediaHost {
         !this.gridaGatewayBaseUrl ||
         process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
     });
-    this.modelCatalog = new ModelCatalogStore({
-      // Native BYOK facts are the reviewed installed release. The schema-1
-      // endpoint remains compatibility for old installations, not this store's authority.
-      snapshot: models.snapshot.seed(),
-    });
+    const store = opts.model_catalogue
+      ? new ModelCatalogueStore({
+          directory: opts.model_catalogue,
+          offline: true,
+        })
+      : undefined;
+    this.readCatalogue = store && (() => store.read());
   }
 
   register(app: Hono): void {
-    const {
-      services,
-      providerHttp,
-      gridaSession,
-      gridaGatewayBaseUrl,
-      modelCatalog,
-    } = this;
+    const { services, providerHttp, gridaSession, gridaGatewayBaseUrl } = this;
     const caps = this.capabilities;
+    const readCatalogue = this.readCatalogue;
+    if (readCatalogue && (caps.images || caps.video)) {
+      app.get("/providers/visual/models", async (c) => {
+        const snapshot = await readCatalogue();
+        return c.json({
+          version: snapshot.version,
+          image: caps.images ? VisualModels.list(snapshot, "image") : [],
+          video: caps.video ? VisualModels.list(snapshot, "video") : [],
+        });
+      });
+    }
     if (caps.gg) {
       app.get("/providers/gg/models", async (c) => {
         const snapshot = await this.ggCatalog.ready();
@@ -149,7 +156,7 @@ export class MediaHost {
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
         provider_http: providerHttp,
-        catalog: modelCatalog,
+        runtime_catalogue: this.readCatalogue,
         gg_catalog: this.ggCatalog,
       });
     }
@@ -160,7 +167,7 @@ export class MediaHost {
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
         provider_http: providerHttp,
-        catalog: modelCatalog,
+        runtime_catalogue: this.readCatalogue,
         gg_catalog: this.ggCatalog,
       });
     }
@@ -214,12 +221,10 @@ export class MediaHost {
 
   /** Start catalogue refresh after the routes are mounted. */
   start(): void {
-    this.modelCatalog.start();
     if (this.capabilities.gg) this.ggCatalog.start();
   }
 
   dispose(): void {
-    this.modelCatalog.dispose();
     this.ggCatalog.dispose();
     this.gridaSession.clear();
   }

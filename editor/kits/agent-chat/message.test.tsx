@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/lib/agent-chat/types";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import {
   IMAGE_REFERENCE_PART,
   imagesMessageContext,
@@ -13,7 +14,12 @@ import {
   SLIDES_TEMPLATE_PART,
 } from "@/lib/desktop/slides-message-context";
 import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
-import { ChatMessageView, type ChatMessageActions } from "./message";
+import {
+  ChatMessageView,
+  ToolCallGroupView,
+  type ChatMessageActions,
+} from "./message";
+import { ToolCardContent } from "./tool-card";
 
 const actions = vi.hoisted(
   () =>
@@ -61,6 +67,84 @@ function render(parts: ChatMessage["parts"], controls?: ChatMessageActions) {
   );
 }
 
+it("quotes each accepted batch answer with its question in order", () => {
+  const html = render(
+    native_message_parts.of({
+      messageId: "reply",
+      role: "user",
+      text: "Plain fallback",
+      questionReplies: [
+        {
+          waitId: "wait",
+          id: "format",
+          question: "Which format?",
+          answer: "Print",
+        },
+        {
+          waitId: "wait",
+          id: "theme",
+          question: "Which theme?",
+          answer: "The user skipped this question.",
+          skipped: true,
+        },
+      ],
+    })
+  );
+  expect(html).toContain("Which format?");
+  expect(html).toContain("Print");
+  expect(html).toContain("Which theme?");
+  expect(html).toContain("Skipped");
+  expect(html.indexOf("Which format?")).toBeLessThan(
+    html.indexOf("Which theme?")
+  );
+  expect(html).not.toContain("Plain fallback");
+});
+
+it("shows the submitted answer once while the question tool is collapsed", () => {
+  const question = "Which format?";
+  const answer = "Large print";
+  const entry = native_tool_parts.entry({
+    callId: "ask",
+    title: "question",
+    kind: "other",
+    outcome: "succeeded",
+    input: { questions: [{ question }] },
+    output: { text: "", truncated: false, structured: { answers: [[answer]] } },
+  });
+  const reply = native_message_parts.of({
+    messageId: "reply",
+    role: "user",
+    text: answer,
+    questionReply: { waitId: "wait", question },
+  });
+
+  const html = renderToStaticMarkup(
+    <>
+      <ToolCallGroupView entries={[entry]} />
+      <ChatMessageView message={{ id: "reply", role: "user", parts: reply }} />
+    </>
+  );
+
+  expect(html).toMatch(/<button[^>]*aria-expanded="false"/);
+  expect(html).toContain("Asked you");
+  expect(html.match(/Large print/g)).toHaveLength(1);
+});
+
+it("shows one passive selection marker on the accepted user message", () => {
+  const parts = native_message_parts.of({
+    messageId: "selected",
+    role: "user",
+    text: "Inspect these shapes.",
+    svgTextSelection: true,
+    svgSelection: true,
+  });
+  expect(parts[0]).toEqual({ type: "data-svg-selection", data: true });
+  const html = render(parts);
+  expect(html).toContain(">Selection</span>");
+  expect(html).not.toContain(">Text selection</span>");
+  expect(html).not.toContain('aria-label="Clear selection"');
+});
+
 /** Extract an actual rendered element including nested elements of its tag. */
 function region(html: string, attribute: string): string | null {
   const position = html.indexOf(attribute);
@@ -76,6 +160,62 @@ function region(html: string, attribute: string): string | null {
   }
   throw new Error("unbalanced rendered element");
 }
+
+describe("tool call icons", () => {
+  it.each([
+    { toolName: "workbench_list_tabs", icon: "lucide-monitor" },
+    { toolName: "browser_snapshot", icon: "lucide-monitor" },
+    { toolName: "tool_search", icon: "lucide-search" },
+    { toolName: "read_skill", icon: "lucide-book-open" },
+    { toolName: "other_tool", icon: "lucide-wrench" },
+  ])("renders the icon for $toolName", ({ toolName, icon }) => {
+    expect(renderToolCalls(toolName)).toContain(icon);
+  });
+
+  it("uses a monitor on a collapsed group dominated by desktop tools", () => {
+    const html = renderToolCalls(
+      "workbench_list_tabs",
+      "browser_snapshot",
+      "other_tool"
+    );
+    expect(html.match(/<svg[^>]*>/)?.[0]).toContain("lucide-monitor");
+    expect(html).toContain("Used 2 desktop tools, used 1 tool call");
+  });
+
+  function renderToolCalls(...toolNames: string[]) {
+    const parts = toolNames.map((title) =>
+      native_tool_parts.entry({
+        callId: title,
+        title,
+        kind: "other",
+        outcome: "succeeded",
+      })
+    );
+    return renderToStaticMarkup(
+      <ChatMessageView message={{ id: "reply", role: "assistant", parts }} />
+    );
+  }
+});
+
+it("shows the exit status and multiline output of a failed native command", () => {
+  const entry = native_tool_parts.entry({
+    callId: "failed-command",
+    title: "exec_command",
+    kind: "execute",
+    outcome: "failed",
+    input: { cmd: "cat missing.md" },
+    commandActions: [{ kind: "read", path: "missing.md" }],
+    output: {
+      text: "Wall time: 0.0123 seconds\nProcess exited with code 1\nOutput:\ncat: missing.md: No such file\nCheck the path.\n",
+      truncated: false,
+    },
+  });
+  const html = renderToStaticMarkup(<ToolCardContent entry={entry} />);
+  expect(html).toContain("Process exited with code 1");
+  expect(html).toMatch(
+    /<pre[^>]*>\$ cat missing\.md\n\nWall time:.*\nProcess exited with code 1\nOutput:\ncat: missing\.md: No such file\nCheck the path\./
+  );
+});
 
 describe("user message attachments", () => {
   it("keeps workflow references and model-only context out of authored prose", async () => {

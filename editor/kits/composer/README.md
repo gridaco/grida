@@ -22,6 +22,8 @@ import {
 ```
 
 `ComposerContent` imports the default editor CSS. The stable styling root is `.composer-content`; call sites can override the CSS variables on that element or pass `className`.
+When `editorClassName` constrains the editor height and enables vertical
+scrolling, `scrollFade` fades the edges where draft text continues offscreen.
 
 ## Basic Usage
 
@@ -67,12 +69,24 @@ function ComposerBox() {
 ## Capabilities
 
 - Slash commands with keyboard selection, Escape and outside-click dismissal.
+- An optional inline suggestion in an empty paragraph. Its full text stays
+  outside the document until the person presses Tab. It then becomes editable
+  text and follows the ordinary Send action.
 - Optional host actions on explicit command selection, shared by keyboard and menu clicks.
 - Mentions from a caller-provided catalog.
 - File attachments as message parts.
 - Inline file references.
 - Opaque, read-only directory references (never recursive attachments).
-- Minimal formatting: bullet lists, ordered lists, inline code, and code blocks.
+- Select text to add a link or apply bold or italic. Press a link to open it,
+  edit its text, or change its destination. Cmd/Ctrl+K opens the destination
+  field for the selection. Web links use the same color and destination icons
+  in the draft and the transcript. A host can give `ComposerContent` an
+  `onLinkClick` handler to route the formatting menu's **Open link** action.
+- Markdown shortcuts include lists, block quotes, bold, italic, code, and
+  explicit links such as `[label](https://example.com)`.
+- Enter submits the draft. Shift+Enter starts a paragraph or adds a list item.
+  Use Shift+Enter on an empty list item to leave the list. In a code block,
+  Shift+Enter inserts a newline.
 - Empty submissions are rejected by default.
 - Core accepts duplicate attachment inputs and assigns unique attachment ids; consumers can pass an attachment filter when they want deduping.
 
@@ -89,7 +103,10 @@ Messages contain ordered `parts` such as:
 - `file-attachment`
 - `editor-context`
 
-The message `meta` intentionally includes only stable submission metadata: plain text, attachments, and `submitted_at`. Raw Tiptap HTML/JSON is not part of the public message contract.
+Message metadata includes the plain text, attachments, and submission time.
+When the draft contains structured formatting, `composer.submit()` also
+provides `meta.markdown`. Desktop uses that text for sending and falls back to
+`meta.text` for a plain draft.
 
 ## Customization
 
@@ -105,6 +122,12 @@ or leaving and re-entering its token makes completion available again.
 the caller. It supports keyboard selection, Escape and outside-click dismissal,
 and hides itself when no actions exist. Selecting an action preserves the draft.
 Opening it dismisses active text completion so the two menus cannot overlap.
+
+Pair footer controls with `composerToolbarButtonClassName` for the shared 28px
+height and pill shape. `ComposerToolbarTooltip` accepts a short label and an
+optional shortcut keycap for a binding the host already supports.
+`ComposerToolbarChip` renders removable modes and shares the permission
+control’s icon-only layout below a 26rem composer width.
 
 Use the provider/controller for behavior:
 
@@ -179,6 +202,24 @@ Use CSS variables for the default editor skin:
   --composer-chip-color: var(--color-blue-600);
 }
 ```
+
+`Dictation` coordinates a single recording and accepts host-provided microphone
+capture and recognition. Subscribe to its snapshot to render starting,
+recording, finishing, and error states. During recording, the snapshot exposes
+the stream for a waveform to borrow. The caller inserts the returned transcript
+into the current draft.
+
+```ts
+const dictation = new Dictation(openMicrophone);
+const transcript = dictation.start(recognize);
+// Wire Stop to dictation.stop() and Cancel or teardown to dictation.cancel().
+```
+
+The recognizer receives the captured stream and an abort signal. It returns a
+result promise and a `stop` method that stops collecting audio and requests the
+final transcript. Dictation closes the microphone tracks after requesting the
+final result or when the session ends. The recognizer handles its own teardown
+on abort. The playground supplies a Web Speech recognizer with a sample fallback.
 
 For custom UI, keep `ComposerProvider` and `ComposerContent`, then replace `ComposerTriggerMenu` and `ComposerAttachmentCards` with call-site components built on `useComposer()`.
 

@@ -1,0 +1,16 @@
+{
+  "id": "desktop-fx",
+  "description": "Plan and run Grida FX workflows, adapt examples, and inspect saved runs.",
+  "skills": ["desktop-fx"],
+  "package": "@grida/fx",
+  "command": "grida-fx",
+  "resourceDirectory": "bundled-programs",
+  "licenseFile": "FX-LICENSE",
+  "versionFile": "fx-version",
+  "platformPackages": {
+    "darwin-arm64": "@grida/fx-darwin-arm64",
+    "darwin-x64": "@grida/fx-darwin-x64",
+    "linux-arm64": "@grida/fx-linux-arm64-gnu",
+    "linux-x64": "@grida/fx-linux-x64-gnu"
+  }
+}

@@ -45,7 +45,15 @@ struct ProfileFile {
     goal_read_verification: Option<ReadVerification>,
     goal_read_verifications: Option<Vec<ReadVerification>>,
     #[serde(default)]
+    allow_external_file_read: bool,
+    #[serde(default)]
+    allow_command_network: bool,
+    #[serde(default)]
+    allow_command_escalation: bool,
+    #[serde(default)]
     allow_full_access: bool,
+    #[serde(default)]
+    allow_approve_for_me: bool,
     #[serde(default)]
     initial_permission_mode: PermissionMode,
 }
@@ -189,8 +197,8 @@ impl From<Executable> for TrustedExecutable {
 }
 
 /// Load a profile explicitly selected by the supervising native process.
-/// The profile is outside model-editable settings. Files and commands share
-/// fixed custody denials, and command payloads cannot write installed tools.
+/// The profile is outside model-editable settings. Confined commands enforce
+/// the profile's custody denials and protect installed tools from writes.
 pub fn load_permission_profile(
     profile_file: &Path,
     state_directory: &Path,
@@ -208,13 +216,39 @@ pub fn load_permission_profile_excluding(
     credential_home: Option<&Path>,
     launch_secrets: &[&str],
 ) -> Result<Arc<PermissionProfile>> {
+    load_launch_permission_profile(
+        profile_file,
+        state_directory,
+        credential_home,
+        launch_secrets,
+        false,
+        false,
+    )
+}
+
+/// The launcher can separately offer scoped approvals and single-command
+/// escalation without changing the profile file. Accepted work keeps its
+/// captured offers across host upgrades.
+pub fn load_launch_permission_profile(
+    profile_file: &Path,
+    state_directory: &Path,
+    credential_home: Option<&Path>,
+    launch_secrets: &[&str],
+    scoped_approvals: bool,
+    command_escalation: bool,
+) -> Result<Arc<PermissionProfile>> {
     let bytes = read_profile(profile_file)?;
     let profile: ProfileFile = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
     if profile.version != 1 || profile.directories.is_empty() || profile.directories.len() > 32 {
         return Err(invalid());
     }
     let allow_full_access = profile.allow_full_access;
+    let allow_command_escalation = profile.allow_command_escalation || command_escalation;
+    let allow_approve_for_me = profile.allow_approve_for_me || scoped_approvals;
     let initial_permission_mode = profile.initial_permission_mode;
+    let allow_external_file_read = profile.allow_external_file_read || scoped_approvals;
+    let allow_command_network = profile.allow_command_network
+        || (scoped_approvals && profile.command.as_ref().is_some_and(|c| !c.hooks_only));
     let goal_read_verifications = match (
         profile.goal_read_verification,
         profile.goal_read_verifications,
@@ -377,7 +411,11 @@ pub fn load_permission_profile_excluding(
     Ok(Arc::new(
         profile
             .with_bundled_skills(bundled_skills)?
+            .with_external_file_read(allow_external_file_read)?
+            .with_command_network(allow_command_network, state_directory)
+            .with_command_escalation(allow_command_escalation)?
             .with_goal_read_verifications(goal_read_verifications)?
+            .with_approve_for_me(allow_approve_for_me)
             .with_full_access(allow_full_access, initial_permission_mode)?,
     ))
 }
@@ -534,6 +572,36 @@ mod tests {
         assert!(profile.matches_primary(&fixture.directory));
         assert!(!profile.matches_primary(&fixture.state));
         assert!(!profile.matches_primary(&fixture.directory.join("nested")));
+    }
+
+    #[test]
+    fn scoped_launch_preserves_older_captures_and_requires_a_current_offer() {
+        use agent_kit_core::ScopeId;
+
+        let fixture = Fixture::new();
+        fixture.write(&fixture.directory);
+        let original = fixture.load().unwrap();
+        let scope = ScopeId::new("workspace").unwrap();
+        let captured = original.capture(scope.clone());
+        let upgraded = load_launch_permission_profile(
+            &fixture.profile,
+            &fixture.state,
+            Some(&fixture.custody),
+            &[],
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            upgraded.recapture(&captured, scope.clone()).unwrap(),
+            captured
+        );
+        for mode in [PermissionMode::Restricted, PermissionMode::ApproveForMe] {
+            let next = upgraded.capture_mode(scope.clone(), mode).unwrap();
+            assert_ne!(next, captured);
+            assert!(upgraded.validate_capture(&next).is_ok());
+            assert!(original.validate_capture(&next).is_err());
+        }
     }
 
     #[test]

@@ -1,5 +1,5 @@
 //! Finite commands and long-running sessions under explicit host authority.
-//! Confined scopes deny networking; unconfined scopes require a separate API.
+//! Confined scopes deny networking by default. Unconfined scopes require a separate API.
 //!
 //! GRIDA-SEC-004 — native confinement for host-approved processes.
 //!
@@ -33,6 +33,8 @@ use std::time::{Duration, Instant};
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod native;
+#[cfg(target_os = "macos")]
+mod proxy_environment;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod wire;
 
@@ -58,6 +60,19 @@ pub struct Installation {
     /// A non-setuid bubblewrap (0.8 or later). Required on Linux, ignored on
     /// macOS.
     pub bubblewrap: Option<TrustedExecutable>,
+}
+
+/// The HTTP proxy endpoint supplied by the trusted host for one command.
+/// The host owns endpoint lifetime, authentication, and egress policy.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub enum HttpProxy {
+    /// An already-listening endpoint on exactly `127.0.0.1`.
+    #[cfg(target_os = "macos")]
+    Loopback { port: u16, password: String },
+    /// A canonical socket path inside a mandatory read/write denial. The
+    /// helper exposes an HTTP proxy on loopback in its private namespace.
+    #[cfg(target_os = "linux")]
+    Unix { socket: PathBuf, password: String },
 }
 
 /// How far the backend must be able to stop the launched work.
@@ -128,6 +143,10 @@ pub struct ExecutionScope {
     /// paths and other launches' temporary storage. Writes still come only
     /// from `write` and private temporary storage.
     pub disk_read: bool,
+    /// Allow a TCP listener on one port and connections to loopback on that
+    /// port for local readiness checks. The command chooses its bind address.
+    /// Backends without listener confinement refuse this scope.
+    pub listen_port: Option<std::num::NonZeroU16>,
 }
 
 /// Explicit host authority for an ordinary-user process without filesystem,
@@ -321,6 +340,19 @@ pub struct PreparedProcess {
     native: native::Prepared,
 }
 
+/// The filesystem reach of one prepared confined command before mandatory
+/// protected-path exclusions. The launch also has its own private temporary
+/// directory, whose random name is intentionally excluded from these facts.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FilesystemGrants {
+    pub disk_read: bool,
+    pub read_roots: Vec<PathBuf>,
+    pub write_roots: Vec<PathBuf>,
+    pub runtime_roots: Vec<PathBuf>,
+    pub resolved_executable: PathBuf,
+    pub resolved_cwd: PathBuf,
+}
+
 /// A launched process under supervision.
 ///
 /// Supervision continues after this handle is dropped, but dropping it
@@ -456,6 +488,14 @@ impl PreparedProcess {
         }
     }
 
+    /// Inspect the bound command and roots, including runtime mount aliases.
+    pub fn filesystem_grants(&self) -> Result<FilesystemGrants> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.native.filesystem_grants();
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        Err(unavailable())
+    }
+
     /// Identity of the process input and the exact native paths captured in
     /// this preparation. Output limits, deadlines and private temporary
     /// directories are execution bounds rather than part of this identity.
@@ -485,6 +525,18 @@ impl PreparedProcess {
         }
     }
 
+    /// Verify the exact prepared working directory against a host-opened
+    /// directory, including for a confined command in a nested directory.
+    pub fn validate_working_directory(&self, directory: &std::fs::File) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.native.validate_working_directory(directory);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = directory;
+            Err(unavailable())
+        }
+    }
+
     /// Consume this exact preparation after the caller's admission barrier.
     ///
     /// Requires a Tokio runtime context. The launcher is started from a
@@ -502,6 +554,83 @@ impl PreparedProcess {
             let _ = cancellation;
             Err(unavailable())
         }
+    }
+
+    /// Supply bytes authorized by the host after capture, then run the exact
+    /// prepared command to completion. The caller binds the input to its own
+    /// admission barrier because these bytes are outside the capture fingerprint.
+    ///
+    /// Requires offline confinement, no broad filesystem read or write grant,
+    /// and initially empty fixed stdin. The fixed input limit and the usual
+    /// launch checks still apply. Private temporary storage stays available.
+    pub fn spawn_with_input(
+        self,
+        input: Vec<u8>,
+        cancellation: CancellationToken,
+    ) -> Result<RunningProcess> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            Ok(RunningProcess {
+                native: self.native.spawn_with_input(input, cancellation)?,
+            })
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (input, cancellation);
+            Err(unavailable())
+        }
+    }
+
+    /// Run one finite, confined command with access to the host's
+    /// SOCKS5 broker. The socket's real location must be under a mandatory
+    /// read/write denial. Seatbelt grants only that socket. Bubblewrap exposes
+    /// a single bridge in a private network namespace. In both cases
+    /// the caller owns destination policy, credentials and broker shutdown.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn spawn_with_socks_proxy(
+        self,
+        socket: &std::path::Path,
+        expected_socket: &std::path::Path,
+        password: &str,
+        cancellation: CancellationToken,
+    ) -> Result<RunningProcess> {
+        Ok(RunningProcess {
+            native: self.native.spawn_with_proxy(
+                socket,
+                expected_socket,
+                password,
+                cancellation,
+            )?,
+        })
+    }
+
+    /// Run a confined command with a trusted host's authenticated HTTP proxy.
+    /// The proxy is the only outbound route. All filesystem rules still apply.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn spawn_with_http_proxy(
+        self,
+        proxy: &HttpProxy,
+        cancellation: CancellationToken,
+    ) -> Result<RunningProcess> {
+        Ok(RunningProcess {
+            native: self.native.with_http_proxy(proxy)?.spawn(cancellation)?,
+        })
+    }
+
+    /// Start a supervised confined session with the same HTTP proxy scope.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn spawn_session_with_http_proxy(
+        self,
+        options: SessionOptions,
+        proxy: &HttpProxy,
+        cancellation: CancellationToken,
+    ) -> Result<RunningSession> {
+        Ok(RunningSession {
+            native: self
+                .native
+                .with_http_proxy(proxy)?
+                .spawn_session(options, cancellation)?,
+        })
     }
 
     /// Open bounded, bidirectional stdio to a reviewed system executable.

@@ -61,6 +61,66 @@ exec /bin/sh -c "$2"
       ).toBeLessThanOrEqual(24 * 1024);
     });
 
+    it("registers the bundled FX command and skill together", async () => {
+      await fs.writeFile(
+        shell,
+        "#!/bin/sh\nexport PATH=/usr/bin:/bin\nexec /usr/bin/env -0\n",
+        {
+          mode: 0o700,
+        }
+      );
+      const workspace = path.join(shellHome, "workspace");
+      const resources = path.join(shellHome, "resources");
+      const helper = path.join(
+        resources,
+        "native-agent",
+        "agent-kit-sandbox-helper"
+      );
+      await fs.mkdir(workspace);
+      await fs.mkdir(path.dirname(helper), { recursive: true });
+      await fs.writeFile(helper, "sandbox helper", { mode: 0o700 });
+
+      const { NativeCommandProfiles } =
+        await import("./native-agent-command-profile");
+      const protectedPaths = [resources];
+      const hooks = {
+        hooks: [],
+        command: {
+          helper: { path: helper, sha256: [] },
+          hooksOnly: true as const,
+          temporaryParent: shellHome,
+          runtimePaths: ["/usr/bin"],
+        },
+      };
+      const withoutFx = await NativeCommandProfiles.launch(
+        resources,
+        workspace,
+        hooks,
+        protectedPaths
+      );
+      expect(withoutFx?.bundledSkills).toBeUndefined();
+      expect(withoutFx?.environment.PATH).toBe("/usr/bin:/bin");
+
+      const carrier = path.join(resources, "bundled-programs");
+      await fs.mkdir(path.join(carrier, "bin"), { recursive: true });
+      await fs.writeFile(path.join(carrier, "bin", "grida-fx"), "FX engine", {
+        mode: 0o700,
+      });
+      await fs.writeFile(path.join(carrier, "fx-version"), "0.11.0\n");
+      const withFx = await NativeCommandProfiles.launch(
+        resources,
+        workspace,
+        hooks,
+        protectedPaths
+      );
+      expect(withFx?.bundledSkills).toEqual(["desktop-fx"]);
+      const commandDirectory = withFx!.environment.PATH.split(
+        path.delimiter
+      )[0]!;
+      expect(withFx?.runtimePaths).toContain(commandDirectory);
+      expect(await fs.readdir(commandDirectory)).toEqual(["grida-fx"]);
+    });
+
     it("falls back for all callers and stops the shell and its child when login hangs", async () => {
       const pidFile = path.join(shellHome, "shell-pids");
       await fs.writeFile(

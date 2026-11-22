@@ -2,11 +2,14 @@
 
 import type { JSONContent } from "@tiptap/core";
 
+import { Kbd } from "@app/ui/components/kbd";
 import { cn } from "@app/ui/lib/utils";
+import markdownStyles from "@/components/chat-markdown.module.css";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   createContext,
   type HTMLAttributes,
+  type MouseEventHandler,
   type PropsWithChildren,
   type RefObject,
   useContext,
@@ -30,8 +33,10 @@ import {
   type ComposerSnapshot,
   type ComposerTrigger,
 } from "./composer-core";
+import { ComposerFormattingMenu } from "./composer-formatting-menu";
 import { ComposerTiptap } from "./composer-tiptap";
 import { ComposerTransfer } from "./composer-transfer";
+import "@/components/chat-web-link.css";
 import "./composer-content.css";
 
 type ComposerContextValue = {
@@ -55,11 +60,17 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  /** Whether an inline suggestion can occupy the empty editable paragraph. */
+  isEmptyDraft: () => boolean;
   /** The editor's document, or null when it is empty. */
   readDocument: () => unknown | null;
   /** Restore a saved document into an empty editor. False when not applied. */
   restoreDocument: (doc: unknown) => boolean;
-  appendText: (text: string, maxBytes: number) => boolean;
+  appendText: (
+    text: string,
+    maxBytes: number,
+    placement?: "paragraph" | "inline"
+  ) => boolean;
   /** Put the caret at the end of the draft. False before the editor exists. */
   focus: () => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
@@ -147,6 +158,16 @@ export function useComposer() {
         editor?.commands.clearContent(true);
         core.clear();
       },
+      isEmptyDraft() {
+        const current = core.getSnapshot();
+        return (
+          !!editor &&
+          !editor.view.composing &&
+          ComposerTiptap.hasEmptyParagraph(editor) &&
+          !current.attachments.length &&
+          !current.contexts.length
+        );
+      },
       readDocument() {
         return editor && !editor.isEmpty ? editor.getJSON() : null;
       },
@@ -162,8 +183,11 @@ export function useComposer() {
         ComposerTiptap.syncCore(core, editor);
         return true;
       },
-      appendText(text, maxBytes) {
-        return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);
+      appendText(text, maxBytes, placement) {
+        return (
+          !!editor &&
+          ComposerTiptap.appendText(editor, text, maxBytes, placement)
+        );
       },
       focus() {
         return !!editor && editor.commands.focus("end");
@@ -195,7 +219,12 @@ export function useComposer() {
         if (editor) {
           ComposerTiptap.syncCore(core, editor);
         }
-        return core.createMessage(input);
+        const message = core.createMessage(input);
+        if (message && editor) {
+          const markdown = ComposerTiptap.formattedMarkdown(editor.state.doc);
+          if (markdown !== undefined) message.meta.markdown = markdown;
+        }
+        return message;
       },
     }),
     [core, editor, snapshot, commandSelection]
@@ -217,19 +246,31 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
+  onLinkClick,
+  suggestion,
+  onDraftChange,
   onTransfer,
   onFiles,
   onDirectories,
   readOnly = false,
+  scrollFade = false,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
   autofocus?: boolean;
   /** Keep the mounted document visible while its submission is being confirmed. */
   readOnly?: boolean;
+  /** Fade clipped content when the editor has a constrained height. */
+  scrollFade?: boolean;
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /** Optional handler for the formatting menu's Open link action. */
+  onLinkClick?: MouseEventHandler<HTMLAnchorElement>;
+  /** Faint text outside the document. Only plain Tab accepts the full text. */
+  suggestion?: { text: string; take(text: string): boolean };
+  /** Synchronous document and composition changes, including edits within one render. */
+  onDraftChange?: (empty: boolean) => void;
   /**
    * Preferred source-aware transfer callback. Receives one envelope per paste or
    * drop, retaining gesture provenance, resource kind, ordering, and the original
@@ -267,6 +308,10 @@ export function ComposerContent({
   const editorRef = useRef<Editor | null>(null);
   // The editor is created once; read the latest callback through a ref so a
   // re-rendered consumer's handler is always the one invoked.
+  const suggestionRef = useRef(suggestion);
+  suggestionRef.current = suggestion;
+  const draftChangeRef = useRef(onDraftChange);
+  draftChangeRef.current = onDraftChange;
   const onTransferRef = useRef(onTransfer);
   onTransferRef.current = onTransfer;
   const onFilesRef = useRef(onFiles);
@@ -287,13 +332,19 @@ export function ComposerContent({
         "aria-autocomplete": "list",
         "aria-controls": resolvedTriggerMenuId,
         "aria-expanded": "false",
-        class: cn("outline-none", editorClassName),
+        class: cn(
+          "outline-none",
+          scrollFade &&
+            "data-[scroll-overflow]:scroll-fade-y scroll-fade-3 [--scroll-fade-reveal:0.75rem]",
+          editorClassName
+        ),
       },
       handleKeyDown(_view, event) {
         return ComposerTiptap.handleKeyDown({
           core,
           editor: editorRef.current,
           event,
+          suggestion: suggestionRef.current,
           triggerIndex: core.getSnapshot().triggerIndex,
           moveTriggerIndex: (delta) => core.moveTriggerIndex(delta),
           submit() {
@@ -301,6 +352,23 @@ export function ComposerContent({
           },
           onCommandSelect: commandSelection.current,
         });
+      },
+      handleClick(_view, _position, event) {
+        const current = editorRef.current;
+        return !!current && ComposerTiptap.selectPressedLink(current, event);
+      },
+      handleDOMEvents: {
+        compositionstart() {
+          draftChangeRef.current?.(false);
+          return false;
+        },
+        compositionend() {
+          const editor = editorRef.current;
+          draftChangeRef.current?.(
+            !!editor && ComposerTiptap.hasEmptyParagraph(editor)
+          );
+          return false;
+        },
       },
       handlePaste(_view, event) {
         const transfer = ComposerTransfer.fromPaste(event.clipboardData);
@@ -343,6 +411,9 @@ export function ComposerContent({
       }
     },
     onUpdate({ editor }) {
+      draftChangeRef.current?.(
+        !editor.view.composing && ComposerTiptap.hasEmptyParagraph(editor)
+      );
       ComposerTiptap.syncCore(core, editor);
     },
     onSelectionUpdate({ editor }) {
@@ -359,6 +430,33 @@ export function ComposerContent({
   useLayoutEffect(() => {
     editor?.setEditable(!readOnly);
   }, [editor, readOnly]);
+
+  useEffect(() => {
+    if (!editor || !scrollFade) return;
+
+    const viewport = editor.view.dom;
+    let frame = 0;
+    const measureOverflow = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        // Chromium can retain the last mask when a scroll timeline goes idle.
+        viewport.toggleAttribute(
+          "data-scroll-overflow",
+          viewport.scrollHeight > viewport.clientHeight
+        );
+      });
+    };
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(viewport);
+    editor.on("update", measureOverflow);
+    return () => {
+      editor.off("update", measureOverflow);
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      viewport.removeAttribute("data-scroll-overflow");
+    };
+  }, [editor, scrollFade]);
 
   // Keep the placeholder reactive. `useEditor` builds the editor once, so a
   // changed `placeholder` prop never reconfigures the Placeholder extension on
@@ -380,6 +478,16 @@ export function ComposerContent({
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
+    if (suggestion) {
+      dom.setAttribute("aria-keyshortcuts", "Tab");
+      dom.setAttribute(
+        "aria-description",
+        `Suggested prompt: ${suggestion.text}. Press Tab to edit it.`
+      );
+    } else {
+      dom.removeAttribute("aria-keyshortcuts");
+      dom.removeAttribute("aria-description");
+    }
     const selectedItem = snapshot.trigger?.items[snapshot.triggerIndex];
     dom.setAttribute("aria-controls", resolvedTriggerMenuId);
     dom.setAttribute("aria-expanded", snapshot.trigger ? "true" : "false");
@@ -391,15 +499,52 @@ export function ComposerContent({
     } else {
       dom.removeAttribute("aria-activedescendant");
     }
-  }, [editor, resolvedTriggerMenuId, snapshot.trigger, snapshot.triggerIndex]);
+  }, [
+    editor,
+    resolvedTriggerMenuId,
+    snapshot.trigger,
+    snapshot.triggerIndex,
+    suggestion,
+  ]);
 
   return (
     <div
       {...props}
-      className={cn("composer-content", className)}
+      className={cn("composer-content", markdownStyles.draft, className)}
       data-composer-content
+      data-composer-suggestion={suggestion ? "" : undefined}
     >
-      <EditorContent editor={editor} />
+      {suggestion && (
+        <div
+          className={cn("composer-suggestion", editorClassName)}
+          aria-hidden="true"
+        >
+          <p
+            className="composer-text-node composer-suggestion-lines"
+            data-suggestion-text={suggestion.text}
+          >
+            <span className="composer-suggestion-inline">
+              <span>{suggestion.text}</span>
+              <Kbd className="ms-1 h-4 border border-current bg-transparent align-middle whitespace-nowrap text-inherit">
+                <span>⇥</span>
+                Tab
+              </Kbd>
+            </span>
+          </p>
+        </div>
+      )}
+      <EditorContent className="composer-editor" editor={editor} />
+      {/* Tiptap moves the menu's DOM. Keep the menu mounted when completion
+          opens or editability changes. */}
+      {editor && (
+        <div className="contents">
+          <ComposerFormattingMenu
+            editor={editor}
+            disabled={readOnly || !!snapshot.trigger}
+            onLinkClick={onLinkClick}
+          />
+        </div>
+      )}
     </div>
   );
 }

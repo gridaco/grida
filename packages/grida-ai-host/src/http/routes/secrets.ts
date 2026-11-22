@@ -27,7 +27,11 @@
  */
 
 import type { Hono } from "hono";
-import { BYOK_PROVIDER_IDS } from "../../protocol/provider-ids";
+import { ProviderCredentials } from "@grida/ai/providers";
+import {
+  BYOK_PROVIDER_IDS,
+  OPENAI_PROJECT_PROVIDER_ID,
+} from "../../protocol/provider-ids";
 import {
   isKnownProviderId,
   type EndpointProvidersStore,
@@ -79,7 +83,15 @@ export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
     if (r.data.key.trim().length === 0) {
       return c.json({ error: "key must not be empty or whitespace-only" }, 400);
     }
-    await store.set(r.data.provider_id, r.data.key);
+    let key = r.data.key;
+    if (r.data.provider_id === OPENAI_PROJECT_PROVIDER_ID) {
+      try {
+        key = ProviderCredentials.normalize(OPENAI_PROJECT_PROVIDER_ID, key);
+      } catch {
+        return c.json({ error: "Invalid OpenAI project API key." }, 400);
+      }
+    }
+    await store.set(r.data.provider_id, key);
     console.log(`[agent-host-secrets] set providerId=${r.data.provider_id}`);
     return c.json({ ok: true });
   });

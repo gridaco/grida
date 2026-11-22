@@ -33,6 +33,7 @@ export type VideoRoutesDeps = {
   media?: MediaPersistence | null;
   /** Video catalogue for resolution; absent ⇒ the bundled one. */
   catalog?: ModelCatalogStore;
+  runtime_catalogue?: VideoClient.Options["runtime_catalogue"];
   gg_catalog?: GGDiscoveryStore;
   // GRIDA-GG: provider — the optional hosted video arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
@@ -42,7 +43,15 @@ export type VideoRoutesDeps = {
 };
 
 export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
-  const { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog } = deps;
+  const {
+    secrets,
+    gg,
+    gg_base_url,
+    provider_http,
+    catalog,
+    runtime_catalogue,
+    gg_catalog,
+  } = deps;
 
   app.post("/video/generate", async (c) => {
     const r = await body(c, {
@@ -66,7 +75,15 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveVideoModel(
-        { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog },
+        {
+          secrets,
+          gg,
+          gg_base_url,
+          provider_http,
+          catalog,
+          runtime_catalogue,
+          gg_catalog,
+        },
         d.model_id,
         // The shared operation checks the selected binding's input mode before I/O.
         {

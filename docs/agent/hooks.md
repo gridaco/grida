@@ -86,8 +86,8 @@ contains these fields for each command:
 
 At most eight hooks are supported. They run in configured order, with bounded
 input, output and execution time. There are no regex matchers, background hooks,
-MCP handlers, or model-based handlers in this version. This is Grida's schema;
-Codex hook configuration is not interchangeable with it.
+MCP handlers, or model-based handlers in this version. Translate hooks from
+other tools to the schema above before adding them.
 
 ## Events and results
 

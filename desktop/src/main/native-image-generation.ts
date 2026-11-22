@@ -1,7 +1,12 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — bounded media requests from a supervised agent.
 import { createHash } from "node:crypto";
 import type { ImageGenerateRequest } from "@grida/ai-host";
-import { catalog } from "@grida/ai/catalogue";
+import {
+  bundledModelCatalogue,
+  catalog,
+  VisualModels,
+} from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import type { WorkspaceReviewReceipt } from "./native-workspace-review";
 
 type Provider = "openrouter" | "vercel";
@@ -91,21 +96,25 @@ export class NativeImageGeneration {
       .digest("hex");
   }
 
-  static forByok(provider: Provider, endpoint: string, request: Request) {
+  static forByok(
+    provider: Provider,
+    endpoint: string,
+    request: Request,
+    snapshot: ModelCatalogueSnapshot = bundledModelCatalogue()
+  ) {
     const model = catalog.image.default_id;
     if (!model) return undefined;
-    const card = catalog.image.findImageModelCard(model);
-    if (!card?.listed) return undefined;
-    const binding = catalog.image.binding(card, provider);
-    if (!binding) return undefined;
+    const route = VisualModels.image(snapshot, model, provider);
+    if (!route) return undefined;
+    const reference = VisualModels.image(snapshot, model, provider, true);
     return new NativeImageGeneration(
       endpoint,
       provider,
       model,
-      binding.id,
-      catalog.image.supportsTransparentBackground(card, provider),
+      route.binding_id,
+      route.native_background === true,
       // A reference may only reuse the exact paid route captured at admission.
-      binding.references?.id === binding.id,
+      reference?.binding_id === route.binding_id,
       request
     );
   }

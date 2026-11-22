@@ -1,0 +1,9 @@
+{
+  "match": {
+    "meta": "application-name",
+    "attributes": {
+      "data-grida-fx-viewer": "1"
+    }
+  },
+  "productLabel": "FX Viewer"
+}

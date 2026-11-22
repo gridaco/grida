@@ -37,6 +37,81 @@ pub enum Content {
     ToolCall(ToolCall),
     ToolResult(ToolResult),
     ProviderState(ProviderState),
+    /// An observation of work performed inside the model provider's inference.
+    ProviderEvidence(ProviderEvidence),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum ProviderEvidence {
+    WebSearch {
+        status: SearchStatus,
+        action: Option<SearchAction>,
+    },
+    UrlCitation(UrlCitation),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchStatus {
+    InProgress,
+    Completed,
+    Failed,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SearchAction {
+    Search {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        query: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        queries: Vec<String>,
+    },
+    OpenPage {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+    FindInPage {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pattern: Option<String>,
+    },
+}
+
+/// End-exclusive character offsets in the assistant message's visible text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UrlCitation {
+    pub url: String,
+    pub title: String,
+    pub start_index: usize,
+    pub end_index: usize,
+}
+
+impl ProviderEvidence {
+    /// A hosted search has one current state per output item. Citations are
+    /// additive and may be reported in both progress and final output.
+    pub fn record(&self, content: &mut Vec<Content>) -> bool {
+        for part in content.iter_mut() {
+            let Content::ProviderEvidence(previous) = part else {
+                continue;
+            };
+            if previous == self {
+                return false;
+            }
+            if matches!(
+                (&*previous, self),
+                (Self::WebSearch { .. }, Self::WebSearch { .. })
+            ) {
+                *previous = self.clone();
+                return true;
+            }
+        }
+        content.push(Content::ProviderEvidence(self.clone()));
+        true
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

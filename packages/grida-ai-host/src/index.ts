@@ -8,6 +8,7 @@ export {
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
   byokProvidersFor,
+  OPENAI_PROJECT_PROVIDER_ID,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
   type ByokProviderId,
@@ -23,6 +24,7 @@ export {
   isChatGptSubscriptionModelId,
   type ChatGptAuthStart,
   type ChatGptSubscriptionAccount,
+  type ChatGptTurnCapabilities,
   type ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is
@@ -84,4 +86,7 @@ export {
   type EndpointProviderConfig,
   type ProbedEndpointModel,
 } from "./protocol/endpoints";
-export type { GGModelsView } from "./protocol/gg-models";
+export type {
+  GGModelsView,
+  VisualModelCatalogueView,
+} from "./protocol/gg-models";

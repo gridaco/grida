@@ -491,6 +491,37 @@ fn text(outcome: &ToolOutcome) -> String {
 }
 
 #[tokio::test]
+async fn external_file_revocation_stops_an_approved_read_and_future_requests() {
+    let fixture = Fixture::new();
+    let launch = fixture.protected.join("profile.json");
+    fs::write(&launch, serde_json::to_vec(&json!({
+        "version":1,"workspace":"workspace","revision":"scoped","primary":"primary",
+        "directories":[{"id":"primary","name":"Project","path":fixture.default,"generation":"initial","read":"allow"}],
+        "allowExternalFileRead":true,
+    })).unwrap()).unwrap();
+    fs::set_permissions(&launch, fs::Permissions::from_mode(0o600)).unwrap();
+    let profile = grida_agent::launch_permissions::load_permission_profile(
+        &launch,
+        fixture.database.parent().unwrap(),
+        Some(&fixture.protected),
+    )
+    .unwrap();
+    let run = fixture.first(&profile, true).await;
+    let note = fixture.additional.join("note");
+    fs::write(&note, "one external reference").unwrap();
+    let action = json!({"directory":"external-file","path":note.strip_prefix("/").unwrap()});
+    let wait = deferred(run.invoke("approved", "read_file", action.clone()).await);
+    run.answer(wait, ApprovalDecision::ApproveOnce).await;
+    run.permissions.revoke(&binding("external-file")).unwrap();
+    for id in ["approved", "next"] {
+        failed(
+            run.invoke(id, "read_file", action.clone()).await,
+            "permission_revoked",
+        );
+    }
+}
+
+#[tokio::test]
 async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
     let fixture = Fixture::new();
     let run = fixture

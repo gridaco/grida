@@ -76,7 +76,7 @@ async fn historical_inspection_lists_operations_and_reads_only_the_selected_prep
     let project_text = "private project guidance for the captured turn";
     std::fs::write(workspace.path().join("AGENTS.md"), project_text).unwrap();
     let mut endpoint = Endpoint::start(vec![
-        Reply::Question("question_async"),
+        Reply::Tool("question_async", super::questions::EDITION_QUESTION),
         Reply::Finished("Done."),
     ])
     .await;

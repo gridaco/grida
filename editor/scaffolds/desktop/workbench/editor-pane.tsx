@@ -53,7 +53,7 @@ import {
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
-import { EditorPaneTab } from "./editor-pane-tab";
+import { EditorPaneTab, type EditorPaneTabProps } from "./editor-pane-tab";
 import { EditorPaneStart } from "./editor-pane-start";
 import { BrowserPane } from "./browser-pane";
 import { BrowserTabIcon } from "./browser-tab-icon";
@@ -69,7 +69,6 @@ import { WorkbenchTab } from "./workbench-tab";
 import { PanelTabContent } from "./workbench-panel-content";
 import { WorkbenchPanelTab } from "./workbench-panel-tab";
 import type { WorkbenchPanel, WorkbenchPanels } from "./workbench-panels";
-import type { WorkspaceSvgText } from "./workspace-svg-text";
 import { FileContextMenu } from "./workbench-file-context-menu";
 import {
   isWorkspaceWorkbenchCommand,
@@ -83,7 +82,7 @@ const TAB_MOVE_SHORTCUTS = "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight";
 
 export type EditorPaneProps = {
   workspace: Workspace;
-  svgText?: WorkspaceSvgText;
+  surfaceHost?: EditorPaneTabProps["surfaceHost"];
   /** Content of the open panel tabs. */
   panels: WorkbenchPanels;
   browsers?: WorkspaceBrowserTabs;
@@ -117,7 +116,7 @@ export type EditorPaneProps = {
 
 export function EditorPane({
   workspace,
-  svgText,
+  surfaceHost,
   panels,
   browsers,
   openTabs,
@@ -331,7 +330,7 @@ export function EditorPane({
              surface remains clipped so only its shadow escapes. */
           <div
             className={cn(
-              "h-full min-h-0 pl-1.5 pr-3",
+              "h-full min-h-0 pr-3",
               hasBottomPane ? "pb-1.5" : "pb-3"
             )}
           >
@@ -352,7 +351,7 @@ export function EditorPane({
                     <EditorPaneTab
                       key={`${workspace.id}:${tab}`}
                       workspace={workspace}
-                      svgText={svgText}
+                      surfaceHost={surfaceHost}
                       relPath={target.relPath}
                       active={tab === activeTab}
                       onDirtyChange={onTabDirtyChange}
@@ -564,7 +563,7 @@ export function EditorTitleBar({
           ref={railRef}
           role="tablist"
           aria-label="Open editors"
-          className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
+          className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center overflow-x-auto overscroll-x-contain pr-2 scroll-pr-2"
           onPointerLeave={(event) =>
             previewController.railLeave(event.pointerType)
           }

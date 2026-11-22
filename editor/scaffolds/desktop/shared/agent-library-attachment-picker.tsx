@@ -16,6 +16,7 @@ import { ReferenceGallery } from "@/scaffolds/desktop/home/reference-gallery";
 import {
   LibraryExplorerView,
   type LibraryExplorerItem,
+  type LibraryExplorerPageLoader,
 } from "@/kits/library-explorer";
 import { isSupportedImageType } from "@/lib/agent-chat/image-attachment";
 import {
@@ -29,11 +30,13 @@ export function AgentLibraryAttachmentPicker({
   onAttach,
   single = false,
   request,
+  loadPage = resolveLibraryExplorerPage,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAttach: (pins: DesignLibraryPin[]) => void;
   single?: boolean;
+  loadPage?: LibraryExplorerPageLoader;
   request?: {
     initialQuery: string;
     busy: boolean;
@@ -138,7 +141,7 @@ export function AgentLibraryAttachmentPicker({
             <LibraryExplorerView
               key={query}
               initialSource={searchSource}
-              loadPage={resolveLibraryExplorerPage}
+              loadPage={loadPage}
               onToggle={toggleSearchResult}
               selectedIds={selectedIds}
               scrollContainerRef={scrollRef}

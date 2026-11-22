@@ -24,10 +24,10 @@ import {
 } from "@app/ui/components/dropdown-menu";
 import { Input } from "@app/ui/components/input";
 import { GridaLogo } from "@/components/grida-logo";
-import { HierarchyPanel } from "./hierarchy-panel";
+import { HierarchyPanel } from "@/scaffolds/svg-editor/hierarchy-panel";
 import { InspectorPanel } from "./inspector-panel";
 import { SvgMenuContent } from "./svg-menu";
-import { SvgCanvasContextMenu } from "./context-menu";
+import { SvgCanvasContextMenu } from "@/scaffolds/svg-editor/context-menu";
 
 /** Zoom step matches the editor's keyboard handler — see
  *  `gestures/defaults.ts#ZOOM_STEP`. */

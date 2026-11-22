@@ -1,13 +1,21 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { BoxIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { differenceInCalendarDays } from "date-fns";
+import { models } from "@grida/ai/catalogue";
+import {
+  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
+  isChatGptSubscriptionModelId,
+} from "@grida/ai-host";
 import type {
   NativeChatMessage,
+  NativeChatTurnRecord,
   NativeSubagentLifecycleEvent,
 } from "@grida/desktop-bridge";
 import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
 import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
+import { reviewText } from "../shared/agent-approval";
 import { NativeSubagentIdentity } from "./native-subagent-identity";
 
 /**
@@ -18,12 +26,21 @@ import { NativeSubagentIdentity } from "./native-subagent-identity";
 export function NativeTurnActivity({
   block,
   renderMessage,
+  showModelChanges = false,
   subagentEvents = [],
+  approvalReviews,
+  onReconsider,
   onOpenSubagent,
   loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
-  renderMessage: (message: NativeChatMessage) => ReactNode;
+  showModelChanges?: boolean;
+  approvalReviews?: NativeChatTurnRecord["approvalReviews"];
+  onReconsider?: (reviewId: string) => void;
+  renderMessage: (
+    message: NativeChatMessage,
+    completedAnswer?: boolean
+  ) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
   onOpenSubagent?: (childId: string, inputId: string) => void;
   loadToolImage?: (previewId: string) => Promise<Blob>;
@@ -38,8 +55,20 @@ export function NativeTurnActivity({
     subagentEvents,
     block.turnId
   );
+  const visibleReviews = approvalReviews?.filter(
+    (review) =>
+      review.decision !== "approved" && review.failure !== "interrupted"
+  );
+  const pending =
+    visibleReviews?.filter((review) => review.decision === "reviewing") ?? [];
+  const decisions = visibleReviews?.filter(
+    (review) => review.decision !== "reviewing"
+  );
   const hasWork =
-    (timeline.work.length > 0 || timeline.unplaced.length > 0) && !stopped;
+    (timeline.work.length > 0 ||
+      timeline.unplaced.length > 0 ||
+      !!visibleReviews?.length) &&
+    !stopped;
   return (
     <div
       data-testid="native-turn-activity"
@@ -49,9 +78,16 @@ export function NativeTurnActivity({
       }
       className="flex flex-col gap-4"
     >
-      {block.requests.map(renderMessage)}
+      {showModelChanges && block.modelChange && (
+        <ModelChangeDivider {...block.modelChange} />
+      )}
+      {block.timeDividerAtMs !== undefined && (
+        <TurnTimeDivider atMs={block.timeDividerAtMs} />
+      )}
+      {block.requests.map((message) => renderMessage(message))}
       {(turn_activity.showsHeader(block) ||
-        (block.finished && subagentEvents.length > 0)) && (
+        (block.finished &&
+          (subagentEvents.length > 0 || !!visibleReviews?.length))) && (
         <div className="border-b pb-1">
           {hasWork ? (
             <button
@@ -74,6 +110,59 @@ export function NativeTurnActivity({
           )}
         </div>
       )}
+      {open && pending.length > 0 && (
+        <div
+          className="text-xs text-muted-foreground break-words"
+          role="status"
+        >
+          {pending.length === 1 ? (
+            <>
+              Reviewing access for <bdi>{reviewText(pending[0].action)}</bdi>
+            </>
+          ) : (
+            <>
+              Reviewing {pending.length} approval requests
+              {pending.slice(0, 3).map((review, index) => (
+                <bdi key={index} className="block truncate">
+                  {reviewText(review.action)}
+                </bdi>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+      {decisions?.map((approvalReview, index) => (
+        <p key={index} className="text-xs text-muted-foreground break-words">
+          {approvalReview.decision === "needs_human"
+            ? "Automatic review deferred to you for"
+            : approvalReview.failure
+              ? REVIEW_FAILURE[approvalReview.failure]
+              : "Automatically declined"}{" "}
+          <bdi>{reviewText(approvalReview.action)}</bdi>
+          {approvalReview.decision === "declined" &&
+            approvalReview.riskLevel &&
+            ` (${approvalReview.riskLevel} risk)`}
+          {approvalReview.decision === "declined" &&
+            approvalReview.rationale && (
+              <span className="block">
+                <bdi>{approvalReview.rationale}</bdi>
+              </span>
+            )}
+          {approvalReview.reviewId &&
+            onReconsider &&
+            (approvalReview.reconsidered ? (
+              <span className="block">Reconsideration requested.</span>
+            ) : (
+              <button
+                type="button"
+                className="block cursor-pointer underline underline-offset-2"
+                onClick={() => onReconsider(approvalReview.reviewId!)}
+              >
+                Request reconsideration
+              </button>
+            ))}
+        </p>
+      ))}
       {open &&
         timeline.work.map((item) =>
           item.kind === "commentary" ? (
@@ -118,9 +207,66 @@ export function NativeTurnActivity({
           ))}
         </section>
       )}
-      {block.answers.map(renderMessage)}
+      {block.answers.map((message, index) =>
+        renderMessage(
+          message,
+          block.outcome === "succeeded" && index === block.answers.length - 1
+        )
+      )}
     </div>
   );
+}
+
+function TurnTimeDivider({ atMs }: { atMs: number }) {
+  const date = new Date(atMs);
+  const now = new Date();
+  const daysAgo = differenceInCalendarDays(now, date);
+  const day =
+    daysAgo === 0 || daysAgo === 1
+      ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
+          -daysAgo,
+          "day"
+        )
+      : date.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          year:
+            date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+        });
+  return (
+    <time
+      dateTime={date.toISOString()}
+      className="text-muted-foreground mt-4 block text-center text-xs font-light first-letter:uppercase"
+    >
+      <span className="font-normal">{day}</span>{" "}
+      {date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+    </time>
+  );
+}
+
+function ModelChangeDivider({ from, to }: { from: string; to: string }) {
+  const fromLabel = modelLabel(from);
+  const toLabel = modelLabel(to);
+  const sameLabel = fromLabel === toLabel;
+  return (
+    <p className="flex w-full items-center gap-3 px-1 text-center text-xs text-muted-foreground select-none">
+      <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
+      <span className="flex min-w-0 items-center gap-1.5">
+        <BoxIcon aria-hidden className="size-3.5 shrink-0" />
+        <span className="min-w-0 wrap-anywhere">
+          Model changed from {sameLabel ? from : fromLabel} to{" "}
+          {sameLabel ? to : toLabel}.
+        </span>
+      </span>
+      <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
+    </p>
+  );
+}
+
+function modelLabel(id: string): string {
+  if (isChatGptSubscriptionModelId(id))
+    return CHATGPT_SUBSCRIPTION_MODEL_METADATA[id].label;
+  return models.text.modelSpecById(id)?.label ?? id;
 }
 
 function SubagentEventRow({
@@ -155,3 +301,11 @@ function SubagentEventRow({
     </button>
   );
 }
+
+const REVIEW_FAILURE = {
+  timed_out: "Automatic review timed out for",
+  interrupted: "Automatic review interrupted for",
+  unavailable: "Automatic review unavailable for",
+  invalid_reply: "Automatic review failed for",
+  needs_human: "Automatic review deferred to you for",
+} as const;

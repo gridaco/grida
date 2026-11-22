@@ -27,8 +27,9 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::questions::{
-    QuestionAnswer, QuestionStyle, QuestionTool, defer_for_answer, prepare_answer, read_question,
-    read_registration, visible_reply,
+    QuestionAnswer, QuestionItemAnswer, QuestionStyle, QuestionTool, defer_for_answer,
+    prepare_answer, prepare_batch_answer, read_question, read_registration, replies_in_context,
+    visible_replies,
 };
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde_json::json;
@@ -37,6 +38,22 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const QUESTION: &str = "Which edition should the document target?";
+
+fn batch_arguments() -> ToolArguments {
+    ToolArguments::Json(json!({"questions": [
+        {
+            "id": "edition",
+            "header": "Edition",
+            "question": QUESTION,
+            "options": [
+                {"label":"Screen","description":"For viewing on a device."},
+                {"label":"Print","description":"For physical printing."}
+            ]
+        },
+        {"id":"title","question":"Which title should it use?"},
+        {"id":"subtitle","question":"Do you want a subtitle?"}
+    ]}))
+}
 
 struct ScriptProvider {
     requests: Mutex<Vec<InferenceRequest>>,
@@ -73,10 +90,14 @@ impl Provider for ScriptProvider {
             Content::ToolCall(ToolCall {
                 id: ToolCallId::new("ask-edition")?,
                 tool: request.request().tools[0].id.clone(),
-                arguments: ToolArguments::Json(json!({
-                    "question": QUESTION,
-                    "options": ["Screen", "Print"]
-                })),
+                arguments: if request.request().tools[0].version == 1 {
+                    ToolArguments::Json(json!({
+                        "question": QUESTION,
+                        "options": ["Screen", "Print"]
+                    }))
+                } else {
+                    batch_arguments()
+                },
             })
         } else {
             Content::Text("Completed available work.".into())
@@ -258,6 +279,7 @@ impl Fixture {
         };
         Master::new(
             MasterConfig {
+                request_options: Default::default(),
                 model: model(),
                 instructions: "Complete the task and incorporate user answers.".into(),
                 max_steps: 5,
@@ -374,7 +396,7 @@ impl Fixture {
 }
 
 fn question_tool(turn: &Turn, style: QuestionStyle) -> QuestionTool {
-    QuestionTool::new(turn.operations(), style).unwrap()
+    QuestionTool::legacy(turn.operations(), style).unwrap()
 }
 
 fn inventory(tool: impl Tool + 'static) -> InventorySnapshot {
@@ -404,7 +426,7 @@ async fn nonblocking_question_expires_in_the_same_commit_as_completion() {
     assert_eq!(view.state.waits().len(), 1);
     let request = read_question(wait).unwrap();
     assert_eq!(request.style, QuestionStyle::Nonblocking);
-    assert_eq!(request.prompt.question, QUESTION);
+    assert_eq!(request.questions[0].question, QUESTION);
     assert!(wait.withdrawn);
     let Some(OperationOutcome::Tool(outcome)) =
         view.operation(&request.operation).unwrap().outcome()
@@ -469,7 +491,8 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
     let transcript = grida_agent_master::questions::transcript(&view.state);
     let replies: Vec<_> = transcript
         .iter()
-        .filter_map(|HistoryRecord::Message(message)| visible_reply(message))
+        .filter_map(|HistoryRecord::Message(message)| visible_replies(message))
+        .flatten()
         .collect();
     assert_eq!(replies.len(), 1);
     assert_eq!(replies[0].question, QUESTION);
@@ -488,7 +511,7 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
     let Some(HistoryRecord::Message(mut quoted)) = prepared.contribution else {
         panic!("missing reply");
     };
-    assert_eq!(visible_reply(&quoted).unwrap().answer, quoted_answer);
+    assert_eq!(visible_replies(&quoted).unwrap()[0].answer, quoted_answer);
     let [Content::Text(value)] = quoted.content.as_slice() else {
         panic!("missing text");
     };
@@ -497,7 +520,7 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
         1
     );
     quoted.provenance.source = "fixture".into();
-    assert!(visible_reply(&quoted).is_none());
+    assert!(visible_replies(&quoted).is_none());
     assert_eq!(record.attempts.len(), 1);
     let Some(OperationOutcome::Tool(outcome)) = record.outcome() else {
         panic!("expected one tool result");
@@ -511,6 +534,158 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
     );
     assert_eq!(fixture.provider.requests.lock().unwrap().len(), 2);
     assert_eq!(view.state.waits().len(), 1);
+}
+
+#[tokio::test]
+async fn question_batch_validates_and_settles_ordered_answers_in_one_wait() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let opened = fixture.open(&store).await;
+    let ops = opened.operations();
+    let tool = QuestionTool::new(ops.clone(), QuestionStyle::AnswerDependent).unwrap();
+    for input in [
+        json!({"questions":[]}),
+        json!({"questions":[{"id":"Repeated","question":"First?"}]}),
+        json!({"questions":[{"id":"same","question":"First?"},{"id":"same","question":"Second?"}]}),
+        json!({"questions":[{"id":"a","question":"First?","options":[{"label":"Choice"},{"label":" Choice "}]}]}),
+        json!({"questions":[{"id":"a","question":"First?"},{"id":"b","question":"Second?"},{"id":"c","question":"Third?"},{"id":"d","question":"Fourth?"}]}),
+    ] {
+        assert!(tool.validate(&ToolArguments::Json(input)).is_err());
+    }
+    let tools = inventory(tool);
+    assert!(matches!(
+        fixture.master(tools).run(opened, input()).await.unwrap(),
+        MasterOutcome::Suspended(_)
+    ));
+    assert_eq!(fixture.provider.requests.lock().unwrap().len(), 1);
+    let view = ops.view();
+    assert_eq!(view.state.waits().len(), 1);
+    let wait = view.state.waits().values().next().unwrap();
+    let request = read_question(wait).unwrap();
+    assert_eq!(request.version, 2);
+    assert_eq!(request.questions[0].header.as_deref(), Some("Edition"));
+    assert_eq!(
+        request.questions[0].options[0].description.as_deref(),
+        Some("For viewing on a device.")
+    );
+    let answer = |id: &str, answer| QuestionItemAnswer {
+        id: id.into(),
+        answer,
+    };
+    let selections = vec![
+        answer(
+            "title",
+            QuestionAnswer::Text {
+                text: "New title".into(),
+            },
+        ),
+        answer("subtitle", QuestionAnswer::Skipped),
+        answer("edition", QuestionAnswer::Choice { index: 1 }),
+    ];
+    assert!(prepare_answer(wait, QuestionAnswer::Skipped).is_err());
+    assert!(prepare_batch_answer(wait, selections[..2].to_vec()).is_err());
+    for bad in [
+        answer("wrong", QuestionAnswer::Skipped),
+        answer("title", QuestionAnswer::Skipped),
+        answer("edition", QuestionAnswer::Choice { index: 2 }),
+    ] {
+        let mut invalid = selections.clone();
+        invalid[2] = bad;
+        assert!(prepare_batch_answer(wait, invalid).is_err());
+    }
+    let prepared = prepare_batch_answer(wait, selections.iter().rev().cloned().collect()).unwrap();
+    assert_eq!(
+        prepared.answer,
+        prepare_batch_answer(wait, selections).unwrap().answer
+    );
+    let HistoryRecord::Message(contribution) = prepared.contribution.unwrap();
+    let replies = visible_replies(&contribution).unwrap();
+    assert_eq!(replies[0].question_id.as_deref(), Some("edition"));
+    assert_eq!(replies[0].answer, "Print");
+    assert_eq!(replies[1].answer, "New title");
+    assert!(replies[2].skipped);
+    let session_view = store.inspect(session()).await.unwrap();
+    store
+        .control(ControlRequest {
+            id: change("answer"),
+            session: session(),
+            expected_revision: session_view.revision,
+            action: SessionControl::ResolveAndAppend {
+                turn: turn(),
+                expected: view.state.controls().revision,
+                expected_history: view.state.history().position(),
+                wait: prepared.wait,
+                answer: prepared.answer,
+                records: vec![HistoryRecord::Message(contribution.clone())],
+            },
+        })
+        .await
+        .unwrap();
+
+    let resumed = fixture.resume(&store).await;
+    let ops = resumed.operations();
+    let tools = inventory(QuestionTool::new(ops.clone(), QuestionStyle::AnswerDependent).unwrap());
+    assert!(matches!(
+        fixture.master(tools).run(resumed, input()).await.unwrap(),
+        MasterOutcome::Settled(receipt) if receipt.outcome.status == OutcomeStatus::Succeeded
+    ));
+    let view = ops.view();
+    let requests = fixture.provider.requests.lock().unwrap();
+    let evidence = replies_in_context(&view.state, &contribution, &requests[1].messages)
+        .expect("accepted batch in the next prepared model request");
+    assert_eq!(evidence.len(), 3);
+    assert!(replies_in_context(&view.state, &contribution, &[]).is_none());
+    let Some(OperationOutcome::Tool(outcome)) =
+        view.operation(&request.operation).unwrap().outcome()
+    else {
+        panic!("expected one tool result");
+    };
+    assert_eq!(
+        outcome.structured.as_ref().unwrap()["answers"],
+        json!([
+            {"id":"edition","answer":"Print"},
+            {"id":"title","answer":"New title"},
+            {"id":"subtitle","answer":null}
+        ]),
+    );
+}
+
+#[tokio::test]
+async fn nonblocking_batch_registers_all_questions_and_expires_as_one_wait() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let opened = fixture.open(&store).await;
+    let ops = opened.operations();
+    let tools = inventory(QuestionTool::new(ops.clone(), QuestionStyle::Nonblocking).unwrap());
+    assert!(matches!(
+        fixture.master(tools).run(opened, input()).await.unwrap(),
+        MasterOutcome::Settled(receipt) if receipt.outcome.status == OutcomeStatus::Succeeded
+    ));
+    assert_eq!(fixture.provider.requests.lock().unwrap().len(), 2);
+    let view = ops.view();
+    assert_eq!(view.state.waits().len(), 1);
+    let wait = view.state.waits().values().next().unwrap();
+    let request = read_question(wait).unwrap();
+    assert_eq!(request.questions.len(), 3);
+    assert!(wait.withdrawn);
+    let Some(OperationOutcome::Tool(outcome)) =
+        view.operation(&request.operation).unwrap().outcome()
+    else {
+        panic!("expected one tool result");
+    };
+    assert_eq!(outcome.structured.as_ref().unwrap()["status"], "registered");
+    let answers = request
+        .questions
+        .into_iter()
+        .map(|item| QuestionItemAnswer {
+            id: item.id,
+            answer: QuestionAnswer::Skipped,
+        })
+        .collect();
+    assert_eq!(
+        prepare_batch_answer(wait, answers).err().unwrap().code,
+        "question_no_longer_answerable"
+    );
 }
 
 struct InterruptedQuestion {

@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — explicit video provider authority, bounded execution/results, safe failures.
 // GRIDA-SEC-006 — scoped GG is checked at submission; accepted work cannot be recalled.
 // GRIDA-GG: token — no account credentials, mint, persistence, or implicit provider switching.
-import { models } from "./catalogue";
+import { models, VisualModels } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -28,6 +28,7 @@ export class VideoClient {
   readonly #getKey: VideoClient.Keys["get"];
   readonly #http: ProviderHttp;
   readonly #catalog?: ModelCatalogStore;
+  readonly #runtimeCatalogue?: VisualModels.Read;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
   readonly #ggCatalog: GGDiscoveryStore;
@@ -40,6 +41,7 @@ export class VideoClient {
       this.#getKey = get.bind(keys);
       this.#http = http;
       this.#catalog = catalog;
+      this.#runtimeCatalogue = options.runtime_catalogue;
       this.#ggCatalog =
         options.gg_catalog ?? new GGDiscoveryStore({ fetch: http.request });
       if (gg !== undefined)
@@ -57,12 +59,19 @@ export class VideoClient {
       const selected = selection(input);
       if (selected.provider === "gg")
         return await this.#resolveHosted(selected);
-      const view = await catalogViewOnMiss(
-        this.#catalog,
-        (v) => !v.video.cardById(selected.model_id)
-      );
-      const card = view.video.cardById(selected.model_id);
-      if (!MediaRoutes.videoModel(card)) {
+      const runtime = await this.#runtimeCatalogue?.();
+      const legacy = runtime
+        ? null
+        : await catalogViewOnMiss(
+            this.#catalog,
+            (view) => !view.video.cardById(selected.model_id)
+          );
+      const card = legacy?.video.cardById(selected.model_id);
+      if (
+        runtime
+          ? !Object.hasOwn(runtime.visual?.video ?? {}, selected.model_id)
+          : !MediaRoutes.videoModel(card)
+      ) {
         if (
           selected.provider === "auto" &&
           liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
@@ -78,11 +87,14 @@ export class VideoClient {
           : [selected.provider];
       let capable = false;
       for (const provider of order) {
-        const route = MediaRoutes.video(
-          card,
-          provider,
-          selected.image ?? false
-        );
+        const route = runtime
+          ? VisualModels.video(
+              runtime,
+              selected.model_id,
+              provider,
+              selected.image
+            )
+          : card && MediaRoutes.video(card, provider, selected.image ?? false);
         if (!route) continue;
         capable = true;
         if (!(await this.#key(provider))) continue;
@@ -262,6 +274,7 @@ export namespace VideoClient {
     keys: Keys;
     http: ProviderHttp;
     catalog?: ModelCatalogStore;
+    runtime_catalogue?: VisualModels.Read;
     gg?: GgTokenSource;
     gg_base_url?: string;
     gg_catalog?: GGDiscoveryStore;

@@ -14,6 +14,7 @@ mod input_images;
 pub(super) mod library;
 mod lifecycle;
 mod model_change;
+mod prediction;
 mod processes;
 pub(super) mod tool_images;
 pub(super) use processes::PROCESSES;
@@ -40,7 +41,7 @@ use agent_client_protocol::{
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{ControlRevision, JournalPosition};
-use agent_kit_core::{BindingId, ChangeId, Fingerprint, SessionId, TurnId};
+use agent_kit_core::{BindingId, ChangeId, Fingerprint, ModelId, SessionId, TurnId};
 use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
@@ -61,6 +62,7 @@ const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 const FILE_REFERENCE: &str = "co.grida/session/file-reference";
 const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
 pub(super) const MESSAGE_CONTEXT: &str = "co.grida/session/message-context";
+pub(super) const QUESTION_BATCH_LIST: &str = "co.grida/session/questions-v2";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -188,6 +190,7 @@ fn capability_keys(
         .chain([skills::CATALOG])
         .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
+        .chain(reviewer.then_some(prediction::CAPABILITY))
         .chain(summaries::artifact_capability(reviewer))
         .chain(input_images::capability(reviewer))
         .chain(input_images::chunks_capability(reviewer))
@@ -248,6 +251,7 @@ struct Submit {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
     message_context: Option<MessageContext>,
 }
@@ -560,6 +564,8 @@ fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> 
 #[serde(rename_all = "camelCase")]
 struct TurnSummary {
     turn_id: TurnId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    model_id: Option<ModelId>,
     epoch: u64,
     journal_position: JournalPosition,
     history_position: HistoryPosition,
@@ -576,6 +582,7 @@ impl From<TurnView> for TurnSummary {
     fn from(turn: TurnView) -> Self {
         Self {
             turn_id: turn.binding.turn,
+            model_id: None,
             epoch: turn.binding.epoch,
             journal_position: turn.position,
             history_position: turn.history_position,
@@ -584,7 +591,10 @@ impl From<TurnView> for TurnSummary {
             cancelled: turn.controls.cancelled,
             disposition: turn.disposition,
             input_needed: !turn.controls.cancelled
-                && crate::host::needs_user_input(&turn.pending_request_schemas),
+                && crate::host::needs_user_input(
+                    &turn.pending_request_schemas,
+                    Some(turn.disposition),
+                ),
             status: turn.outcome.map(|outcome| outcome.status),
         }
     }
@@ -691,6 +701,7 @@ pub(super) fn handlers(
         ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(prediction::handlers(host.clone(), sessions.clone()))
         .extend(input_images::handlers(host.clone(), sessions.clone()))
         .extend(tool_images::handlers(host.clone(), sessions.clone()))
         .extend(gateway_billing::handlers(host.clone(), sessions.clone()))
@@ -724,6 +735,7 @@ pub(super) fn handlers(
                         request.editor_presentation,
                         request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
+                        request.editor_tool_context_id.as_ref(),
                         request.allow_wakeups,
                     )?;
                     let mut parts = identified_prompt(
@@ -737,13 +749,16 @@ pub(super) fn handlers(
                     )?;
                     append_editor_context(&mut parts, request.editor_context, &submit_sessions)?;
                     append_message_context(&mut parts, request.message_context, &submit_sessions)?;
+                    let (questions, question_batches) =
+                        questions::support(&submit_sessions, request.meta.as_ref())?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
                             PromptRequest {
                                 id: request.input_id,
                                 session: request.session_id,
                                 parts,
-                                questions: questions::available(&submit_sessions),
+                                questions,
+                                question_batches,
                                 operating_regime: operating_regime(
                                     &submit_sessions,
                                     request.operating_regime,
@@ -752,6 +767,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &submit_sessions,
+                                )?,
                                 initial_title: initial_title(
                                     &submit_sessions,
                                     request.initial_title,
@@ -766,6 +785,7 @@ pub(super) fn handlers(
                                 editor_presentation: request.editor_presentation,
                                 editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
+                                editor_tool_context_id: request.editor_tool_context_id,
                             },
                         )
                         .await
@@ -790,6 +810,26 @@ pub(super) fn handlers(
                         .side_snapshot(&snapshot)
                         .await
                         .map_err(host_error)?;
+                    let mut current = snapshot.current.map(TurnSummary::from);
+                    if let Some(turn) = &mut current {
+                        turn.model_id = snapshot_host
+                            .captured_turn_model(&snapshot.session, &turn.turn_id)
+                            .await
+                            .map_err(host_error)?;
+                    }
+                    let mut latest = snapshot.latest.map(TurnSummary::from);
+                    if let Some(turn) = &mut latest {
+                        turn.model_id = match current
+                            .as_ref()
+                            .filter(|active| active.turn_id == turn.turn_id)
+                        {
+                            Some(active) => active.model_id.clone(),
+                            None => snapshot_host
+                                .captured_turn_model(&snapshot.session, &turn.turn_id)
+                                .await
+                                .map_err(host_error)?,
+                        };
+                    }
                     let previews = require(
                         &snapshot_sessions,
                         input_images::QUEUED,
@@ -811,8 +851,8 @@ pub(super) fn handlers(
                             .collect::<Result<_>>()?,
                         admission_paused: snapshot.admission_paused,
                         idle_queue_resume_available,
-                        current: snapshot.current.map(TurnSummary::from),
-                        latest: snapshot.latest.map(TurnSummary::from),
+                        current,
+                        latest,
                         retry_not_before_ms,
                     })
                 }
@@ -889,6 +929,7 @@ fn editor_binding(
     presentation: bool,
     browser: bool,
     svg_target: Option<&BindingId>,
+    tool_context: Option<&BindingId>,
     allow_wakeups: bool,
 ) -> Result<()> {
     if let Some(endpoint) = endpoint {
@@ -912,6 +953,16 @@ fn editor_binding(
     if let Some(target) = svg_target {
         require(sessions, crate::editor_surfaces::SVG_TEXT_CAPABILITY, None)?;
         if endpoint.is_none() || allow_wakeups || uuid::Uuid::parse_str(target.as_str()).is_err() {
+            return Err(Error::invalid_params());
+        }
+    }
+    if let Some(context) = tool_context {
+        require(
+            sessions,
+            crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
+            None,
+        )?;
+        if endpoint.is_none() || allow_wakeups || uuid::Uuid::parse_str(context.as_str()).is_err() {
             return Err(Error::invalid_params());
         }
     }

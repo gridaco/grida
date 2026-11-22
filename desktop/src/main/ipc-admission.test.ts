@@ -73,6 +73,9 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:browser:") &&
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
+          !channel.startsWith("grida:composer-predictions:") &&
+          !channel.startsWith("grida:personalization:") &&
+          !channel.startsWith("grida:voice:") &&
           !channel.startsWith("grida:archives:") &&
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
@@ -82,6 +85,36 @@ describe("ipc_admission", () => {
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
+  });
+
+  it("separates Voice settings from composer recording", () => {
+    const voice = (pathname: string) =>
+      allowedFor("main", pathname).filter((channel) =>
+        channel.startsWith("grida:voice:")
+      );
+    const read = [
+      IPC_CHANNELS.VOICE_SETTINGS_GET,
+      IPC_CHANNELS.VOICE_SETTINGS_CHANGED,
+    ];
+    expect(voice("/desktop/settings")).toEqual([
+      IPC_CHANNELS.VOICE_SETTINGS_GET,
+      IPC_CHANNELS.VOICE_SETTINGS_UPDATE,
+      IPC_CHANNELS.VOICE_SETTINGS_CHANGED,
+      IPC_CHANNELS.VOICE_KEY_SAVE,
+      IPC_CHANNELS.VOICE_KEY_REMOVE,
+    ]);
+    for (const route of [
+      "/desktop/welcome",
+      "/desktop/workspace",
+      "/desktop/file",
+    ]) {
+      expect(voice(route)).toEqual([
+        ...read,
+        IPC_CHANNELS.VOICE_TRANSCRIBE,
+        IPC_CHANNELS.VOICE_CANCEL,
+      ]);
+    }
+    expect(voice("/desktop/tools")).toEqual([]);
   });
 
   it("admits browser control only from the main workspace shell", () => {
@@ -206,6 +239,20 @@ describe("ipc_admission", () => {
       expect(allowedFor("main", route)).not.toContain(channel);
   });
 
+  it("admits subscription feature discovery only for ordinary workspace chat", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES;
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    for (const route of [
+      "/desktop/welcome",
+      "/desktop/settings",
+      "/desktop/file",
+    ])
+      expect(allowedFor("main", route)).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+  });
+
   it("admits exact selected-file SVG chat without project settings or presentation", () => {
     const document = allowedFor("main", "/desktop/file", true);
     expect(document).toEqual(
@@ -214,6 +261,7 @@ describe("ipc_admission", () => {
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
         IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
         IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+        IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
       ])
     );
     for (const channel of [
@@ -238,6 +286,8 @@ describe("ipc_admission", () => {
       IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
     ])
       expect(deck).toContain(channel);
     for (const channel of [
@@ -280,7 +330,9 @@ describe("ipc_admission", () => {
 
   it.each([
     IPC_CHANNELS.WELCOME_CHAT_PROFILES,
+    IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES,
     IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
     IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
     IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
   ])("admits %s only on the exact Welcome route", (channel) => {
@@ -303,7 +355,7 @@ describe("ipc_admission", () => {
       allowedFor("main", "/desktop/welcome").filter((allowed) =>
         nativeChat.includes(allowed)
       )
-    ).toEqual([]);
+    ).toEqual([IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW]);
   });
 
   it("admits notification focus consumption only in the main workspace", () => {
@@ -350,6 +402,7 @@ describe("ipc_admission", () => {
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
         IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
         IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+        IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
       ])
     );
     for (const channel of [

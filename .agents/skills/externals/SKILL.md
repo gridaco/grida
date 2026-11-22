@@ -15,3 +15,13 @@ When updating a shared external, check the upstream release and each shipping co
 - **CLI** pin in [packages/grida-cli/package.json](../../../packages/grida-cli/package.json) and the [root pnpm lockfile](../../../pnpm-lock.yaml). Follow the [CLI release procedure](../../../scripts/cli-release/README.md#grida-fx-the-one-dependency) and verify the installed `grida fx --version`.
 
 Start from a [published FX release](https://www.npmjs.com/package/@grida/fx) with its platform artifacts available. Review any existing exact-version package-manager exceptions when changing pins.
+
+**Grida Models** publishes the public model facts. When updating the bundled
+seed, change the exact `@grida/ai-models` pin, the root lockfile, and generated
+projections together. [Models source](https://github.com/gridaco/models) ·
+[Seed update procedure](../../../data/ai/README.md)
+
+Desktop refreshes supported foreground chat and BYOK image and video from
+compatible Models V2 releases after installation. The exact pin keeps builds
+reproducible and supplies the first-launch fallback. Changes to installed
+adapters or the discovery bridge follow the [Desktop release runbook](../../../docs/contributing/desktop-release.md#verify-compatibility).

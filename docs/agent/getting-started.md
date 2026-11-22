@@ -22,25 +22,24 @@ headless host. Windows Desktop has no agent chat.
 
 ## Start from Welcome
 
-Describe what you want in the Welcome composer and send. Grida opens the
-default project folder, or the project chosen at the top left, and sends your
-message as the first message of a new chat there. Your message is sent once:
-reloading the window does not send it again.
+Describe what you want in the Welcome composer and press **Send**. The composer
+clears so you can start typing your next message while Grida opens the selected
+project. Your first message and its attachment appear in the project chat while
+it starts. Reloading during the handoff preserves the follow-up as a separate
+draft. If that chat already has an unsent draft, the text you typed during
+opening stays on Home.
 
 If the connection cannot start, the workspace keeps your Welcome message.
-Choose **Retry** to send it once the original connection is ready. If you
-choose a different model, the message appears in the composer so you can
-review it and press **Send**.
+Choose **Retry** once the original connection is ready. If you choose another
+model, review the outgoing message with **Edit**, then send it explicitly.
 
 The model picker on Welcome lists **Default**, models from a connected
 **ChatGPT Subscription**, and models available through your saved provider
 keys and endpoints. New chats use your last explicitly chosen model and
 effort together. With no saved choice, a new chat prefers a ready subscription.
 The chat in the project uses the model you choose; more
-Grida models appear in the project's own picker once its chat is running. If
-the chosen model cannot start, or the project needs a model choice first,
-the chat says your message wasn't sent and puts it in the composer so you
-can send it yourself. [Choose a model](./models-and-usage.md#choose-a-model)
+Grida models appear in the project's own picker once its chat is running.
+[Choose a model](./models-and-usage.md#choose-a-model)
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template
@@ -62,12 +61,13 @@ guidance as context.
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. The **Default** access
-shown in the composer lets the agent read and edit files in this project and
-run commands in a sandbox without asking; other folders and the internet are
-off. To let this chat use user-accessible files and the internet, open
-**Default**, choose **Full access**, and confirm the in-app dialog. New chats
-still begin with Default. Type `@` to mention a file, for example “Summarize @README.md and list
+Open a folder in Grida Desktop and open its chat pane. A new chat starts in
+**Auto** when available. The agent reads and edits files in the project and
+runs commands in a sandbox. The chat’s model reviews eligible requests for
+extra access. Choose **Ask for approval** in the access picker to review them
+yourself. Choose **Full access** and confirm the dialog to allow ordinary-user
+filesystem and network access for commands.
+Type `@` to mention a file, for example “Summarize @README.md and list
 the open TODOs.” A mention gives the agent the file's path; it reads the
 file's current contents when it needs them. To investigate without changing
 anything, type `/plan` or choose **+ → Plan mode** before you send.
@@ -78,6 +78,39 @@ its chat. Ask about files inside the deck by name while you work in the slide
 editor. A deck opened from inside a project has its own saved chats and can
 reach only the files within the deck.
 [Edit selected text](#edit-selected-text-in-an-svg-or-slide)
+[Work with an SVG selection](#work-with-an-svg-selection)
+
+## Continue from a suggested prompt
+
+With **Settings → Personalization → Suggested prompts** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. If you clear the draft before sending, the same suggestion reappears while it still applies to the chat. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
+
+## Open a local web preview
+
+In a Desktop project chat, a finished reply that gives you one local web
+address with a port can show a **Web preview** card. Click the card or **Open**
+to use your local-link preference in **Settings → Browser**. If you use
+Grida and that exact address is already open in the workbench, Grida switches
+to its tab. The menu beside **Open** offers **Open in default browser** and
+**Copy link**. If the local server is stopped, start it and reload the page.
+
+When the card is visible, Desktop can fill in the page title, description and
+icon. Recognized products such as FX Viewer can also show their name. The
+second line shows the description, or the host and port if no description is
+available. Hover over the local link in the reply to see its preview and
+product label when available. Cards and inline links for the same address
+share preview details. If you stop or restart a local server, hover the link
+again or bring a card into view to recheck it. **Open** is available while
+Desktop reads the preview.
+
+## Preview a public link
+
+Hover over a public link in a Desktop project chat to see its domain and
+**Open** action. After a short delay, the card can show the page title,
+description, favicon, and preview image when available. It can also label a
+recognized product such as FX Viewer. Desktop requests the metadata and images
+before you open the link. Both the link and **Open**
+follow your web-link preference in **Settings → Browser**, even if the
+preview is unavailable.
 
 ## Attach an image
 
@@ -133,12 +166,10 @@ attaches a reference with the folder's name, location and type. Its card has
 no total size or media preview. Attaching it does not copy, list or archive
 its contents.
 
-The agent uses its existing permissions to inspect the folder. Within an
-already permitted project, its file tools can list or search it. A reference
-to another folder does not extend those tools' access. Plan cannot run a
-command to inspect it; Act keeps the command access already allowed for that
-chat. Grida's private folders, folders containing that private data, and
-filesystem aliases to either cannot be attached.
+The agent uses its existing permissions to inspect the folder. In Plan it
+can run confined commands to find or search files within its read scope.
+A folder reference grants no additional access. Grida refuses attachments of its
+private folders, folders containing that private data, and aliases to either.
 [Understand agent permissions](./permissions.md)
 
 The folder reference stays with a queued or saved message. Reopening the chat
@@ -148,20 +179,36 @@ is not a saved copy, so moving or deleting the folder can make it unavailable.
 If your installed Desktop build cannot accept folder references, the drop
 shows an update message and keeps the draft and current attachment.
 
+## Work with an SVG selection
+
+Open an SVG or a deck in Desktop, then select objects or points on a path in
+the editable view. On a freeform board, click an SVG pin to select the whole
+SVG and its placement. Send an **Act** message that refers to the selection.
+The chip above the composer names the selected layer, such as **Group** or
+**Rectangle**, or previews the selected text. Select **×** on the chip to clear
+the selection. The sent message shows a **Selection** marker.
+
+The agent can inspect the selected objects or path points in the live editor.
+Opacity edits apply to the selected objects in one Undo step. Use **Save** in
+the editor to write the change to disk.
+
+For a board pin, ask “Which SVG is selected?” or “Where is this pin on the
+board?” Chat can inspect the file and placement, including which pin you
+selected when several use the same file. Open the source SVG to select and
+edit its contents.
+
+A queued message keeps the selection you sent. Switching tabs, slides, or
+pins, or changing the captured content or placement, can make that capture
+stale. Select the target again and send a new message. **Plan** messages omit
+the selection.
+
 ## Edit selected text in an SVG or slide
 
-Open an SVG or a slide in Desktop and select one plain text element. Without
-the **Plan** badge, send a message asking the agent to read or replace it, for
-example “Make this heading shorter.” The composer shows **SVG text selection**
-when the selection can go with your message. Look above the sent message to
-see whether it carried the selection. The change appears in the editor and can
-be undone there; use the editor's **Save** command to write it to disk. If
-another program has changed the file, the save dialog handles the conflict.
-
-Switching tabs or slides, changing the selection, or editing the document
-before the agent acts makes the selected text unavailable; select it again
-and send a new message. A queued message keeps its original selection, which
-can become unavailable while it waits. **Plan** messages omit the selection.
+Select one plain text element and send an **Act** message such as “Make this
+heading shorter.” The agent uses the SVG selection attached to that message
+to read and replace the text. The change appears in the editor and can be
+undone there. Use **Save** to write it to disk. If another program has changed
+the file, the save dialog handles the conflict.
 
 ## Current limits
 

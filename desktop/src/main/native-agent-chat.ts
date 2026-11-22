@@ -28,6 +28,7 @@ import type {
   NativeChatImageArtifact,
   NativeChatActivity,
   NativeChatToolImage,
+  NativeChatUrlCitation,
   NativeChatMessage,
   NativeChatMessageContext,
   NativeChatMessageAttachment,
@@ -40,6 +41,8 @@ import type {
   NativeChatReadState,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatQuestionPrompt,
+  NativeChatQuestionReply,
   NativeChatQueueChange,
   NativeChatQueuedMessage,
   NativeChatQueueItem,
@@ -65,6 +68,7 @@ import {
 import { NativeAgentPermissionModes } from "./native-agent-permission-mode";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeFileReference } from "./native-file-reference";
+import { readCommandActions } from "./native-command-actions";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -75,6 +79,7 @@ import type { NativeHookInspection } from "@grida/desktop-bridge";
 import type {
   NativeEditorSurfaceDelivery,
   NativeEditorSurfaceSelection,
+  NativeEditorSvgSelectionDelivery,
   NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
@@ -95,6 +100,8 @@ import {
 } from "./native-agent-side-chats";
 import {
   NativeAgentProcess,
+  PREDICT_PROMPT,
+  QUESTION_BATCHES,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
@@ -263,16 +270,14 @@ type TaskBasis = Readonly<{
   expectedControlRevision: number;
 }>;
 
-export type NativeQuestionReview = Readonly<
-  Pick<
-    NativeChatQuestion,
-    "style" | "question" | "options" | "expiresWithTurn"
-  > & {
-    task: TaskBasis;
-    waitId: string;
-    expectedHistoryPosition: number;
-  }
->;
+export type NativeQuestionReview = Readonly<{
+  style: NativeChatQuestion["style"];
+  expiresWithTurn?: true;
+  task: TaskBasis;
+  waitId: string;
+  expectedHistoryPosition: number;
+}> &
+  NativeChatQuestionPrompt;
 
 export type NativeLibrarySelectionReview = Readonly<{
   task: TaskBasis;
@@ -406,6 +411,10 @@ export class NativeAgentChat {
     ).update(session.id, revision, requestId, mode);
   }
 
+  get acceptsTurnCapabilities(): boolean {
+    return this.connected && this.process.acceptsTurnCapabilities;
+  }
+
   get acceptsInputRoutes(): boolean {
     return this.connected && this.process.acceptsInputRoutes;
   }
@@ -445,6 +454,7 @@ export class NativeAgentChat {
           connectionId: input.selection.connectionId,
           model: input.selection.model,
           effort: input.selection.effort,
+          ...(input.selection.speed && { speed: input.selection.speed }),
         },
       })
     );
@@ -1014,7 +1024,8 @@ export class NativeAgentChat {
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
@@ -1023,12 +1034,17 @@ export class NativeAgentChat {
       deliver,
       revision,
       svgText,
-      browser
+      browser,
+      svgSelection
     );
   }
 
   get acceptsEditorContext(): boolean {
     return this.process.acceptsEditorContext;
+  }
+
+  get acceptsEditorToolContext(): boolean {
+    return this.process.acceptsEditorToolContext;
   }
 
   submit(
@@ -1039,13 +1055,15 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1057,13 +1075,15 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1098,7 +1118,8 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsLibrarySelection)
       return Promise.reject(
@@ -1110,6 +1131,7 @@ export class NativeAgentChat {
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1138,6 +1160,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "messageContext",
     ]);
     if (
@@ -1162,6 +1185,7 @@ export class NativeAgentChat {
             ? undefined
             : choice(input.effort, EFFORT_CHOICES),
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1194,6 +1218,7 @@ export class NativeAgentChat {
       Object.keys(input).length !==
         (effort ? 6 : 5) +
           Number(input.selectionRevision !== undefined) +
+          Number(input.webSearch !== undefined) +
           Number(input.messageContext !== undefined) ||
       typeof input.text !== "string"
     )
@@ -1208,6 +1233,7 @@ export class NativeAgentChat {
         image: pngPrompt(input.png),
         effort,
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1236,6 +1262,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "sha256",
       "size",
       "lastModified",
@@ -1284,6 +1311,7 @@ export class NativeAgentChat {
         regime,
         {
           selectedImage,
+          webSearch: optionalWebSearch(input.webSearch),
           effort,
           selectionRevision,
           messageContext,
@@ -1319,6 +1347,7 @@ export class NativeAgentChat {
       Object.keys(input).length !==
         (effort ? 7 : 6) +
           Number(input.selectionRevision !== undefined) +
+          Number(input.webSearch !== undefined) +
           Number(input.messageContext !== undefined) ||
       typeof input.text !== "string"
     )
@@ -1333,6 +1362,7 @@ export class NativeAgentChat {
         file: selectedFile(input.name, input.bytes),
         effort,
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1362,6 +1392,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "messageContext",
     ]);
     if (
@@ -1392,6 +1423,7 @@ export class NativeAgentChat {
       }),
       effort,
       selectionRevision: optionalSelectionRevision(input.selectionRevision),
+      webSearch: optionalWebSearch(input.webSearch),
       messageContext,
     });
   }
@@ -1411,6 +1443,7 @@ export class NativeAgentChat {
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
       selectionRevision?: number;
+      webSearch?: true;
       editorContext?: NativeEditorObservation;
       messageContext?: NativeChatMessageContext;
     } = {}
@@ -1428,7 +1461,13 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       messageContext,
+      webSearch,
     } = options;
+    if (
+      webSearch &&
+      (!this.process.acceptsTurnCapabilities || selectionRevision === undefined)
+    )
+      throw new Error("web_search_selection_required");
     if (
       selectionRevision !== undefined &&
       (!Number.isSafeInteger(selectionRevision) ||
@@ -1467,7 +1506,10 @@ export class NativeAgentChat {
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
         ...(selectionRevision !== undefined && {
-          _meta: { "co.grida/selectionRevision": selectionRevision },
+          _meta: {
+            "co.grida/selectionRevision": selectionRevision,
+            ...(webSearch && { "co.grida/webSearch": true }),
+          },
         }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(editorContext && { editorContext }),
@@ -1517,7 +1559,9 @@ export class NativeAgentChat {
 
   async inputReceipt(
     session: NativeChatSession,
-    inputId: string
+    inputId: string,
+    /** Omitted for a read-only receipt lookup. A retry must match its original permission. */
+    expectedWebSearch?: boolean
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     const result = object(
@@ -1528,6 +1572,15 @@ export class NativeAgentChat {
     );
     this.requireAttached(session);
     const accepted = acceptance(result.receipt, sessionId, inputId);
+    if (expectedWebSearch !== undefined) {
+      // Prior workers and records predate hosted search and omit this setting.
+      const stored =
+        result.settings === undefined
+          ? undefined
+          : object(result.settings).webSearch;
+      if ((stored === undefined ? false : flag(stored)) !== expectedWebSearch)
+        throw new Error("submission_web_search_changed");
+    }
     // A recovered receipt settles Main's unknown temporary custody as well.
     await this.selectedImages?.complete(sessionId, inputId).catch(() => {});
     return accepted;
@@ -1612,6 +1665,42 @@ export class NativeAgentChat {
       queue,
     });
     return snapshot;
+  }
+
+  async predictPrompt(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    permission?: AbortSignal
+  ): Promise<string | null> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const latest = snapshot.latest;
+    if (
+      !this.process.acceptsPromptPrediction ||
+      snapshot.side ||
+      snapshot.current ||
+      snapshot.queuedInputs ||
+      latest?.disposition !== "settled" ||
+      latest.status !== "succeeded"
+    )
+      return null;
+    const result = object(
+      await this.process.request(
+        `_${PREDICT_PROMPT}`,
+        { sessionId, turnId: latest.turnId },
+        20_000,
+        permission
+      )
+    );
+    this.requireAttached(session);
+    if (result.text === null) return null;
+    if (
+      typeof result.text !== "string" ||
+      !result.text.trim() ||
+      Buffer.byteLength(result.text) > 4096 ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(result.text)
+    )
+      throw invalidResponse();
+    return result.text;
   }
 
   async turnSummary(
@@ -2223,7 +2312,7 @@ export class NativeAgentChat {
       return {
         view: revision(page.view),
         messages: [...capture.messages.values()],
-        turns: turnRecords(page.turns),
+        turns: turnRecords(page.turns, this.process.acceptsReconsideration),
         older,
       };
     } finally {
@@ -2240,7 +2329,9 @@ export class NativeAgentChat {
     const permissions = this.process.permissions;
     if (
       !permissions ||
-      current?.disposition !== "suspended" ||
+      !current ||
+      (current.disposition !== "suspended" &&
+        (current.disposition !== "running" || !current.inputNeeded)) ||
       current.paused ||
       current.cancelled
     )
@@ -2255,7 +2346,28 @@ export class NativeAgentChat {
       )
     )
       throw new Error("native_chat_approval_changed");
-    return reviews;
+    // Destination approvals can ask the user while the process is running.
+    // Pre-launch approvals wait for the turn to suspend.
+    return current.disposition === "running"
+      ? reviews.filter((review) =>
+          review.waitId.startsWith("approval/network/")
+        )
+      : reviews;
+  }
+
+  async reconsiderDenial(
+    session: NativeChatSession,
+    turnId: string,
+    reviewId: string
+  ): Promise<void> {
+    const sessionId = this.requireAttached(session);
+    if (!this.process.permissions || !this.process.acceptsReconsideration)
+      throw new Error("native_chat_reconsideration_unavailable");
+    await this.process.permissions.reconsiderDenial(
+      sessionId,
+      turnId,
+      reviewId
+    );
   }
 
   async answerApproval(
@@ -2270,6 +2382,10 @@ export class NativeAgentChat {
     return permissions.answer(review, decision);
   }
 
+  withQuestionBatchPreference<T>(available: boolean, admit: () => T): T {
+    return this.process.withQuestionBatchPreference(available, admit);
+  }
+
   async questions(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot
@@ -2277,12 +2393,7 @@ export class NativeAgentChat {
     const sessionId = this.requireObservation(session, snapshot);
     const current = snapshot.current;
     if (!current || current.cancelled) return [];
-    const result = object(
-      await this.process.request("_co.grida/session/questions", {
-        sessionId,
-        turnId: current.turnId,
-      })
-    );
+    const result = await this.pendingQuestions(sessionId, current.turnId);
     this.requireAttached(session);
     if (
       result.sessionId !== sessionId ||
@@ -2299,16 +2410,7 @@ export class NativeAgentChat {
         "answer_dependent",
         "nonblocking",
       ] as const);
-      const question = boundedText(entry.question, 2048);
-      if (!Array.isArray(entry.options) || entry.options.length > 6)
-        throw invalidResponse();
-      const options = entry.options.map((option: unknown) =>
-        boundedText(option, 256)
-      );
-      if (
-        new Set(options.map((option) => option.trim())).size !== options.length
-      )
-        throw invalidResponse();
+      const prompt = questionPrompt(entry, this.process.acceptsQuestionBatches);
       const expectedHistoryPosition = current.historyPosition;
       const requestId = `desktop-question-${createHash("sha256")
         .update(
@@ -2332,8 +2434,7 @@ export class NativeAgentChat {
           this.process.acceptsOptionalQuestions && {
             expiresWithTurn: true as const,
           }),
-        question,
-        options: Object.freeze(options),
+        ...prompt,
       });
     });
     if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
@@ -2352,16 +2453,35 @@ export class NativeAgentChat {
       !this.questionReviews.has(review)
     )
       throw new Error("native_chat_question_unavailable");
+    const batch = answer.kind === "batch";
+    if (
+      batch !== "questions" in review ||
+      (batch && !this.process.acceptsQuestionBatches)
+    )
+      throw new Error("native_chat_question_unavailable");
     const result = await this.process.request(
-      "_co.grida/session/answer-question",
+      batch
+        ? `_${QUESTION_BATCHES.answer}`
+        : "_co.grida/session/answer-question",
       {
         ...review.task,
         waitId: review.waitId,
         expectedHistoryPosition: review.expectedHistoryPosition,
-        answer,
+        ...(batch ? { answers: answer.answers } : { answer }),
       }
     );
     return controlReceipt(result, review.task);
+  }
+
+  private async pendingQuestions(sessionId: string, turnId: string) {
+    return object(
+      await this.process.request(
+        this.process.acceptsQuestionBatches
+          ? `_${QUESTION_BATCHES.list}`
+          : "_co.grida/session/questions",
+        { sessionId, turnId }
+      )
+    );
   }
 
   async librarySelections(
@@ -2702,6 +2822,7 @@ export class NativeAgentChat {
             this.process.acceptsActivityOrder,
             true
           );
+          const turnId = optionalIdentity(order.turnId ?? attribution?.turnId);
           const previewId =
             (this.process.acceptsInputImageChunks &&
               ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
@@ -2720,9 +2841,12 @@ export class NativeAgentChat {
           captureAttachment(
             capture,
             messageId,
-            optionalIdentity(order.turnId ?? attribution?.turnId),
             Object.freeze({ ...entry, ...(previewId && { previewId }) }),
-            order
+            {
+              ...order,
+              turnId,
+              ...authoredInputIdentity(role, turnId, attribution?.inputId),
+            }
           );
         }
         return;
@@ -2747,31 +2871,33 @@ export class NativeAgentChat {
             role === "user"
               ? this.readDisplayParts(attribution?.displayParts)
               : undefined;
-          const reply =
-            role === "user" && attribution?.questionReply !== undefined
-              ? object(attribution.questionReply)
-              : undefined;
           const order = NativeActivityOrder.notification(
             metadata,
             attribution,
             this.process.acceptsActivityOrder,
             content.text.length > 0
           );
+          const turnId = optionalIdentity(order.turnId ?? attribution?.turnId);
           captureText(capture, identity(update.messageId), role, content.text, {
-            turnId: optionalIdentity(order.turnId ?? attribution?.turnId),
-            phase: messagePhase(attribution?.phase, role),
             ...order,
+            turnId,
+            ...authoredInputIdentity(role, turnId, attribution?.inputId),
+            phase: messagePhase(attribution?.phase, role),
+            ...(role === "assistant" &&
+              attribution?.citations !== undefined && {
+                citations: urlCitations(attribution.citations),
+              }),
             ...(displayParts?.length && { displayParts }),
-            ...(reply && {
-              questionReply: {
-                waitId: identity(reply.waitId),
-                question: boundedText(reply.question, 2048),
-              },
-            }),
+            ...(role === "user" && questionReplyMetadata(attribution)),
             ...(role === "user" &&
               attribution?.turnId !== undefined &&
               attribution.svgTextSelection === true && {
                 svgTextSelection: true,
+              }),
+            ...(role === "user" &&
+              attribution?.turnId !== undefined &&
+              attribution.editorToolContext === true && {
+                svgSelection: true,
               }),
           });
         }
@@ -2789,8 +2915,19 @@ export class NativeAgentChat {
               text: content.text,
               messageId: identity(update.messageId),
               turnId: identity(attribution.turnId),
+              ...authoredInputIdentity(
+                role,
+                attribution.turnId,
+                attribution.inputId
+              ),
+              ...(role === "user" && questionReplyMetadata(attribution)),
               offsetBytes: revision(attribution.offsetBytes),
               replace: flag(attribution.replace),
+              ...(role === "assistant" &&
+                attribution.replace === true &&
+                attribution.citations !== undefined && {
+                  citations: urlCitations(attribution.citations),
+                }),
               ...NativeActivityOrder.notification(
                 metadata,
                 attribution,
@@ -2920,12 +3057,7 @@ export class NativeAgentChat {
         ? this.observe(session).then((snapshot) => snapshot.side?.title ?? null)
         : this.catalogEntry(session).then((entry) => entry.title)
     ).catch(() => null);
-    const pending = object(
-      await this.process.request("_co.grida/session/questions", {
-        sessionId,
-        turnId,
-      })
-    );
+    const pending = await this.pendingQuestions(sessionId, turnId);
     if (
       pending.sessionId !== sessionId ||
       pending.turnId !== turnId ||
@@ -2937,7 +3069,12 @@ export class NativeAgentChat {
       (entry: unknown) => object(entry).waitId === waitId
     );
     if (!match) return;
-    const question = boundedText(object(match).question, 2048);
+    const prompt = questionPrompt(
+      object(match),
+      this.process.acceptsQuestionBatches
+    );
+    const question =
+      "questions" in prompt ? prompt.questions[0].question : prompt.question;
     this.onLifecycle?.(
       {
         kind: "question_asked",
@@ -3102,19 +3239,29 @@ function captureText(
   attribution?: Pick<
     NativeChatMessage,
     | "turnId"
+    | "inputId"
     | "phase"
     | "activityOrder"
     | "activityOrderIncomplete"
+    | "citations"
     | "svgTextSelection"
+    | "svgSelection"
     | "displayParts"
     | "questionReply"
+    | "questionReplies"
   >
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   capture.bytes += Buffer.byteLength(text);
+  if (attribution?.citations)
+    capture.bytes += Buffer.byteLength(JSON.stringify(attribution.citations));
   if (attribution?.questionReply)
     capture.bytes += Buffer.byteLength(attribution.questionReply.question);
+  if (attribution?.questionReplies)
+    capture.bytes += Buffer.byteLength(
+      JSON.stringify(attribution.questionReplies)
+    );
   if (attribution?.displayParts)
     capture.bytes += Buffer.byteLength(
       JSON.stringify(attribution.displayParts)
@@ -3135,11 +3282,17 @@ function captureText(
   capture.messages.set(messageId, {
     ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
+    ...(attribution?.inputId && { inputId: attribution.inputId }),
     ...(attribution?.phase && { phase: attribution.phase }),
+    ...(attribution?.citations && { citations: attribution.citations }),
     ...(attribution?.questionReply && {
       questionReply: attribution.questionReply,
     }),
+    ...(attribution?.questionReplies && {
+      questionReplies: attribution.questionReplies,
+    }),
     ...(attribution?.svgTextSelection && { svgTextSelection: true }),
+    ...(attribution?.svgSelection && { svgSelection: true }),
     ...(attribution?.displayParts && {
       displayParts: attribution.displayParts,
     }),
@@ -3150,17 +3303,55 @@ function captureText(
   });
 }
 
+function urlCitations(value: unknown): readonly NativeChatUrlCitation[] {
+  const citations: NativeChatUrlCitation[] = [];
+  if (!Array.isArray(value)) return citations;
+  for (const entry of value.slice(0, 64)) {
+    if (entry === null || typeof entry !== "object") continue;
+    const { url, title, startIndex, endIndex } = entry;
+    if (
+      typeof url !== "string" ||
+      Buffer.byteLength(url) > 4096 ||
+      (title !== undefined &&
+        (typeof title !== "string" || Buffer.byteLength(title) > 1024)) ||
+      !Number.isSafeInteger(startIndex) ||
+      !Number.isSafeInteger(endIndex) ||
+      startIndex < 0 ||
+      endIndex <= startIndex
+    )
+      continue;
+    const link = URL.parse(url);
+    if (
+      !link ||
+      !["https:", "http:"].includes(link.protocol) ||
+      !link.hostname ||
+      link.username ||
+      link.password
+    )
+      continue;
+    citations.push(
+      Object.freeze({
+        url: link.href,
+        ...(title && { title }),
+        startIndex,
+        endIndex,
+      })
+    );
+  }
+  return Object.freeze(citations);
+}
+
 function captureAttachment(
   capture: TranscriptCapture,
   messageId: string,
-  turnId: string | undefined,
   entry: NativeChatMessageAttachment,
-  order: NativeActivityOrder.Fact = {}
+  attribution: NativeActivityOrder.Fact &
+    Pick<NativeChatMessage, "turnId" | "inputId">
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   if (previous && previous.role !== "user") throw invalidResponse();
-  const merged = NativeActivityOrder.merge(previous ?? {}, order);
+  const merged = NativeActivityOrder.merge(previous ?? {}, attribution);
   const kept = { ...previous };
   delete kept.activityOrder;
   delete kept.activityOrderIncomplete;
@@ -3181,7 +3372,8 @@ function captureAttachment(
     role: "user",
     text: "",
     ...kept,
-    ...(turnId && { turnId }),
+    ...(attribution.turnId && { turnId: attribution.turnId }),
+    ...(attribution.inputId && { inputId: attribution.inputId }),
     ...merged,
     attachments: [...recorded, entry],
   });
@@ -3262,8 +3454,19 @@ function activity(
     throw invalidResponse();
   const source =
     attribution.source === undefined ? undefined : identity(attribution.source);
-  if (source !== undefined && kind !== "integration") throw invalidResponse();
+  if (
+    source !== undefined &&
+    kind !== "integration" &&
+    !(
+      kind === "search" &&
+      source === "provider" &&
+      update.title === "web_search"
+    )
+  )
+    throw invalidResponse();
   const input = toolDetail(update.rawInput);
+  const title = identity(update.title);
+  const commandActions = readCommandActions(title, attribution.commandActions);
   const callId = identity(update.toolCallId);
   const turnId = optionalIdentity(attribution.turnId);
   const output = toolOutput(
@@ -3275,10 +3478,11 @@ function activity(
   );
   return Object.freeze({
     callId,
-    title: identity(update.title),
+    title,
     kind: kind as NativeChatActivity["kind"],
     ...(source !== undefined && { source }),
     outcome: outcome as NativeChatActivity["outcome"],
+    ...(commandActions !== undefined && { commandActions }),
     ...NativeActivityOrder.read(
       NativeActivityOrder.notification(
         metadata,
@@ -3336,6 +3540,19 @@ function optionalIdentity(value: unknown): string | undefined {
   return value === undefined ? undefined : identity(value);
 }
 
+function authoredInputIdentity(
+  role: NativeChatMessage["role"],
+  turnId: unknown,
+  value: unknown
+): Pick<NativeChatMessage, "inputId"> {
+  return role === "user" &&
+    typeof turnId === "string" &&
+    typeof value === "string" &&
+    IDENTITY.test(value)
+    ? { inputId: value }
+    : {};
+}
+
 function messagePhase(
   value: unknown,
   role: NativeChatMessage["role"]
@@ -3346,7 +3563,10 @@ function messagePhase(
   return value;
 }
 
-function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
+function turnRecords(
+  value: unknown,
+  acceptsReconsideration: boolean
+): NativeChatTurnRecord[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > MAX_TRANSCRIPT_MESSAGES)
     throw invalidResponse();
@@ -3365,15 +3585,88 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
     const compaction = compactionFact(record.compaction);
+    const approvalReviews = approvalReviewFacts(
+      record.approvalReviews,
+      acceptsReconsideration
+    );
+    const modelId = optionalIdentity(record.modelId);
     return Object.freeze({
       turnId: identity(record.turnId),
+      ...(modelId !== undefined && { modelId }),
       status: status as NativeChatTurnRecord["status"],
       startedAtMs,
       ...(settledAtMs !== undefined && { settledAtMs }),
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),
       ...(compaction && { compaction }),
+      ...(approvalReviews && { approvalReviews }),
     });
+  });
+}
+
+function approvalReviewFacts(
+  value: unknown,
+  acceptsReconsideration: boolean
+): NativeChatTurnRecord["approvalReviews"] {
+  if (value == null) return undefined;
+  if (!Array.isArray(value) || value.length > 1024) throw invalidResponse();
+  return value.map((item) => {
+    const {
+      decision,
+      action,
+      failure,
+      riskLevel,
+      rationale,
+      reviewId,
+      reconsidered,
+      userAuthorization,
+    } = object(item);
+    if (
+      (decision !== "reviewing" &&
+        decision !== "approved" &&
+        decision !== "declined" &&
+        decision !== "needs_human") ||
+      typeof action !== "string" ||
+      !action ||
+      Buffer.byteLength(action) > 4096 ||
+      (rationale !== undefined &&
+        (typeof rationale !== "string" || Buffer.byteLength(rationale) > 512))
+    )
+      throw invalidResponse();
+    return {
+      decision,
+      action,
+      ...(acceptsReconsideration &&
+        reviewId !== undefined &&
+        decision === "declined" && { reviewId: identity(reviewId) }),
+      ...(reconsidered === true && { reconsidered: true as const }),
+      ...(userAuthorization !== undefined && {
+        userAuthorization: choice(userAuthorization, [
+          "unknown",
+          "low",
+          "medium",
+          "high",
+        ] as const),
+      }),
+      ...(failure !== undefined && {
+        failure: choice(failure, [
+          "timed_out",
+          "interrupted",
+          "invalid_reply",
+          "unavailable",
+          "needs_human",
+        ] as const),
+      }),
+      ...(riskLevel !== undefined && {
+        riskLevel: choice(riskLevel, [
+          "low",
+          "medium",
+          "high",
+          "critical",
+        ] as const),
+      }),
+      ...(rationale && { rationale }),
+    };
   });
 }
 
@@ -3414,8 +3707,10 @@ function acceptance(
 
 function turn(value: unknown): NativeChatTurn {
   const result = object(value);
+  const modelId = optionalIdentity(result.modelId);
   return Object.freeze({
     turnId: identity(result.turnId),
+    ...(modelId !== undefined && { modelId }),
     epoch: revision(result.epoch),
     journalPosition: revision(result.journalPosition),
     historyPosition: revision(result.historyPosition),
@@ -3450,6 +3745,111 @@ function controlReceipt(
     sessionRevision: revision(result.sessionRevision),
     journalPosition: revision(result.journalPosition),
   });
+}
+
+function questionPrompt(
+  entry: Record<string, unknown>,
+  batchAvailable: boolean
+): NativeChatQuestionPrompt {
+  if (entry.questions === undefined) {
+    const question = boundedText(entry.question, 2048);
+    const options = questionOptions(entry.options).map((option) =>
+      boundedText(option, 256)
+    );
+    uniqueQuestionValues(options.map((option) => option.trim()));
+    return { question, options: Object.freeze(options) };
+  }
+
+  if (
+    !batchAvailable ||
+    entry.question !== undefined ||
+    entry.options !== undefined ||
+    !Array.isArray(entry.questions) ||
+    entry.questions.length < 1 ||
+    entry.questions.length > 3
+  )
+    throw invalidResponse();
+  const questions = entry.questions.map((value: unknown) => {
+    const item = object(value);
+    const options = questionOptions(item.options).map((option) => {
+      const optionValue = object(option);
+      return Object.freeze({
+        label: boundedText(optionValue.label, 256),
+        ...(optionValue.description !== undefined && {
+          description: boundedText(optionValue.description, 512),
+        }),
+      });
+    });
+    uniqueQuestionValues(options.map(({ label }) => label.trim()));
+    return Object.freeze({
+      id: questionItemId(item.id),
+      question: boundedText(item.question, 2048),
+      ...(item.header !== undefined && {
+        header: boundedText(item.header, 48),
+      }),
+      options: Object.freeze(options),
+    });
+  });
+  uniqueQuestionValues(questions.map(({ id }) => id));
+  return { questions: Object.freeze(questions) };
+}
+
+function questionItemId(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-z0-9_]{1,64}$/.test(value))
+    throw invalidResponse();
+  return value;
+}
+
+function questionOptions(value: unknown): readonly unknown[] {
+  if (!Array.isArray(value) || value.length > 6) throw invalidResponse();
+  return value;
+}
+
+function uniqueQuestionValues(values: readonly string[]): void {
+  if (new Set(values).size !== values.length) throw invalidResponse();
+}
+
+function questionReplyMetadata(
+  attribution: Record<string, unknown> | undefined
+): Pick<NativeChatMessage, "questionReply" | "questionReplies"> {
+  if (attribution?.questionReplies !== undefined) {
+    const values = attribution.questionReplies;
+    if (
+      attribution.questionReply !== undefined ||
+      !Array.isArray(values) ||
+      values.length < 1 ||
+      values.length > 3
+    )
+      throw invalidResponse();
+    const questionReplies = values.map(
+      (value: unknown): NativeChatQuestionReply => {
+        const reply = object(value);
+        if (reply.skipped !== undefined && reply.skipped !== true)
+          throw invalidResponse();
+        return Object.freeze({
+          waitId: identity(reply.waitId),
+          id: questionItemId(reply.id),
+          question: boundedText(reply.question, 2048),
+          answer: boundedText(reply.answer, 4096),
+          ...(reply.skipped === true && { skipped: true }),
+        });
+      }
+    );
+    uniqueQuestionValues(questionReplies.map(({ id }) => id));
+    if (
+      questionReplies.some(({ waitId }) => waitId !== questionReplies[0].waitId)
+    )
+      throw invalidResponse();
+    return { questionReplies: Object.freeze(questionReplies) };
+  }
+  if (attribution?.questionReply === undefined) return {};
+  const reply = object(attribution.questionReply);
+  return {
+    questionReply: Object.freeze({
+      waitId: identity(reply.waitId),
+      question: boundedText(reply.question, 2048),
+    }),
+  };
 }
 
 function boundedText(value: unknown, bytes: number): string {
@@ -4102,6 +4502,11 @@ function hostEffort(effort: NativeChatEffort | undefined): {
     default:
       return { reasoning: effort };
   }
+}
+
+function optionalWebSearch(value: unknown): true | undefined {
+  if (value === undefined || value === true) return value;
+  throw new Error("web_search_invalid");
 }
 
 function optionalSelectionRevision(value: unknown): number | undefined {

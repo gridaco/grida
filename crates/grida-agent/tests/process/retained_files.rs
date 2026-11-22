@@ -429,8 +429,8 @@ async fn reopen(state: &Path, endpoint: &str) -> PrivateStdio {
     let mut client = PrivateStdio::from_child(spawn_serve(state, endpoint));
     let mut initialize = extension_initialize();
     for capability in [
-        "questions",
-        "answer-question",
+        "questions-v2",
+        "answer-question-v2",
         "turn-summary",
         "delete",
         "organize",
@@ -511,7 +511,10 @@ async fn exact_text_and_binary_files_resume_or_report_missing_scratch_without_di
         let project = TempDir::new().unwrap();
         let selected = project.path().join("selected file.bin");
         fs::write(&selected, bytes).unwrap();
-        let mut replies = vec![Reply::Tool(TOOL, "{}"), Reply::Question("question")];
+        let mut replies = vec![
+            Reply::Tool(TOOL, "{}"),
+            Reply::Tool("question", super::questions::EDITION_QUESTION),
+        ];
         if unavailable.is_none() {
             replies.extend([
                 Reply::Tool(TOOL, r#"{"include_text":true}"#),
@@ -588,7 +591,7 @@ async fn exact_text_and_binary_files_resume_or_report_missing_scratch_without_di
         assert_eq!(snapshot["current"]["turnId"], turn);
         let pending = read(
             &mut client,
-            "_co.grida/session/questions",
+            "_co.grida/session/questions-v2",
             json!({"sessionId":session,"turnId":turn}),
         )
         .await;
@@ -602,11 +605,11 @@ async fn exact_text_and_binary_files_resume_or_report_missing_scratch_without_di
             "expectedSessionRevision":snapshot["sessionRevision"],
             "expectedControlRevision":pending["controlRevision"],
             "expectedHistoryPosition":pending["historyPosition"],
-            "waitId":pending["questions"][0]["waitId"],"answer":{"kind":"choice","index":1},
+            "waitId":pending["questions"][0]["waitId"],"answers":[{"id":"edition","answer":{"kind":"choice","index":1}}],
         });
         let receipt = read(
             &mut client,
-            "_co.grida/session/answer-question",
+            "_co.grida/session/answer-question-v2",
             answer.clone(),
         )
         .await;
@@ -656,7 +659,7 @@ async fn exact_text_and_binary_files_resume_or_report_missing_scratch_without_di
             }
         );
         assert_eq!(
-            read(&mut client, "_co.grida/session/answer-question", answer).await,
+            read(&mut client, "_co.grida/session/answer-question-v2", answer).await,
             receipt
         );
         if let Some(lost) = unavailable {

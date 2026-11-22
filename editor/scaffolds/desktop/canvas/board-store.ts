@@ -1,5 +1,8 @@
 import { dotcanvas } from "dotcanvas";
+import { NativeEditorSelection } from "@grida/desktop-bridge";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
+import type { EditorSelection } from "../shared/editor-selection";
 import {
   assertBundleLocalSrc,
   workspaceBundleFs,
@@ -51,9 +54,22 @@ function framesFromManifest(m: dotcanvas.Manifest): Frame[] {
     }));
 }
 
+function selectionLayout(frame: Frame): NativeEditorSelection.Layout | null {
+  if (!Number.isFinite(frame.layout?.x) || !Number.isFinite(frame.layout?.y))
+    return null;
+  const layout: dotcanvas.Layout = {};
+  for (const key of ["x", "y", "w", "h", "z"] as const) {
+    const value = frame.layout?.[key];
+    if (typeof value === "number" && Number.isFinite(value))
+      layout[key] = value;
+  }
+  return layout;
+}
+
 export class CanvasBoard {
   private manifest: dotcanvas.Manifest = { editor: "board", documents: [] };
   private frames: Frame[] = [];
+  private selectedId: string | null = null;
   private readonly fs: dotcanvas.WritableFs;
   private readonly listeners = new Set<() => void>();
   private writeChain: Promise<void> = Promise.resolve();
@@ -73,8 +89,42 @@ export class CanvasBoard {
     return () => this.listeners.delete(listener);
   };
   getFrames = (): readonly Frame[] => this.frames;
+  getSelectedId = (): string | null => this.selectedId;
+
+  selectFrame(id: string | null): void {
+    const current = this.frames.some((frame) => frame.id === id) ? id : null;
+    if (this.selectedId === current) return;
+    this.selectedId = current;
+    this.notify();
+  }
+
+  selectedDocument(boardPath: string): EditorSelection.Document | undefined {
+    const frame = this.frames.find((item) => item.id === this.selectedId);
+    if (!frame || isUriSrc(frame.src)) return;
+    let relPath: string;
+    try {
+      relPath = this.bundlePath(frame.src);
+    } catch {
+      return;
+    }
+    const path = WorkspaceArtifact.toAgentPath(
+      boardPath === "/" ? frame.src : relPath
+    );
+    const subject = NativeEditorSelection.subject({
+      kind: "document",
+      path,
+      placement: { boardPath, pinId: frame.id },
+    });
+    if (subject?.kind === "document")
+      return { subject, layout: selectionLayout(frame) };
+  }
 
   private notify(): void {
+    if (
+      this.selectedId !== null &&
+      !this.frames.some((frame) => frame.id === this.selectedId)
+    )
+      this.selectedId = null;
     for (const l of this.listeners) l();
   }
 

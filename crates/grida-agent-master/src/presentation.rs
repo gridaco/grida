@@ -6,13 +6,35 @@ use agent_kit_core::tools::{Invocation, RecoveryKind, ToolDefinition};
 use agent_kit_core::turn::{OperationInput, OperationState, TurnState};
 use agent_kit_core::{OperationId, Result, ToolId, TurnId};
 use agent_kit_runtime::{InvokeOutcome, OperationKey, StepToolOutcome, Turn};
-use serde_json::json;
+use serde_json::{Value, json};
 
 pub const OPEN: &str = "surface_open";
+pub const WORKBENCH_SHOW: &str = "workbench_show";
+pub const DESKTOP_CONTEXT: &str = "You are working in Grida Desktop.";
 pub const PRINCIPAL: &str = "live-editor";
 pub const TARGETED_VERSION: u32 = 3;
+pub const WORKBENCH_PATHS_VERSION: u32 = 4;
 pub const MAX_PATH_BYTES: usize = 4096;
-pub const INSTRUCTIONS: &str = "When producing or editing a primary artifact, request surface_open at the first meaningful renderable checkpoint so the user can follow the work. Keep working after the request. Open the existing primary artifact before substantial edits when it is not already visible. Reopen it only when the user asks or the primary artifact changes. Treat presentation as optional and verify the artifact independently.";
+
+/// Shared artifact presentation policy, applied only with a captured presentation grant.
+pub fn append_instructions(
+    instructions: &mut String,
+    workbench: bool,
+    viewer_urls: bool,
+    workbench_paths: bool,
+) {
+    instructions.push_str("\n\nWhen producing a primary artifact, request ");
+    instructions.push_str(if workbench { WORKBENCH_SHOW } else { OPEN });
+    instructions.push_str(" at the first meaningful renderable checkpoint. Use the workspace path of the file or the bundle directory. The workbench chooses the viewer.");
+    if workbench_paths {
+        instructions.push_str(r#" Pass the workspace-relative or in-workspace absolute file path directly, for example {"target":{"kind":"file","path":"decks/Launch.canvas"}}. Use tool_search to find the Workbench tool when needed."#);
+    }
+    if viewer_urls {
+        instructions
+            .push_str(" For an artifact served by a running viewer, use its verified HTTP(S) URL.");
+    }
+    instructions.push_str(" For an existing primary artifact, reveal it before substantial edits if it is not already visible. Respect requests to keep it closed. Preserve focus unless the user asks to switch windows. Keep working after the request and verify the artifact independently. A receipt confirms the request was sent. Observe the viewer before claiming what appeared. Reveal it again only when the user asks or the primary artifact changes.");
+}
 
 pub fn definition() -> Result<ToolDefinition> {
     Ok(ToolDefinition {
@@ -31,6 +53,31 @@ pub fn definition() -> Result<ToolDefinition> {
     })
 }
 
+/// File-only workbench presentation when browser surfaces are unavailable.
+pub fn workbench_show_definition() -> Result<ToolDefinition> {
+    let mut tool = definition()?;
+    tool.id = ToolId::new(WORKBENCH_SHOW)?;
+    tool.description = "Ask the attached workbench to show an existing workspace file or recognized bundle. The workbench chooses the viewer. Acknowledgment confirms a request was sent, and display is best effort.".into();
+    tool.input = InputFormat::Json(json!({
+        "type": "object",
+        "properties": {
+            "target": {
+                "type": "object",
+                "properties": {
+                    "kind": {"const": "file"},
+                    "path": {"type": "string", "minLength": 2, "maxLength": MAX_PATH_BYTES}
+                },
+                "required": ["kind", "path"],
+                "additionalProperties": false
+            },
+            "presentation": {"const": "reveal"}
+        },
+        "required": ["target"],
+        "additionalProperties": false
+    }));
+    Ok(tool)
+}
+
 /// Only the trusted editor's exact presentation request is auxiliary. Other
 /// unconfirmed operations retain the normal turn and deletion fences.
 pub fn unconfirmed(operation: &OperationState, turn: &TurnId) -> bool {
@@ -43,39 +90,42 @@ pub fn unconfirmed(operation: &OperationState, turn: &TurnId) -> bool {
     let grants = &operation.record.grants;
     grants.authority.principal.as_str() == PRINCIPAL
         && grants.authority.scope.as_str() == turn.as_str()
-        && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == OPEN)
-        && (definition().is_ok_and(|definition| invocation.definition() == &definition)
-            || targeted_file_reveal(invocation))
+        && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == invocation.definition().id.as_str())
+        && is_file_reveal(invocation)
 }
 
-fn targeted_file_reveal(invocation: &Invocation) -> bool {
+fn is_file_reveal(invocation: &Invocation) -> bool {
     let tool = invocation.definition();
-    if tool.id.as_str() != OPEN || tool.version != TARGETED_VERSION {
-        return false;
+    let typed_reveal = || match invocation.arguments() {
+        ToolArguments::Json(arguments) => file_reveal_path(arguments).is_some(),
+        _ => false,
+    };
+    match (tool.id.as_str(), tool.version) {
+        (OPEN, 2) => definition().is_ok_and(|definition| *tool == definition),
+        (WORKBENCH_SHOW, 2) => {
+            workbench_show_definition().is_ok_and(|definition| *tool == definition)
+                && typed_reveal()
+        }
+        (OPEN | WORKBENCH_SHOW, TARGETED_VERSION) => typed_reveal(),
+        (WORKBENCH_SHOW, WORKBENCH_PATHS_VERSION) => typed_reveal(),
+        _ => false,
     }
-    let ToolArguments::Json(arguments) = invocation.arguments() else {
-        return false;
-    };
-    let Some(arguments) = arguments.as_object() else {
-        return false;
-    };
-    let Some(target) = arguments
-        .get("target")
-        .and_then(serde_json::Value::as_object)
-    else {
-        return false;
-    };
-    // Only a file reveal has the same effect as the original presentation.
-    arguments.len() == 1 + usize::from(arguments.contains_key("presentation"))
+}
+
+/// Extract a typed workspace file reveal without admitting other effects.
+pub fn file_reveal_path(arguments: &Value) -> Option<&str> {
+    let arguments = arguments.as_object()?;
+    let target = arguments.get("target")?.as_object()?;
+    if arguments.len() == 1 + usize::from(arguments.contains_key("presentation"))
         && arguments
             .get("presentation")
             .is_none_or(|mode| mode.as_str() == Some("reveal"))
         && target.len() == 2
         && target.get("kind").and_then(serde_json::Value::as_str) == Some("file")
-        && target
-            .get("path")
-            .and_then(serde_json::Value::as_str)
-            .is_some()
+    {
+        return target.get("path")?.as_str();
+    }
+    None
 }
 
 pub(super) fn blocks_continuation(
@@ -190,9 +240,7 @@ mod tests {
         operation.record.input = invocation(other, &id, json!({"path":"/poster.canvas"}));
         assert!(!unconfirmed(&operation, &turn));
 
-        let mut targeted = definition().unwrap();
-        targeted.version = TARGETED_VERSION;
-        for (arguments, auxiliary) in [
+        let cases = [
             (
                 json!({"target":{"kind":"file","path":"/poster.canvas"}}),
                 true,
@@ -214,9 +262,39 @@ mod tests {
                 json!({"target":{"kind":"file","path":"/poster.canvas","url":"https://example.com"}}),
                 false,
             ),
+        ];
+        let mut retained_targeted = definition().unwrap();
+        retained_targeted.version = TARGETED_VERSION;
+        let new_file_only = workbench_show_definition().unwrap();
+        let mut new_targeted = new_file_only.clone();
+        new_targeted.version = TARGETED_VERSION;
+        let mut workbench_paths = new_targeted.clone();
+        workbench_paths.version = WORKBENCH_PATHS_VERSION;
+        for definition in [
+            retained_targeted,
+            new_file_only,
+            new_targeted,
+            workbench_paths,
         ] {
-            operation.record.input = invocation(targeted.clone(), &id, arguments);
-            assert_eq!(unconfirmed(&operation, &turn), auxiliary);
+            let grant = GrantId::new(definition.id.as_str()).unwrap();
+            for (arguments, auxiliary) in &cases {
+                operation.record.input = invocation(definition.clone(), &id, arguments.clone());
+                operation.record.grants.grants = vec![grant.clone()];
+                assert_eq!(unconfirmed(&operation, &turn), *auxiliary);
+            }
         }
+
+        let mut wrong_definition = workbench_show_definition().unwrap();
+        wrong_definition.description = "Unexpected workbench presentation".into();
+        operation.record.input = invocation(wrong_definition, &id, cases[0].0.clone());
+        assert!(!unconfirmed(&operation, &turn));
+
+        operation.record.input = invocation(
+            workbench_show_definition().unwrap(),
+            &id,
+            cases[0].0.clone(),
+        );
+        operation.record.grants.grants = vec![GrantId::new(OPEN).unwrap()];
+        assert!(!unconfirmed(&operation, &turn));
     }
 }

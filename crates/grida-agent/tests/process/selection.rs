@@ -206,6 +206,15 @@ async fn new_admission_checks_selection_but_exact_input_retry_keeps_its_original
         wrong_route["error"]["data"], "chat_selection_route_changed",
         "{wrong_route}"
     );
+    let mut future = selected("other-model", "high");
+    future["speed"] = "fast".into();
+    let accelerated = client
+        .request(UPDATE, json!({"cwd":cwd.path(),"sessionId":session,"expectedRevision":2,"operationId":"speed","selection":future}))
+        .await;
+    assert_eq!(
+        accelerated["result"]["selection"]["speed"], "fast",
+        "{accelerated}"
+    );
     let history = client
         .request("_co.grida/session/history", json!({"sessionId":session}))
         .await;
@@ -224,8 +233,8 @@ async fn new_admission_checks_selection_but_exact_input_retry_keeps_its_original
         selected("other-model", "high"),
         "{inherited}"
     );
-    let source_edit = client.request(UPDATE,json!({"cwd":cwd.path(),"sessionId":session,"expectedRevision":2,"operationId":"choose-source","selection":selected("fixture","low")})).await;
-    assert_eq!(source_edit["result"]["revision"], 3, "{source_edit}");
+    let source_edit = client.request(UPDATE,json!({"cwd":cwd.path(),"sessionId":session,"expectedRevision":3,"operationId":"choose-source","selection":selected("fixture","low")})).await;
+    assert_eq!(source_edit["result"]["revision"], 4, "{source_edit}");
     let destination_edit = client.request(UPDATE,json!({"cwd":cwd.path(),"sessionId":destination,"expectedRevision":1,"operationId":"choose-destination","selection":selected("fixture","medium")})).await;
     assert_eq!(
         destination_edit["result"]["revision"], 2,

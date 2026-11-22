@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getDesktopBridge } from "@/lib/desktop/bridge";
 import type { SettingsArchives } from "@/lib/desktop/settings-archives";
 import { ChatActivityDate } from "@/scaffolds/desktop/shared/chat-activity-date";
+import { SettingsSection } from "./settings-layout";
 
 export function ArchivedChatsSettings({
   controller,
@@ -43,18 +44,14 @@ export function ArchivedChatsSettings({
   }
 
   return (
-    <section data-testid="settings-archived-chats" className="space-y-5">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">
-            Archived chats
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Restore a chat to its workspace’s chat list.
-          </p>
-        </div>
-        {state.supported && (
+    <SettingsSection
+      title="Archived chats"
+      description="Restore a chat to its workspace’s chat list."
+      data-testid="settings-archived-chats"
+      action={
+        state.supported && (
           <Button
+            className="shrink-0"
             size="icon-sm"
             variant="ghost"
             aria-label="Refresh archived chats"
@@ -63,8 +60,9 @@ export function ArchivedChatsSettings({
           >
             <RefreshCwIcon className="size-4" />
           </Button>
-        )}
-      </header>
+        )
+      }
+    >
       {state.loading && state.entries.length === 0 ? (
         <p role="status" className="text-sm text-muted-foreground">
           Loading archived chats…
@@ -90,7 +88,7 @@ export function ArchivedChatsSettings({
             )}
           <ul className="divide-y rounded-xl border empty:hidden">
             {state.entries.map((chat) => (
-              <li key={chat.id} className="flex items-center gap-3 p-3">
+              <li key={chat.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
                     {chat.title || "Untitled chat"}
@@ -138,6 +136,6 @@ export function ArchivedChatsSettings({
           {state.error}
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }

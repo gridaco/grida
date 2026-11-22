@@ -25,11 +25,12 @@ let root: Root | undefined;
 afterEach(() => {
   act(() => root?.unmount());
   root = undefined;
+  vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
 
 // Keep retained state across mounts while giving each observer a new attachment.
-async function setup() {
+async function setup(predictPrompt?: DesktopNativeChat["predictPrompt"]) {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -143,6 +144,7 @@ async function setup() {
     nextOffset: null,
   });
   const bridge: DesktopNativeChat = {
+    predictPrompt,
     status: async () => (hostAvailable ? "native-ready" : "native-unavailable"),
     takeNotificationFocus: async () => null,
     inputReceipt: async () => {
@@ -298,51 +300,97 @@ async function send(text: string) {
   await expect.poll(() => composer()?.textContent).toBe("");
 }
 
-it.each(["submit", "enqueue"] as const)(
-  "clears the composer on the %s receipt while transcript replay is pending",
-  async (action) => {
-    const f = await setup();
-    if (action === "enqueue") {
-      await send("Start the review.");
-      await expect
-        .element(page.getByText("Start the review.", { exact: true }))
-        .toBeVisible();
-    }
-    const text = "Check the margins.";
-    await writeDraft(text);
-    await expect
-      .element(page.getByRole("button", { name: "Send", exact: true }))
-      .toBeEnabled();
-    const receipt = Promise.withResolvers<void>();
-    const replay = Promise.withResolvers<void>();
-    const submit = f.submit.getMockImplementation()!;
-    f.submit.mockImplementationOnce(async (...args) => {
-      await receipt.promise;
-      return submit(...args);
+it("shows an inline prediction after a reply, then Tab makes it an editable draft until Send", async () => {
+  vi.stubGlobal("grida", {
+    protocol: 1,
+    window: {},
+    composerPredictions: {
+      get: async () => ({ enabled: true, revision: 1 }),
+      onChange: () => () => {},
+    },
+  });
+  const pending = Promise.withResolvers<string | null>();
+  const predict = vi.fn<NonNullable<DesktopNativeChat["predictPrompt"]>>(
+    () => pending.promise
+  );
+  const f = await setup(predict);
+  const suggestion = "Compare the two <drafts>.";
+  const hint = () => document.querySelector("[data-composer-suggestion] kbd");
+  await send("Review the two slides.");
+  await act(async () =>
+    f.settle("succeeded", "The second draft has tighter margins.")
+  );
+  await expect.poll(() => predict.mock.calls.length).toBe(1);
+  await act(async () => pending.resolve(suggestion));
+  await expect
+    .poll(() => hint()?.previousElementSibling?.textContent)
+    .toBe(suggestion);
+  expect(hint()?.textContent).toContain("Tab");
+  expect(composer()?.textContent).toBe("");
+  expect(f.submit).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    composer()!.focus();
+    const imeTab = new KeyboardEvent("keydown", {
+      key: "Tab",
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
     });
-    const read = f.bridge.transcriptPage!;
-    const transcript = vi
-      .spyOn(f.bridge, "transcriptPage")
-      .mockImplementationOnce(async (...args) => {
-        await replay.promise;
-        return read(...args);
-      });
-    const sending = page.getByRole("button", { name: "Sending…" });
-    try {
-      await act(async () => userEvent.keyboard("{Enter}"));
-      await expect.element(sending).toBeDisabled();
-      expect(composer()?.textContent).toBe(text);
-      await act(async () => receipt.resolve());
-      await expect.poll(() => transcript.mock.calls.length).toBe(1);
-      expect(f.submit.mock.lastCall?.[0]).toBe(action);
-      await expect.poll(() => composer()?.textContent).toBe("");
-      await expect.element(sending).not.toBeInTheDocument();
-    } finally {
-      receipt.resolve();
-      await act(async () => replay.resolve());
-    }
-  }
-);
+    expect(composer()!.dispatchEvent(imeTab)).toBe(true);
+    expect(composer()?.textContent).toBe("");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    composer()!.focus();
+    await userEvent.keyboard("{Tab}");
+  });
+  expect(composer()?.textContent).toBe(suggestion);
+  expect(document.activeElement).toBe(composer());
+  expect(f.submit).toHaveBeenCalledTimes(1);
+  await act(async () => userEvent.fill(composer()!, ""));
+  await expect
+    .poll(() => hint()?.previousElementSibling?.textContent)
+    .toBe(suggestion);
+  expect(predict).toHaveBeenCalledTimes(1);
+  await act(async () => userEvent.keyboard("{Tab}"));
+  expect(composer()?.textContent).toBe(suggestion);
+  await writeDraft(" Use the cover.");
+  const edited = suggestion + " Use the cover.";
+  expect(composer()?.textContent).toBe(edited);
+  await f.mount();
+  await expect.poll(() => composer()?.textContent).toBe(edited);
+  expect(predict).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    composer()!.focus();
+    await userEvent.keyboard("{Enter}");
+  });
+  await expect.poll(() => f.submit.mock.calls.at(-1)?.[3]).toBe(edited);
+  expect(f.submit).toHaveBeenCalledTimes(2);
+});
+
+it("keeps a draft editable while predicting and discards a reply after typing then clearing", async () => {
+  vi.stubGlobal("grida", {
+    protocol: 1,
+    window: {},
+    composerPredictions: {
+      get: async () => ({ enabled: true, revision: 1 }),
+      onChange: () => () => {},
+    },
+  });
+  const pending = Promise.withResolvers<string | null>();
+  const predict = vi.fn<NonNullable<DesktopNativeChat["predictPrompt"]>>(
+    () => pending.promise
+  );
+  const f = await setup(predict);
+  await send("Review the cover.");
+  await act(async () => f.settle("succeeded", "Ready for review."));
+  await expect.poll(() => predict.mock.calls.length).toBe(1);
+  await writeDraft("x");
+  await act(async () => userEvent.keyboard("{Backspace}"));
+  await act(async () => pending.resolve("Stale."));
+  expect(composer()?.textContent).toBe("");
+  expect(composer()?.getAttribute("aria-keyshortcuts")).toBeNull();
+  expect(document.querySelector("[data-composer-suggestion]")).toBeNull();
+  expect(f.submit).toHaveBeenCalledTimes(1);
+});
 
 it("shows a waiting input through automatic handoff while its queue details are delayed", async () => {
   const f = await setup();

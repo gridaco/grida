@@ -11,6 +11,8 @@ export type GGModel = Readonly<{
   label: string;
   kind: string;
   created: number;
+  /** Calendar date published on the Gateway model card, when known. */
+  release_date?: string;
   owned_by: string;
   interfaces: readonly string[];
   input_modalities: readonly string[];
@@ -335,11 +337,19 @@ function parseModel(value: unknown): GGModel {
   )
     throw 0;
   const limits = gg.limits;
+  const date = record(gg.card.release) ? gg.card.release.date : undefined;
+  const releaseDate =
+    typeof date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    new Date(date).toJSON()?.slice(0, 10) === date
+      ? date
+      : undefined;
   return {
     id: value.id,
     label: gg.card.label,
     kind: gg.kind,
     created: typeof value.created === "number" ? value.created : 0,
+    ...(releaseDate && { release_date: releaseDate }),
     owned_by: text(value.owned_by) ? value.owned_by : value.id.split("/")[0],
     interfaces: gg.interfaces.filter(
       (iface) =>

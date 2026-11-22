@@ -50,14 +50,16 @@ description. When you name a skill or ask for work a skill describes, for
 example "make a short deck about tides", the agent reads that skill's full
 instructions and follows them. It says which skill it is using. The bundled
 skills include `dotcanvas`, `slides` and `svg`. Workspace chats with bundled
-FX also offer `desktop-fx` for working with FX workflows. The agent reads a bundled skill
-from Grida itself and a project skill as a project file, under the chat's
-existing access. A skill adds guidance, never access.
+FX also offer a skill for planning workflows and inspecting saved runs. A
+Desktop turn with Browser access can discover guidance for inspecting pages.
 
-A project skill in `.agents/skills/<name>/SKILL.md` (or
-`.claude/skills/<name>/SKILL.md`) replaces a bundled skill with the same name.
-The list is saved with each message, so later skill edits apply to later
-messages.
+For an ordinary skill name, Grida looks in `.agents/skills/<name>/SKILL.md`
+first, then `.claude/skills/<name>/SKILL.md`. To select a particular
+extension's skill, use the name shown by discovery, such as
+`desktop-fx/desktop-fx`. This also works when another extension or your project
+uses the same local name. If several extensions match a bare name, choose one
+by its full name. Each message keeps the skill selection it accepted. All
+skills use the chat's existing permissions.
 
 To choose a skill yourself from a source-built host, add `--skill svg` to
 `grida-agent run`, and repeat the flag for more skills. A selected skill's
@@ -69,24 +71,53 @@ select it again. [Use durable client operations](./clients.md#use-durable-client
 
 ## Use the tools available to the task
 
-A Desktop workspace chat on macOS and Linux runs under the **Default** access
-shown in the composer. The agent reads, creates and edits files in the project
-and runs commands there in a sandbox without asking each time; its commands
-can read elsewhere on your computer but cannot write outside the project or
-reach the internet. Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
-when you want it to investigate without changing anything. Skills add
-guidance but never add access. [Understand agent permissions](./permissions.md)
+With **Auto** or **Ask for approval**, a Desktop workspace chat on macOS and
+Linux can read, create and edit files in the project and run commands there
+in a sandbox without asking each time. Commands can read elsewhere on your
+computer. The sandbox limits writes to the project and a temporary directory,
+and the agent needs approval to connect a command to a public destination.
+The agent uses commands to find and read project files. Turn on the **Plan**
+badge (**+ → Plan mode** or `/plan`) for read-only investigation. Plan uses
+Desktop's normal read scope under read-only, offline confinement. Skills use the chat's existing permissions. [Understand agent permissions](./permissions.md)
 
 Source-built headless and ACP hosts use the permission profile you supply.
 [Work with selected folders](./clients.md#work-with-selected-folders)
 
+In a Desktop **Act** chat with an attached workbench, describe the operation
+you need. The agent can look up the available Desktop tools for that task,
+such as listing open tabs, inspecting selected SVG objects or path points,
+or editing an object's opacity. The lookup uses
+the workbench bound when your message was sent. If it has since been closed
+or replaced, send a new message from the current workbench. To show an
+existing file or bundle, give its project-relative path or full path inside
+the project, such as `slides/Launch.canvas`. Grida selects the viewer and
+activates the existing tab if the artifact is already open. With Browser
+available, the agent can also show a web link or check a specific page. When
+several extensions could help, the agent sees a short
+description of each and can look up its tools and skills.
+A request about an FX workflow can lead the agent to the bundled FX skill,
+which uses the chat's existing command permissions.
+
 Current limits:
 
-- The agent cannot render the SVG or HTML it writes to an image to check how
-  it looks, so review visual results in the editor yourself.
+- Browser captures show a page's current viewport. Review the appearance of
+  a standalone SVG in its editor.
 - If the model sends a tool request whose details Grida cannot read, the
   agent is told the request could not be read and can send it again in the
   same turn. Repeated failures end the turn at its step limit.
+
+## Search the web for one message
+
+With **GPT-6.2 Sol** on a connected **ChatGPT Subscription**, the agent can
+search the live web when a question needs current information. Ask a question
+from Home or in a workspace chat, or ask directly, for example “Search the
+web for today’s forecast in Seoul.” **Settings → Personalization → Web search**
+controls this across workspaces and is on by default.
+
+When the model searches, the chat shows the reported search activity. Open a
+cited source from the reply to read it. Sources remain available when you
+reopen the chat. A reply can have no citations.
+[Web search preferences](./desktop-settings.md#personalization)
 
 ## Use tools from a local MCP server
 

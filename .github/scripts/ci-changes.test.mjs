@@ -49,6 +49,26 @@ for (const [name, paths, expected] of [
     ["rust", "conformance", "native", "docs"],
   ],
   [
+    "embedded Desktop browser tool catalog",
+    ["extensions/browser/tools.json"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "embedded Desktop Workbench tool catalog",
+    ["desktop/src/main/desktop-workbench-tools.json"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "extension-owned skill",
+    ["extensions/desktop-fx/skills/desktop-fx/SKILL.md"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "standalone skill",
+    ["skills/svg/SKILL.md"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
     "Cargo build configuration",
     [".cargo/config.toml"],
     ["rust", "conformance", "native", "docs"],

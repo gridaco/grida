@@ -4,10 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { defaultFilter } from "cmdk";
 import { startOfToday, subDays } from "date-fns";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { toast } from "sonner";
 import { app, useDesktopBridge } from "@/lib/desktop/bridge";
 import type {
   NativeChatEffort,
+  NativeChatSpeed,
+  NativeChatTurnCapabilities,
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
@@ -17,10 +20,14 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CopyIcon,
   RotateCcwIcon,
   EllipsisVerticalIcon,
+  EyeOffIcon,
+  FolderIcon,
+  GitForkIcon,
+  HashIcon,
   ListIcon,
-  MailIcon,
   PencilIcon,
   PlusIcon,
   SparklesIcon,
@@ -40,6 +47,10 @@ import { ChatActivityIndicators } from "./chat-activity-indicators";
 import { cn } from "@app/ui/lib/utils";
 import { NativeEffortSlider } from "./native-effort-slider";
 import { ComposerControlSkeleton } from "../shared/composer-control-skeleton";
+import {
+  ComposerToolbarTooltip,
+  composerToolbarButtonClassName,
+} from "@/kits/composer";
 import {
   Popover,
   PopoverContent,
@@ -63,7 +74,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
 import {
@@ -71,15 +87,18 @@ import {
   type NativeChatController,
   type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
+import layout from "./native-chat-layout.module.css";
 
 export function NativeChatHeader({
   controller,
   state,
+  workingDirectory,
   disabled = false,
   onChatSelected,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
+  workingDirectory?: string;
   disabled?: boolean;
   onChatSelected?: () => void;
 }) {
@@ -92,6 +111,7 @@ export function NativeChatHeader({
   const title = state.selected
     ? controller.chatTitle(state.selected)
     : NEW_CHAT_TITLE;
+  const entry = state.catalogEntry;
   useEffect(() => {
     if (disabled) return;
     const visible = () => pickerOpen.current && !document.hidden;
@@ -144,7 +164,7 @@ export function NativeChatHeader({
   return (
     <header
       data-testid="native-chat-header"
-      className="flex h-10 shrink-0 items-center gap-2 px-[max(0.75rem,calc((100%_-_48rem)/2))] text-xs font-medium"
+      className={`flex h-10 shrink-0 items-center gap-2 text-xs font-medium ${layout.contentInset}`}
     >
       <Popover
         open={open}
@@ -252,8 +272,8 @@ export function NativeChatHeader({
                           <ContextMenuItem
                             onSelect={() => void controller.markChatUnread(id)}
                           >
-                            <MailIcon aria-hidden />
-                            Mark unread
+                            <EyeOffIcon aria-hidden />
+                            Mark as unread
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
@@ -337,7 +357,7 @@ export function NativeChatHeader({
       >
         <PlusIcon className="size-4" />
       </Button>
-      {(state.catalogEntry || state.catalogEntryError) && (
+      {(entry || state.catalogEntryError) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -364,7 +384,7 @@ export function NativeChatHeader({
               renaming.current = false;
             }}
           >
-            {state.catalogEntry && (
+            {entry && (
               <>
                 <DropdownMenuItem
                   disabled={state.catalogChanging}
@@ -382,11 +402,62 @@ export function NativeChatHeader({
                       void controller.markChatUnread(state.selected!)
                     }
                   >
-                    <MailIcon aria-hidden />
-                    Mark unread
+                    <EyeOffIcon aria-hidden />
+                    Mark as unread
                   </DropdownMenuItem>
                 )}
-                {!state.catalogEntry.archived && (
+                <DropdownMenuSeparator />
+                {controller.commandChoices.includes("fork") && (
+                  <>
+                    <DropdownMenuItem
+                      disabled={state.acting || !!state.commandRunning}
+                      onSelect={() =>
+                        void controller
+                          .runComposerCommand("fork")
+                          .catch(() => {})
+                      }
+                    >
+                      <GitForkIcon aria-hidden />
+                      Fork chat
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <CopyIcon aria-hidden />
+                    Copy
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="w-48">
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void copyChatValue(entry.sessionId, "Chat ID copied")
+                        }
+                      >
+                        <HashIcon aria-hidden />
+                        Copy chat ID
+                      </DropdownMenuItem>
+                      {workingDirectory && (
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void copyChatValue(
+                              workingDirectory,
+                              "Working directory copied"
+                            )
+                          }
+                        >
+                          <FolderIcon aria-hidden />
+                          Copy working directory
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+                {(!entry.archived || entry.deletionAvailable) && (
+                  <DropdownMenuSeparator />
+                )}
+                {!entry.archived && (
                   <DropdownMenuItem
                     disabled={state.catalogChanging}
                     onSelect={() => void archiveChat()}
@@ -395,7 +466,7 @@ export function NativeChatHeader({
                     Archive
                   </DropdownMenuItem>
                 )}
-                {state.catalogEntry.deletionAvailable && (
+                {entry.deletionAvailable && (
                   <DropdownMenuItem
                     disabled={!controller.canDeleteSavedChat}
                     onSelect={() => void deleteChat()}
@@ -406,9 +477,7 @@ export function NativeChatHeader({
                 )}
               </>
             )}
-            {state.catalogEntry && state.catalogEntryError && (
-              <DropdownMenuSeparator />
-            )}
+            {entry && state.catalogEntryError && <DropdownMenuSeparator />}
             {state.catalogEntryError && (
               <DropdownMenuItem
                 onSelect={() => void controller.readChatDetails()}
@@ -421,6 +490,15 @@ export function NativeChatHeader({
       )}
     </header>
   );
+}
+
+async function copyChatValue(value: string, confirmation: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(confirmation);
+  } catch {
+    toast.error("Couldn't copy to the clipboard.");
+  }
 }
 
 function chatsByDate(ids: readonly string[], controller: NativeChatController) {
@@ -454,9 +532,75 @@ const EFFORT_LABEL: Record<EffortStop, string> = {
 };
 const DEFAULT_EFFORT: EffortStop = "medium";
 
+const RESPONSE_SPEEDS = [
+  { value: "standard", label: "Standard", description: "Default speed" },
+  {
+    value: "fast",
+    label: "Fast",
+    description: "Faster responses, more usage",
+  },
+  {
+    value: "ultrafast",
+    label: "Ultrafast",
+    description: "Fastest available responses, more usage",
+  },
+] as const;
+
+// Keep the rear bolt open from the turn at its crown to the lower tip.
+const RESPONSE_SPEED_BOLT_RIGHT_EDGE =
+  "M12.5 4.75 13.25 3.75Q14 3 13.75 4.25L12.75 9.5H18.5Q19.5 9.5 18.75 10.5L10.25 20.25";
+const RESPONSE_SPEED_BOLT = `${RESPONSE_SPEED_BOLT_RIGHT_EDGE}Q9.25 21.5 9.5 20L10.5 15H5.25Q4.25 15 5 14Z`;
+
+function ResponseSpeedIcon({
+  speed,
+  className,
+}: {
+  speed: NativeChatSpeed;
+  className: string;
+}) {
+  const doubled = speed === "ultrafast";
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="1 1 22 22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {doubled && (
+        <path
+          d={RESPONSE_SPEED_BOLT_RIGHT_EDGE}
+          transform="translate(2.75)"
+          strokeWidth="1.55"
+        />
+      )}
+      <path
+        d={RESPONSE_SPEED_BOLT}
+        transform={doubled ? "translate(-2.25)" : undefined}
+        fill={speed === "standard" ? undefined : "currentColor"}
+      />
+    </svg>
+  );
+}
+
 function effortStop(effort: NativeChatEffort | undefined): EffortStop {
   return !effort || effort === "standard" ? DEFAULT_EFFORT : effort;
 }
+
+const OPENAI_MODEL_LIST_ERRORS = {
+  unavailable: "Couldn’t load OpenAI API models.",
+  keyRejected: "OpenAI rejected the project key. Replace it in Settings.",
+  modelsForbidden: "The OpenAI project key needs permission to list models.",
+  noCompatibleModels: "This OpenAI project has no compatible models.",
+} satisfies Record<
+  Exclude<NonNullable<NativeChatProfileCatalog["openAiIssue"]>, "loading">,
+  string
+>;
+
+const OPENAI_MODEL_REFRESH_INTERVAL_MS = 500;
 
 export function NativeModelPicker({
   profiles,
@@ -468,6 +612,7 @@ export function NativeModelPicker({
   initialError,
   effort,
   onEffort,
+  speed,
   ultraAvailable,
   ultraOffered = true,
   defaultUnavailable,
@@ -489,6 +634,12 @@ export function NativeModelPicker({
   initialError?: string | null;
   effort?: NativeChatEffort;
   onEffort?: (effort: NativeChatEffort) => void;
+  speed?: {
+    value: NativeChatSpeed;
+    capabilities: NativeChatTurnCapabilities | null;
+    onChange(speed: NativeChatSpeed): void;
+    refresh(): void;
+  };
   /** Negotiated harness support; absent until the installed host is checked. */
   ultraAvailable?: boolean;
   /**
@@ -576,22 +727,75 @@ export function NativeModelPicker({
   // Model-list entry reloads choices; effort changes leave them alone.
   // (see test/desktop-agent-chat-model-refresh.md)
   const showModels = !!onSelect && (!onEffort || view === "models");
-  const editingEffort = open && !showModels && !!onEffort;
+  const showEffort = !showModels && !!onEffort;
+  const editingEffort = open && showEffort;
+  const speedAvailable = !!speed?.capabilities?.speeds.length;
+  const activeSpeed =
+    speed &&
+    RESPONSE_SPEEDS.find(
+      ({ value }) =>
+        value !== "standard" &&
+        value === speed.value &&
+        speed.capabilities?.speeds.includes(value)
+    );
+  const speedDescription = activeSpeed && `${activeSpeed.label} response speed`;
+  const speedStatus = speed?.capabilities?.status;
+  const speedError =
+    speedStatus === "reauthenticationRequired"
+      ? "Sign in to ChatGPT again to check faster speeds."
+      : speedStatus === "unavailable"
+        ? "Couldn’t check available speeds."
+        : null;
+  const resetSpeed =
+    !!speed?.capabilities && speed.value !== "standard" && !speedAvailable;
+  const modelListError =
+    refreshError ??
+    (profiles?.subscriptionIssue === "unavailable"
+      ? "Couldn’t load ChatGPT models."
+      : profiles?.subscriptionIssue === "reauthenticationRequired"
+        ? "Sign in to ChatGPT again to load its models."
+        : undefined);
+  const openAiIssue = profiles?.openAiIssue;
+  const openAiLoading = openAiIssue === "loading" && !refreshError;
+  const openAiModelError =
+    openAiIssue &&
+    openAiIssue !== "loading" &&
+    OPENAI_MODEL_LIST_ERRORS[openAiIssue];
+  const refreshOpenAi =
+    open && showModels && openAiLoading && !busy && !loading && !initialError;
+  const refreshModels = useRef(onRefresh);
+  useEffect(() => {
+    refreshModels.current = onRefresh;
+  }, [onRefresh]);
+  useEffect(() => {
+    if (!refreshOpenAi) return;
+    // The profile reader shares overlapping reads. Poll only while the list
+    // can show the result of Main's pending discovery.
+    const timer = setInterval(
+      () => refreshModels.current(),
+      OPENAI_MODEL_REFRESH_INTERVAL_MS
+    );
+    return () => clearInterval(timer);
+  }, [refreshOpenAi]);
   if (initialError)
     return (
-      <Button
-        type="button"
-        size="xs"
-        variant="ghost"
-        aria-label="Retry loading models"
-        title={initialError}
-        className="w-32 min-w-16 shrink rounded-xl text-muted-foreground"
-        disabled={busy}
-        onClick={onRefresh}
-      >
-        <RotateCcwIcon className="size-3.5" />
-        Retry
-      </Button>
+      <ComposerToolbarTooltip label={initialError}>
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          aria-label="Retry loading models"
+          className={cn(
+            composerToolbarButtonClassName,
+            "w-32 min-w-16 shrink text-muted-foreground"
+          )}
+          disabled={busy}
+          onClick={onRefresh}
+        >
+          <RotateCcwIcon className="size-3.5" />
+          Retry
+        </Button>
+      </ComposerToolbarTooltip>
     );
   if (loading) return <ComposerControlSkeleton kind="model" />;
   return (
@@ -605,49 +809,59 @@ export function NativeModelPicker({
           setAllModels(false);
           setModelSearch("");
           setSettingsError(null);
+          speed?.refresh();
           if (onSelect && !onEffort) onRefresh();
         }
       }}
     >
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          role="combobox"
-          aria-label={editingEffort ? "Select effort" : "Model connection"}
-          aria-expanded={open}
-          disabled={busy}
-          title={
-            editingEffort
-              ? "Select effort"
-              : selected
-                ? `${selected.connection} · ${selected.model}`
-                : label
-          }
-          className={cn(
-            "min-w-16 max-w-52 shrink gap-1.5 rounded-xl px-1.5 font-normal",
-            open && "bg-muted px-3",
-            editingEffort && "text-muted-foreground"
-          )}
-        >
-          <ConnectionIcon connection={selected?.connection} />
-          <span className="truncate">
-            {editingEffort ? "Select effort" : label}
-          </span>
-          {onEffort && !editingEffort && (
-            <span className="shrink-0 text-muted-foreground">
-              {EFFORT_LABEL[stop]}
+      <ComposerToolbarTooltip
+        label={
+          speedDescription
+            ? `Select efforts & models · ${speedDescription}`
+            : "Select efforts & models"
+        }
+      >
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            role="combobox"
+            aria-label={editingEffort ? "Select effort" : "Model connection"}
+            aria-description={speedDescription}
+            aria-expanded={open}
+            disabled={busy}
+            className={cn(
+              composerToolbarButtonClassName,
+              "min-w-16 max-w-52 shrink gap-1.5 px-1.5 font-normal",
+              editingEffort && "text-muted-foreground"
+            )}
+          >
+            {activeSpeed ? (
+              <ResponseSpeedIcon
+                speed={activeSpeed.value}
+                className="size-3.5 shrink-0"
+              />
+            ) : (
+              <ConnectionIcon connection={selected?.connection} />
+            )}
+            <span className="truncate">
+              {editingEffort ? "Select effort" : label}
             </span>
-          )}
-          {open && !editingEffort && (
-            <ChevronDownIcon
-              aria-hidden="true"
-              className="size-3 shrink-0 text-muted-foreground"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+            {onEffort && !editingEffort && (
+              <span className="shrink-0 text-muted-foreground">
+                {EFFORT_LABEL[stop]}
+              </span>
+            )}
+            {open && !editingEffort && (
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="size-3 shrink-0 text-muted-foreground"
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+      </ComposerToolbarTooltip>
       <PopoverContent
         align="end"
         side="top"
@@ -663,13 +877,82 @@ export function NativeModelPicker({
           }}
           className="overflow-hidden"
         >
-          <div ref={measurePanel}>
-            {!showModels && onEffort && (
+          <div ref={measurePanel} className="relative">
+            {showEffort && (
               <div
                 data-testid="native-effort-panel"
                 className="flex flex-col gap-3 p-3"
               >
                 <div className="relative px-8">
+                  <DropdownMenu
+                    key={
+                      speedAvailable ? "speed-available" : "speed-unavailable"
+                    }
+                    modal={false}
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        className="absolute top-0 left-0"
+                        aria-label="Response speed"
+                        aria-description={speedDescription}
+                        title="Response speed"
+                        disabled={busy || !speedAvailable}
+                      >
+                        <ResponseSpeedIcon
+                          speed={activeSpeed?.value ?? "standard"}
+                          className="size-3.5 text-muted-foreground"
+                        />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    {speedAvailable && speed && (
+                      <DropdownMenuContent
+                        side="right"
+                        align="start"
+                        collisionPadding={12}
+                        className="w-60 max-w-[calc(100vw-1.5rem)] rounded-xl"
+                      >
+                        <DropdownMenuRadioGroup value={speed.value}>
+                          {RESPONSE_SPEEDS.map(
+                            ({ value, label, description }) => (
+                              <DropdownMenuPrimitive.RadioItem
+                                key={value}
+                                value={value}
+                                textValue={label}
+                                disabled={
+                                  busy ||
+                                  (value !== "standard" &&
+                                    !speed.capabilities?.speeds.includes(value))
+                                }
+                                onSelect={() => {
+                                  if (value !== speed.value)
+                                    speed.onChange(value);
+                                }}
+                                className="flex cursor-default items-center gap-3 rounded-lg px-2.5 py-1.5 outline-none select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:opacity-50"
+                              >
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <span className="text-sm font-medium">
+                                    {label}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {description}
+                                  </span>
+                                </span>
+                                <DropdownMenuPrimitive.ItemIndicator>
+                                  <CheckIcon
+                                    aria-hidden="true"
+                                    className="size-3.5"
+                                  />
+                                </DropdownMenuPrimitive.ItemIndicator>
+                              </DropdownMenuPrimitive.RadioItem>
+                            )
+                          )}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    )}
+                  </DropdownMenu>
                   <div className="flex min-w-0 flex-col items-center gap-0.5">
                     <span className="text-sm font-medium text-primary">
                       {EFFORT_LABEL[stop]}
@@ -741,8 +1024,8 @@ export function NativeModelPicker({
             )}
             {showModels && (
               <Command>
-                {onEffort && (
-                  <div className="flex items-center gap-1 border-b px-2 py-1">
+                <div className="flex h-12 items-center gap-1 border-b px-3">
+                  {onEffort && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -752,9 +1035,9 @@ export function NativeModelPicker({
                     >
                       <ChevronLeftIcon className="size-3" />
                     </Button>
-                    <span className="text-xs font-medium">Models</span>
-                  </div>
-                )}
+                  )}
+                  <span className="text-xs font-medium">Models</span>
+                </div>
                 <CommandInput
                   placeholder="Search all models…"
                   value={modelSearch}
@@ -828,7 +1111,7 @@ export function NativeModelPicker({
                               setAllModels(true);
                             } else {
                               setOpen(false);
-                              void app.openSettings().catch(() => {
+                              void app.openSettings("models").catch(() => {
                                 setSettingsError(
                                   "Couldn't open Settings. Restart Desktop and try again."
                                 );
@@ -848,19 +1131,59 @@ export function NativeModelPicker({
                 </CommandList>
               </Command>
             )}
+            {showEffort && speed && (speedError || resetSpeed) && (
+              <div className="flex flex-wrap items-center gap-1.5 border-t px-3 py-2">
+                {speedError && (
+                  <p className="w-full text-xs text-muted-foreground">
+                    {speedError}
+                  </p>
+                )}
+                {speedStatus === "unavailable" && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={speed.refresh}
+                  >
+                    Retry availability
+                  </Button>
+                )}
+                {resetSpeed && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => speed.onChange("standard")}
+                  >
+                    Use Standard
+                  </Button>
+                )}
+              </div>
+            )}
             {showModels && settingsError && (
               <p role="alert" className="px-3 py-2 text-xs text-destructive">
                 {settingsError}
               </p>
             )}
-            {showModels && refreshError && (
+            {showModels && openAiLoading && (
+              <p
+                role="status"
+                className="px-3 py-2 text-xs text-muted-foreground"
+              >
+                Loading OpenAI API models…
+              </p>
+            )}
+            {showModels && (modelListError || openAiModelError) && (
               <div
                 role="alert"
                 className="flex items-center gap-2 px-3 py-2 text-xs"
               >
-                <span className="min-w-0 flex-1 text-muted-foreground">
-                  {refreshError}
-                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground">
+                  {modelListError && <span>{modelListError}</span>}
+                  {openAiModelError && <span>{openAiModelError}</span>}
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -885,7 +1208,8 @@ function ConnectionIcon({ connection }: { connection?: string }) {
       ? OpenRouterLogo
       : connection === "Vercel AI Gateway"
         ? VercelLogo
-        : connection === "ChatGPT Subscription"
+        : connection === "ChatGPT Subscription" ||
+            connection === "OpenAI API · Project billing"
           ? OpenAILogo
           : connection === "Ollama"
             ? OllamaLogo

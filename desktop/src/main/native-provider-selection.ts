@@ -4,7 +4,9 @@ import {
   isValidEndpointProviderId,
   type EndpointProviderConfig,
 } from "@grida/ai-host";
-import { catalog } from "@grida/ai/catalogue";
+import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -13,6 +15,7 @@ import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeImageGeneration } from "./native-image-generation";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 
 export namespace NativeProviderSelection {
   type Settings = Readonly<{
@@ -28,8 +31,13 @@ export namespace NativeProviderSelection {
       | "provider"
       | "endpoint"
       | "model"
+      | "wireModel"
+      | "imageInput"
+      | "maxOutputTokens"
+      | "reasoning"
       | "credentialHome"
       | "configuredEndpointKey"
+      | "configuredEndpointId"
       | "imageGeneration"
       | "llamaCppInputCount"
       | "subagents"
@@ -43,11 +51,14 @@ export namespace NativeProviderSelection {
     hasKey: (id: string) => Promise<boolean>;
     network: () => Promise<NativeProviderNetwork>;
     imageRequest?: (init: RequestInit) => Promise<Response>;
+    modelCatalogue?: ModelCatalogueSnapshot;
+    onOpenAiAuthenticationFailure?: () => void;
   }>;
 
   const builtInEndpoints = {
     openrouter: "https://openrouter.ai/api/v1",
     vercel: "https://ai-gateway.vercel.sh/v1",
+    [OPENAI_PROJECT_PROVIDER_ID]: ProviderNetworkPolicy.OPENAI_API_BASE,
   } as const;
   // The native CLI also owns these vendor keys in the shared store.
   const nativeVendorKeys = new Set(["openai", "anthropic", "google"]);
@@ -60,52 +71,89 @@ export namespace NativeProviderSelection {
 
   /** Whether `endpoint` is the base URL of a built-in stored-key provider. */
   export function isBuiltInEndpoint(endpoint: string): boolean {
-    return Object.values<string>(builtInEndpoints).includes(endpoint);
+    return builtInProviderId(endpoint) !== undefined;
+  }
+
+  export function builtInProviderId(endpoint: string): string | undefined {
+    return Object.entries(builtInEndpoints).find(
+      ([, url]) => url === endpoint
+    )?.[0];
+  }
+
+  export function isLoopbackEndpoint(endpoint: string): boolean {
+    const url = URL.parse(endpoint);
+    return !!url && isLoopbackHost(url.hostname);
   }
 
   export async function builtInByok(
     providerId: string,
     model: string,
-    settings: ByokSettings
+    settings: ByokSettings,
+    selected?: ChatModels.Binding
   ): Promise<Launch & Readonly<{ credentialHome: string }>> {
     if (!isBuiltInByok(providerId))
       throw new Error("native_provider_byok_unavailable");
-    if (!Object.hasOwn(catalog.text.catalog, model))
+    const isOpenAiProject = providerId === OPENAI_PROJECT_PROVIDER_ID;
+    const binding =
+      selected ??
+      (providerId !== OPENAI_PROJECT_PROVIDER_ID
+        ? ChatModels.resolve(
+            bundledModelCatalogue(),
+            { provider: providerId },
+            model
+          )
+        : undefined);
+    if (
+      !binding ||
+      binding.modelId !== model ||
+      (isOpenAiProject && binding.imageInput)
+    )
       throw new Error("native_provider_model_unavailable");
     const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
       throw new Error("native_provider_byok_key_missing");
     const custody = await capturedCredential(home, providerId, true);
     const endpoint = builtInEndpoints[providerId];
-    const target = `${endpoint}/chat/completions`;
+    const target = `${endpoint}/${isOpenAiProject ? "responses" : "chat/completions"}`;
     const network = await settings.network();
-    const imageGeneration = settings.imageRequest
-      ? NativeImageGeneration.forByok(
-          providerId,
-          endpoint,
-          settings.imageRequest
-        )
-      : undefined;
-    // Reasoning is a published fact of this provider's binding of the model.
-    const reasoning =
-      catalog.text.catalog[
-        model as keyof typeof catalog.text.catalog
-      ]?.reasoningProviders?.includes(providerId) === true;
+    const imageGeneration =
+      settings.imageRequest && providerId !== OPENAI_PROJECT_PROVIDER_ID
+        ? NativeImageGeneration.forByok(
+            providerId,
+            endpoint,
+            settings.imageRequest,
+            settings.modelCatalogue
+          )
+        : undefined;
     return {
-      provider: "openai-compatible",
+      provider: isOpenAiProject ? "responses" : "openai-compatible",
       endpoint,
       model,
+      wireModel: binding.wireModel,
+      imageInput: binding.imageInput,
+      maxOutputTokens: binding.maxOutputTokens,
       credentialHome: home,
       subagents: true,
-      ...(reasoning && { reasoning: true as const }),
+      ...(binding.reasoning && { reasoning: true as const }),
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         isCurrent: () => custody.isCurrent(network),
-        prepare: (url, headers) =>
-          url === target &&
-          /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
-            ? custody.prepare(network, url, headers)
-            : null,
+        prepare: (url, headers) => {
+          if (
+            (url !== target &&
+              (!isOpenAiProject || url !== `${target}/input_tokens`)) ||
+            !/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
+          )
+            return null;
+          const dispatch = custody.prepare(network, url, headers);
+          if (!dispatch || !isOpenAiProject) return dispatch;
+          return async (body, signal) => {
+            const response = await dispatch(body, signal);
+            if (response?.status === 401)
+              settings.onOpenAiAuthenticationFailure?.();
+            return response;
+          };
+        },
       },
     };
   }
@@ -165,6 +213,7 @@ export namespace NativeProviderSelection {
       provider: "openai-compatible",
       endpoint,
       model,
+      configuredEndpointId: config.id,
       ...(llamaCppInputCount && { llamaCppInputCount }),
       ...(credentialHome && {
         credentialHome,

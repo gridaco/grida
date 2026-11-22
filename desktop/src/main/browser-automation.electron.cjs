@@ -1,8 +1,11 @@
 // GRIDA-SEC-016 — browser tool operations on isolated local pages.
 const assert = require("node:assert/strict");
+const { execFile } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
 const { once } = require("node:events");
+const { setTimeout: delay } = require("node:timers/promises");
+const { promisify } = require("node:util");
 const { app, BrowserWindow, nativeImage } = require("electron");
 
 const bundle = process.argv[2];
@@ -48,6 +51,165 @@ document.querySelector('form').addEventListener('submit',event=>{
 console.error('fixture startup diagnostic');
 </script>`;
 
+/** Open the ordinary installed FX service in the admitted workbench guest. */
+async function fxScenario({
+  window,
+  shellEval,
+  event,
+  attachmentId,
+  workspace,
+  origin,
+  fx,
+}) {
+  const [engine, cwd, serialized] = fx;
+  const entry = JSON.parse(serialized);
+  const { DesktopBrowserTools } = require(
+    path.join(bundle, "desktop-browser-tools.cjs")
+  );
+  const { FxViewer } = require(path.join(bundle, "fx-viewer.cjs"));
+  const execute = promisify(execFile);
+  const fxCommand = async (...args) => {
+    const { stdout } = await execute(
+      engine,
+      [...args, "--project", cwd, "--json"],
+      { env: { GRIDA_FX_NETWORK: "off" }, timeout: 5000 }
+    );
+    return JSON.parse(stdout);
+  };
+  const browser = new DesktopBrowserTools(
+    host,
+    new FxViewer(
+      (requested) =>
+        requested === workspace ? FxViewer.projectDirectory(cwd) : undefined,
+      (args, signal) => FxViewer.run(engine, args, signal)
+    )
+  );
+  const shell = window.webContents;
+  const publish = (active) =>
+    assert(
+      browser.publish(
+        event,
+        { active: null, open: [], truncated: false },
+        active
+      )
+    );
+  publish(null);
+  const lease = browser.lease(shell, shell.mainFrame, () => {});
+  const call = async (tool, args) => {
+    const result = await lease.invoke(tool, args, AbortSignal.timeout(6000));
+    assert.equal(result.error, undefined, JSON.stringify({ tool, result }));
+    return result.data;
+  };
+
+  phase = "start packaged FX service";
+  const first = await fxCommand(
+    "start",
+    "--background",
+    "--port",
+    String(await loopbackPort())
+  );
+  assert.equal(first.state, "running");
+  assert.equal(first.project_id, entry.project_id);
+  try {
+    phase = "present and observe packaged FX plan in the workbench";
+    const preview = await browser.resolveFxPreview(shell, entry);
+    assert.equal(preview.state, "service_ready");
+    assert.equal(new URL(preview.url).origin, new URL(first.url).origin);
+    const { tabId, readiness } = await call("surface_open", {
+      target: { kind: "url", url: preview.url },
+    });
+    const claim = host.reserveMount(event, { attachmentId, pageId: tabId });
+    await shellEval(`(() => {
+      const el = document.createElement("webview");
+      el.src = ${JSON.stringify(claim.src)};
+      el.style = "display:flex;width:700px;height:390px";
+      document.getElementById("slot").append(el);
+    })()`);
+    host.setActive(event, { attachmentId, pageId: tabId, active: true });
+    publish(tabId);
+    const target = { kind: "workbench", tabId };
+    const wait = (readiness) =>
+      call("browser_wait", {
+        target,
+        readiness,
+        condition: { kind: "ready", state: "load" },
+        timeoutMs: 5000,
+      });
+    const load = await wait(readiness);
+    assert.equal(load.url, preview.url);
+    const readObservation = async () => {
+      const end = Date.now() + 5000;
+      do {
+        const observation = await browser.captureEditorObservation(shell);
+        if (observation) return observation;
+        await delay(60);
+      } while (Date.now() < end);
+      assert.fail("The FX page did not publish its viewer context");
+    };
+    const inspection = await readObservation();
+    assert.equal(inspection.surface, "fx-viewer");
+    assert.equal(inspection.payload.tabId, tabId);
+    assert.deepEqual(inspection.payload.subject.reference, entry);
+
+    phase = "withdraw FX observation after navigation";
+    const away = await call("browser_navigate", {
+      target,
+      documentId: load.documentId,
+      action: { kind: "goto", url: `${origin}/fixture` },
+    });
+    const other = await wait(away.readiness);
+    assert.notEqual(other.documentId, load.documentId);
+    assert.equal(await browser.captureEditorObservation(shell), null);
+    const back = await call("browser_navigate", {
+      target,
+      documentId: other.documentId,
+      action: { kind: "goto", url: preview.url },
+    });
+    await wait(back.readiness);
+    const restored = await readObservation();
+    assert.deepEqual(restored.payload.subject.reference, entry);
+    assert.notEqual(restored.payload.documentId, inspection.payload.documentId);
+
+    phase = "withdraw the old service binding after replacement";
+    await fxCommand("stop");
+    assert.equal(
+      (await browser.resolveFxPreview(shell, entry)).state,
+      "stopped"
+    );
+    let nextPort;
+    do {
+      nextPort = await loopbackPort();
+    } while (String(nextPort) === new URL(first.url).port);
+    const replacement = await fxCommand(
+      "start",
+      "--background",
+      "--port",
+      String(nextPort)
+    );
+    assert.equal(replacement.project_id, first.project_id);
+    assert.notEqual(replacement.instance_id, first.instance_id);
+    assert.notEqual(replacement.url, first.url);
+    assert.equal(await browser.captureEditorObservation(shell), null);
+    const resumed = await browser.resolveFxPreview(shell, entry);
+    assert.equal(resumed.state, "service_ready");
+    assert.equal(new URL(resumed.url).origin, new URL(replacement.url).origin);
+    assert.equal(new URL(resumed.url).pathname, new URL(preview.url).pathname);
+  } finally {
+    lease.close();
+    await fxCommand("stop");
+  }
+}
+
+async function loopbackPort() {
+  const socket = http.createServer();
+  socket.listen(0, "127.0.0.1");
+  await once(socket, "listening");
+  const { port } = socket.address();
+  socket.close();
+  await once(socket, "close");
+  return port;
+}
+
 async function main() {
   app.dock?.hide();
   const slowResponse = Promise.withResolvers();
@@ -77,6 +239,9 @@ async function main() {
     width: 864,
     height: 628,
     webPreferences: {
+      // The test runner may cover this window. Keep the embedder compositing
+      // the visible workbench guest for Chromium's real screenshot request.
+      backgroundThrottling: false,
       webviewTag: true,
       sandbox: true,
       contextIsolation: true,
@@ -99,6 +264,22 @@ async function main() {
   });
   const event = { sender: shell, senderFrame: shell.mainFrame };
   const { attachmentId } = await host.attach(event, workspace);
+  const fx = process.argv.slice(4);
+  if (fx.length) {
+    await fxScenario({
+      window,
+      shellEval,
+      event,
+      attachmentId,
+      workspace,
+      origin,
+      fx,
+    });
+    window.destroy();
+    server.close();
+    console.log("packaged FX Electron scenario passed");
+    return;
+  }
   const service = new BrowserAutomation(host);
   let live = true;
   const scope = {
@@ -505,10 +686,31 @@ async function main() {
       );
     }),
   ]).finally(() => clearTimeout(frameTimer));
-  await ok("browser_capture", {
+  const visibleCapture = await ok("browser_capture", {
     target: foreground.target,
     documentId: selected.documentId,
   });
+  assert.equal(visibleCapture.data.documentId, selected.documentId);
+  assert.equal(visibleCapture.image.mimeType, "image/jpeg");
+  const screenshot = nativeImage.createFromBuffer(
+    Buffer.from(visibleCapture.image.base64, "base64")
+  );
+  const { width, height } = screenshot.getSize();
+  assert(width > 0 && height > 0);
+  // The center of the fixture is its orange background, clear of the form.
+  // Allow for the display color profile and JPEG quantization.
+  const [blue, green, red, alpha] = screenshot
+    .crop({
+      x: Math.floor(width / 2),
+      y: Math.floor(height / 2),
+      width: 1,
+      height: 1,
+    })
+    .toBitmap();
+  assert(
+    red > 220 && green > 130 && green < 190 && blue < 100 && alpha === 255,
+    `Expected orange page pixels, got rgba(${red}, ${green}, ${blue}, ${alpha})`
+  );
   const workbenchSnapshot = (
     await ok("browser_snapshot", {
       target: foreground.target,

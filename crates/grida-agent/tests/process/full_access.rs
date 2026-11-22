@@ -199,16 +199,86 @@ async fn permission_choice_is_per_chat_durable_exact_and_requires_launch_authori
     endpoint.done().await;
 }
 
-struct ResourceServer {
-    url: String,
-    paths: Arc<Mutex<Vec<String>>>,
+#[tokio::test]
+async fn withdrawing_automatic_review_returns_the_chat_to_manual_approval() {
+    let fixture = Fixture::new(false);
+    let original = fs::read(&fixture.profile).unwrap();
+    let mut profile: Value = serde_json::from_slice(&original).unwrap();
+    profile["allowApproveForMe"] = json!(true);
+    let enabled = serde_json::to_vec(&profile).unwrap();
+    fs::write(&fixture.profile, &enabled).unwrap();
+    let endpoint = Endpoint::start(vec![Reply::Finished("Ready.")]).await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let chat = session(&mut client, &fixture).await;
+    let select = change(&fixture, &chat, 0, "select-reviewer", "approve_for_me");
+    let chosen = client.request(UPDATE, select.clone()).await;
+    assert_eq!(chosen["result"]["revision"], 1, "{chosen}");
+    client.close().await;
+
+    fs::write(&fixture.profile, original).unwrap();
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    attach(&mut client, &fixture, &chat).await;
+    // New work can be admitted even if the client has not read the setting yet.
+    prompt(&mut client, &chat).await;
+    let current = client.request(INSPECT, target(&fixture, &chat)).await;
+    assert_eq!(current["result"]["mode"], "restricted", "{current}");
+    assert_eq!(current["result"]["available"], json!(["restricted"]));
+    assert_eq!(current["result"]["revision"], 2);
+    assert_eq!(
+        client.request(UPDATE, select).await["result"],
+        chosen["result"]
+    );
+    assert_eq!(
+        client.request(INSPECT, target(&fixture, &chat)).await["result"],
+        current["result"]
+    );
+    client.close().await;
+
+    fs::write(&fixture.profile, enabled).unwrap();
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    attach(&mut client, &fixture, &chat).await;
+    let restored = client.request(INSPECT, target(&fixture, &chat)).await;
+    assert_eq!(restored["result"]["mode"], "restricted", "{restored}");
+    assert_eq!(
+        restored["result"]["available"],
+        json!(["restricted", "approve_for_me"])
+    );
+    let stale = client
+        .request(
+            UPDATE,
+            change(&fixture, &chat, 1, "stale", "approve_for_me"),
+        )
+        .await;
+    assert_eq!(
+        stale["error"]["data"], "permission_mode_revision_changed",
+        "{stale}"
+    );
+    let selected = client
+        .request(
+            UPDATE,
+            change(&fixture, &chat, 2, "select-again", "approve_for_me"),
+        )
+        .await;
+    assert_eq!(selected["result"]["mode"], "approve_for_me", "{selected}");
+    assert_eq!(selected["result"]["revision"], 3);
+    client.close().await;
+    endpoint.done().await;
+}
+
+pub(super) struct ResourceServer {
+    pub(super) url: String,
+    pub(super) paths: Arc<Mutex<Vec<String>>>,
     task: tokio::task::JoinHandle<()>,
 }
 
 impl ResourceServer {
     async fn start(body: Vec<u8>) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!("http://{}", listener.local_addr().unwrap());
+        Self::bind("127.0.0.1", body).await
+    }
+
+    pub(super) async fn bind(host: &str, body: Vec<u8>) -> Self {
+        let listener = TcpListener::bind((host, 0)).await.unwrap();
+        let url = format!("http://{host}:{}", listener.local_addr().unwrap().port());
         let paths = Arc::new(Mutex::new(Vec::new()));
         let observed = paths.clone();
         let task = tokio::spawn(async move {
@@ -281,10 +351,16 @@ async fn default_denies_network_and_outside_writes_full_access_allows_both_and_c
             assert_eq!(result["structured"]["backend"], "unconfined", "{result}");
             Reply::Finished("Observed the unconfined result.")
         })),
-        tool(
-            "read_file",
-            json!({"directory":"filesystem","path":outside.strip_prefix("/").unwrap()}),
-        ),
+        Reply::Choose(Box::new({
+            let outside = outside.clone();
+            move |request| {
+                assert!(!offered(request, "read_file"));
+                tool(
+                    "exec_command",
+                    json!({"access":"read","cmd":format!("/bin/cat '{}'", outside.display())}),
+                )
+            }
+        })),
         Reply::Choose(Box::new(|request| {
             let result = last_tool(request);
             assert_eq!(result["status"], "succeeded", "{result}");
@@ -655,44 +731,78 @@ async fn model_created_worker_inherits_full_access_for_its_exact_assignment() {
 }
 
 #[tokio::test]
-#[ignore = "requires the current native helper"]
-async fn full_access_does_not_enable_mutation_or_command_tools_in_plan() {
+#[ignore = "requires the current native helper and OS confinement"]
+async fn full_access_plan_uses_a_confined_read_only_shell() {
     let fixture = fixture(true);
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["initialPermissionMode"] = json!("full_access");
+    profile["directories"][0]["commandRead"] = json!("allow");
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
-    let endpoint = Endpoint::start(vec![Reply::Choose(Box::new(|request| {
-        assert!(offered(request, "read_file"));
-        for tool in [
-            "exec_command",
-            "write_stdin",
-            "write_file",
-            "edit_file",
-            "spawn_agent",
-        ] {
-            assert!(!offered(request, tool), "Plan offered {tool}");
-        }
-        Reply::Finished("The investigation requires no mutation.")
-    }))])
+    fs::write(fixture.primary.join("note"), "permitted plan input").unwrap();
+
+    let endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            assert!(offered(request, "exec_command"));
+            for tool in [
+                "read_file",
+                "list_files",
+                "search_text",
+                "write_stdin",
+                "write_file",
+                "edit_file",
+                "spawn_agent",
+            ] {
+                assert!(!offered(request, tool), "Plan offered {tool}");
+            }
+            tool(
+                "exec_command",
+                json!({
+                    "cmd":"if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > ../extra/plan-outside) 2>/dev/null; then exit 43; fi; /bin/cat note",
+                }),
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            let result = last_tool(request);
+            #[cfg(target_os = "macos")]
+            assert_eq!(result["structured"]["backend"], "seatbelt", "{result}");
+            #[cfg(target_os = "linux")]
+            assert_eq!(result["structured"]["backend"], "bubblewrap", "{result}");
+            assert_eq!(result["structured"]["completion"]["code"], 0, "{result}");
+            assert!(
+                result.to_string().contains("permitted plan input"),
+                "{result}"
+            );
+            Reply::Finished("The investigation requires no mutation.")
+        })),
+    ])
     .await;
-    let output = fixture
-        .process(&endpoint.url, "run")
-        .args([
-            "--mode",
-            "plan",
-            "--prompt",
-            "Inspect the available resources.",
-        ])
-        .arg("--cwd")
-        .arg(&fixture.primary)
-        .output()
-        .await
-        .unwrap();
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args([
+                "--mode",
+                "plan",
+                "--prompt",
+                "Inspect the available resources.",
+            ])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    assert_eq!(
+        fs::read_to_string(fixture.primary.join("note")).unwrap(),
+        "permitted plan input"
+    );
+    assert!(!fixture.extra.join("plan-outside").exists());
     endpoint.done().await;
 }
 

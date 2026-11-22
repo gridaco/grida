@@ -23,6 +23,7 @@ export namespace chat_vocabulary {
   export const CONTEXT_PARTS = {
     files: "data-user_file_attachments",
     svgTextSelection: "data-svg-text-selection",
+    svgSelection: "data-svg-selection",
     messageContext: "data-message-context",
     questionReply: "data-question-reply",
   } as const;

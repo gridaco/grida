@@ -34,6 +34,10 @@ export const CHATGPT_TOKEN_URL = "https://auth.openai.com/oauth/token" as const;
 export const CHATGPT_RESPONSES_URL =
   "https://chatgpt.com/backend-api/codex/responses" as const;
 
+// Subscription catalog shape supported by this adapter.
+const CATALOG_CLIENT_VERSION = "0.170.0";
+export const CHATGPT_MODELS_URL = `https://chatgpt.com/backend-api/codex/models?client_version=${CATALOG_CLIENT_VERSION}`;
+
 const CHATGPT_CODEX_CLIENT_ID =
   process.env.GRIDA_CHATGPT_OAUTH_CLIENT_ID?.trim() ||
   "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -52,6 +56,7 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
     },
   },
   responses_url: CHATGPT_RESPONSES_URL,
+  catalog_client_version: CATALOG_CLIENT_VERSION,
   originator: "grida",
   default_model_id: CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
 };

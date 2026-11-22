@@ -90,4 +90,4 @@ itself ([Plan mode](../agent/mode-plan.md)), not a built-in subagent.
 
 ## See also
 
-- [Fundamental tools (Grida binding)](./tools-fundamentals.md)
+- [Agent tool contracts](../agent/tools.md)

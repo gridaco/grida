@@ -4,6 +4,181 @@ import { ProviderNetworkPolicy } from "./provider-network-policy";
 const grants = ProviderNetworkPolicy.builtInGrants("https://grida.co/path");
 
 describe("ProviderNetworkPolicy", () => {
+  it("publishes only the authenticated OpenAI image generation POST to the sidecar", () => {
+    const { OPENAI_IMAGE_GRANT_ID, OPENAI_IMAGE_URL, OPENAI_API_BASE } =
+      ProviderNetworkPolicy;
+    const request = {
+      grant_id: OPENAI_IMAGE_GRANT_ID,
+      method: "POST",
+      url: OPENAI_IMAGE_URL,
+      headers: [
+        ["authorization", "Bearer project-fixture"],
+        ["content-type", "application/json"],
+      ] as const,
+    };
+    expect(ProviderNetworkPolicy.authorize(grants, request).url.href).toBe(
+      OPENAI_IMAGE_URL
+    );
+    for (const override of [
+      { method: "GET" },
+      { url: `${OPENAI_API_BASE}/responses` },
+      { url: `${OPENAI_API_BASE}/images/edits` },
+      { url: `${OPENAI_IMAGE_URL}?other=1` },
+      { headers: [["content-type", "application/json"]] as const },
+      { headers: [...request.headers, ["openai-project", "other"]] as const },
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(grants, { ...request, ...override })
+      ).toThrow(/not allowed/);
+    }
+    for (const id of [
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+      ProviderNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(grants, { ...request, grant_id: id })
+      ).toThrow(/not (allowed|granted)/);
+    }
+  });
+
+  it("admits project discovery and Responses only on the Main OpenAI grant", () => {
+    const { OPENAI_PROJECT_GRANT_ID, OPENAI_API_BASE } = ProviderNetworkPolicy;
+    const native = [...grants, ...ProviderNetworkPolicy.mainOnlyGrants()];
+    const request = (method: string, url: string) => ({
+      grant_id: OPENAI_PROJECT_GRANT_ID,
+      method,
+      url,
+      headers: [["authorization", "Bearer project-key"]] as const,
+    });
+    for (const [method, path] of [
+      ["GET", "models"],
+      ["POST", "responses"],
+      ["POST", "responses/input_tokens"],
+    ]) {
+      const metadata = request(method!, `${OPENAI_API_BASE}/${path}`);
+      expect(ProviderNetworkPolicy.authorize(native, metadata).method).toBe(
+        method
+      );
+      expect(() => ProviderNetworkPolicy.authorize(grants, metadata)).toThrow(
+        /unknown/
+      );
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, { ...metadata, headers: [] })
+      ).toThrow(/not allowed/);
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, {
+          ...metadata,
+          headers: [...metadata.headers, ["openai-project", "other-project"]],
+        })
+      ).toThrow(/not allowed/);
+    }
+    for (const [method, url] of [
+      ["POST", `${OPENAI_API_BASE}/models`],
+      ["POST", `${OPENAI_API_BASE}/responses?other=1`],
+      ["POST", `${OPENAI_API_BASE}/chat/completions`],
+      ["GET", "https://api.openai.com.example/v1/models"],
+      ["POST", "https://chatgpt.com/backend-api/codex/responses"],
+    ]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, request(method!, url!))
+      ).toThrow(/not (allowed|granted)/);
+    }
+  });
+
+  it("limits each Voice key to its Main-only transcription POST", () => {
+    const { OPENAI_IMAGE_GRANT_ID, OPENAI_PROJECT_GRANT_ID, voiceRoutes } =
+      ProviderNetworkPolicy;
+    const native = [...grants, ...ProviderNetworkPolicy.mainOnlyGrants()];
+    const multipart = [
+      ["content-type", "multipart/form-data; boundary=fixture"],
+    ] as const;
+    const headersByProvider = {
+      openai: multipart,
+      openrouter: [["content-type", "application/json"]],
+      vercel: [
+        ["content-type", "application/json"],
+        ["ai-gateway-protocol-version", "0.0.1"],
+        ["ai-transcription-model-specification-version", "4"],
+        ["ai-model-id", "openai/gpt-transcribe"],
+      ],
+      grida: [...multipart, ["idempotency-key", "voice-fixture"]],
+    } as const;
+    for (const provider of [
+      "openai",
+      "openrouter",
+      "vercel",
+      "grida",
+    ] as const) {
+      const route = voiceRoutes[provider];
+      const request = {
+        grant_id: route.grantId,
+        method: "POST",
+        url: route.url,
+        headers: [
+          ["authorization", "Bearer voice-fixture"],
+          ...headersByProvider[provider],
+        ] as const,
+      };
+      const approved = ProviderNetworkPolicy.authorize(native, request);
+      expect(approved.url.href).toBe(route.url);
+      expect(ProviderNetworkPolicy.maxRequestBodyBytes(approved)).toBe(
+        route.maxBodyBytes
+      );
+      expect(() => ProviderNetworkPolicy.authorize(grants, request)).toThrow(
+        /unknown/
+      );
+      for (const override of [
+        { method: "GET" },
+        { url: `${route.url}?alternate=1` },
+        { url: `${new URL(route.url).origin}/other` },
+        { url: "https://unknown.example/v1/audio/transcriptions" },
+        { headers: [["authorization", "Bearer voice-fixture"]] as const },
+        { headers: headersByProvider[provider] },
+        {
+          headers: [
+            ...request.headers.filter(([key]) => key !== "content-type"),
+            [
+              "content-type",
+              provider === "openrouter" || provider === "vercel"
+                ? multipart[0][1]
+                : "application/json",
+            ],
+          ] as const,
+        },
+        { headers: [...request.headers, ["openai-project", "other"]] as const },
+      ]) {
+        expect(() =>
+          ProviderNetworkPolicy.authorize(native, { ...request, ...override })
+        ).toThrow(/not (?:allowed|granted)/);
+      }
+      for (const other of Object.values(voiceRoutes)) {
+        if (other === route) continue;
+        expect(() =>
+          ProviderNetworkPolicy.authorize(native, {
+            ...request,
+            grant_id: other.grantId,
+          })
+        ).toThrow(/not granted/);
+      }
+    }
+    const openAiRequest = {
+      method: "POST",
+      url: voiceRoutes.openai.url,
+      headers: [
+        ["authorization", "Bearer voice-fixture"],
+        ...multipart,
+      ] as const,
+    };
+    for (const grantId of [OPENAI_PROJECT_GRANT_ID, OPENAI_IMAGE_GRANT_ID]) {
+      expect(() =>
+        ProviderNetworkPolicy.authorize(native, {
+          ...openAiRequest,
+          grant_id: grantId,
+        })
+      ).toThrow(/not allowed/);
+    }
+  });
+
   it("authorizes only built-in provider origins and suffixes", () => {
     const exact = ProviderNetworkPolicy.authorize(grants, {
       grant_id: ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,

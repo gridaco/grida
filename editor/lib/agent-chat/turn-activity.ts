@@ -1,3 +1,4 @@
+import { isSameDay } from "date-fns";
 import type {
   NativeChatActivity,
   NativeChatMessage,
@@ -17,6 +18,8 @@ import type {
  * See docs/wg/ai/agent/experience.md#read-each-finished-turn.
  */
 export namespace turn_activity {
+  const IDLE_DIVIDER_MS = 10 * 60 * 1000;
+
   export type Item =
     | Readonly<{ kind: "commentary"; message: NativeChatMessage }>
     | Readonly<{
@@ -53,6 +56,10 @@ export namespace turn_activity {
     | Readonly<{
         kind: "turn";
         turnId: string;
+        /** Captured models of the neighboring turns at this boundary. */
+        modelChange?: Readonly<{ from: string; to: string }>;
+        /** Start time to show before this turn's opening request. */
+        timeDividerAtMs?: number;
         /** Messages that opened the turn, shown before its header. */
         requests: readonly NativeChatMessage[];
         /** Running turns stay expanded; finished turns start collapsed. */
@@ -63,13 +70,17 @@ export namespace turn_activity {
         answers: readonly NativeChatMessage[];
       }>;
 
-  export type Current = Pick<NativeChatTurn, "turnId"> | null | undefined;
+  export type Current =
+    | Pick<NativeChatTurn, "turnId" | "modelId">
+    | null
+    | undefined;
 
   export function group(
     messages: readonly NativeChatMessage[],
     records: readonly NativeChatTurnRecord[],
     current: Current,
-    latest?: Pick<NativeChatTurn, "turnId" | "status"> | null
+    latest?: Pick<NativeChatTurn, "turnId" | "status" | "modelId"> | null,
+    transcriptGapBefore?: string
   ): Block[] {
     const known = new Map(records.map((record) => [record.turnId, record]));
     const order = new Map(records.map((record, at) => [record.turnId, at]));
@@ -90,13 +101,21 @@ export namespace turn_activity {
         });
       }
     };
+    let previousModel: string | undefined;
+    let previousTurn: NativeChatTurnRecord | undefined;
     let index = 0;
     while (index < messages.length) {
       const first = messages[index];
+      if (first.messageId === transcriptGapBefore) {
+        previousModel = undefined;
+        previousTurn = undefined;
+      }
       const turnId = first.turnId;
       const position = turnId === undefined ? undefined : order.get(turnId);
       if (position !== undefined) placeCompactionsBefore(position);
       if (!turnId) {
+        previousModel = undefined;
+        previousTurn = undefined;
         blocks.push({ kind: "message", message: first });
         index++;
         continue;
@@ -105,10 +124,28 @@ export namespace turn_activity {
       while (end < messages.length && messages[end].turnId === turnId) end++;
       const members = messages.slice(index, end);
       index = end;
+      const record = known.get(turnId);
+      const precedingTurn = previousTurn;
+      previousTurn = record;
+      const observed =
+        current?.turnId === turnId
+          ? current
+          : latest?.turnId === turnId
+            ? latest
+            : undefined;
+      const model = record?.modelId ?? observed?.modelId;
+      const modelChange =
+        previousModel !== undefined &&
+        model !== undefined &&
+        previousModel !== model
+          ? { from: previousModel, to: model }
+          : undefined;
+      previousModel = model;
       // A turn the host recorded or classified is grouped, even when it
       // ended before any response. Otherwise there is nothing to collapse safely.
       if (
-        !known.has(turnId) &&
+        !record &&
+        model === undefined &&
         !members.some((message) => message.phase !== undefined)
       ) {
         for (const message of members)
@@ -120,12 +157,17 @@ export namespace turn_activity {
       while (
         opening < members.length &&
         members[opening].role === "user" &&
-        !members[opening].questionReply
+        !members[opening].questionReply &&
+        !members[opening].questionReplies
       )
         opening++;
       const requests = members.slice(0, opening);
       const rest = members.slice(opening);
-      const record = known.get(turnId);
+      const showTimeDivider =
+        requests.length > 0 &&
+        record &&
+        precedingTurn &&
+        startsNewTimeGroup(precedingTurn, record.startedAtMs);
       const outcome =
         record?.status ??
         (latest?.turnId === turnId ? (latest.status ?? null) : null);
@@ -141,6 +183,8 @@ export namespace turn_activity {
       blocks.push({
         kind: "turn",
         turnId,
+        ...(modelChange && { modelChange }),
+        ...(showTimeDivider && { timeDividerAtMs: record.startedAtMs }),
         requests,
         finished,
         outcome,
@@ -154,6 +198,15 @@ export namespace turn_activity {
     }
     placeCompactionsBefore(Number.POSITIVE_INFINITY);
     return blocks;
+  }
+
+  function startsNewTimeGroup(previous: NativeChatTurnRecord, atMs: number) {
+    if (atMs < previous.startedAtMs) return false;
+    return (
+      !isSameDay(atMs, previous.startedAtMs) ||
+      (previous.settledAtMs !== undefined &&
+        atMs - previous.settledAtMs >= IDLE_DIVIDER_MS)
+    );
   }
 
   /**
@@ -355,7 +408,7 @@ export namespace turn_activity {
     execute: "ran commands",
     generate: "generated images",
     delegate: "delegated work",
-    ask: "asked a question",
+    ask: "asked you",
     other: "used tools",
   };
 

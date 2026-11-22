@@ -10,6 +10,9 @@
  */
 export type ByokModality = "text" | "image" | "video";
 
+/** Distinct from the headless `openai` slot and outside the custom endpoint ID range. */
+export const OPENAI_PROJECT_PROVIDER_ID = "desktop-openai-project-credential";
+
 export const BYOK_PROVIDER_METADATA = [
   {
     id: "openrouter",
@@ -37,6 +40,11 @@ export const BYOK_PROVIDER_METADATA = [
   },
   // Tripo exposes named 3D features, not a generic text/image/video resolver.
   { id: "tripo", label: "Tripo", modalities: [] },
+  {
+    id: OPENAI_PROJECT_PROVIDER_ID,
+    label: "OpenAI API · Project billing",
+    modalities: ["text", "image"],
+  },
 ] as const;
 
 export type ByokProviderMetadata = (typeof BYOK_PROVIDER_METADATA)[number];

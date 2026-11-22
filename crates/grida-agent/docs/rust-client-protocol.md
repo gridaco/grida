@@ -362,10 +362,10 @@ required for metadata inspection or mutation.
   in a providerless metadata host and is not an independent execution grant.
 - `_co.grida/session/selection/update` takes `{cwd, sessionId,
 expectedRevision, operationId, selection}`. A selection is `{connectionId,
-model, effort}`: connection ID is a stable 64-character lowercase hex host
-  reference or null for the workspace default; model is the wire model ID;
-  effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
-  normalizes to `medium`. The supervisor validates configured connection and
+model, effort, speed?}`: connection ID is a stable 64-character lowercase hex host
+  reference or null for the workspace default. The model is the canonical selection ID. Its provider selector is resolved privately at acceptance.
+  Effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
+  normalizes to `medium`. Speed is `standard` (default), `fast`, or `ultrafast`. The supervisor validates configured connection and
   model availability separately from worker readiness. A successful response
   is `{sessionId, operationId, revision, selection}`. An invalid selection or
   stale expected revision changes no metadata. Exact outstanding operation
@@ -398,6 +398,33 @@ connection to `connectionId`. An exact accepted-input retry observes its
 original receipt before consulting newer chat settings. Historical inputs,
 Goals, reviews and retries keep their original execution captures.
 
+On private routed stdio, `co.grida/provider/turn-capabilities: 1` enables
+selected-turn offer discovery. The worker calls
+`_co.grida/provider/turnCapabilities` with the captured `routeId` (when routed)
+and namespaced `model`. The supervisor replies with `status`, offered accelerated
+`speeds`, and a `webSearch` boolean. Status is `available`, `unsupported`,
+`unavailable`, or `reauthenticationRequired`. The credential owner checks the
+selected subscription identity and its authenticated model listing. For
+compatibility with older supervisors, the worker accepts
+`fastModeDisabled: true` as a request to use Standard without changing the
+chat’s saved selection.
+Desktop offers live access for new inputs that permit search. The worker
+still accepts an optional `webSearchMode` of `cached` or `indexed` from older
+supervisors and preserves that restriction in accepted inputs. Search captures
+without an access mode use live access.
+
+For regular `session/submit` and `session/enqueue`, a client can send
+`_meta["co.grida/webSearch"] = true` with the selection revision to permit
+provider-hosted search for that input. Speed comes from the revisioned chat
+selection. An accelerated or search-enabled input requires a positive offer
+at admission. Ordinary Standard inputs bypass offer discovery. The durable
+input retains the model, connection, speed and search permission for execution.
+An accepted-input retry with a different search permission conflicts. Private
+`_co.grida/session/input` inspection returns `settings.webSearch` when enabled.
+An omitted setting means search was off, including for older records and
+workers. The public acceptance receipt contains only submission data. Goals
+and auxiliary operations use their own request settings.
+
 The native host persists versioned private selection records adjacent to its
 database under the same exclusive process owner. This adds no SQLite schema
 migration. Forks capture the source selection once at the fork action;
@@ -428,11 +455,24 @@ at the same `cwd`. Each response carries the same `requestId`, a `view`, and
 an opaque `older` cursor at the same `_meta` key. Standard text chunks for
 that response also carry the `requestId` in `_meta`.
 
+Chunks for a locally authored user message can include `inputId` in the same
+metadata. It identifies the exact accepted input that produced the message
+and can differ from its `messageId`. A message with only attachments carries
+the input ID on its resource links. Inherited messages and messages without
+an exact submission match omit the field.
+
 Pass `older` as `before` in a new read to step backward until `older` is null.
 The host delivers each page in chronological order. A page can contain no
 visible messages and still have an older cursor. When a cursor's view or its
 active-turn boundary changes, restart from the latest page. Reading starts
 no work. `session/load` without this metadata retains full ACP replay.
+
+For a main chat, the negotiated `_co.grida/session/snapshot` response can
+include `modelId` on each of `current` and `latest`. The transcript window's
+`turns` use the same optional field on every page. It identifies the foreground
+model captured for the input the turn claimed, including inputs accepted into
+the queue. Later chat selections and auxiliary model calls have their own
+scope. The host omits `modelId` when a turn has no captured foreground model.
 
 Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
 `plan` or `act` when submitting, enqueueing, starting a goal, or revising
@@ -546,6 +586,48 @@ and structured display parts remain available through inspection of the
 queued input at the same session revision. Supplemental model context is
 excluded from the preview.
 
+### Composer predictions
+
+A private stdio client can negotiate `co.grida/session/predict-prompt: 1` and
+request `_co.grida/session/predict-prompt` with `{sessionId, turnId}` for an
+attached chat. The client decides whether its composer can use a suggestion.
+The request accepts no instructions, provider choice, grants, or message text.
+
+An idle, active regular chat can receive one prediction for its latest
+successful user turn. The host validates the completed turn's provider and
+account. A hosted connection must offer the product's `nano` model under the
+same authority. A local endpoint on `localhost` or a numeric loopback address
+can use its selected model directly. A supervised endpoint must confirm its
+live offer through `co.grida/provider/prediction-route: 1`. An unavailable
+offer skips prediction.
+The prediction includes the visible reply, retained compacted context and a
+fixed instruction. A different model receives portable conversation text and
+tool observations. Private reasoning and signed continuation data stay with
+their original model.
+It offers no tools, rechecks inference authority and runs one generation under
+a 15-second deadline with a separate output allowance. Goals, workers, side
+chats and queued work are ineligible. The host reserves the attempt only
+while the chat is active and the same reply is still current. Archiving the
+chat while the supervisor resolves its model skips generation. Changing the chat's selected model,
+connection or effort invalidates the completed turn's prediction. Cancellation,
+stale context, unavailable authority and provider failure can all yield an empty
+result.
+
+The result contains `text` (a short editable prompt or `null`) and `elapsedMs`.
+Optional `modelId` names the requested prediction model when there is provider
+execution evidence.
+Optional `tokenUsage` uses the turn summary's reported categories for this
+prediction alone. With Gateway billing negotiated, `gatewayBilling` can report
+the scoped charge from the prediction's terminal receipt. For a pending or
+missing terminal receipt, the host makes one bounded lookup for the exact
+dispatched request on its captured supervisor route. A charge that remains
+pending when the draft returns stays pending in this response. Missing counts and
+unavailable receipts represent unknown measurements. The host retains only a
+session-scoped reservation so concurrent or replayed requests cannot charge
+twice, even after a restart. The inference and suggestion stay outside the
+parent transcript, queue and turn account. Clients insert accepted text into
+their ordinary draft and send only upon explicit submission.
+
 ### Retained tool-result images
 
 Private stdio clients on macOS and Linux can negotiate
@@ -633,6 +715,26 @@ before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
 
+For recognized `exec_command` input, the host includes an optional
+`commandActions` array in tool-call attribution under
+`_meta["co.grida/session/updates"]` and
+`_meta["co.grida/session/transcript-window"]`. The same field may appear on
+tool activity in a child conversation. The array lists the following action
+shapes in command order.
+
+- `{kind: "read", path}`
+- `{kind: "list_files", path?, piped?: true}`
+- `{kind: "search", query, path?, piped?: true}`
+
+The host emits 1–16 actions, with each string limited to 1,024 UTF-8 bytes.
+Paths use the operands as written in the command, relative to the command's
+working directory where applicable. The projection uses the original
+arguments. It describes the requested operations, so a compound command can
+list actions that the shell skipped after an earlier error. The `piped` flag
+marks an action whose output goes to a filter. The shell's exit status then
+describes the pipeline and may reflect only the filter. Treat missing or
+unrecognized metadata as a generic command activity.
+
 Negotiated private stdio lifecycle updates use
 `_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
 `turnId` and `waitId` of a registered question on this attached session. Both
@@ -652,8 +754,10 @@ expired result needs no attention. Older consumers ignore unknown fact kinds.
 | `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                                                              |
 | `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                                                      |
 | `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                                                     |
-| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                                                               |
-| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                                                                  |
+| `questions`                              | `sessionId`, `turnId`. Read pending singleton questions and the current control/history basis.                                                                                                                  |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed singleton answer and its correlated contribution.                                                                        |
+| `questions-v2`                           | `sessionId`, `turnId`. Read pending question batches and retained singleton questions, with the current control/history basis.                                                                                  |
+| `answer-question-v2`                     | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answers`. Commit one answer or skip per question ID and its correlated contribution together.                                                    |
 | `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                                                     |
 | `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                                                          |
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                                    |
@@ -675,16 +779,26 @@ had its end read. Its `_meta["co.grida/session/processes"]` holds the complete
 `processes` list. After missed live updates the host sends the current list.
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
-the prompt. Skill references use `grida-skill:<name>@<revision>`. The catalog
-returns metadata and omits local paths and bodies. A stale or unavailable
-selection rejects the new input before inference. Use a new submission or
+the prompt. Standalone and project skills use `grida-skill:<name>@<revision>`.
+An extension skill uses `grida-skill:<extension>/<name>@<revision>`. Use the
+URI returned by the catalog to select that revision. A client can also name an
+extension skill before it has a turn-specific catalog. For example,
+`grida-skill:browser/browser` alongside authored text selects the Browser
+skill only if the attached Act turn captures a Browser grant. Acceptance pins
+the resolved revision, and input inspection returns its complete URI. A bare
+ACP skill URI still requires a revision. The catalog returns metadata and omits
+local paths and bodies. A stale or unavailable selection rejects the input
+before inference. Use a new submission or
 queued replacement to change skills for accepted work. Steering keeps the
 active turn's captured guidance.
 
-Bundled skills are available to every session. Project discovery reads only
-the explicitly readable primary root supplied by the host. It checks
-`.agents/skills` before `.claude/skills`, followed by bundled skills, and uses
-the first available definition for each name. An accepted input retains its
+Standalone bundled skills are available to every session. Project discovery
+reads only the explicitly readable primary root supplied by the host. A bare
+name looks in `.agents/skills` before `.claude/skills` and standalone bundled
+skills. Extension entries carry their own identity through selection and read.
+A qualified name selects an eligible owner directly. A bare name shared by
+multiple extensions needs qualification when no project or standalone entry
+resolves it. An accepted input retains its
 chosen skill bodies and any root `AGENTS.md` guidance. The `input` operation
 reports selected skill versions and the project instruction revision when
 present. These sources supply model context without changing tool permissions.
@@ -915,24 +1029,52 @@ request. Pause holds the retry and Stop closes it. The value is absent when
 there is no current retry. An eligible pre-execution failure can reserve this
 retry, including a connection refusal verified by the direct HTTP host.
 
-Clients negotiate both question operations to enable the corresponding tools
-for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
+Clients negotiate both `co.grida/session/questions-v2` and
+`co.grida/session/answer-question-v2` with capability value `1` to enable
+question batches on newly accepted input. A connection advertising only the
+original pair still submits inputs with the singleton tools. The accepted
+input keeps its original tool definition across queueing, suspension, and
+restarts. A supervisor can pass `_meta: {"co.grida/session/questions-v2": false}`
+on submit, enqueue, queue replacement, revision, or goal start to select the
+negotiated singleton tools for that input. A text-only replacement retains
+the original input's question version.
+
+Both listing methods take `sessionId` and `turnId` and return their
+`controlRevision`, `historyPosition`, and pending `questions`. A v2
+batch entry has `waitId`, `style` (`answer_dependent` or `nonblocking`),
+and a `questions` array in display order. An item has `id`, `question`,
+optional `header`, and `options` with labeled choices and optional
+descriptions. A retained singleton keeps its original entry
+`{waitId, style, question, options}`, with string choices. The v1 listing
+only returns those singleton entries.
+
+Answer values are `{ "kind": "text", "text": "..." }`,
 `{ "kind": "choice", "index": 0 }`, or `{ "kind": "skipped" }`.
-Keep the request identity and all parameters stable when retrying. Accepted
-answers retain a scheduling wake across concurrent worker completion and
-capacity changes. An explicit task pause is independent of answer receipt.
+A v2 submission sends `answers: [{id, answer}, ...]`, with each item ID
+exactly once, and settles a whole wait. If a v2-only client answers a retained
+singleton, use the item ID `question`. The v1 method takes one `answer` for
+a singleton wait. Keep the request identity and all parameters stable when
+retrying. Accepted answers retain a scheduling wake across concurrent worker
+completion and capacity changes. An explicit task pause is independent of
+answer receipt.
+
 Hosts advertising `co.grida/session/optional-questions: 1` expire unanswered
-nonblocking questions in the owning turn's settlement commit. Closing or
-skipping an optional card locally lets the person reopen it while the wait is
-pending. Sending `{ "kind": "skipped" }` explicitly resolves a wait.
-A reply accepted before settlement reaches the next model decision as a user
-message wrapped in `<send_user_message_question_reply>` with a JSON array of
-`{questionItemId, question, answer}`. An answer-dependent tool receives its
-answer as the tool result. For either style, the transcript window delivers the
-readable answer in a user text chunk with `questionReply: {waitId, question}`
-in the chunk's window metadata. Quoted markup in ordinary chat stays ordinary
-text. An embedded `run --questions` exits with `input_required` and code `6`
-when an answer is required. An unanswered optional question permits success.
+nonblocking questions in the owning turn's settlement commit. A card
+dismissed locally may reopen while its wait is pending. An answer accepted
+before settlement reaches the next model decision as a correlated user
+contribution. An answer-dependent tool receives its answers as the tool
+result.
+
+A committed batch appears in the transcript window as a plain-language user
+text chunk. Private attached updates also carry this chunk for clients that
+negotiated `co.grida/session/questions-v2`. The first chunk carries
+`questionReplies: [{waitId, id, question, answer, skipped?}, ...]` in its
+negotiated window or update metadata, with `skipped: true` when applicable.
+Retained singleton reply chunks keep their window metadata
+`questionReply: {waitId, question}`. Quoted markup in ordinary chat stays
+ordinary text. An embedded `run --questions` exits with `input_required`,
+code `6`, and the pending question entries when it needs answers. An
+unanswered optional batch permits success.
 
 ### Temporary side chats
 
@@ -1045,12 +1187,15 @@ returns pending `approvals` with `input_required` and exit code `6`.
 
 `co.grida/session/permission-mode` version 1 is available only to a negotiated
 private supervising stdio connection. It grants no authority by itself. The
-launch permission profile must independently enable `allowFullAccess` before
-the supervisor can select that mode.
+trusted launcher enables the available choices. Full access, automatic review
+and one-command escalation have independent launch opt-ins.
 
 - `_co.grida/session/permission-mode` takes `{cwd, sessionId}` and returns
-  `{sessionId, revision, mode, available}`. Modes are `restricted` and
-  `full_access`; an unselected chat starts at revision 0 in restricted mode.
+  `{sessionId, revision, mode, available}`. An unselected chat starts at
+  revision 0 in the trusted launch's initial mode, which defaults to
+  `restricted`. Read `available` before offering `approve_for_me` or
+  `full_access`. Desktop labels these choices **Ask for approval**, **Auto**,
+  and **Full access**, respectively.
 - `_co.grida/session/permission-mode/update` takes
   `{cwd, sessionId, expectedRevision, requestId, mode}` and returns the state
   plus `requestId`. An exact retry observes the committed receipt. Conflicting
@@ -1064,11 +1209,65 @@ The update selects the mode for inputs accepted after it in this ordinary
 parent chat. Running turns, queued inputs and worker assignments keep their
 captured mode through replay and recovery. Child and side chats cannot select
 their own broader posture. A running command retains its launch permissions.
-Only turns with Full access can read or write its terminal when it launched
-unconfined. The supervisor can always list and stop the chat's processes.
+Only turns with Full access can drive a terminal launched in Full access. A
+reviewed command retry stays confined and uses pipes with closed stdin. Its chat can poll the output or
+interrupt it on later turns. The
+supervisor can always list and stop the chat's processes.
+When the launcher withdraws automatic review, the next permission inspection,
+update or new input for a chat with a saved `approve_for_me` selection records
+`restricted` at the next revision. An exact retry still returns its historical
+receipt. Restoring support requires a fresh user selection to enable review.
 Saved Full access is unavailable when the current trusted launch does not
 authorize it. Earlier implementations can return `permission_mode_busy` when
 work or running processes remain.
+
+With `approve_for_me`, a scoped assessment approves or declines the exact
+action. A timeout or failed assessment closes an eligible action. If a request
+cannot enter automatic review, the supervising client can receive a human
+approval request. Pending rows with `reviewing: true` carry observational
+state. A client may answer a scoped wait only after the host hands it off.
+Ordinary manual decisions suspend the turn. For a running command, the broker
+opens a distinct human-owned wait at handoff and publishes its wait ID. Use
+that ID and its observed revisions. Snapshot and catalogue `inputNeeded`
+reflect the handoff. The independent configured single-read reviewer retains
+its manual fallback and optional `reviewFailure` field.
+
+A command launch reports `managed_network: true` when its restricted process receives
+a destination broker. The `terminal` and `finite` flags describe actual input and
+lifetime, with an omitted `finite` meaning false. A destination approval effect
+carries `network: {host, port}`, as well as
+`filesystem` with the captured `disk_read`, `read_roots`, `write_roots`,
+`runtime_roots`, `private_temp_write`, `resolved_executable` and
+`resolved_cwd`. The effect's `environment_names` lists names only. A client
+that cannot present the scope can decline the request. A host offering
+per-command escalation can issue a separate `escalated_command` effect. It
+carries the exact `command`, `justification`, `cwd`, `executable`,
+`environment_names`, `access` and captured `filesystem` scope. Its `network`
+is `denied`, `listen`, or `managed` for a retained outbound retry. On a managed
+profile, an ordinary confined command emits destination waits directly as it
+connects. Each identifies the public host and port and uses the same reply contract. Each destination decision belongs to the running process and
+is reused for its later connections. A `listen` effect has a required nonzero integer
+`listen_port` and represents incoming TCP and same-port loopback connections.
+The command controls its bind address. The listener grant does not include Internet access. Every retry keeps host filesystem
+exclusions and can remain live after the turn. A client must be able to present
+the captured filesystem and network scope to approve it.
+A transcript turn can include `approvalReviews` with bounded action text and
+a decision of `reviewing`, `approved`, `declined` or `needs_human`. Scoped
+assessments can carry `riskLevel`, `userAuthorization`, a bounded plain-text `rationale` and a
+technical `failure` when applicable. Desktop shows pending review as activity.
+Approval clears that activity. A denial or timeout appears with the action.
+Concurrent connections to distinct destinations have independent reviews. A
+resolved decision leaves the other pending reviews visible.
+The acting model receives the public reason for a blocked action alongside its
+tool result. When the assessment input contains private inspection output, the
+host supplies a fixed rationale identifying the investigation and decision. This
+also applies to failed inspections and observations reused from earlier reviews.
+The raw output and the reviewer's own explanation stay private.
+An eligible denied assessment carries a `reviewId`. A private client that
+negotiates `co.grida/session/reconsider-denial` can select that exact denial
+using `sessionId`, `turnId` and `reviewId`. A `recorded: true` reply confirms
+the user's instruction to reconsider the exact action. The transcript then reports `reconsidered: true`. Recording it starts no work. Any subsequent
+attempt receives a new assessment under the current policy.
 
 Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts
@@ -1266,6 +1465,94 @@ retains that binding, including while it waits in the queue, and the turn's
 editor tools target only that endpoint. Both operations require Act, a text
 prompt with optional editor context, and the negotiated capabilities.
 
+When both peers also negotiate `co.grida/session/desktop-tools` version 1,
+new accepted input carries the Desktop product context, including when no
+workbench is attached. For an eligible editor binding, the agent requests
+its catalog at input acceptance, including for queued input.
+`_co.grida/editor/desktop-tools` is a reverse ACP request with
+`sessionId`, `endpointId`, `timeoutMs`, `expiresAtMs` in Unix milliseconds,
+and `message`, an MCP JSON-RPC `tools/list` or `tools/call` request. An
+optional `scope` object can include `svgTargetId`, `contextId`, or
+`presentation: true`. Main bounds the operation by the original absolute
+deadline and its local relative timeout. The reply echoes the session and
+endpoint and carries the correlated MCP reply in `message`.
+Each listed definition gives `co.grida/definitionRevision` in `_meta` and a
+call repeats that revision in `params._meta`. The agent captures at most 16
+definitions and 32 KiB of catalog data. Main rejects an expired request,
+unavailable endpoint, or changed definition before dispatch. ACP
+cancellation applies to the individual outstanding call. A lost or
+uncorrelated reply after an execution request leaves the outcome uncertain.
+Accepted input cannot switch to a replacement source or retry its call
+through a legacy route.
+
+Peers can also negotiate `co.grida/session/desktop-browser-mcp` version 1.
+The modern Browser and browser-enabled Workbench tools use the same reverse
+request with `scope.browser: true` for the captured Browser lease. The
+Browser-scoped catalog is limited to 24 definitions and 48 KiB. Its
+definitions may declare `co.grida/maxInputBytes` (at most 40 KiB) and
+`co.grida/maxOutputBytes` (at most 448 KiB) in `_meta`. Definitions without
+an override use 32 KiB per direction. A capture with
+`co.grida/resultMimeType: "image/jpeg"` can return one standard MCP image
+alongside bounded structured metadata. The image is capped at 256 KiB decoded,
+with a longest edge of at most 1,024 pixels. Browser call results carry
+`co.grida/disposition` in result `_meta`, matching the structured disposition.
+Revocation and cancellation discard late replies. If the host cannot verify a
+dispatched effect, the result remains uncertain.
+
+Peers can negotiate `co.grida/session/desktop-tool-sources` version 1 to
+capture independent source registrations over the same carrier. These requests
+set `scope.sources: true`. Every listed definition carries
+`_meta["co.grida/source"]` with an `id`, a Main-issued `generation`, and a
+task-oriented `description` of up to 160 UTF-8 bytes. A call echoes that
+source's `id` and `generation` in the same metadata field along with the
+captured definition revision. Main assigns distinct private tool names when sources contribute
+operations with the same local name. Existing built-in model-facing names
+remain stable. Replacing a source assigns a new generation even when it lists
+the same definitions. Calls on the retired generation fail before invocation.
+A separate source on the same endpoint can continue to serve its grants.
+
+The source-qualified catalog uses the 24-definition and 48 KiB ceilings.
+Main admits source groups to the list in registration order, skipping any
+group that cannot fit. A source that retires while the response is queued
+is removed without discarding the other listed sources.
+The input and result size overrides and optional JPEG result type apply to
+qualified definitions under the same per-tool limits. A definition with
+`_meta["co.grida/resultDisposition"]: true` requires a matching disposition
+in the result metadata and structured content. Source descriptions and these
+result declarations convey no execution authority. Retained catalogs keep
+their chosen dialect. A peer without source negotiation continues to serve
+the earlier catalog and call format.
+
+On private Desktop stdio, peers can additionally negotiate
+`co.grida/session/editor-tool-context` version 1. An eligible Act text Submit
+or Enqueue can include `editorToolContextId` alongside the editor endpoint.
+The host retains the opaque ID with the accepted input. An exact retry keeps
+the same capture and receipt. A retry that changes the ID fails. The catalog
+and invocation requests carry it as `scope.contextId`. Main authorizes that
+reference against the capture's owning attachment, session and endpoint.
+Desktop uses it for inspection, opacity, and text operations on the same
+editable SVG document, including a mounted slide.
+Inherited work receives no live editor-tool context. The local accepted
+user message may carry `editorToolContext: true` in the transcript metadata
+to indicate a capture was attached. The marker contains no capture identity
+or payload. Unsupported peers omit the new fields.
+
+Peers that negotiate Desktop tool sources can also negotiate
+`co.grida/session/workbench-file-paths` version 1. The host sends
+`scope.workbenchPaths: true` for that catalog and retains the field with
+the definitions for invocation. The scope always requires negotiated
+sources. Absent this field, the earlier Workbench path and inventory
+contracts apply. The external MCP catalogs use their own existing schemas.
+
+`workbench_list_tabs` returns one bounded inventory with the active tab ID,
+tab descriptors, and truncation. File descriptors carry workspace-relative
+paths. `workbench_show` accepts a typed target. A file target may use a
+workspace-relative or in-workspace absolute filesystem path. Browser
+availability adds visible browser targets and
+`workbench_close_browser_tab`. The model-facing `browser_close` handles
+background pages. Previously accepted inputs retain their names,
+schema revisions, and grants.
+
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Agent → client | `_co.grida/editor/surface-list-open` | `sessionId`, `endpointId`. Returns the same identities with `available`, the `active` path or null, up to 50 `open` paths relative to the workspace root, and `truncated`.              |
@@ -1290,7 +1577,7 @@ bounded structured data or a domain error, and optional JPEG bytes for a
 browser capture. JSON-RPC cancellation closes the outstanding request against
 that endpoint. Legacy file requests keep their existing method and schema.
 
-The client and agent negotiate
+For compatibility with earlier Desktop clients, the client and agent negotiate
 `co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
 An Act text submission or queued input may carry `editorSvgTargetId` with its
 `editorEndpointId`. This is the renderer's opaque capture of the current
@@ -1676,10 +1963,28 @@ inputs can use different provider connections. The agent asks the supervisor
 to resolve the input's saved choice with `_co.grida/provider/resolve`.
 Its parameters are the saved `connectionId` (null selects the configured
 default) and the exact `model`. Only the supervising client supplies an
-endpoint, custody configuration or Gateway/subscription scope.
+endpoint, custody configuration or Gateway/subscription scope. On queue dispatch or recovery, a captured `retainedWireModel` requests the
+exact provider selector accepted with the input. This includes
+`retainedImageInput` and, for an accepted faster response, `retainedSpeed`
+(`fast` or `ultrafast`). The supervisor revalidates
+the original connection and the native host checks the returned binding.
 
-Every successful response carries the same model and a supervisor-local
+Every successful ordinary selection response carries the same model and a supervisor-local
 `routeId` UUID. The `kind` determines the remaining fields.
+
+Private supervisors can independently negotiate
+`co.grida/provider/prediction-route: 1`. A [composer prediction](#composer-predictions)
+adds `purpose: "composerPrediction"` to the request. The `connectionId` and
+`model` identify the completed turn's selection. For an alternate foreground
+route, `sourceRouteId` identifies the exact supervisor-issued handle for that
+selection. Its absence identifies the worker's original launch, including a
+named launch. The supervisor verifies the source handle, connection and model
+together before resolving an economy model under that account. The response
+supplies the verified prediction model and route under the same account.
+Desktop issues a separate route for each supervised prediction, even when it
+uses the foreground model. Turning predictions off revokes that route and
+leaves the foreground exchange available. A fixed worker can negotiate this
+operation while keeping its original foreground model.
 
 | Kind      | Fields                                                                                                                                                                                                                        |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1687,6 +1992,13 @@ Every successful response carries the same model and a supervisor-local
 | `http`    | `endpoint`, `protocol`, and applicable native provider settings: `maxOutputTokens`, `credentialHome`, `configuredEndpointKey`, `compatibleOutputLimitField`, `llamaCppInputCount`, `reasoning`, and `imageGenerationBinding`. |
 | `gateway` | `endpoint`, `scope`, optional `maxOutputTokens`, and `gatewayBilling` when the supervisor can read billing for this exact scope.                                                                                              |
 | `chatgpt` | `endpoint` and `scope` for the subscription connection.                                                                                                                                                                       |
+
+For `chatgpt` and built-in OpenRouter or Vercel `http` routes, the supervisor
+may supply `wireModel` and `imageInput`. The native adapter sends that exact
+selector and enables image input only when the selected adapter supports it.
+The canonical model remains the identity in session settings and turn history.
+The equivalent private launch arguments are `--supervised-wire-model` and
+`--supervised-image-input`. Older supervisors can omit both fields.
 
 For alternate routes every provider exchange action and cancellation includes
 the `routeId`. Image generation and Gateway billing reads also include this
@@ -1707,9 +2019,10 @@ The `co.grida/config/*` operations are client features: a person's own tooling
 inspects, sets, resets and reloads defaults through them. Configuration
 inspection reports `exact_input_counting` for the selected provider profile.
 The flag describes a supported counting route. Each prepared request must
-still return an exact count before an explicit limit can be used. The agent
-changes settings only by editing the settings file, which asks for approval
-like any other write ([agent edits](./rust-config.md#agent-edits)).
+still return an exact count before an explicit limit can be used. Clients can
+also reload a revision written by a person. Accepted inputs from earlier
+hosts may retain settings-file authority through recovery.
+[Agent configuration](./rust-config.md#agent-edits)
 
 ## Compatibility acceptance
 

@@ -1,3 +1,55 @@
+.workbench {
+  --workspace-chat-gap: 1.25rem;
+}
+
+.chatPane {
+  --chat-content-end-inset: var(--workspace-chat-gap);
+}
+
+.chatPane
+  :global(
+    .desktop-native-drag-scroll-viewport[data-slot="scroll-area-viewport"]
+  )
+  + :global(
+    [data-slot="scroll-area-scrollbar"]:is(
+      [data-scroll-active],
+      :hover,
+      :active
+    )
+  ) {
+  z-index: 30;
+}
+
+/* Keep the whole gutter available for resizing while the scrollbar is hidden. */
+.chatSeparator {
+  width: var(--workspace-chat-gap);
+  margin-inline-start: calc(-1 * var(--workspace-chat-gap));
+}
+
+.chatSeparator::before {
+  left: calc(var(--workspace-chat-gap) / 2);
+}
+
+/* The panel library hit-tests rectangles at the document level. Give the
+ * revealed scrollbar its own space as well as a higher stacking order. */
+.workbench:has(
+    .chatPane
+      :global(
+        .desktop-native-drag-scroll-viewport[data-slot="scroll-area-viewport"]
+      )
+      + :global(
+        [data-slot="scroll-area-scrollbar"]:is(
+          [data-scroll-active],
+          :hover,
+          :active
+        )
+      )
+  )
+  .chatSeparator {
+  width: calc(var(--workspace-chat-gap) / 2);
+  margin-inline-end: calc(var(--workspace-chat-gap) / 2);
+}
+
 .decorativeOverflow {
   overflow: visible !important;
 }

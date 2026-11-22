@@ -7,6 +7,7 @@ import type { MusicClient } from "./music-client";
 import type { SoundEffectClient } from "./sound-effect-client";
 import type { TextToSpeechClient } from "./text-to-speech-client";
 import type { ThreeDClient } from "./three-d-client";
+import { OPENAI_PROJECT_PROVIDER_ID } from "./provider-ids";
 
 const contract = (name: keyof typeof contracts): S.Schema =>
   structuredClone(contracts[name]) as S.Schema;
@@ -44,8 +45,9 @@ export namespace MediaInputs {
     const openrouter25 =
       descriptor.provider_id === "openrouter" &&
       /^openai\/gpt-image-2\.5-(?:flare|sunburst)$/.test(descriptor.binding_id);
-    if (fal25) delete schema.properties.aspect_ratio;
-    if (fal25 || openrouter25) delete schema.properties.seed;
+    const openAiProject = descriptor.provider_id === OPENAI_PROJECT_PROVIDER_ID;
+    if (fal25 || openAiProject) delete schema.properties.aspect_ratio;
+    if (fal25 || openrouter25 || openAiProject) delete schema.properties.seed;
     schema.properties.background.enum = descriptor.native_background
       ? ["auto", "opaque", "transparent"]
       : ["auto"];

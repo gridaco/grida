@@ -7,7 +7,7 @@ tags: [desktop, chat, scroll, scrollbar]
 status: untested
 severity: low
 date: 2026-11-15
-updated: 2026-11-17
+updated: 2026-11-21
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/workbench/conversation-scrollbar.browser.tsx
@@ -17,10 +17,11 @@ covered_by:
 
 The conversation uses a Radix overlay scrollbar on the same native viewport as
 streaming autoscroll. Its transparent track does not gain a background on hover.
-The rounded thumb appears during scrolling, remains available while interacting
-with it, and fades after scrolling stops. The transcript's edge fade does not
-obscure the scrollbar. This behavior is shared by the main chat, subagent
-transcripts, and the composer UI demo.
+The rounded thumb appears during manual scrolling, remains available while
+interacting with it, and fades when the interaction ends. Opening a transcript
+or automatically following a response keeps the thumb hidden. The transcript's
+edge fade does not obscure the scrollbar. This behavior is shared by the main
+chat, subagent transcripts, and the composer UI demo.
 
 ## Steps
 
@@ -32,8 +33,9 @@ transcripts, and the composer UI demo.
    - Expected: the thumb stays available during interaction, the transcript
      scrolls normally, and the edge fade does not obscure the thumb.
 4. While a response streams, stay at the bottom, then scroll upward.
-   - Expected: streaming follows the bottom initially, but respects scrolling
-     upward. Scroll to bottom restores following the response.
+   - Expected: streaming follows the bottom with the thumb hidden. Scrolling
+     upward shows the thumb and lets you read earlier content. Scroll to bottom
+     restores following the response.
 5. Repeat in a subagent transcript and the composer conversation demo.
    - Expected: the same scrollbar appearance and fading behavior.
 6. Enable reduced motion and repeat scrolling.
@@ -41,6 +43,6 @@ transcripts, and the composer UI demo.
 
 ## Notes
 
-Automated Chromium coverage checks the shared viewport, native scrollbar hiding,
-transparent track, animation, eventual hiding, streaming follow, and scrolling
-upward. Manual status remains untested for thumb dragging in Electron.
+Automated Chromium coverage checks the shared viewport, hidden scrollbar during
+streaming follow, transparent track, and scrollbar reveal and hide during manual
+scrolling. Manual status remains untested for thumb dragging in Electron.

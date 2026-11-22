@@ -21,6 +21,10 @@ import {
 } from "@app/ui/components/command";
 import { cn } from "@app/ui/lib/utils";
 import {
+  ComposerToolbarTooltip,
+  composerToolbarButtonClassName,
+} from "./composer-toolbar";
+import {
   useComposer,
   useComposerInternals,
   type ComposerCommand,
@@ -33,9 +37,11 @@ const Anchor = createContext<HTMLElement | null>(null);
 export function ComposerMenuAnchor({
   children,
   className,
+  onPointerDown,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
+  const { editor } = useComposerInternals();
   return (
     <Anchor.Provider value={anchor}>
       <div
@@ -43,6 +49,24 @@ export function ComposerMenuAnchor({
         ref={setAnchor}
         className={cn("relative", className)}
         data-composer-menu-anchor
+        onPointerDown={(event) => {
+          onPointerDown?.(event);
+          const { currentTarget, target } = event;
+          if (
+            !editor?.isEditable ||
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            !(target instanceof Element) ||
+            !currentTarget.contains(target)
+          )
+            return;
+          const control = target.closest(
+            "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu], [data-composer-formatting]"
+          );
+          if (control && currentTarget.contains(control)) return;
+          event.preventDefault();
+          editor.commands.focus("end");
+        }}
       >
         {children}
       </div>
@@ -81,10 +105,12 @@ export type ComposerMenuAction = Readonly<{
 export function ComposerActionMenu({
   items,
   label = "Add to message",
+  tooltip = label,
   className,
 }: {
   items: readonly ComposerMenuAction[];
   label?: string;
+  tooltip?: string;
   className?: string;
 }) {
   const composer = useComposer();
@@ -119,23 +145,28 @@ export function ComposerActionMenu({
   if (items.length === 0) return null;
   return (
     <>
-      <Button
-        ref={button}
-        type="button"
-        size="icon-sm"
-        variant="ghost"
-        aria-label={label}
-        title={label}
-        aria-haspopup="listbox"
-        aria-expanded={open && !composer.trigger}
-        className={cn("shrink-0 rounded-full text-muted-foreground", className)}
-        onClick={() => {
-          composer.dismissTrigger();
-          setOpen((previous) => !previous);
-        }}
-      >
-        <PlusIcon className="size-4" />
-      </Button>
+      <ComposerToolbarTooltip label={tooltip}>
+        <Button
+          ref={button}
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          aria-label={label}
+          aria-haspopup="listbox"
+          aria-expanded={open && !composer.trigger}
+          className={cn(
+            composerToolbarButtonClassName,
+            "w-7 text-muted-foreground",
+            className
+          )}
+          onClick={() => {
+            composer.dismissTrigger();
+            setOpen((previous) => !previous);
+          }}
+        >
+          <PlusIcon className="size-4" />
+        </Button>
+      </ComposerToolbarTooltip>
       {open && !composer.trigger && (
         <ComposerMenuSurface ref={panel} data-composer-action-menu>
           <Command

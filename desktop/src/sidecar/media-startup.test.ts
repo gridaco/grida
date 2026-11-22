@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 
 // Only the Electron fetch adapter is replaced. The real host validates grants
 // and carries requests/responses over the same bounded channel as Desktop.
@@ -40,6 +41,116 @@ const ggToken = "synthetic-scoped-gg-token";
 const audio = Buffer.from([0x49, 0x44, 0x33, 0x04]);
 
 describe("built Desktop media startup", () => {
+  it("generates a GPT image through the ordinary sidecar route with the shared OpenAI project key", async () => {
+    const root = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-openai-media-"))
+    );
+    const userData = path.join(root, "state");
+    const mediaRoot = path.join(root, "media");
+    const catalogueDirectory = path.join(root, "catalogue");
+    const output = path.join(root, "build");
+    const home = path.join(root, "home");
+    const env = { HOME: home, USERPROFILE: home, TMPDIR: root };
+    const model = "openai/gpt-image-2.6-flare";
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+    const projectKey = "sk-proj-image-fixture";
+    let sidecar: Sidecar | undefined;
+    try {
+      for (const directory of [userData, mediaRoot, catalogueDirectory, home])
+        await fs.mkdir(directory, { mode: 0o700 });
+      await runBuild(root, output, env);
+      await fs.symlink(
+        path.join(desktop, "node_modules"),
+        path.join(root, "node_modules"),
+        "dir"
+      );
+      const discovery = ggContractFixture([]);
+      const generate = vi.fn<
+        (url: string, init: RequestInit) => Promise<Response>
+      >(async (url, init) => {
+        expect(url).toBe("https://api.openai.com/v1/images/generations");
+        expect(init.method).toBe("POST");
+        expect(new Headers(init.headers).get("authorization")).toBe(
+          `Bearer ${projectKey}`
+        );
+        expect(JSON.parse(await new Response(init.body).text())).toMatchObject({
+          model: "gpt-image-2.6-flare",
+          prompt: "A red triangle",
+        });
+        return Response.json({ data: [{ b64_json: png }] });
+      });
+      sidecar = await Sidecar.start({
+        root,
+        output,
+        userData,
+        mediaRoot,
+        catalogueDirectory,
+        env,
+        runtime: await sidecarRuntime(),
+        fetchProvider: async (url, init) => {
+          const metadata = discovery.response(url);
+          if (!metadata) return await generate(url, init);
+          expect(new Headers(init.headers).has("authorization")).toBe(false);
+          return metadata;
+        },
+        generation: 1,
+      });
+      await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
+        mode: 0o600,
+      });
+      expect(
+        (
+          await sidecar.post("/secrets/set", {
+            provider_id: OPENAI_PROJECT_PROVIDER_ID,
+            key: projectKey,
+          })
+        ).status
+      ).toBe(200);
+      const available = await sidecar.get("/providers/visual/models");
+      expect(available.status).toBe(200);
+      expect((await available.json()).image).toContainEqual(
+        expect.objectContaining({
+          id: model,
+          providers: expect.objectContaining({
+            [OPENAI_PROJECT_PROVIDER_ID]: expect.objectContaining({
+              text: true,
+            }),
+          }),
+        })
+      );
+      const result = await sidecar.post("/images/generate", {
+        model_id: model,
+        prompt: "A red triangle",
+      });
+      expect(result.status).toBe(200);
+      const image = await result.json();
+      expect(image).toMatchObject({
+        provider_id: OPENAI_PROJECT_PROVIDER_ID,
+        model_id: model,
+        images: [{ base64: png, media_type: "image/png" }],
+      });
+      const stored = image.images[0].stored_media;
+      expect(stored).toMatchObject({
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        file_name: "image-1.png",
+        media_type: "image/png",
+      });
+      expect(
+        await fs.readFile(
+          path.join(mediaRoot, "items", stored.id, "content", stored.file_name)
+        )
+      ).toEqual(Buffer.from(png, "base64"));
+      expect(generate).toHaveBeenCalledTimes(1);
+    } finally {
+      try {
+        await sidecar?.stop();
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  }, 90_000);
+
   it.runIf(process.platform === "darwin")(
     "serves workspace files through the confined read-only catalog consumer",
     async () => {
@@ -579,6 +690,7 @@ type StartOptions = {
   output: string;
   userData: string;
   mediaRoot: string;
+  catalogueDirectory?: string;
   env: NodeJS.ProcessEnv;
   runtime: { executable: string; electron: boolean };
   fetchProvider: (url: string, init: RequestInit) => Promise<Response>;
@@ -636,6 +748,9 @@ class Sidecar {
       `--user-data=${options.userData}`,
       `--media-root=${options.mediaRoot}`,
       `--editor-base-url=${origin}`,
+      ...(options.catalogueDirectory
+        ? [`--model-catalogue=${options.catalogueDirectory}`]
+        : []),
       ...(options.workspaceCatalog
         ? [
             "--sandbox-enforced=1",

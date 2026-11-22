@@ -1,11 +1,20 @@
 // GRIDA-SEC-004 — explicit first-party credential checks over host-authorized HTTP.
 import type { ProviderHttp } from "./http";
-import { isByokProviderId, type ByokProviderId } from "./provider-ids";
+import {
+  isByokProviderId,
+  OPENAI_PROJECT_PROVIDER_ID,
+  type ByokProviderId,
+} from "./provider-ids";
 
 const MAX_KEY_BYTES = 4096;
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const CHECK_TIMEOUT_MS = 10_000;
 const FAL_ENDPOINT = "fal-ai/flux/dev";
+
+type CheckedProvider = Exclude<
+  ByokProviderId,
+  "elevenlabs" | typeof OPENAI_PROJECT_PROVIDER_ID
+>;
 
 /**
  * First-party BYOK admission policy; never a credential store.
@@ -55,6 +64,7 @@ export class ProviderCredentials {
       }
       case "tripo":
       case "elevenlabs":
+      case OPENAI_PROJECT_PROVIDER_ID:
         // Opaque by documented contract; no inferred prefix or suffix grammar.
         break;
       default:
@@ -76,8 +86,9 @@ export class ProviderCredentials {
   }): Promise<ProviderCredentials.CheckResult> {
     const key = ProviderCredentials.normalize(provider, input);
     if (signal?.aborted) throw new ProviderCredentials.Failure("aborted");
-    // User Read is an extra ElevenLabs permission; public models prove nothing.
-    if (provider === "elevenlabs")
+    // User Read is an extra ElevenLabs permission. Desktop checks OpenAI
+    // availability with the saved key during model discovery.
+    if (provider === "elevenlabs" || provider === OPENAI_PROJECT_PROVIDER_ID)
       return Object.freeze({ status: "not_supported" });
 
     // Exhaustive and private: adding a provider cannot inherit another one's
@@ -87,7 +98,7 @@ export class ProviderCredentials {
       openrouter: "https://openrouter.ai/api/v1/key",
       vercel: "https://ai-gateway.vercel.sh/v1/credits",
       fal: `https://api.fal.ai/v1/models/pricing?endpoint_id=${FAL_ENDPOINT}`,
-    } satisfies Record<Exclude<ByokProviderId, "elevenlabs">, string>;
+    } satisfies Record<CheckedProvider, string>;
     const url = urls[provider];
     const controller = new AbortController();
     const deadline = performance.now() + CHECK_TIMEOUT_MS;
@@ -234,10 +245,7 @@ export class ProviderCredentials {
     }
   }
 
-  static #accept(
-    provider: Exclude<ByokProviderId, "elevenlabs">,
-    data: unknown
-  ) {
+  static #accept(provider: CheckedProvider, data: unknown) {
     if (!isObject(data)) throw new CheckFailure("invalid_response");
     switch (provider) {
       case "tripo":

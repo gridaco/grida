@@ -6,17 +6,19 @@ import path from "node:path";
 import {
   byokProvidersFor,
   CHATGPT_PROVIDER_ID,
-  CHATGPT_SUBSCRIPTION_MODEL_IDS,
-  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
-  CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
-  isChatGptSubscriptionModelId,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
   type GGModelsView,
 } from "@grida/ai-host";
-import { catalog } from "@grida/ai/catalogue";
+import {
+  catalog,
+  isChatModelIdentifier,
+  ChatModels,
+} from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -91,25 +93,41 @@ export namespace NativeChatProfiles {
       .digest("hex");
   }
 
-  export function subscriptionChoices(scope: string): Saved[] {
-    return CHATGPT_SUBSCRIPTION_MODEL_IDS.map((modelId) => {
-      return {
-        id: subscriptionBinding(scope, modelId),
-        providerId: CHATGPT_PROVIDER_ID,
-        modelId,
-        connection: "ChatGPT Subscription",
-        model: CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].label,
-      };
-    });
+  export function subscriptionChoices(
+    scope: string,
+    models: readonly ChatModels.Binding[]
+  ): Saved[] {
+    return models.map((model) => ({
+      ...displayFacts(model),
+      id: subscriptionBinding(scope, model.modelId),
+      providerId: CHATGPT_PROVIDER_ID,
+      modelId: model.modelId,
+      connection: "ChatGPT Subscription",
+      model: label(model.label, model.modelId),
+    }));
+  }
+
+  function displayFacts(model: ChatModels.Binding) {
+    return {
+      ...(model.contextWindow && { contextWindow: model.contextWindow }),
+      ...(model.imageInput && { imageInput: true as const }),
+      ...(model.reasoning && { reasoning: true as const }),
+    };
   }
 
   export function gatewayOutputLimit(model: GatewayModel | undefined) {
+    return model?.capabilities.tools === true
+      ? gatewayChatOutputLimit(model)
+      : undefined;
+  }
+
+  /** A text-only completion does not require a tool-capable foreground model. */
+  export function gatewayChatOutputLimit(model: GatewayModel | undefined) {
     if (
       !model ||
       !/^[A-Za-z0-9_.:/@-]{1,128}$/.test(model.id) ||
       model.kind !== "text" ||
-      !model.interfaces.includes("chat.completions") ||
-      model.capabilities.tools !== true
+      !model.interfaces.includes("chat.completions")
     )
       return undefined;
     const { max_output_tokens: limit } = model.limits;
@@ -142,34 +160,16 @@ export namespace NativeChatProfiles {
   }
 
   /** The context window from the selected provider's model catalogue. */
-  export function contextWindow(
-    modelId: string,
-    providerId?: string
-  ): number | undefined {
+  export function contextWindow(modelId: string): number | undefined {
     const window =
-      providerId === CHATGPT_PROVIDER_ID &&
-      isChatGptSubscriptionModelId(modelId)
-        ? CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].context_window
-        : catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
-            ?.contextWindow;
+      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
+        ?.contextWindow;
     return positive(window) ? window : undefined;
   }
 
-  /** Canonical PNG/tool facts intersected with the native route's implemented profile. */
-  export function imageInput(providerId: string, modelId: string): boolean {
-    if (providerId === CHATGPT_PROVIDER_ID)
-      return (
-        isChatGptSubscriptionModelId(modelId) &&
-        CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].image_input
-      );
-    const model =
-      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog];
-    if (!model?.tool_call || !model.imageInputMimes.includes("image/png"))
-      return false;
-    if (providerId === "openrouter")
-      return catalog.text.listed_models().some((entry) => entry.id === modelId);
-    // GG's native adapter currently implements only this exact retained-PNG route.
-    return providerId === GG_PROVIDER_ID && modelId === "openai/gpt-5.6-sol";
+  /** The gateway adapter currently implements retained PNG input on this route. */
+  export function gatewayImageInput(modelId: string): boolean {
+    return modelId === "openai/gpt-5.6-sol";
   }
 
   /**
@@ -195,24 +195,36 @@ export namespace NativeChatProfiles {
   }
 
   export async function builtInChoices(
-    resolve: (providerId: string, modelId: string) => Promise<Launch>
+    snapshot: ModelCatalogueSnapshot,
+    resolve: (
+      providerId: string,
+      modelId: string,
+      binding: ChatModels.Binding
+    ) => Promise<Launch>,
+    openAiModels: readonly ChatModels.Binding[] = []
   ): Promise<Saved[]> {
-    const models = catalog.text.listed_models();
-    const sample = models[0];
-    if (!sample) return [];
     const choices: Saved[] = [];
     for (const { id, label: connection } of byokProvidersFor("text")) {
       if (!NativeProviderSelection.isBuiltInByok(id)) continue;
-      // All listed text choices use the same fixed route and credential owner.
-      const eligible = await resolve(id, sample.id).catch(() => null);
+      const models =
+        id === OPENAI_PROJECT_PROVIDER_ID
+          ? openAiModels
+          : ChatModels.list(snapshot, { provider: id });
+      const sample = models[0];
+      if (!sample) continue;
+      // The credential owner is common to every binding on this provider.
+      const eligible = await resolve(id, sample.modelId, sample).catch(
+        () => null
+      );
       if (!eligible) continue;
       for (const model of models) {
         choices.push({
-          id: binding(id, { ...eligible, model: model.id }),
+          ...displayFacts(model),
+          id: binding(id, { ...eligible, model: model.modelId }),
           providerId: id,
-          modelId: model.id,
+          modelId: model.modelId,
           connection,
-          model: label(catalog.text.displayLabel(model), model.id),
+          model: label(model.label, model.modelId),
         });
       }
     }
@@ -409,21 +421,12 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     typeof entry.providerId === "string" &&
     (entry.providerId === GG_PROVIDER_ID ||
       (entry.providerId === CHATGPT_PROVIDER_ID &&
-        typeof entry.modelId === "string" &&
-        savedSubscriptionModelId(entry.modelId)) ||
+        isChatModelIdentifier(entry.modelId)) ||
       isValidEndpointProviderId(entry.providerId) ||
       NativeProviderSelection.isBuiltInByok(entry.providerId)) &&
     modelId(entry.modelId) &&
     modelId(entry.connection) &&
     modelId(entry.model)
-  );
-}
-
-/** Retired choices remain readable receipts, never new execution authority. */
-function savedSubscriptionModelId(id: string): boolean {
-  return (
-    isChatGptSubscriptionModelId(id) ||
-    CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS.some((retired) => retired === id)
   );
 }
 

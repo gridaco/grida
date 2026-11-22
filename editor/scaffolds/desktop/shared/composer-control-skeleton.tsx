@@ -1,7 +1,11 @@
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
+import {
+  composerToolbarButtonClassName,
+  composerToolbarLabelClassName,
+} from "@/kits/composer";
 
-export const composerAccessLabelClassName = "hidden @[26rem]:inline";
+export const composerAccessReviewLabel = "Ask for approval";
 
 export function ComposerControlSkeleton({
   kind,
@@ -14,7 +18,8 @@ export function ComposerControlSkeleton({
       role="status"
       aria-label={model ? "Loading models…" : "Checking access…"}
       className={cn(
-        "flex h-6 items-center rounded-xl px-1.5",
+        composerToolbarButtonClassName,
+        "flex items-center px-1.5",
         model ? "w-32 min-w-16 shrink" : "shrink-0"
       )}
     >
@@ -25,15 +30,15 @@ export function ComposerControlSkeleton({
           model ? "min-w-0 flex-1" : "min-w-3.5"
         )}
       >
-        {/* The hidden label reserves the same text, icon and gap as Default. */}
+        {/* Reserve the text, icon and gap for the manual review label. */}
         {!model && (
           <span
             className={cn(
               "invisible whitespace-nowrap pl-4.5 text-xs font-medium",
-              composerAccessLabelClassName
+              composerToolbarLabelClassName
             )}
           >
-            Default
+            {composerAccessReviewLabel}
           </span>
         )}
       </Skeleton>

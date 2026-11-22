@@ -3,6 +3,8 @@ export namespace SettingsNavigation {
   export const sections = [
     { id: "account", label: "Account" },
     { id: "appearance", label: "Appearance" },
+    { id: "personalization", label: "Personalization" },
+    { id: "voice", label: "Voice" },
     { id: "browser", label: "Browser" },
     { id: "credits", label: "Credits" },
     { id: "models", label: "LLM Providers" },
@@ -15,6 +17,7 @@ export namespace SettingsNavigation {
 
   export function fromHash(hash: string): Section {
     const value = hash.replace(/^#/, "");
+    if (value === "chat") return "personalization";
     if (value === "provider-elevenlabs" || value === "provider-tripo")
       return "media";
     return sections.find((section) => section.id === value)?.id ?? "account";

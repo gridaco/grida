@@ -47,6 +47,7 @@ pub fn classify(tool: &ToolId) -> Activity {
     }
     let kind = match id {
         "read_file"
+        | "read_scoped_file"
         | "list_files"
         | "view_image"
         | "inspect_retained_file"

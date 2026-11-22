@@ -13,6 +13,7 @@ import type {
   ProviderId,
   EndpointProviderConfig,
   GGModelsView,
+  VisualModelCatalogueView,
   ProbedEndpointModel,
   ImageGenerateRequest,
   ImageGenerateResult,
@@ -61,7 +62,11 @@ import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
 import type { DesktopFxViewer } from "./fx-viewer";
+import type { DesktopVoice } from "./voice";
+
 export { DesktopBrowser } from "./browser";
+export * from "./voice";
+export { WebPreview } from "./web-preview";
 export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
@@ -69,6 +74,10 @@ export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
+export {
+  NativeEditorSelection,
+  NativeEditorSelection as NativeEditorSvgSelection,
+} from "./native-editor-selection";
 export { NativeEditorSvgText } from "./native-editor-svg-text";
 export type {
   NativeEditorSurfaceOpen,
@@ -76,6 +85,8 @@ export type {
 } from "./native-editor-surfaces";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
+
+export type DesktopSettingsSection = "models" | "voice";
 
 export type DesktopNativeCapabilities = {
   host_apps: boolean;
@@ -96,12 +107,16 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
   /** Optional browser; negotiate its version and presentation before use. */
   browser?: boolean;
+  /** Named OpenAI API project key custody and native chat support. */
+  openai_api?: boolean;
 };
 
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
   /** Bundled media capabilities; omission means an older Desktop binary. */
   media?: {
+    /** Direct image generation using the OpenAI project key. */
+    openai_images?: boolean;
     /** First-party Tripo credentials, generation and host-authorized egress. */
     tripo?: boolean;
     /** Explicit eligibility and rigging plus bounded native GLB upload. */
@@ -280,6 +295,24 @@ export type DesktopArchivedChatPage = Readonly<{
   unavailableWorkspaces?: readonly string[];
 }>;
 
+export type DesktopPersonalizationSettings = Readonly<{
+  suggestedPrompts: boolean;
+  /** The existing IPC value "live" represents automatic search. */
+  webSearch: "disabled" | "live";
+  revision: number;
+}>;
+
+export type DesktopPersonalizationChange =
+  | Readonly<{ suggestedPrompts: boolean }>
+  | Readonly<{ webSearch: DesktopPersonalizationSettings["webSearch"] }>
+  /** Older renderers use "onDemand" to turn automatic search off. */
+  | Readonly<{ webSearch: "onDemand" }>;
+
+export type DesktopComposerPredictionSettings = Readonly<{
+  enabled: boolean;
+  revision: number;
+}>;
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
@@ -288,6 +321,24 @@ export type DesktopBridge = {
   browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** User-wide preferences shared by Settings and regular workspace chats. */
+  personalization?: {
+    get(): Promise<DesktopPersonalizationSettings>;
+    set(
+      change: DesktopPersonalizationChange
+    ): Promise<DesktopPersonalizationSettings>;
+    onChange(
+      listener: (settings: DesktopPersonalizationSettings) => void
+    ): () => void;
+  };
+  /** User-wide Desktop preference. Only the Settings window can change it. */
+  composerPredictions?: {
+    get(): Promise<DesktopComposerPredictionSettings>;
+    set(enabled: boolean): Promise<DesktopComposerPredictionSettings>;
+    onChange(
+      listener: (value: DesktopComposerPredictionSettings) => void
+    ): () => void;
+  };
   /** Metadata discovery for Home and the workbench. Older hosts omit this capability. */
   chatCatalog?: {
     list(query?: DesktopChatCatalogQuery): Promise<DesktopChatCatalogPage>;
@@ -296,6 +347,8 @@ export type DesktopBridge = {
       onChanged: () => void
     ): Promise<(() => void) | null>;
   };
+  /** GPT-Transcribe dictation owned by Desktop Main. Absent on older builds. */
+  voice?: DesktopVoice;
   /** Global config.toml hooks. Absent on older native builds. */
   hooks?: DesktopHooks;
   /** Fixed Settings archive operations, absent on older protocol-1 hosts. */
@@ -334,6 +387,10 @@ export type DesktopBridge = {
      * Optional because older protocol-1 hosts expose no Settings action.
      */
     open_settings?: () => Promise<void>;
+    /** Open the LLM Providers section of the native Settings window. */
+    open_llm_provider_settings?: () => Promise<void>;
+    /** Open the Voice section of the native Settings window. */
+    open_voice_settings?: () => Promise<void>;
     /**
      * Finish the dedicated onboarding surface and promote the same entry
      * BrowserWindow to the regular workstation. Optional because older
@@ -532,6 +589,7 @@ export type DesktopBridge = {
   providers?: {
     /** Anonymous metadata is read by the native host; absent on older builds. */
     gg_models?: () => Promise<GGModelsView>;
+    visual_models?: () => Promise<VisualModelCatalogueView>;
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
     /** Explicit Connect/Save consents to this exact saved destination. New
      * hosts retain that consent across restarts without another dialog. */

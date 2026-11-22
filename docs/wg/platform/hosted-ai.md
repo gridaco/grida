@@ -127,7 +127,7 @@ There are three different questions, with different owners:
 
 | Question                                                              | Source                                                                                                                                                                                   |
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| What is this model and what do providers document?                    | The pinned public `@grida/ai-models` release from [Models](https://github.com/gridaco/models).                                                                                           |
+| What is this model and what do providers document?                    | The public [Models catalogue](https://github.com/gridaco/models). An exact release supplies the bundled baseline.                                                                        |
 | What can GG serve now, with which contract and price?                 | Anonymous [GG models](https://gateway.grida.ai/v1/models), [endpoints](https://gateway.grida.ai/v1/endpoints) and [operation schemas](https://gateway.grida.ai/schemas/operations.json). |
 | What does Grida recommend and what can this installed client execute? | `data/ai/presets.json` plus implemented native/BYOK and GG interface adapters.                                                                                                           |
 
@@ -153,13 +153,13 @@ different model, provider or credential. Product-specific background removal and
 upscaling remain native feature contracts. Library embedding model, dimensions
 and normalization remain persisted-data contracts, not live catalogue defaults.
 
-**BYOK and offline behavior.** The pinned public Models snapshot provides facts
-for installed adapters and offline display. Current hosts keep this immutable
-release pin rather than refreshing native facts from the legacy HTTP catalogue.
-A provider listing cannot manufacture an adapter. Exact provider SKU prices stay
-opaque; unqualified inputs are withheld rather than invented. Missing coarse
-estimates remain unknown. GG's current tariffs, reservation and settlement are
-service-owned; client catalogue costs are display estimates only.
+**BYOK and offline behavior.** Desktop uses the latest verified Models V2
+snapshot for supported foreground chat and BYOK image and video. The bundled
+release is available on first launch, and a failed refresh leaves the last
+verified snapshot usable. Choices reflect the installed adapter's supported
+provider operations. Execution also requires a valid provider connection.
+Exact provider SKU prices stay opaque, and missing coarse estimates remain
+unknown. GG owns its current tariffs, reservation and settlement.
 
 **Installed-client compatibility.** `GET /api/v1/models/catalog` retains the
 schema-1 text/image/video distribution protocol for older installed clients. Its

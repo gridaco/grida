@@ -1,4 +1,6 @@
-Model facts are consumed from the pinned public `@grida/ai-models` release.
+The pinned public `@grida/ai-models` release seeds the catalogue. Desktop
+refreshes foreground chat and BYOK image and video facts from the latest
+compatible V2 release.
 `@grida/ai/catalogue` owns only the client compatibility projection and Grida
 product presets; it is not the live GG offering list. See
 [`data/ai`](../../data/ai/README.md) for ownership and generation.
@@ -7,8 +9,10 @@ product presets; it is not the live GG offering list. See
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel AI Gateway, fal, or scoped Grida
-Gateway credentials. Music generation uses GG’s current music interface;
-sound effects and speech use their existing ElevenLabs BYOK operations. Three
+Gateway credentials. The runtime V2 image catalogue also supports direct
+OpenAI project billing for its compatible text-to-image bindings. Music
+generation uses GG’s current music interface. Sound effects and speech use
+their existing ElevenLabs BYOK operations. Three
 existing fal 3D endpoints and direct Tripo H3.1/P1/P2 model generation return a
 primary GLB asset.
 
@@ -23,7 +27,7 @@ producer tests; there are no reserved executors or empty future subpaths.
 The configured [`@grida/ai-host`](../grida-ai-host), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
-setup. the pinned public `@grida/ai-models` release supplies canonical facts; its explicit
+setup. The pinned public `@grida/ai-models` release supplies canonical facts; its explicit
 `@grida/ai/catalogue` entry supplies this SDK's existing bundled service
 catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
 not promise service-policy neutrality. A result contains bytes
@@ -40,7 +44,7 @@ or executor scaffolding to anticipate future operations.
 
 ## Discovery and JSON inputs
 
-`MediaOperations` describes installed BYOK adapters and the typed GG Tripo
+`MediaOperations` describes the schema-1 BYOK adapter set and the typed GG Tripo
 file/rigging adapters without
 constructing a client, reading credentials, refreshing a catalogue, or making
 network requests. Its descriptors and schemas are deeply immutable and JSON
@@ -150,6 +154,14 @@ not a JSON output schema: results contain `Uint8Array`, and hosts choose their
 serialization, filenames, persistence, and receipts. Image output has at most the
 accepted `n` items. Discovery neither executes nor adds a universal media executor;
 callers dispatch to the existing typed clients, including the exact 3D model union.
+
+## Public Models V2
+
+Use `@grida/ai/model-catalogue` to parse exact-release Models V2 documents.
+`parseModelCatalogue(version, models, agents)` returns an immutable view of text, image, and video
+model facts, provider bindings and agent selectors. See the
+[catalogue reference](./src/catalogue/README.md#models-v2-in-desktop)
+for the host store and Grida chat integration.
 
 ## Current GG discovery and execution
 

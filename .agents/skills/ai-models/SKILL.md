@@ -11,13 +11,13 @@ description: >
 
 ## Choose the owner first
 
-| Subject                                                                                   | Canonical owner                                                                                                                                                             |
-| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model identities, labels, releases, labs, provider bindings, capabilities, regular prices | Public [`gridaco/models`](https://github.com/gridaco/models), consumed as the pinned `@grida/ai-models` release.                                                            |
-| Currently served GG models, effective capabilities, prices and operation schemas          | [GG models](https://gateway.grida.ai/v1/models), [endpoints](https://gateway.grida.ai/v1/endpoints), [operation schemas](https://gateway.grida.ai/schemas/operations.json). |
-| Product membership, defaults, tier choices and feature subsets                            | `data/ai/presets.json`.                                                                                                                                                     |
-| Executable native/BYOK inputs and adapters                                                | `data/ai/native-inputs.json`, `packages/grida-ai/src/`, `crates/grida-ai/src/`.                                                                                             |
-| Library model/dimensions/normalization storage invariant                                  | `presets.json` → `library_embedding`; coordinate existing vectors before changing it.                                                                                       |
+| Subject                                                                                   | Canonical owner                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model identities, labels, releases, labs, provider bindings, capabilities, regular prices | Public [`gridaco/models`](https://github.com/gridaco/models), used at runtime by Desktop chat and BYOK image and video. The exact `@grida/ai-models` pin supplies the bundled seed. |
+| Currently served GG models, effective capabilities, prices and operation schemas          | [GG models](https://gateway.grida.ai/v1/models), [endpoints](https://gateway.grida.ai/v1/endpoints), [operation schemas](https://gateway.grida.ai/schemas/operations.json).         |
+| Product membership, defaults, tier choices and feature subsets                            | `data/ai/presets.json`.                                                                                                                                                             |
+| Executable native/BYOK inputs and adapters                                                | `data/ai/native-inputs.json`, `packages/grida-ai/src/`, `crates/grida-ai/src/`.                                                                                                     |
+| Library model/dimensions/normalization storage invariant                                  | `presets.json` → `library_embedding`; coordinate existing vectors before changing it.                                                                                               |
 
 Do not recreate an authored factual catalogue or GG allowlist in Grida. A public
 Models binding is a fact, not installed adapter support or GG availability.
@@ -30,10 +30,18 @@ choices and the retained schema-1 installed-client protocol. It is not a second
 facts authoring home. Unknown prices/estimates remain unknown, never zero.
 Historical client estimates cannot authorize or settle hosted spending.
 
-Grida Desktop's ChatGPT subscription model list is a closed compatibility list
-with its own membership, order and default in
-[`data/ai/chatgpt-subscription.json`](../../../data/ai/chatgpt-subscription.json).
-For manual updates, follow the [subscription provider runbook](../../../packages/grida-ai-host/docs/chatgpt-subscription-provider.md#update-membership-and-the-default).
+Desktop foreground chat resolves public facts through `ChatModels` in
+`@grida/ai/catalogue`. Subscription choices require a selector in the public
+`agents.json`, a compatible native adapter and an offer from the signed-in
+account. OpenRouter and Vercel use the exact selected provider binding.
+For subscription policy, `data/ai/chatgpt-subscription.json` owns the preferred
+default and historical saved IDs. Update active public selectors in the Models
+project. See the [subscription provider runbook](../../../packages/grida-ai-host/docs/chatgpt-subscription-provider.md#update-membership-and-the-default).
+
+Desktop BYOK image and video use `VisualModels` over the same V2 snapshot.
+Settings, pickers, and execution share adapter eligibility. The installed
+image and video membership projection serves compatibility callers.
+[Catalogue ownership](../../../packages/grida-ai/src/catalogue/README.md#models-v2-in-desktop)
 
 ## Updating the public dependency or product presets
 
@@ -74,12 +82,12 @@ execution credential. Respect cache expiry and unavailable state rather than
 restoring retired GG models from a bundled list. The hosted renderer preserves
 released binaries lacking the discovery bridge through their existing finite
 native choices; never enter that compatibility path after a capable host's
-empty, failed or expired read. BYOK/offline metadata remains
-available independently from the immutable release pin. New hosts do not fetch
-the legacy native catalogue. Keep `/api/v1/models/catalog` readable for older
-clients using `catalog.snapshot.legacy()`; omit only shapes its schema cannot
-represent, retaining exact facts in the current seed. Never treat that endpoint
-as current GG inventory.
+empty, failed or expired read. Desktop checks for newer V2 facts in the
+background. Its verified cache and bundled seed provide offline metadata.
+Keep `/api/v1/models/catalog` readable for older clients using
+`catalog.snapshot.legacy()`. Omit shapes that schema 1 cannot represent and
+preserve the exact facts in the current seed. GG discovery remains the
+authority for current GG offerings.
 
 Signed-in product usage keeps organization-scoped authorization and the existing
 native response contracts. It does not require a standalone GG customer API key.

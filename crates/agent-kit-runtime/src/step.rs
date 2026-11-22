@@ -50,6 +50,7 @@ impl Turn {
             plan.inference_grants.clone(),
             Some(sender),
             None,
+            None,
         );
         tokio::pin!(inference);
         let mut completed_inference = None;
@@ -319,6 +320,11 @@ fn malformed_arguments() -> ToolOutcome {
     outcome
 }
 
+/// Identify the retained result of one call from a specific inference.
+pub fn tool_result_message_id(origin: &OperationId, call: &ToolCallId) -> Result<MessageId> {
+    MessageId::new(fingerprint_name("result", &(origin, call))?)
+}
+
 fn candidate_history(
     origin: &OperationId,
     messages: impl IntoIterator<Item = Message>,
@@ -330,7 +336,7 @@ fn candidate_history(
             continue;
         };
         records.push(HistoryRecord::Message(Message {
-            id: MessageId::new(fingerprint_name("result", &(origin, &tool.call.id))?)?,
+            id: tool_result_message_id(origin, &tool.call.id)?,
             role: Role::Tool,
             phase: None,
             content: vec![Content::ToolResult(ToolResult {

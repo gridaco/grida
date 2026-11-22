@@ -12,6 +12,10 @@ concurrent inference, tool work, and questions. Dropping an observer detaches it
 Dropping the controller closes admission and cancels the local execution scopes.
 In-flight operations keep the lease until their local execution exits. Verified
 settlement or suspension releases ownership and leaves old handles inactive.
+A callback admitted through `TurnOperations::run_attached` can continue bounded work
+after its tool publishes a result. Suspension and settlement drain admitted
+callbacks while still accepting steering or cancellation. A callback waiting
+for input on behalf of a live resource must also observe that resource’s end.
 A helper still waiting on an interaction that suspension retained returns
 `WaitOutcome::Pending` and drops its lease handle.
 

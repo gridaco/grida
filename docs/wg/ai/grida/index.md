@@ -1,6 +1,6 @@
 ---
 title: Grida bindings
-description: Grida-specific tool surfaces and bindings of the agent RFC. Fundamentals as Grida ships them, canvas tools (scene-graph search, specialized inserts, exec/lint/format, resource lookup), and image-generation tools.
+description: Grida tool surfaces and agent contracts, from the earlier embedded tool proposal to the native host and document tools.
 keywords: [grida, ai, tools, canvas, image, bindings]
 format: md
 tags:
@@ -12,13 +12,10 @@ tags:
 
 # Grida bindings
 
-These docs describe how Grida implements and extends the
-implementation-agnostic [agent RFC](../agent/index.md). The RFC
-specifies shapes (locked tool set, capability surface, session
-schema, ACP wire) without dictating product-specific behavior;
-this layer binds those shapes to Grida's actual surfaces — the
-canvas, the image-generation provider seam, and the host-level
-fundamentals as Grida ships them.
+These docs describe Grida's tool surfaces and design proposals. The
+[agent RFC](../agent/index.md) defines shared invocation, capability,
+session, and authority contracts. Each host selects tools for the
+environment it supports.
 
 The [Rust/Electron tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 defines shared Grida capabilities exposed directly and through MCP, including
@@ -27,14 +24,14 @@ current implementation evidence and earlier domain-tool proposals.
 
 ## Pages
 
-| Page                                                                  | Covers                                                                                                                                                                                                                     |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [**Architecture** (start here for implementation)](./architecture.md) | Grida's implementation blueprint: native agent host, retained media sidecar, Desktop process ownership, capacity providers, anti-goals.                                                                                    |
-| [Workspace Surfaces](./workspace-surfaces.md)                         | Current product model for repository-backed workspaces and visible artifacts: canvas-first policy, agnostic surface tools, host interactivity, user authority, and reopen continuity.                                      |
-| [Fundamental Tools (Grida binding)](./tools-fundamentals.md)          | How the locked-tool RFC ([`../agent/tools.md`](../agent/tools.md)) lands in Grida — virtual-fs adapter, in-canvas `bash`, the `view_image` perception extension ([`../agent/vision.md`](../agent/vision.md)), host wiring. |
-| [Canvas Tools](./tools-canvas.md)                                     | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance.                                                     |
-| [Image Tools](./tools-image.md)                                       | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                                                                           |
-| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized internal agents (chat titles and compaction), with their provider and cost bounds.                                                                                                                     |
+| Page                                                                  | Covers                                                                                                                                                                                |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**Architecture** (start here for implementation)](./architecture.md) | Grida's implementation blueprint: native agent host, retained media sidecar, Desktop process ownership, capacity providers, anti-goals.                                               |
+| [Workspace Surfaces](./workspace-surfaces.md)                         | Current product model for repository-backed workspaces and visible artifacts: canvas-first policy, agnostic surface tools, host interactivity, user authority, and reopen continuity. |
+| [Embedded Agent Tool Proposal](./tools-fundamentals.md)               | Earlier Web agent design for virtual filesystems and hosts that mediate file access.                                                                                                  |
+| [Canvas Tools](./tools-canvas.md)                                     | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance.                |
+| [Image Tools](./tools-image.md)                                       | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                                      |
+| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized internal agents (chat titles and compaction), with their provider and cost bounds.                                                                                |
 
 ## See also
 

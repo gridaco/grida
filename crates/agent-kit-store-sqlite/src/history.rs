@@ -638,6 +638,13 @@ pub(super) fn insert_view(
     seed: Option<&HistorySeed>,
     after: i64,
 ) -> Result<()> {
+    // A revised branch cannot inherit private observations from a discarded turn.
+    transaction
+        .execute(
+            "DELETE FROM private_checkpoints WHERE session=?1",
+            [session.as_str()],
+        )
+        .map_err(database_error)?;
     let bytes = seed.map(seed_bytes).transpose()?;
     let identity = seed.map(Fingerprint::of).transpose()?;
     transaction.execute(
@@ -666,6 +673,7 @@ pub(super) fn seed_bytes(seed: &HistorySeed) -> Result<Vec<u8>> {
 }
 
 pub(super) struct View {
+    pub(super) annotation_after: Option<i64>,
     pub(super) id: SessionRevision,
     pub(super) seed: Option<HistorySeed>,
     pub(super) seed_identity: Option<Fingerprint>,
@@ -726,6 +734,7 @@ pub(super) fn select_view(
                 })
                 .transpose()?;
             View {
+                annotation_after: None,
                 id: SessionRevision(unsigned(row.get(0).map_err(database_error)?)?),
                 seed,
                 seed_identity: row
@@ -848,11 +857,33 @@ pub(super) fn read_view_projection(
             MAX_HISTORY_TURNS + 1
         ])
         .map_err(database_error)?;
+    let annotations = super::annotation::idle_records(connection, session, &view, before)?;
+    let annotation_identity = (!annotations.is_empty())
+        .then(|| Fingerprint::of(&annotations))
+        .transpose()?;
+    let mut annotations = annotations;
     let mut budget = HistoryBudget::default();
     if let Some(seed) = &view.seed {
         budget.add(&seed.records)?;
     }
     let mut records: Vec<RetainedRecord> = Vec::new();
+    if let Some(additions) = annotations.remove(&unsigned(view.after)?) {
+        budget.add(&additions)?;
+        let id = connection
+            .query_row(
+                "SELECT id FROM turns WHERE session=?1 AND ordinal=?2",
+                params![session.as_str(), view.after],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(database_error)?;
+        let turn = TurnId::new(id)?;
+        let position = super::turn_layout::read_facts(connection, session, &turn)?.position;
+        records.extend(additions.into_iter().map(|record| RetainedRecord {
+            turn: turn.clone(),
+            position,
+            record,
+        }));
+    }
     let mut snapshots = Vec::new();
     let mut unprojected_suffix_after = None;
     let mut scanned_turns = 0;
@@ -873,7 +904,10 @@ pub(super) fn read_view_projection(
         let state = decode_turn(connection, head, session, &turn)?;
         let position = state.position();
         if unprojected_suffix_after.is_none() {
-            let projected = project(&state);
+            let mut projected = project(&state);
+            if let Some(additions) = annotations.remove(&ordinal) {
+                projected.extend(additions);
+            }
             match budget.add(&projected) {
                 Ok(()) => records.extend(projected.into_iter().map(|record| RetainedRecord {
                     turn: turn.clone(),
@@ -902,7 +936,13 @@ pub(super) fn read_view_projection(
         basis: HistoryBasis {
             view: view.id,
             tail: snapshots.last().map(|(tail, _)| tail.clone()),
-            fingerprint: Fingerprint::of(&(session, view.id, view.seed_identity, snapshots))?,
+            fingerprint: {
+                let base = Fingerprint::of(&(session, view.id, view.seed_identity, snapshots))?;
+                match annotation_identity {
+                    Some(additions) => Fingerprint::of(&(base, additions))?,
+                    None => base,
+                }
+            },
         },
         session_revision,
         seed: view.seed,

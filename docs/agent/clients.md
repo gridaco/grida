@@ -143,10 +143,15 @@ directories. When `grida-agent run` omits `--cwd`, the profile's primary
 supplies the working directory. Ask for a file in another directory by its
 profile ID, especially when the same relative path exists in both folders.
 
-Set `read: allow` for bounded text reads, directory listings, and literal
-search, or `read: ask` to require approval. Listing a folder in the profile
-does not grant access by itself. A changed profile can block continuation
-of a retained task after restart.
+Set `read: allow` for bounded text reads or `read: ask` to require approval.
+A primary directory with unconditional read command access uses commands to
+list, search, and read files. The launch profile determines whether commands
+can read ordinary files elsewhere on disk. For a narrow read profile, the
+host can provide one separately granted text file as input to a confined
+command. That read takes the directory ID and relative file path and follows
+the directory's approval rule. File-only profiles use file grants for
+bounded reads, directory listings, and literal search. A changed profile can
+block continuation of a retained task after restart.
 
 A trusted native launcher can opt into review for one configured file read.
 Every other action that requires approval still asks. If the review is
@@ -161,9 +166,10 @@ In Desktop, add the **Plan** badge with `/plan` or **+ → Plan mode**.
 [Decide what the agent may do](./effort-and-goals.md#decide-what-the-agent-may-do)
 
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
-The agent can read permitted material and ask enabled questions. Commands,
-working-copy edits, settings changes through agent tools, and timed wake-ups
-are unavailable in Plan.
+The agent can read permitted material and ask enabled questions. A profile
+with a read command grant and native confinement also lets the agent search
+or inspect the project with commands in Plan. Working-copy edits, settings
+changes through agent tools, and timed wake-ups are unavailable in Plan.
 
 To authorize execution, open the same chat with `--mode act` and submit a new
 prompt. Act is the default and still uses your selected permissions. Previously
@@ -330,6 +336,13 @@ reports its own `current.disposition` and `current.inputNeeded` in the
 session snapshot. Clients can include the side chats they own when showing a
 parent's activity.
 
+To read the model captured for a main-chat turn, negotiate
+`co.grida/session/snapshot` or `co.grida/session/transcript-window` version 1.
+Read the optional `modelId` on the snapshot's `current` and `latest` turns, or
+on each transcript turn as you page through history. A queued turn keeps the
+model captured when its input was accepted. Older turns may lack that evidence.
+The same extensions are available through `grida agent serve --stdio`.
+
 Clients that negotiate `co.grida/session/initial-title` version 1 can send
 the optional `_meta["co.grida/initialTitle"]` string with a first
 `session/prompt`. Acceptance saves the excerpt for workspace listing.
@@ -431,18 +444,22 @@ Unverified cleanup blocks a replacement run.
 
 ## Run a confined command
 
-Desktop workspace chats on macOS and Linux run commands in the project under
-the **Default** preset. [Understand agent permissions](./permissions.md)
+Desktop workspace chats on macOS and Linux run commands in a project sandbox
+with **Auto** or **Ask for approval**. [Understand agent permissions](./permissions.md)
 
 Headless hosts can run commands on macOS and Linux when the launcher supplies
 a reviewed permission profile and native helper. Each command runs through
 the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
-selected directory access and a separate temporary scope. Network access is
-denied under Default. An explicitly authorized Full access chat instead runs
-commands without filesystem/network confinement; Plan keeps the command tools
-unavailable in either mode. [Choose Full access](./permissions.md#choose-full-access)
+selected directory access and a separate temporary scope. The sandbox blocks
+direct networking. A launcher that enables scoped approvals can admit one
+brokered destination for a finite command after a per-action decision. Explicit
+Full access in Act runs commands with ordinary-user filesystem and network
+access. Plan uses the launch profile's read scope. Desktop's default scope
+includes ordinary files outside the project. Plan commands stay confined,
+run offline, end within the call, and can write only to private temporary
+storage. [Choose Full access](./permissions.md#choose-full-access)
 
-A command that is still running after its short wait, such as a development
+An Act command that is still running after its short wait, such as a development
 server or a watcher, stays with the chat as a numbered process. Later turns of
 the same chat read its output, type into it, or interrupt it. Ending a turn,
 stopping it, pausing, waiting for approval and restarting the turn leave the
@@ -647,15 +664,11 @@ parent is up to the client.
 
 ## Set the context input limit
 
-In Grida Desktop, ask the agent to change the context input limit and approve
-the edit, or edit the workspace's `config.toml` and restart Desktop.
-[Change agent settings](./settings.md)
+In Grida Desktop, edit the workspace's `config.toml` while Desktop is closed.
+Reopen the workspace to load the new limit. [Change agent settings](./settings.md)
 
-An ACP client that negotiates the configuration operations can inspect, set,
-reset and reload the limit. Under a permission profile that allows file writes,
-the agent can also edit the host's `config.toml` as the directory
-`agent-settings`; every such write arrives as an ordinary approval request.
-[Agent configuration](../reference/agent-configuration.md#changes-made-by-the-agent)
+A trusted ACP client that negotiates the configuration operations can inspect,
+set, reset, and reload the limit. [Agent configuration](../reference/agent-configuration.md#managed-changes)
 
 ## Attach a PNG to a message
 
@@ -709,9 +722,9 @@ message starts no file read or model request.
 
 A private native client represents a folder with the existing local resource
 link, a canonical file URI and the `inode/directory` media type, omitting size
-and preview. The reference adds no filesystem grant. File tools still need an
-already permitted root; Plan has no command-inspection path, and Act uses the
-existing command scope. Desktop Main validates the actual dropped directory
+and preview. The reference adds no filesystem grant. Plan commands inspect
+folders under their confined read scope. Act uses its existing command scope.
+Desktop Main validates the actual dropped directory
 and refuses protected directories, containing ancestors and canonical aliases.
 An older Desktop host without folder-reference support refuses the drop
 before submission and preserves the draft and current attachment.
@@ -788,6 +801,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/pause`, `resume`, `steer`                                                | Pause a turn, resume its verified suspension, or send a correction to that turn.                          |
 | `co.grida/session/stop`, `resume-queue`                                                    | Stop a turn and pause queue advancement, then reopen queue admission when ready.                          |
 | `co.grida/session/questions`, `answer-question`                                            | Inspect pending questions and submit a correlated choice, free-text answer, or skip.                      |
+| `co.grida/session/questions-v2`, `answer-question-v2`                                      | Inspect and answer a batch of one to three questions with one correlated submission.                      |
 | `co.grida/session/approvals`, `answer-approval`                                            | Inspect requests for additional access and decide each exact action.                                      |
 | `co.grida/session/history`, `fork`, `revise`                                               | Browse retained message anchors, branch a chat, or replace an earlier text message.                       |
 | `co.grida/session/compact`                                                                 | Summarize earlier model context and keep the original transcript available.                               |
@@ -838,7 +852,11 @@ Negotiate `co.grida/session/turn-summary` to read a settled turn by its
 fallback, recorded tool dispositions, unresolved operations, and any completion
 checks. The same record is available after reopening the chat.
 
-Negotiate both question operations to enable question tools for new inputs.
+Negotiate both v2 question operations to enable batches for new inputs. A batch
+answer supplies one choice, free-text answer, or skip for each item ID. Its
+answers commit together. Clients negotiating only the original pair can still
+receive and answer single questions. The v2 list preserves the original shape of
+retained singleton waits.
 An answer can resume suspended work when its other conditions allow execution.
 An explicit Pause remains effective after the answer. Question negotiation does
 not add image or file-input capabilities; clients keep the input profile their
@@ -855,7 +873,9 @@ Select a named skill with `run --skill NAME` or through the ACP skill catalog.
 Repeat the flag to select more than one. Bundled skills include `dotcanvas`,
 `slides`, and `svg`. On Unix, a local run can also use skills in its selected
 project. An ACP host must explicitly allow reads from the primary project
-directory. Project skills override bundled skills with the same name.
+directory. Project skills take precedence for bare names. An eligible
+extension skill can also be selected by its full `extension/skill` name.
+ACP clients can use the versioned URI returned by the catalog.
 
 With a permission profile, the agent also sees each available skill's name
 and description and reads one when the request calls for it, without a

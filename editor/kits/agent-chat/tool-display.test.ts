@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { toolDisplay } from "./tool-display";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
+import type {
+  NativeChatActivityOutcome,
+  NativeChatCommandAction,
+} from "@grida/desktop-bridge";
+import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 
 describe("toolDisplay", () => {
   it("summarizes mixed tool chunks in stable product copy", () => {
@@ -56,6 +61,20 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("counts the questions in a batch as well as retained single questions", () => {
+    const questions = [
+      { id: "edition", question: "Which edition?" },
+      { id: "theme", question: "Which theme?" },
+    ];
+    expect(
+      toolDisplay.summarize([
+        tool("1", "question", { question: "Which title?" }),
+        tool("2", "question_async", { questions }),
+        runningTool("3", "question", { questions }),
+      ])
+    ).toBe("Asked 3 questions, asking 2 questions");
+  });
+
   it("keeps running and failed work honest in the same ranked action group", () => {
     expect(
       toolDisplay.group([
@@ -96,6 +115,171 @@ describe("toolDisplay", () => {
       action: "command",
       title: "Ran command",
       detail: "Run agent sidecar tests",
+    });
+  });
+
+  it.each([
+    {
+      command: "cat src/README.md",
+      actions: [{ kind: "read", path: "src/README.md" }],
+      outcome: "running",
+      action: "read",
+      title: "Reading README.md",
+      tone: "running",
+    },
+    {
+      command: "rg TODO src",
+      actions: [{ kind: "search", query: "TODO", path: "src" }],
+      outcome: "succeeded",
+      action: "search",
+      title: "Searched for TODO in src",
+      tone: "ok",
+    },
+    {
+      command: "rg --files src | head -n 20",
+      actions: [{ kind: "list_files", path: "src" }],
+      outcome: "succeeded",
+      action: "list",
+      title: "Listed files in src",
+      tone: "ok",
+    },
+    {
+      command: "cat missing.md",
+      actions: [{ kind: "read", path: "missing.md" }],
+      outcome: "failed",
+      action: "read",
+      title: "Failed to read missing.md",
+      tone: "error",
+    },
+  ] as const)(
+    "describes $command as $title",
+    ({ command, actions, outcome, action, title, tone }) => {
+      const entry = shell(command, actions, outcome);
+      expect(entry).toMatchObject({
+        type: "tool-exec_command",
+        input: { command },
+      });
+      expect(toolDisplay.describe(entry)).toMatchObject({
+        action,
+        title,
+        tone,
+      });
+    }
+  );
+
+  it("keeps a failed compound command as one call and preserves action order", () => {
+    const entry = shell(
+      "cat missing.md && rg TODO src",
+      [
+        { kind: "read", path: "missing.md" },
+        { kind: "search", query: "TODO", path: "src" },
+      ],
+      "failed"
+    );
+    expect(toolDisplay.describe(entry)).toMatchObject({
+      action: "command",
+      title: "Command failed",
+      detail: "read missing.md, search for TODO in src",
+      tone: "error",
+    });
+    expect(toolDisplay.summarize([entry])).toBe("Failed to run 1 command");
+  });
+
+  it("describes a pipeline without claiming its list or search succeeded", () => {
+    const entry = shell(
+      "rg --files missing | head",
+      [{ kind: "list_files", path: "missing", piped: true }],
+      "succeeded"
+    );
+    expect(toolDisplay.describe(entry)).toMatchObject({
+      action: "command",
+      title: "Ran command",
+      detail: "list files in missing",
+    });
+    expect(toolDisplay.summarize([entry])).toBe("Ran 1 command");
+  });
+
+  it.each([
+    ["cancelled", "Command stopped"],
+    ["uncertain", "Command outcome unconfirmed"],
+  ] as const)(
+    "keeps the %s outcome on a classified command",
+    (outcome, title) => {
+      const entry = shell(
+        "cat README.md",
+        [{ kind: "read", path: "README.md" }],
+        outcome
+      );
+      expect(toolDisplay.describe(entry)).toMatchObject({
+        title,
+        detail: "read README.md",
+        tone: "error",
+      });
+    }
+  );
+
+  it("keeps a command that returned a session ID in the command display", () => {
+    const entry = native_tool_parts.entry({
+      callId: "background",
+      kind: "execute",
+      title: "exec_command",
+      outcome: "succeeded",
+      input: { cmd: "cat README.md" },
+      commandActions: [{ kind: "read", path: "README.md" }],
+      output: {
+        text: "Wall time: 0.25 seconds\nProcess running with session ID 3\nOutput:\n",
+        truncated: false,
+      },
+    });
+    expect(toolDisplay.describe(entry)).toMatchObject({
+      action: "command",
+      title: "Ran command",
+      detail: "cat README.md",
+    });
+  });
+
+  it("uses exploration verbs in a collapsed group of commands", () => {
+    expect(
+      toolDisplay.summarize([
+        shell(
+          "rg TODO src",
+          [{ kind: "search", query: "TODO", path: "src" }],
+          "succeeded"
+        ),
+        shell("ls src", [{ kind: "list_files", path: "src" }], "succeeded"),
+      ])
+    ).toBe("Listed files, searched files");
+  });
+
+  it("counts one read target across repeated commands in the same working directory", () => {
+    const read = (workdir: string) =>
+      shell(
+        "cat README.md",
+        [{ kind: "read", path: "README.md" }],
+        "succeeded",
+        { workdir }
+      );
+    expect(toolDisplay.summarize([read("/a"), read("/a")])).toBe("Read 1 file");
+    expect(toolDisplay.summarize([read("/a"), read("/b")])).toBe(
+      "Read 2 files"
+    );
+  });
+
+  it("keeps legacy commands generic even with model-supplied display fields", () => {
+    const entry = native_tool_parts.entry({
+      callId: "legacy",
+      kind: "execute",
+      title: "exec_command",
+      outcome: "succeeded",
+      input: {
+        cmd: "cat README.md",
+        commandActions: [{ kind: "read", path: "README.md" }],
+      },
+    });
+    expect(toolDisplay.describe(entry)).toMatchObject({
+      action: "command",
+      title: "Ran command",
+      detail: "cat README.md",
     });
   });
 
@@ -332,9 +516,9 @@ describe("toolDisplay", () => {
     });
   });
 
-  it("labels skill loading as a dedicated action", () => {
+  it("labels current and historical skill reads as skill loading", () => {
     expect(
-      toolDisplay.describe(tool("1", "skill", { name: "slides" }))
+      toolDisplay.describe(tool("1", "read_skill", { name: "slides" }))
     ).toMatchObject({
       action: "skill",
       title: "Loaded skill",
@@ -343,12 +527,42 @@ describe("toolDisplay", () => {
 
     expect(
       toolDisplay.summarize([
-        tool("1", "skill", { name: "slides" }),
+        tool("1", "read_skill", { name: "slides" }),
         tool("2", "skill", { name: "pdf" }),
       ])
     ).toBe("Loaded 2 skills");
   });
+
+  it("shows the tool search query and summarizes discovery separately", () => {
+    const input = { query: "open a page" };
+    expect(
+      toolDisplay.describe(runningTool("1", "tool_search", input))
+    ).toMatchObject({
+      action: "tool_search",
+      title: "Searching tools",
+      detail: "open a page",
+    });
+    expect(toolDisplay.summarize([tool("1", "tool_search", input)])).toBe(
+      "Searched tools"
+    );
+  });
 });
+
+function shell(
+  command: string,
+  commandActions: readonly NativeChatCommandAction[],
+  outcome: NativeChatActivityOutcome,
+  input?: { workdir?: string; directory?: string }
+) {
+  return native_tool_parts.entry({
+    callId: "shell",
+    kind: "execute",
+    title: "exec_command",
+    outcome,
+    input: { cmd: command, ...input },
+    commandActions,
+  });
+}
 
 function tool(
   id: string,

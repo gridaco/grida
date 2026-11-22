@@ -1,8 +1,51 @@
 /** Renderer client for the optional native browser capability. */
 import { DesktopBrowser } from "@grida/desktop-bridge";
 import { getDesktopBridge } from "./bridge";
+import { BrowserLinkPreferences } from "./browser-link-preferences";
 
 export namespace Browser {
+  export type OpenDestination = BrowserLinkPreferences.Destination;
+
+  /** Omit the destination to use the current preference. Returns acceptance. */
+  export type OpenHandler = (
+    url: string,
+    destination?: OpenDestination
+  ) => boolean;
+
+  /** Bind deliberate link opens to a Desktop surface and its workbench. */
+  export function opener(
+    openInWorkbench?: (url: string) => boolean
+  ): OpenHandler {
+    return (input, destination) => {
+      const url = DesktopBrowser.normalizeUrl(input);
+      if (!url) return false;
+      const target =
+        destination ?? BrowserLinkPreferences.read()[linkKind(url)];
+      if (target === "grida") {
+        if (openInWorkbench?.(url)) return true;
+        if (destination === "grida") return false;
+      }
+
+      const shell = getDesktopBridge()?.shell;
+      if (!shell?.open_external) return false;
+      void shell.open_external(url).catch(() => {
+        console.warn("Couldn’t open the system browser.");
+      });
+      return true;
+    };
+  }
+
+  function linkKind(url: string): BrowserLinkPreferences.Kind {
+    const host = new URL(url).hostname.replace(/\.$/, "");
+    return host === "localhost" ||
+      host.endsWith(".localhost") ||
+      /^127(?:\.\d+){3}$/.test(host) ||
+      host === "[::1]" ||
+      host === "0.0.0.0"
+      ? "local"
+      : "web";
+  }
+
   export function getBridge(): DesktopBrowser.Bridge | null {
     const bridge = getDesktopBridge();
     return bridge?.caps.native.browser &&

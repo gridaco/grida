@@ -45,62 +45,24 @@ deck stays uniform. Start each from this shape:
 </svg>
 ```
 
-## Working pattern
+## Authoring and validation
 
-- To start a deck: **first make the bundle folder** — a NEW directory whose name
-  ends in `.canvas` (e.g. `Q3 Report.canvas/`), created under your working root.
-  The `.canvas` suffix on the FOLDER is what marks it a bundle (see Structure);
-  a plain folder — or files loose in the workspace root — is NOT a deck and won't
-  open. Then `write_file` each slide as `<name>.canvas/NNN.svg` and `write_file`
-  the manifest as `<name>.canvas/.canvas.json` listing them in order. Every file
-  lives INSIDE that one `.canvas` folder.
-- To edit a deck: `read_file` `.canvas.json` first (preserve `version` /
-  `$schema` and any unknown fields), edit the slide SVGs, then write the full
-  manifest back with `documents` in the intended order.
-- Reorder = reorder `documents`. Add a slide = `write_file` a new `NNN.svg` and
-  insert it into `documents`. Remove = drop it from `documents`.
-
-## Show the result
-
-- Treat presentation as the first production milestone, not the final
-  "validate and open" step. For a new deck, create a meaningful valid first
-  slide and a manifest that references it, then call `surface_open` immediately
-  with the workspace-rooted `.canvas` bundle directory (for example,
-  `/Q3 Report.canvas`). Continue adding and refining slides while the user can
-  watch. Do not wait for the full deck, all assets, polish, preview generation,
-  exhaustive validation, or task completion.
-- Never open an empty bundle, a broken manifest, or a manifest whose first
-  slide is missing. Pass the bundle directory, never its `.canvas.json`
-  manifest.
-- For an existing primary deck, open it after reading its manifest and before
-  substantial edits.
-- If the `.canvas` bundle itself is mounted as `/` in a dedicated file
-  surface, it is already presented; do not call `surface_open` just to reopen
-  it.
-- Treat presentation as auxiliary: continue regardless of the result, never
-  retry based on presentation status, and do not call `surface_open` after
-  every write.
-- Use `surface_list_open` only when the current host surface state is materially
-  useful. It is not required before `surface_open`.
+- Create a directory ending in `.canvas`. Put the manifest and all slide SVGs
+  inside it. The deck is the bundle directory.
+- A new deck is renderable once its manifest references a valid first slide
+  with a meaningful visible composition. Check that the first `src` resolves
+  relative to the manifest and that its SVG has the intended viewBox.
+- For an existing deck, read the current manifest and preserve its `version`,
+  `$schema`, and any unknown fields. Add a slide by creating its SVG and
+  inserting its entry in `documents`. Reorder those entries to change the
+  running order. Removing an entry removes the slide from the deck.
 
 ## Starting from a template
 
-When the person starts from a gallery template, Desktop copies the template's
-`.canvas` bundle (the manifest `.canvas.json` + slide SVGs) into the workspace
-before the first message, and that message names the copy, its title and its
-slide count. The copy is the person's new deck: treat it as the STARTING POINT,
-not a fixed result:
-
-- `read_file` the copy's `.canvas.json` and slide SVGs first. The template
-  defines the deck's **visual system** — palette, type, layout, margins,
-  footer, accents. Hold it: reuse those so every slide you write reads as a
-  sibling, not a stray.
-- Edit that deck in place: replace the placeholder copy with the person's
-  content and add / reorder / remove slides (update `documents`) to fit. Keep
-  the frame (`1920×1080` viewBox, safe margins) and the conventions above.
-- Don't discard the template's design and start from nothing unless the person
-  asks for a different look — keeping that design is the whole point of the
-  pick.
+When a task supplies a copy of a template deck, use that copy as the starting
+point. Read its manifest and slide SVGs to identify its palette, typography,
+margins, footer, and accents. Replace the placeholders in place. Follow the
+same visual system for new slides unless the user requests a different look.
 
 ## See also
 

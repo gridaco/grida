@@ -81,9 +81,14 @@ pub(super) fn validate_worker_shape(stored: &StoredPrompt) -> Result<()> {
         || stored.allow_workspace_reference
         || stored.allow_image_placement
         || stored.editor_endpoint.is_some()
+        || stored.editor_tool_catalog.is_some()
+        || stored.workbench_tools
+        || stored.desktop_context
+        || stored.editor_instructions.is_some()
         || stored.editor_presentation
         || stored.editor_browser_tools
         || stored.editor_svg_target.is_some()
+        || stored.editor_tool_context_id.is_some()
         || !matches!(
             stored.max_steps,
             Some(1..=grida_agent_master::delegation::CHILD_STEPS)
@@ -1054,9 +1059,14 @@ impl Host {
         captured.allow_workspace_reference = false;
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
+        captured.editor_tool_catalog = None;
+        captured.workbench_tools = false;
+        captured.desktop_context = false;
+        captured.editor_instructions = None;
         captured.editor_presentation = false;
         captured.editor_browser_tools = false;
         captured.editor_svg_target = None;
+        captured.editor_tool_context_id = None;
         captured.completion_checks = Some(completion_checks::worker_checks(
             captured.completion_checks.take(),
         )?);

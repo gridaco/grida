@@ -6,6 +6,55 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 
 describe("NativeTurnActivity", () => {
+  it.each([
+    {
+      from: "openai/gpt-6.2-astra",
+      to: "openai/gpt-6.2-sol",
+      label: "Model changed from GPT-6.2 Astra to GPT-6.2 Sol.",
+    },
+    {
+      from: "openai/gpt-6.2-sol",
+      to: "local/custom-model",
+      label: "Model changed from GPT-6.2 Sol to local/custom-model.",
+    },
+    {
+      from: "openai/gpt-5.5",
+      to: "gpt-5.5",
+      label: "Model changed from openai/gpt-5.5 to gpt-5.5.",
+    },
+  ])("renders $label before the next request", ({ from, to, label }) => {
+    const html = renderToStaticMarkup(
+      <NativeTurnActivity
+        block={{
+          kind: "turn",
+          turnId: "t",
+          requests: [
+            {
+              messageId: "next",
+              role: "user",
+              text: "Next request",
+              turnId: "t",
+            },
+          ],
+          modelChange: { from, to },
+          finished: false,
+          outcome: null,
+          durationMs: null,
+          work: [],
+          answers: [],
+        }}
+        showModelChanges
+        renderMessage={(message) => (
+          <p key={message.messageId}>{message.text}</p>
+        )}
+      />
+    );
+    expect(html).toContain("lucide-box");
+    expect(html).toContain(label);
+    expect(html).toContain("Next request");
+    expect(html.indexOf(label)).toBeLessThan(html.indexOf("Next request"));
+  });
+
   it("shows a running turn's tool calls with the chat kit's tool cards", () => {
     const messages: NativeChatMessage[] = [
       { messageId: "ask", role: "user", text: "Check the cart.", turnId: "t" },
@@ -36,15 +85,74 @@ describe("NativeTurnActivity", () => {
     const html = renderToStaticMarkup(
       <NativeTurnActivity
         block={block as Extract<typeof block, { kind: "turn" }>}
+        onReconsider={() => {}}
+        approvalReviews={[
+          { decision: "approved", action: "/reference/prices.csv" },
+          { decision: "reviewing", action: "first.txt" },
+          { decision: "reviewing", action: "second.txt" },
+          {
+            decision: "declined",
+            action: "example.org:443",
+            reviewId: "review-1",
+            rationale: "The transfer exceeds the request.",
+          },
+          {
+            decision: "declined",
+            action: "timeout.test",
+            failure: "timed_out",
+          },
+        ]}
         renderMessage={(message) => (
           <p key={message.messageId}>{message.text}</p>
         )}
       />
     );
     // The kit's read card names the action and the file, not the tool id.
+    expect(html).toMatch(
+      /Reviewing (?:<!-- -->)?2(?:<!-- -->)? approval requests/
+    );
+    expect(html).not.toContain("Automatically approved");
+    expect(html).not.toContain("prices.csv");
+    expect(html).toContain("The transfer exceeds the request.");
+    expect(html).toContain("Automatic review timed out");
+    expect(html.match(/Request reconsideration/g)).toHaveLength(1);
+    expect(html).toContain("example.org:443");
+    expect(html).toContain("Automatically declined");
     expect(html).toContain("Read file");
     expect(html).toContain("cart.js");
     expect(html).not.toContain("read_file");
+  });
+
+  it("keeps a denial visible when reopening a completed turn", () => {
+    const html = renderToStaticMarkup(
+      <NativeTurnActivity
+        block={{
+          kind: "turn",
+          turnId: "done",
+          finished: true,
+          outcome: "succeeded",
+          durationMs: 0,
+          requests: [],
+          work: [],
+          answers: [],
+        }}
+        onReconsider={() => {}}
+        approvalReviews={[
+          {
+            decision: "declined",
+            action: "example.org:443",
+            reviewId: "review",
+            reconsidered: true,
+            rationale: "Unconfirmed destination.",
+          },
+        ]}
+        renderMessage={() => null}
+      />
+    );
+    expect(html).toContain('data-state="collapsed"');
+    expect(html).toContain("Unconfirmed destination.");
+    expect(html).toContain("Reconsideration requested.");
+    expect(html).not.toContain("Request reconsideration");
   });
 
   it("labels legacy unplaced events and makes a child-only finished turn expandable", async () => {
@@ -102,6 +210,45 @@ describe("NativeTurnActivity", () => {
       fixture.dispose();
     }
   });
+
+  it.each([
+    ["running", "Searching for TODO in src"],
+    ["succeeded", "Searched for TODO in src"],
+    ["failed", "Failed to search for TODO in src"],
+  ] as const)(
+    "renders the shared search action for a %s command",
+    (outcome, label) => {
+      const [block] = turn_activity.group(
+        [
+          {
+            messageId: "work",
+            role: "assistant",
+            text: "",
+            turnId: "turn",
+            activity: [
+              {
+                callId: "search",
+                title: "exec_command",
+                kind: "execute",
+                input: { cmd: "rg TODO src" },
+                commandActions: [
+                  { kind: "search", query: "TODO", path: "src" },
+                ],
+                outcome,
+              },
+            ],
+          },
+        ],
+        [{ turnId: "turn", status: null, startedAtMs: 0 }],
+        { turnId: "turn" }
+      );
+      if (block.kind !== "turn") throw new Error("expected_turn");
+      const html = renderToStaticMarkup(
+        <NativeTurnActivity block={block} renderMessage={() => null} />
+      );
+      expect(html).toContain(label);
+    }
+  );
 
   it("keeps stopped work expanded, places a child stop correctly, and leaves the final answer outside", async () => {
     const fixture = await NativeActivityFixtures.create();

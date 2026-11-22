@@ -50,6 +50,30 @@ describe("display_label", () => {
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="0" y="20">   </text></svg>`
     );
     expect(editor.display_label(byTag("text"))).toBe("text");
+    expect(
+      editor.display_label(byTag("text"), { tagLabel: () => "Text" })
+    ).toBe("Text");
+  });
+
+  it("uses nested SVG text spans for a styled heading", () => {
+    const { editor, byTag } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg"><text>
+        <title>Tooltip</title>
+        <tspan x="0" y="20">Slide Deck Title</tspan>
+      </text></svg>`
+    );
+    expect(editor.display_label(byTag("text"))).toBe("Slide Deck Title");
+    expect(editor.display_label(byTag("tspan"))).toBe("Slide Deck Title");
+  });
+
+  it("previews direct and nested text in document order without changing edit eligibility", () => {
+    const { editor, byTag } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg"><text>Estimated <tspan>revenue</tspan> next quarter</text></svg>`
+    );
+    const id = byTag("text");
+    expect(editor.display_label(id)).toBe("Estimated revenue next quarter");
+    editor.commands.select(id);
+    expect(editor.read_selected_text()).toBeNull();
   });
 
   it("truncates long <text> content with an ellipsis", () => {

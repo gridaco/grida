@@ -14,6 +14,7 @@ import type {
 import type { NativeChatSession } from "./native-agent-chat";
 import { NativeAgentHistory } from "./native-agent-history";
 import { NativeActivityOrder } from "./native-activity-order";
+import { readCommandActions } from "./native-command-actions";
 
 const { object, identity, revision } = NativeAgentHistory;
 const CHILD_PAGE = 32;
@@ -379,6 +380,8 @@ function toolActivity(value: unknown, ordered: boolean): NativeChatActivity {
   const kind = choice(row.kind, ACTIVITY_KINDS);
   if (row.source !== undefined && kind !== "integration")
     throw invalidResponse();
+  const title = id(row.title);
+  const commandActions = readCommandActions(title, row.commandActions);
   const input = row.input === undefined ? undefined : jsonDetail(row.input);
   let output: NativeChatActivity["output"];
   if (row.output !== undefined) {
@@ -395,9 +398,10 @@ function toolActivity(value: unknown, ordered: boolean): NativeChatActivity {
   }
   return Object.freeze({
     callId: id(row.callId),
-    title: id(row.title),
+    title,
     kind,
     outcome: choice(row.outcome, ACTIVITY_OUTCOMES),
+    ...(commandActions !== undefined && { commandActions }),
     ...NativeActivityOrder.read(row, ordered, true),
     ...(row.source !== undefined && { source: id(row.source) }),
     ...(input !== undefined && { input }),

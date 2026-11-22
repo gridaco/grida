@@ -26,7 +26,7 @@ impl FileTools {
         }
         let access = authority(&budget.invocation)?;
         match operation {
-            Operation::Read => {
+            Operation::Read | Operation::ReadScoped => {
                 let read = access.configuration.read_settings()?;
                 let exists = read.bytes.is_some();
                 let text = decode(read.bytes.unwrap_or_default())?;

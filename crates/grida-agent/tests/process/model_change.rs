@@ -2,6 +2,8 @@ use super::approvals::Stdio as StdioClient;
 use super::lifecycle::{prompt_request, task_basis};
 use super::*;
 
+const TRANSCRIPT: &str = "co.grida/session/transcript-window";
+
 async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
     let mut command = executable();
     command
@@ -26,6 +28,7 @@ async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
     );
     let mut initialize = extension_initialize();
     initialize["clientCapabilities"]["_meta"]["co.grida/session/model-change"] = 1.into();
+    initialize["clientCapabilities"]["_meta"][TRANSCRIPT] = 1.into();
     let ready = client.request("initialize", initialize).await;
     assert_eq!(
         ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/model-change"], 1,
@@ -215,6 +218,8 @@ async fn a_different_model_can_finalize_an_explicit_stop_without_dispatching_the
         .await;
     let view = snapshot(&mut selected, session).await;
     assert_eq!(view["current"]["disposition"], "suspended");
+    assert_eq!(view["current"]["modelId"], "route-a");
+    assert_eq!(view["latest"]["modelId"], "route-a");
     let denied = selected.request("_co.grida/session/resume",json!({"task":task_basis(&view,session,"wrong-route-resume"),"expectedEpoch":view["current"]["epoch"],"expectedJournalPosition":view["current"]["journalPosition"]})).await;
     assert_eq!(
         denied["error"]["data"], "session_active_route_changed",
@@ -231,5 +236,81 @@ async fn a_different_model_can_finalize_an_explicit_stop_without_dispatching_the
     assert_eq!(settled["latest"]["status"], "cancelled", "{settled}");
     assert!(endpoint.requests.try_recv().is_err());
     selected.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn reopened_transcript_pages_keep_each_turns_captured_model() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(
+        (0..=32)
+            .map(|_| Reply::Finished("Recorded response"))
+            .collect(),
+    )
+    .await;
+    let mut first = start(&state, &endpoint.url, "route-a").await;
+    let created = first
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let prompt = |text: &str| {
+        json!({
+            "sessionId":session,
+            "prompt":[{"type":"text","text":text}],
+        })
+    };
+    let first_reply = first.request("session/prompt", prompt("First turn")).await;
+    assert_eq!(
+        first_reply["result"]["stopReason"], "end_turn",
+        "{first_reply}"
+    );
+    assert_eq!(endpoint.request().await["model"], "route-a");
+    let first_turn = snapshot(&mut first, session).await["latest"]["turnId"].clone();
+    assert!(first_turn.is_string());
+    first.close().await;
+
+    let mut load = json!({
+        "sessionId":session,"cwd":workspace.path(),"mcpServers":[],
+        "_meta":{TRANSCRIPT:{"kind":"attach"}}
+    });
+    let mut second = start(&state, &endpoint.url, "route-b").await;
+    let attached = second.request("session/load", load.clone()).await;
+    assert!(attached.get("error").is_none(), "{attached}");
+    for _ in 0..32 {
+        let reply = second.request("session/prompt", prompt("Later turn")).await;
+        assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+        assert_eq!(endpoint.request().await["model"], "route-b");
+    }
+    second.close().await;
+
+    let mut reopened = start(&state, &endpoint.url, "ambient").await;
+    let attached = reopened.request("session/load", load.clone()).await;
+    assert!(attached.get("error").is_none(), "{attached}");
+    let view = snapshot(&mut reopened, session).await;
+    assert_eq!(view["latest"]["modelId"], "route-b");
+    load["_meta"][TRANSCRIPT] = json!({"kind":"read","requestId":"recent"});
+    let latest = reopened.request("session/load", load.clone()).await;
+    let page = &latest["result"]["_meta"][TRANSCRIPT];
+    let turns = page["turns"].as_array().unwrap();
+    assert_eq!(turns.len(), 32);
+    assert!(turns.iter().all(|turn| turn["modelId"] == "route-b"));
+    assert_eq!(turns.last().unwrap()["turnId"], view["latest"]["turnId"]);
+    assert!(page["older"].is_object(), "{page}");
+
+    load["_meta"][TRANSCRIPT] = json!({"kind":"read","requestId":"older","before":page["older"]});
+    let older = reopened.request("session/load", load).await;
+    let page = &older["result"]["_meta"][TRANSCRIPT];
+    let turns = page["turns"].as_array().unwrap();
+    assert_eq!(turns.len(), 1);
+    assert_eq!(turns[0]["turnId"], first_turn);
+    assert_eq!(turns[0]["modelId"], "route-a");
+    assert!(page["older"].is_null());
+    assert!(endpoint.requests.try_recv().is_err());
+    reopened.close().await;
     endpoint.done().await;
 }

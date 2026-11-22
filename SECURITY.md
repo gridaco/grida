@@ -439,15 +439,30 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    There is no renderer broker method, loopback proxy, socket path, or
    environment credential. The ChatGPT-subscription grant registered by
    GRIDA-SEC-008 holds only exact `auth.openai.com` token and `chatgpt.com`
-   Responses destinations. It is a Main-only grant: Main dispatches it for its
+   Responses and authenticated subscription models destinations. It is a Main-only grant: Main dispatches it for its
    native subscription host, it is never published to the sidecar, and it is
    never eligible for the asset lane.
+   Voice uses Main-only grants for the exact GPT-Transcribe file endpoint on
+   each supported provider. Main decrypts the single saved Voice key and sends
+   it only to its selected provider. The renderer submits bounded audio and
+   receives text or a typed failure. The bridge scopes transcription to admitted
+   composer frames and key changes to the admitted Settings frame.
    When this transport is enabled, the outer native
    policy omits BYOK/GG destinations, so missing provider wiring cannot fall
    back to direct sidecar egress. Electron main transiently observes provider
    request headers and bodies while transporting them, but never persists,
    returns, or logs credentials or bodies; credential ownership and injection
    remain in the sidecar's provider layer.
+
+   Desktop Main publishes the public Models V2 cache with verified release
+   hashes and atomic replacement. The [retained service policy](desktop/src/main/sidecar-sandbox-policy.ts)
+   gives the sidecar read access to that cache and denies writes on confined
+   platforms. File APIs keep the catalogue root outside workspace admission.
+   [Visual model resolution](packages/grida-ai/src/catalogue/visual-models.ts)
+   validates provider selectors before building adapter requests. The
+   Settings and picker view contains compatible model facts and operations.
+   Credential presence and the exact launch binding are still checked at
+   generation time.
 
    Anonymous GG discovery has a separate, narrow permission: credential-free
    `GET` requests to exactly `https://gateway.grida.ai/v1/models`,
@@ -548,8 +563,59 @@ guest except a one-use, exact-document browser mount admitted under
 GRIDA-SEC-016; guest preferences and session selection are forced by Main;
 every main-process IPC handler validates `event.senderFrame.url`.
 
-**Explicit Full access.** The ordinary restricted profile retains all command
-and filesystem exclusions below. A trusted launch can separately opt into
+**Scoped automatic approval.** A trusted workspace launcher can enable one-action
+requests and the per-chat automatic reviewer. The host records each requested
+effect, captured authority and exact operation. It validates the retained answer,
+file identity or prepared command, current controls and authority before dispatch.
+The [review evidence projection](crates/grida-agent/src/host/approval_review/evidence.rs)
+uses the preceding assistant message for context. It checks publication order
+and the conversation known at submission. Structured questions keep assistant
+text separate from the person's answer. A manual approval requires a decision
+bound to its pending request. [Reconsideration](crates/grida-agent/src/host/reconsideration.rs)
+requires an exact denial the client can display without masking or truncation.
+Settings writes stay with the person. A scoped assessment that denies, times out
+or exhausts its technical retries blocks the action. A separate, actionable
+human request handles evidence that the reviewer cannot represent. For command
+assessments with an existing shell read grant, the host can run a bounded,
+offline command under the turn’s filesystem read ceiling. This can include
+ordinary files outside the workspace. Protected and revoked locations remain
+inaccessible. Private scratch is its only write scope. The reviewer has no
+foreground terminal handles or escalation route. An eligible file-only profile
+uses the protected, descriptor-relative primary-workspace reader instead.
+
+The captured model provider receives bounded observations. Compatible later
+reviews in that chat receive retained observations as quoted, untrusted text.
+A checkpoint cannot inject a tool call or grant authority. Raw results stay
+out of public projections and foreground model context. Replacing the
+active history view or changing the reviewer’s effective settings retires the
+reusable context. The host checks the current action, controls and grants
+before resolving its wait. A scoped external read uses a verified descriptor
+and checks the file version before disclosing its bytes.
+Ordinary Act commands in a managed profile receive a host-owned, authenticated
+CONNECT proxy. Launching the command grants no destination.
+The sandbox permits only the bound IPv4 loopback proxy endpoint on macOS
+and a private loopback ingress backed by a protected Unix socket on Linux.
+The host records and checks each exact DNS host and port before resolving or
+dialing a verified public address. A decision applies to one command process,
+including all connections it makes to that destination. Cancelling or ending
+the process revokes the credential and closes the tunnels. Pending decisions
+from a previous execution owner are withdrawn on resumption. Sensitive
+transfers require authority for the data and destination.
+Electron Main retains scoped approval objects and issues opaque frame-local tokens.
+
+**Reviewed command retry.** A trusted launcher can opt in with
+`allowCommandEscalation` or `--allow-reviewed-command-retry`. The native host
+captures the prepared shell, working directory, filesystem and network scope.
+The sandbox enforces the filesystem read ceiling, mandatory host exclusions
+and agent metadata restrictions. On macOS, one reviewed TCP listener can use
+its captured port. The command chooses its bind address. Outbound TCP is limited to loopback on
+the same port so the process can check readiness. The automatic reviewer checks
+a local preview's loopback bind. Desktop binds the exact reported effect to its
+one-use approval token. The originating chat owns the closed-stdin process and
+the supervisor can stop it. Later commands use their own captured authority.
+Plan and worker restrictions still apply.
+
+**Explicit Full access.** A trusted launch can separately opt into
 Full access, and Desktop Main requires an in-app confirmation for the exact
 chat before selecting it. In a workspace the review is tied to the current
 attachment. On Home, Main validates the registered destination and binds a
@@ -562,19 +628,19 @@ without an attachment or a send capability. The private,
 negotiated permission-mode operation is not a model tool. The host records the
 per-chat selection at a serialized admission boundary. Running turns, queued
 inputs and worker assignments keep their captured posture. New chats start
-restricted. Only a turn with captured Full access can interact with a process
-launched unconfined. The supervisor can still list and stop the chat's processes.
+restricted. Only a turn with captured Full access can drive a process launched in that
+mode. The supervisor can still list and stop the chat's processes.
 
 Full access deliberately removes model-command filesystem, network and IPC
 confinement. Same-user code can read or modify local credentials, Grida state,
 installed files and other same-user processes wherever OS permissions allow.
 Private file modes and cleared environments do not isolate these resources
 from that code. The command-level exclusions in GRIDA-SEC-004 and
-GRIDA-SEC-014 therefore apply to restricted execution, not this explicit
-posture. The renderer bridge, retained-sidecar sandbox and purpose-bound
-provider transport remain in force; none is widened to provide the escape
-hatch. Full access adds no OS privilege elevation or automatic credential
-injection and does not require automatic approval review.
+GRIDA-SEC-014 protect confined executions, including approved escalation.
+The renderer bridge, retained-sidecar sandbox and purpose-bound provider
+transport keep their own boundaries. Full access adds no OS privilege
+elevation or automatic credential injection and does not require automatic
+approval review.
 
 The native helper provides process ownership, input/output bounds, terminal
 interaction, deadlines and best-effort cleanup for unconfined launches. Its
@@ -590,16 +656,20 @@ command runs as `<shell> -c <cmd>` in the user's named POSIX shell: the
 captured environment's `SHELL` only when it is an absolute path to an
 executable `sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`. The call
 supplies the command line, an optional working directory and a terminal
-choice; it supplies no environment values or stdin. A command still running
-when its wait ends is kept by its chat in the host's process store. Turn end,
-cancellation, pause and approval waits leave it running; it ends when the
-model or a person stops it, it is evicted for a newer process (64 per chat),
+choice. The host owns the process environment and stdin. A separately
+granted file can supply bounded stdin to a finite read-only command through
+[`input_file`](crates/grida-agent/src/permissions/command_input.rs). The
+host checks the file grant and prepares the command under the primary
+workspace scope. A command still running when its wait ends is kept by its
+chat in the host's process store. Turn end, cancellation, pause and approval
+waits leave it running; it ends when the model or a person stops it, it is
+evicted for a newer process (64 per chat),
 its chat is deleted, or the host shuts down. Kept processes run under a
 24-hour scope. A changed composer permission choice applies to later inputs.
 Processes keep their launch posture. Within a compatible turn, the launch
 approval covers terminal input. A policy that must review every command
 should refuse interactive terminals. The host reports unverified cleanup at
-shutdown and lets the queue proceed. Filesystem grants, network denial, private
+shutdown and lets the queue proceed. Filesystem grants, network scope, private
 temporary storage, and the termination guarantee come from the host and
 native sandbox.
 A host profile can let programs read and execute anywhere except its protected
@@ -608,7 +678,8 @@ paths (disk read) and start from the host's environment minus Grida's own
 with. The host's state, the profile file, the credential home,
 `GRIDA_HOME` and `~/.grida` stay read-and-write protected, so disk read never
 reaches them; the sandbox expresses each as an exclusion of every grant rather
-than relying on rule order. Version-control and agent metadata (`.git`,
+than relying on rule order. Under the default file scope, version-control
+and agent metadata (`.git`,
 `.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
 read-only once it exists when the command starts; agent configuration
 (`.grida`, `.codex`) is protected even before it exists. On Linux the sandbox
@@ -638,33 +709,28 @@ created beneath it. Version-control and agent metadata names are refused as
 the first component. Content goes to an exclusive temporary file in the same
 folder and is renamed into place; an edit also confirms the file is unchanged
 since it was read. Desktop grants the Default preset's write rule only for the
-selected project folder and registers no additional folders, so its file
-tools stay inside the project, apart from the settings file below, and no
-folder can be granted on request. Desktop
-supplies programs its captured login-shell environment, minus app variables.
+selected project folder and registers no additional folders. Its file
+mutations stay inside the project, and a request cannot add a folder grant.
+Desktop supplies programs its captured login-shell environment, minus app
+variables.
 Preparation refusals share one tool response regardless of path existence.
 
-**Agent settings file.** The host's own state stays protected, with one
-carve-out: the file tools reach the host's settings file, `config.toml` in its
-configuration folder (Desktop: the workspace's folder under `chats/workspaces/`;
-headless: the state directory), as directory `agent-settings`. Nothing else
-in that folder is reachable: list, search, image and other paths are refused,
-and a launch profile cannot name a folder `agent-settings`. Under restricted access, a read runs under
-the turn's file grant. Every write or edit is an approval request bound to that
-exact action; the fixed ask rule ignores the folder rules, so neither the
-Default preset's project write rule nor an earlier approval covers it, Plan
-withholds it, and the automatic reviewer answers reads only. The host offers
-the carve-out only while its command denials cover that folder for read and
-write, so a command can neither read nor change the file the file tools
-approve. The settings owner, not the workspace walker, performs the write: it
-validates the complete result first, refuses invalid content unchanged with
-its diagnostic, publishes owner-only content atomically under the writer lock,
-refuses a concurrent manual edit, and activates the result for later accepted
-input; accepted work keeps its capture. Desktop Main admits a write review
-only for `config.toml` under the canonical settings folder it launched.
-The schema accepts only `schema_version` and `context.max_input_tokens`, so an
-approved write cannot add grants, protected paths, credentials, commands or
-egress.
+**Agent settings file.** The configuration owner loads `config.toml` from
+protected storage. A person can edit the file or use a trusted client's
+negotiated configuration operations. A launch profile reserves the
+`agent-settings` directory ID for earlier accepted work.
+
+An earlier accepted input can retain its exact settings grant through queueing,
+pause, and recovery. The host rechecks that grant and that command denials
+protect the folder. The grant covers only `agent-settings/config.toml`. An
+earlier accepted write or edit still asks the person for that exact action.
+The host validates the complete content, detects concurrent edits, and
+publishes valid owner-only content atomically under the writer lock. Desktop
+Main admits a retained write review only for `config.toml` in the canonical
+settings folder it launched. A saved change applies to later inputs. Accepted
+work keeps its captured defaults. The schema accepts only `schema_version`
+and `context.max_input_tokens`.
+
 The adapter retains supervision after the runtime cancels an invocation. The
 host's cleanup barrier reports pending or unverified command identities before
 the host releases resources that depend on cleanup. Same-process reconciliation
@@ -730,9 +796,9 @@ login PTY — arbitrary code execution by design, accepted under the same
 trust model as VSCode's integrated terminal: the human runs commands as
 themselves, on their own machine, with their own privileges (no
 escalation). It is deliberately NOT wrapped in an agent sandbox and
-deliberately NOT part of the agent's tool surface — the agent's Default command tool
-stays confined by the native command sandbox, explicit Full access uses its
-separate owned unconfined process path, and no code path hands the
+deliberately NOT part of the agent's tool surface. The agent's restricted
+commands, including approved escalation, use the native sandbox. Explicit
+Full access uses the supervised unconfined backend. No code path hands the
 agent a handle to a human terminal. What makes the surface acceptable is that
 only the legitimate desktop renderer can reach it: the four terminal IPC
 channels are registered through the same sender-frame `guarded()` wrapper
@@ -888,6 +954,19 @@ pixels through this reader, with no additional filesystem or model grant.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- [Desktop personalization settings](desktop/src/main/desktop-personalization.ts),
+  [physical config reads](desktop/src/main/native-agent-files.ts) and
+  [prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  keep the user opt-in, config integrity and the authorized connection in Main.
+  Settings alone can edit global search mode and suggested prompts. Main rechecks
+  the frame before replacing the file, serializes preference writes, and checks
+  for concurrent hand edits. Invalid source revokes hosted search permission and
+  suggestions and preserves the original file.
+  Turning predictions off revokes pending model lookup and provider dispatch
+  for that opt-in across all Desktop windows.
+  The [native prediction host](crates/grida-agent/src/host/prediction.rs)
+  verifies the completed turn's authority before tool-free inference.
+
 - Retained tool images: [native result authorization](crates/grida-agent/src/host/tool_images.rs),
   [private ACP reader](crates/grida-agent/src/acp/extensions/tool_images.rs),
   [native process regression](crates/grida-agent/tests/process/tool_images.rs),
@@ -916,7 +995,8 @@ pixels through this reader, with no additional filesystem or model grant.
   [helper posture protocol](crates/agent-kit-sandbox/src/wire.rs). These add an
   explicitly confirmed unconfined path without relaxing restricted execution
   or retained-service containment. Headless evidence lives in the
-  [permission-mode process tests](crates/grida-agent/tests/process/full_access.rs).
+  [permission-mode process tests](crates/grida-agent/tests/process/full_access.rs) and
+  [one-command approval cases](crates/grida-agent/tests/process/approvals/escalation.rs).
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
   builds the locked Rust host and helper, strips only staged copies and verifies
@@ -940,12 +1020,15 @@ pixels through this reader, with no additional filesystem or model grant.
   Build output custody stays with the packaging owner. Launch-time trust and
   helper identity remain enforced by the native host.
 - [Bundled command staging](desktop/scripts/bundled-programs.mjs) checks the
-  exact platform package and copies the executable into app resources before
-  signing. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
+  exact platform package in the [FX declaration](extensions/desktop-fx/extension.json)
+  and copies the executable into app resources before signing. The
+  [Desktop FX owner](desktop/src/main/fx-extension.ts) verifies that installed
+  resource before using it. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
   checks the copy against the app resource, places it outside the installation
   and command write grants, and keeps the installation exclusion in effect.
   The command profile exposes the fixed program directory and verifies the
-  projected launcher helper. Host-owned lookups use the installed resource.
+  projected launcher helper. The bundled FX skill is enabled with the verified
+  command projection.
 - [Native agent process owner](desktop/src/main/native-agent-process.ts) and
   [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
   resource executable without a shell. They select the child environment,
@@ -983,14 +1066,23 @@ pixels through this reader, with no additional filesystem or model grant.
   [Main's grant owner](desktop/src/main/provider-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.
-  Built-in OpenRouter and Vercel profiles require a selected catalogue model and
-  a stored key from the supervisor's credential home. Their broker authorizes
-  only that provider's exact Chat Completions route. These profiles permit
+  Built-in OpenRouter and Vercel profiles require a compatible provider binding
+  for the selected canonical model and a stored key from the supervisor's
+  credential home. The catalog supplies the exact wire selector. It cannot
+  supply a destination or authorize a credential. Their broker authorizes
+  only that provider's fixed Chat Completions route. These profiles permit
   manual subagents, ordinary Ultra reviews, and Goal-funded reviews under the
   same captured authority, as do other supported native provider connections.
   The built-in stored-key launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
   exercise built-in and configured keys and refusal after credential replacement.
+  [OpenAI project discovery](desktop/src/main/native-openai-models.ts) uses a
+  separate Main-only grant for the fixed model-list GET and the two Responses
+  POST routes. The picker receives model IDs and safe status. A discovery
+  result is published only while its captured key still matches.
+  The media sidecar uses a separate provider grant for the authenticated
+  OpenAI Images generation POST. The grant admits one fixed URL, refuses
+  redirects, and permits neither chat requests nor asset downloads.
   The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)
   accepts only a saved provider identity and model choice. The
   [workspace launcher](desktop/src/main/native-desktop-agent.ts) resolves
@@ -1181,7 +1273,7 @@ pixels through this reader, with no additional filesystem or model grant.
   rechecks its physical identity before requests and delivery. Its chat worker
   uses private storage and a private working directory, without a project grant
   or external tool host. The attached editor can publish only `/canvas.svg`
-  and provide a captured plain text selection. The editor still owns Save.
+  and provide a captured SVG selection. The editor still owns Save.
   Document window retirement drains its worker. Workbench presentation and
   external-agent commands remain scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
@@ -1217,9 +1309,8 @@ pixels through this reader, with no additional filesystem or model grant.
   token belongs to the current attachment. An unverified reply keeps both
   request identities and the exact replacement text and mode for retry.
   Desktop negotiates no configuration operation and has no settings control
-  or send-time settings permission. A change to the workspace's agent
-  settings file is an ordinary file write (see the agent settings file
-  above), and Main admits a write review only for that exact file.
+  or send-time settings permission. Main continues to validate an exact
+  settings-file write review for earlier accepted work.
   The [workspace configuration owner](crates/grida-agent/src/configuration.rs)
   admits shared defaults only for a private supervising launch bound to the
   exact workspace state root and generation. It serializes source and active
@@ -1261,31 +1352,65 @@ pixels through this reader, with no additional filesystem or model grant.
 - [Live editor observations](crates/grida-agent/src/editor_surfaces.rs)
   require the negotiated private Desktop stdio capability. Main issues the
   binding for an exact authorized [chat attachment](desktop/src/main/native-editor-surfaces.ts).
+  The [private MCP binding](desktop/src/main/native-desktop-tools.ts) correlates
+  each request with this endpoint and limits discovery and calls to its
+  accepted tool scope. It checks the tool definition revision and preserves
+  the original request deadline through dispatch.
+  The [source registry](desktop/src/main/native-desktop-tool-sources.ts)
+  keeps a distinct Main-issued generation and lifetime for each registered
+  source on the endpoint. The carrier checks the captured registration before
+  dispatch and discards a late result if that registration retires. Copying a
+  tool name and revision cannot redirect a call to a different registration.
+  Native workbench and browser grants distinguish visible tab closure from
+  background page cleanup. Both operations retain the exact bound page and
+  workbench validation at the Main receiver.
+  The [Browser MCP adapter](desktop/src/main/desktop-browser-mcp.ts) uses the
+  captured Browser lease and discards replies after revocation.
+  [Native tool image validation](crates/grida-agent/src/file_tools/tool_image.rs)
+  bounds and verifies the JPEG before placing prepared media under the
+  owning tool-result scope.
   Each observation revalidates the current frame and chat. Navigation or
   replacement revokes the binding. Rust retains it with the accepted input,
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
-- The separately negotiated [SVG text tools](crates/grida-agent/src/editor_surfaces/svg_text.rs)
-  capture one exact workbench, standalone SVG, or slide selection for an
-  immediate Act text input. Main dispatches to the admitted frame and validates the bounded
-  [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
-  A deck may publish one bundle-relative slide and must reply for the same
-  observed slide. Main rechecks the deck's directory generation before sending
-  the call and accepting its reply.
-  The [renderer owner](editor/scaffolds/desktop/shared/selected-svg-text.ts)
-  requires the captured editor, view, selection, and revision before the
-  existing SVG text command can run. Its result is a live edit. The normal
-  editor save remains a separate operation. An unverified mutation reply
-  stays uncertain and is never replayed.
-- Live presentation requires a separately negotiated capability and a
-  subscription from the exact attached workbench. Main dispatches a bounded
-  workspace-relative path to the authorized frame. Its receipt identifies the
-  chat, endpoint, and call. The editor validates the target and the original
-  view before activation. A repeated call can recover its receipt without a
-  second send. An unconfirmed dispatch stays in the turn's evidence. The
-  master permits continuation only for the exact trusted presentation
-  definition and turn grant.
+- The [SVG selection tools](desktop/src/main/desktop-selected-svg-selection.ts)
+  use one negotiated editor-tool context for an eligible Act text input,
+  including queued input. The scope resolves through the exact input and
+  owning attachment. The [surface validator](packages/grida-desktop-bridge/src/native-editor-surfaces.ts)
+  validates the selection source against the active tab. Slide and board pin
+  paths must stay inside their bundle. A dedicated bundle window publishes
+  bundle-relative source paths. Main rechecks its directory generation before
+  dispatch and before accepting the result, and accepts a root board selection
+  only on that route.
+  The [renderer owner](editor/scaffolds/desktop/shared/editor-selection.ts)
+  captures the active view and exact target at Send. The capture binds the
+  content revision of an editable SVG or the board and pin identity of a
+  whole document. Main compares the submitted target with the published
+  selection before binding the input. A mismatch makes the capture stale,
+  including on retry. The renderer checks the capture against the live source
+  before dispatch. A board pin exposes bounded read-only inspection. Editable SVG
+  selections expose bounded locators and supported editor commands.
+  Mutations use editor commands and leave disk writes to Save. Main checks
+  the original deadline and [correlated reply](desktop/src/main/native-editor-svg-replies.ts)
+  against the captured scope. Cancellation releases the pending reply and
+  discards late results. An unverified mutation remains uncertain and is
+  never replayed. The transcript marker carries no token and the external
+  inventory has no grant.
+- The [earlier SVG text binding](desktop/src/main/desktop-selected-svg-text.ts)
+  remains available to earlier peers with the original captured text grant.
+  Its scoped and bounded replies still require the same admitted frame,
+  attachment, and deadline.
+- [Workbench presentation](desktop/src/main/desktop-workbench-tools.ts) and
+  the [earlier binding](desktop/src/main/desktop-artifact-presentation.ts)
+  require a separately issued grant and a subscription from the exact attached
+  workbench. Main resolves modern file targets within the captured workspace
+  and checks the published view after validation. It sends a bounded internal
+  path to the authorized frame. The editor verifies the target and the original
+  view before activation. A repeated dispatch recovers the recorded receipt
+  without another send. An unconfirmed dispatch stays in the turn's evidence.
+  The master permits continuation only for an exact trusted file reveal under
+  the captured turn grant.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery
@@ -1365,7 +1490,7 @@ pixels through this reader, with no additional filesystem or model grant.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each
   automatic claim on the captured goal revision, allowance and original
   settings. It revalidates current authority before dispatch. A generated
-  turn receives no new access; a settings file write asks like any other.
+  turn receives no new access.
   For a manual goal, an explicit idle Resume records authority for one further
   work turn. The existing claim atomically consumes that authority under the
   captured goal revision and allowance; replaying the control cannot create
@@ -1646,6 +1771,13 @@ pixels through this reader, with no additional filesystem or model grant.
   under its existing path guard; optional methods and subscription ownership
   are unchanged.
 
+- Main retires chat attachments and workspace browser guests when navigation
+  leaves their scope. The preload resolves late teardown locally once the
+  active route has lost the corresponding capability. The
+  [Electron navigation regression](desktop/src/bridge/workspace-cleanup.electron.test.ts)
+  and its [isolated fixture](desktop/src/bridge/workspace-cleanup.electron.cjs)
+  exercise both active-route dispatch and late cleanup after navigation.
+
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
   [crates/grida-ai/src/input.rs](crates/grida-ai/src/input.rs),
@@ -1760,7 +1892,32 @@ Today:
   selected workspace identity and canonical root in a private directory.
   [Fixtures](desktop/src/main/native-chat-store.test.ts) exercise refused
   state, credential overlap and workspace isolation with real native processes.
-- The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation tools under the existing read grants and keeps command, working-copy mutation, settings changes and timer tools out of the turn inventory. The durable input captures the regime. Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained Act work and refuses to resume it. [Process tests](crates/grida-agent/tests/process/operating_regime.rs) cover captured authority through queue edit, restart and separate Act submission.
+- The [native workspace inventory](crates/grida-agent/src/permissions.rs)
+  offers commands for ordinary text reads in a primary directory with
+  unconditional read command authority. A command with `input_file` can
+  receive one bounded UTF-8 file as stdin in an eligible narrow read profile.
+  This uses an independent named-directory or exact-file grant. The host
+  requires an explicit directory and relative path. The default disk-read
+  profile uses ordinary command scope for disk reads. An outside-project
+  approval binds the file identity and version. The source stays with the host.
+  The command runs in finite, offline, read-only confinement at the primary
+  root. Its authority permits private scratch and withholds terminal input,
+  background yield, and workspace writes. A retained input keeps the original
+  tool inventory and permission capture.
+- The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation
+  tools under the existing read grants and withholds working-copy mutation,
+  settings changes and timers. A Plan command requires the captured read
+  command grant and a [confined execution scope](crates/grida-agent/src/permissions.rs).
+  It follows the launch profile's captured disk-read posture and keeps the
+  profile's protected-path exclusions. It writes only to private scratch and
+  runs without network or elevation. The host applies that boundary under
+  Full access as well. The durable input captures the regime and read policy.
+  Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained
+  Act work and refuses to resume it.
+  [Regime process tests](crates/grida-agent/tests/process/operating_regime.rs)
+  cover queue edit, restart and separate Act submission.
+  [Command process tests](crates/grida-agent/tests/process/approvals.rs)
+  cover Plan command admission and confinement.
 - The native [turn summary](crates/grida-agent/src/acp/extensions/summaries.rs) requires a negotiated capability and an attached chat. It reads the exact settled turn and projects bounded plain text, tool disposition counts, unresolved counts, check statuses, whether independent review findings were collected, and provider-reported token subtotals in a fixed set of categories. Raw operations, arguments, child identities, provider state, and attempt-level usage attribution stay in the host.
 - [Native goal host](crates/grida-agent/src/host/goals.rs) binds goal tools to the exact session, reserved turn, and goal revision. The tools read captured goal metadata or record a proposal. Their grant cannot authorize workspace, command, or provider operations. Explicit goal acceptance retains the selected permissions and uses the ordinary queue and turn owner.
 - An Ultra Goal draws its review share from the existing Goal reservation.
@@ -1969,6 +2126,8 @@ Today:
 - `desktop/src/services-sidecar-channel.ts`, `provider-network-policy.ts`, and `services-sidecar-network.ts` — strict private stdio framing, destination/header policy and the sidecar's explicit provider/provider-asset transport client. The channel carries no host command lane: `command.*` frames are unknown types, and malformed or unknown frames fail the channel.
 - `desktop/src/main/services-sidecar-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
 - `desktop/src/main/provider-network-host.ts` and `provider-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
+- `desktop/src/main/voice.ts` and `voice-microphone.ts` — Main-owned Voice key encryption and provider-bound GPT-Transcribe requests. Microphone requests require the admitted composer and a configured Voice provider.
+- `packages/grida-ai/src/gpt-transcription.ts` — provider-specific recording encoding and bounded transcript decoding over a host-supplied transport.
 - `desktop/src/main/provider-endpoint-consent.ts` — protected Main-owned durable endpoint receipts, explicit Save consent, exact binding restoration, non-minting discovery and serialized revocation. [Consent cases](desktop/src/main/provider-endpoint-consent.test.ts) and [startup cases](desktop/src/main/provider-endpoint-startup.test.ts) pin persistence and ordinary startup/restart wiring; adjacent authority, supervisor and [Settings IPC cases](desktop/src/main/settings-ipc.test.ts) pin transport ACK and frame admission.
 - The [finite command supervisor](crates/grida-agent/src/command.rs) runs reviewed hook and completion checks. It retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt.
 - Model commands run through the [chat process store](crates/grida-agent/src/processes.rs) and its [command tools](crates/grida-agent/src/processes/tools.rs). Each launch uses the approved scope and captured environment; later input reaches only that chat's own processes. Stop, eviction, deletion, scope lifetime and shutdown end them; a changed permission profile governs only later launches, and unverified cleanup is reported at shutdown. The [native session](crates/agent-kit-sandbox/src/native/session.rs) and [trusted helper](crates/agent-kit-sandbox/src/helper.rs) end a session at its scope deadline, on stop or handle drop, and when its owner disappears. The [private process controls](crates/grida-agent/src/acp/extensions/processes.rs) list and stop processes only for an attached chat on a negotiated private connection. [Command tests](crates/grida-agent/tests/commands.rs), [process tests](crates/grida-agent/tests/process/processes.rs) and [native sandbox tests](crates/agent-kit-sandbox/tests/native.rs) cover this boundary.
@@ -2013,6 +2172,7 @@ Today:
 - The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
 - The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while a reviewed hook check's command cleanup is pending; unverified hook cleanup stops automatic queue advancement. Model command processes belong to their chat and do not hold the slot; deletion and host shutdown clean them up. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
 - Trusted launch configuration can select [automatic review](crates/grida-agent/src/host/approval_review.rs) for one exact file read already governed by `ask`. The [review policy](crates/grida-agent-master/src/approval_review.rs) bounds the evidence and gives the selected provider no tools, absolute root, or file content. Only a valid retained result on the same action, scope, control, and history basis can answer the ordinary pending approval. Manual decisions and current file grants still govern. The host filters reviewer output before the public stream. [Built tests](crates/grida-agent/tests/process/approvals/reviewer.rs) cover exact scope, manual precedence, restart, and interruption.
+- In per-chat Auto mode the [review coordinator](crates/grida-agent/src/host/approval_review.rs) binds a private provider dispatch to the exact action. The [investigation](crates/grida-agent/src/host/approval_review/investigation.rs) offers the [confined shell](crates/grida-agent/src/permissions/review_shell.rs) when the turn captured the necessary grant, or the [bounded file reader](crates/grida-agent/src/permissions/review_files.rs) when only a file read is available. The [review session](crates/grida-agent/src/host/approval_review/session.rs) and [private checkpoint store](crates/agent-kit-store-sqlite/src/checkpoint.rs) bind retained evidence to one chat, history view and compatible permissions and model settings. Only a durably answered trunk review can publish its next checkpoint. [Store cases](crates/agent-kit-store-sqlite/tests/store/checkpoint.rs) and [host cases](crates/grida-agent/tests/process/approvals/reviewer.rs) cover recovery, ownership and retired context.
 - The [native ACP confinement fixtures](crates/grida-agent/tests/process/approvals/confinement.rs) retarget a folder alias into a protected root during approval and verify both direct and aliased reads and writes are refused under Seatbelt or bubblewrap. The Linux cases probe socket denial inside the command namespace and verify detached work stops, retaining explicit uncertainty when native cleanup cannot be confirmed.
 - Each [shared ACP listener](crates/grida-agent/src/acp/websocket.rs) has one bearer and one trusted Host. Deploy independent authorities as separate processes with separate private state, listener tokens, provider grants and workspace profiles. The [built deployment fixtures](crates/grida-agent/tests/process/approvals/deployments.rs) exercise cross-token and cross-session refusal, duplicate state ownership, separate provider routing, and concurrent native command scopes. Whole-host containment depends on the deployment's own filesystem and network isolation.
 - The native [workspace bindings](crates/grida-agent/src/workspace.rs) and [retained input store](crates/grida-agent/src/scratch.rs) separate captured locations from current grants and enforce supplied protected roots. Working-copy receipts retain their source identity. [Workspace tests](crates/grida-agent/tests/workspace.rs) and [scratch tests](crates/grida-agent/tests/scratch.rs) exercise replacement, traversal, private publication and restart.
@@ -2043,8 +2203,9 @@ Today:
 - Bundled skills are compiled into the native host, so no file exists for the
   agent's file tools to read and none is extracted or granted. The
   [bundled skill reader](crates/grida-agent/src/host/bundled_skills.rs)
-  returns that fixed text only for a bundled name in the turn's captured skill
-  listing, takes no path, reads no filesystem and has no effects. [Tool
+  resolves a bundled skill only inside the turn's captured listing. For a new
+  extension member it checks the captured owner, local name and document revision.
+  The lookup reads compiled text and accepts no filesystem path. [Tool
   authority](crates/grida-agent/src/host/permissions.rs) checks its turn-bound
   grant independently from workspace permissions, and project skills in the
   same listing are read with the ordinary file tools under the existing
@@ -2055,7 +2216,7 @@ Today:
 - Queued input inspection uses the separately negotiated private [native routes](crates/grida-agent/src/acp/extensions/input_images.rs). The [host](crates/grida-agent/src/host/images.rs) verifies the exact queued input, owning attachment, and observed session revision before and after reading retained bytes. Each chunk is at most 256 KiB and its original is bounded to 20 MiB. Claimed, withdrawn, replaced, stale and foreign inputs reject without dispatch or mutation. [Main's queued display owner](desktop/src/main/native-queued-messages.ts) replaces hidden transport URIs with bounded opaque selectors scoped to the session, input and revision; [IPC](desktop/src/main/native-chat-ipc.ts) additionally rechecks the initiating frame and latest observation after delivery. The existing input inspection reports factual text-only eligibility, so rendering an image does not permit text replacement to discard it. [Native process fixtures](crates/grida-agent/tests/process/raster_images.rs), [Main decoder fixtures](desktop/src/main/native-queued-messages.test.ts) and [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) cover scope, revocation, bounded bytes and observational behavior.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
-- The [agent settings file adapter](crates/grida-agent/src/file_tools/settings.rs) reaches only the host settings file through the [settings owner](crates/grida-agent/src/configuration.rs). [Permission admission](crates/grida-agent/src/permissions.rs) asks for every write and withholds the file unless command denials cover its folder; [Desktop approval review](desktop/src/main/native-agent-permissions.ts) admits only that exact write. [Permission tests](crates/grida-agent/tests/permissions.rs), the [headless approval process test](crates/grida-agent/tests/process/approvals.rs) and [Desktop approval tests](desktop/src/main/native-agent-permissions.test.ts) cover the ask, decline, invalid content, scope and command coverage.
+- The [settings owner](crates/grida-agent/src/configuration.rs) loads and validates protected configuration. [Permission admission](crates/grida-agent/src/permissions.rs) withholds the settings-file grant from new inputs. It binds the [settings file adapter](crates/grida-agent/src/file_tools/settings.rs) for earlier accepted authority and rechecks command denials and exact-action approval on writes. [Desktop approval review](desktop/src/main/native-agent-permissions.ts) verifies the retained destination. [Native configuration tests](crates/grida-agent/tests/process/configuration.rs), [approval process tests](crates/grida-agent/tests/process/approvals.rs), and [Desktop approval tests](desktop/src/main/native-agent-permissions.test.ts) cover the respective boundaries.
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
@@ -2278,7 +2439,8 @@ paths, and params are public, so the design must not rely on obscurity.
    either scheme with byte-identical fixed-target behavior; the OS only
    ever delivers a build its own declared scheme.
 
-Electron main holds no durable desktop account or provider credential.
+Chromium holds the durable Desktop account session. The single Voice provider key is
+encrypted by Electron in Main-owned Desktop preferences.
 Chromium's default session owns the account cookie jar. The current Supabase SSR
 helpers do not configure these cookies as HttpOnly; trusted same-origin renderer
 code is not excluded from that cookie authority. This boundary relies on the
@@ -2288,7 +2450,8 @@ the entry account client invokes `session.defaultSession.fetch` only for the
 two fixed same-origin account routes. Main never reads or exports cookie/token
 material, and `DesktopAccountSession` returns only the three-state projection
 needed by the entry controller—not the route's account payload. Main persists
-only non-secret Desktop preferences separately from every credential store.
+non-secret Desktop preferences and the encrypted Voice key separately from the
+shared provider credentials.
 Its provider
 broker does transiently route BYOK/GG request headers and bodies; the sidecar
 owns persisted BYOK material and may hold the purpose-scoped, short-lived
@@ -2769,7 +2932,10 @@ context.
 1. **Name validation before any path is built** — the
    [native catalog](crates/grida-agent/src/skills.rs) rejects any skill name
    that is not lowercase ASCII letters, digits and `-` starting with a letter,
-   so `..`, absolute paths, and path separators never become a skill name.
+   so `..`, absolute paths, and path separators never become a filesystem skill
+   name. A qualified extension selector consists of two individually validated
+   identifiers. The host resolves it exclusively against compiled package
+   declarations and never passes it to a workspace directory.
 2. **Native project authority** — a local one-shot invocation pins its
    explicit project root. ACP discovers project guidance only inside the
    primary root of a host-supplied profile with read access already allowed.
@@ -2872,8 +3038,10 @@ trusted merely because it is “local.”
    previous account.
 5. **Pinned provider traffic.** Desktop grants, through a Main-only provider
    grant the sidecar never receives, only the exact OpenAI token
-   endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
-   neither is a provider-asset/download grant. The captured native transport
+   endpoint and ChatGPT Responses endpoint for POST, and the fixed
+   subscription models endpoint and compatibility-version query for GET.
+   These are authenticated provider requests. No grant reaches the asset
+   download lane. The captured native transport
    sends only to the configured Responses route, injects bearer/account/product
    headers only at request time, forces stateless Responses posture, and
    permits at most one refresh/replay after `401` within the captured account
@@ -2889,16 +3057,33 @@ trusted merely because it is “local.”
    strict disk reader shared by credential mutations and ignores the generic
    test environment override. Failed Responses return bounded status, request
    identity, and retry timing without upstream response bodies.
-   The private native launch carries the opaque scope and selected model.
+   Optional response speed and hosted search require a fresh, bounded model
+   offer for the captured sign-in lineage. Main projects only supported tiers
+   and hosted-search eligibility. Raw catalog rows and provider-authored
+   instructions stay outside both the renderer and native process. The fixed
+   Responses validator accepts only the supported tier values and a single
+   hosted search declaration alongside local functions. Cached search forbids external access,
+   indexed search requires the provider index gate and live search allows external access.
+   The credential owner enforces current hosted-search permission for requests
+   that include search and rechecks the captured account immediately before
+   each authenticated generation attempt, including token-refresh retries.
+   Once the connection and selector are captured, standard inference without
+   hosted search or a priority tier needs no additional account catalog read.
+   The private native launch carries the opaque scope, canonical model and
+   exact provider selector.
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner exposes the OAuth ceremony as
    direct start/complete/cancel/status/sign-out calls (no HTTP route or
    in-process router), bounds their string inputs, and injects the selected token and account headers at the provider edge.
-   Ordinary Desktop offers the closed compatible model set through its normal
-   connection catalogue. Product membership and the default are authored once
-   in `data/ai/chatgpt-subscription.json`; generated TypeScript and Rust finite wire maps
-   use the pinned Models bindings. Retired IDs permit reading saved metadata
-   only, grant no execution, and remain unavailable until explicitly replaced.
+   For ordinary Desktop, Main intersects the current OAuth connection's visible
+   selectors with compatible OpenAI Codex bindings in one verified public
+   Models V2 release. The public catalog contributes model facts and candidate
+   selectors only. Its refresh reads fixed public HTTPS assets without OAuth
+   credentials, checks the concrete release and its manifest hashes, and can
+   neither change the private inference destination nor confer account access.
+   A new binding requires a current offer for that exact selector and sign-in
+   scope. An account lookup failure withholds new choices. An unavailable saved
+   choice remains identifiable for explicit replacement.
    A saved subscription choice hashes the captured
    connection scope and exact model; it contains no credential. Main recaptures
    and compares that binding before admitting its native worker. Refresh keeps
@@ -2916,7 +3101,10 @@ trusted merely because it is “local.”
    harness reserves generation steps and bounds time and response bytes without
    claiming to impose a provider-side quota ceiling.
 6. **Accepted work keeps its provider authority.** The native host captures the
-   model, provider principal and scope when it accepts work. Continuations, retries,
+   canonical model, provider selector, principal and scope when it accepts
+   work. The host compares the retained selector before dispatch even if the
+   same canonical model has acquired a different mapping. Historical
+   subscription inputs use their original fixed model mapping. Continuations, retries,
    queued inputs, compaction and its recovery refuse with a conflict when the
    live launch authority or provider differs, rather than moving accepted work onto
    another credential or cost boundary. Automatic titles run as a temporary,
@@ -2962,6 +3150,11 @@ platform credential store is a separate hardening step.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-008 .` to enumerate.
 
+- [Prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  captures the economy model through the same subscription owner and verifies
+  its sign-in scope. [Desktop subscription tests](desktop/src/main/native-subscription-profiles.test.ts)
+  exercise this binding with a second provider configured.
+
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) — platform-selected host-local custody and preserved OAuth records, with strict failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
   The load-bearing groups are:
 
@@ -2983,6 +3176,10 @@ platform credential store is a separate hardening step.
   bind one private launch to an exact OAuth connection and the fixed Responses
   route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
   exercise the ceremony and scoped continuation with synthetic responses.
+- [Subscription model discovery](packages/grida-ai-host/src/providers/chatgpt-models.ts)
+  bounds and filters the authenticated catalog for the captured account.
+  [Provider fixtures](packages/grida-ai-host/src/providers/chatgpt.test.ts)
+  cover stale offers and account replacement before dispatch.
 - [Native chat host](crates/grida-agent/src/host.rs), its
   [portable history projection](crates/grida-agent/src/host/history.rs),
   [compaction](crates/grida-agent/src/host/compaction.rs) and
@@ -3000,12 +3197,14 @@ platform credential store is a separate hardening step.
   `providers/{chatgpt-credentials,chatgpt}.ts`, and `src/index.ts` — safe
   vocabulary, OAuth lifecycle, captured native transport, and public type
   projection.
-- `data/ai/chatgpt-subscription.json`, `scripts/ai-catalogue/{generate,projection}.mjs`,
-  and `crates/grida-agent/data/chatgpt-subscription-models.json` — explicit
-  subscription membership, generated finite adapter mappings, and retired
-  metadata IDs kept separate from execution permission. The generator's
-  [regressions](scripts/ai-catalogue/generation.test.mjs) reject stale copies,
-  invalid defaults and unsupported bindings.
+- The [Models V2 store](packages/grida-ai/src/catalogue/store.ts) verifies the
+  public assets. [Catalog resolution](packages/grida-ai/src/catalogue/chat-models.ts)
+  joins eligible model facts to a supplied connection offer.
+  [Product defaults and historical IDs](data/ai/chatgpt-subscription.json)
+  supply recommendation and compatibility data. Older receipts decode through
+  the [frozen subscription mapping](crates/grida-agent/data/chatgpt-subscription-models.json).
+  [Native process cases](crates/grida-agent/tests/process/responses.rs) exercise
+  new selectors, queued inputs, remaps and sign-in changes across restart.
 - `packages/grida-daemon/src/auth/file.ts` and
   `packages/grida-daemon/src/http/server.ts` — shared race-safe credential
   persistence.
@@ -3998,6 +4197,14 @@ grant custody and cleanup.
 
 ### `GRIDA-SEC-014` — Shared native provider credential boundary
 
+Scoped command review receives the names of environment variables and the
+prepared filesystem grants. An escalated command includes its effective
+confined scope, command, resolved shell and working directory, environment
+variable names and justification. The review excludes environment values,
+proxy credentials and the private protected-path inventory. A
+one-file approval rechecks the host’s protected paths, including the adopted
+credential home, before returning bytes.
+
 Desktop [hook registration](desktop/src/main/native-agent-hooks.ts),
 [its tests](desktop/src/main/native-agent-hooks.test.ts),
 [launch profile owner](desktop/src/main/native-agent-permissions.ts),
@@ -4119,20 +4326,21 @@ durable or discard unrelated OAuth records.
    long-lived credential host retains custody access. Native read-only
    adapters require a current directory grant and recheck supplied protected
    roots before opening a target and delivering results. The native permission
-   profile carries the same protected paths into finite command confinement.
-   An approve-once decision remains bounded by those denials. No renderer can
-   configure or remove these protections.
+   profile carries the same protected paths into command confinement. An
+   approval of a confined operation remains bounded by those denials,
+   including an approved command that updates version-control metadata. No
+   renderer can configure or remove these protections.
    The [native launch profile](crates/grida-agent/src/launch_permissions.rs)
    is selected by the supervisor and read from a private canonical file. It
    adds fixed denials for host state, the profile file, and credential homes.
    File tools also deny installed executables, and confined commands cannot
    write them. A session working directory only selects an exact matching
-   profile. Chat input and model-editable configuration confer no grants; the
-   approval-gated agent settings file (GRIDA-SEC-004) stays outside every
-   restricted command scope and accepts only reviewed defaults. Explicit Full
-   access relinquishes these command and file-tool exclusions; ordinary-user
-   unconfined code may reach readable credential files and mutate application
-   state. It does not receive keys automatically through the provider bridge.
+   profile. Chat input and workspace content confer no grants. The protected
+   agent settings file (GRIDA-SEC-004) stays outside every restricted
+   command scope and accepts only reviewed defaults. Full access relinquishes
+   command and file-tool exclusions. Ordinary-user unconfined code can reach
+   readable credential files and mutate application state. The provider
+   bridge keeps custody of its keys.
    The [Desktop launch adapter](desktop/src/main/native-agent-permissions.ts)
    publishes owner-only profiles from canonical main-selected roots and
    protects the native state and additional custody paths. The profile path
@@ -4165,6 +4373,12 @@ durable or discard unrelated OAuth records.
    to a different provider's operation. Stored OpenAI keys require the reviewed
    vendor base URL, while custom destinations require an explicit environment
    credential. Requests disable redirects and automatic retries.
+   The Desktop OpenAI connection owns a dedicated key slot outside the custom
+   endpoint ID range. The [endpoint settings route](packages/grida-ai-host/src/http/routes/providers.ts)
+   validates deletion as a custom endpoint operation before removing its key.
+   The supervised native route selects the dedicated slot only for the official
+   Responses base with an explicit model binding and no custom key. The ordinary
+   host's OpenAI slot and legacy endpoint identities keep their existing meaning.
 
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
@@ -4193,6 +4407,10 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
 
 **Files bound by this id.**
 
+- [Native file validation](desktop/src/main/native-agent-files.ts) supplies
+  the physical-file checks for hook configuration, trusted receipts and
+  pinned executables when Desktop shares its global config with Settings.
+
 - [General worker composition](crates/grida-agent/src/host/delegation.rs) and
   [its authority tests](crates/grida-agent/src/host/delegation/tests.rs) —
   retain the parent's captured permission and provider authority, with private
@@ -4218,11 +4436,14 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [supervised provider transport](crates/grida-agent/src/supervised_provider.rs),
   [private Desktop broker](desktop/src/main/native-provider-egress.ts),
   [Desktop provider selection](desktop/src/main/native-provider-selection.ts),
+  [OpenAI project discovery](desktop/src/main/native-openai-models.ts),
+  [OpenAI discovery fixtures](desktop/src/main/native-openai-models.test.ts),
   [Desktop stored-key fixtures](desktop/src/main/native-provider-selection.test.ts),
   [provider broker fixtures](desktop/src/main/native-provider-egress.test.ts),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
   [native permission admission](crates/grida-agent/src/permissions.rs),
+  [scoped command file input](crates/grida-agent/src/permissions/command_input.rs),
   [native permission tests](crates/grida-agent/tests/permissions.rs),
   [native file adapters](crates/grida-agent/src/file_tools.rs),
   [native file opens](crates/grida-agent/src/file_tools/native.rs),
@@ -4565,12 +4786,38 @@ caller is the actual privileged top-level workbench document.
    navigation lifetime before publishing pixels. Hover images are transient
    display data; the presentation neither persists them nor polls for updates.
    An optional favicon read returns only bounded raster data for the owned
-   guest's current document. Icon URLs come from that guest's native metadata;
-   callers cannot request arbitrary URLs. Fetches use its isolated session
-   without cookies/authentication, validate each HTTP(S) redirect, and bound
-   candidates, time and bytes. Raster bytes are validated without decoding in
-   Main. Navigation/teardown aborts requests and discards late results. The
-   workbench loads only the returned image data, never remote favicon URLs.
+   guest's current document. Icon URLs come from Chromium or from the
+   guest's isolated preload, scoped to the exact top frame and document nonce.
+   Callers cannot request arbitrary URLs. Fetches use the isolated guest
+   session without cookies or authentication and validate each HTTP(S) redirect.
+   Candidate count, response bytes and time are bounded. One lazy sandbox
+   decodes images without network or application access and returns validated
+   PNG data to Main. Cacheable results are held only for the current document.
+   Navigation and teardown abort requests and discard late results. The
+   workbench loads only the returned image data.
+   A separate optional link-preview operation accepts a loopback HTTP(S) URL
+   with an explicit port from a live workspace attachment. Main uses a bounded
+   credential-free loopback connection and parses inert HTML. Bundled extension
+   declarations can recognize display metadata in both preview operations.
+   Optional provider resolvers can request one bounded read on the same loopback
+   origin through Main, within the preview's time and byte limits.
+   Only bounded text and sandbox-decoded raster data
+   reach the workbench. Each attachment owns its subscribers and cached results.
+   Cancellation, attachment retirement and browser reset revoke pending results.
+   Completed previews may report missing metadata, while canceled or skipped
+   requests publish no lookup result. Cache freshness stays inside Main.
+   A page's self-declared product identity conveys display information only.
+   A distinct optional public-link operation shares workspace ownership and
+   cancellation. Main only opens credential-free HTTP(S) connections on the
+   standard ports. It checks DNS results for globally routable addresses and
+   pins the checked address while keeping TLS hostname verification. Each
+   redirect undergoes the same checks. Requests are bounded by time, response
+   size and concurrency. Main parses inert HTML for display text and may read
+   one site icon and one declared Open Graph image. Cross-origin image
+   destinations and every redirect receive the same public-address checks.
+   The image-only sandbox turns bounded sources into bounded raster bytes.
+   Only those bytes and display text reach the workbench. Public cache entries
+   have a separate namespace and expire in memory with the workspace attachment.
    Optional versioned history reads expose only bounded, validated URL/title/
    last-visit snapshots to exact admitted workspace or Settings documents.
    Main records actual successful guest navigations; renderers cannot insert
@@ -4647,19 +4894,34 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   `desktop/src/main/browser-automation-guest.ts`, and
   `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
   admitted target and document checks, typed operations and bounded captures.
+- `desktop/src/main/desktop-browser-mcp.ts` — dispatch scoped to the captured
+  lease, bounded image results and reply revocation on the private MCP carrier.
+- `desktop/src/main/desktop-workbench-tools.ts` and
+  `desktop/src/main/native-editor-surfaces.ts` — exact captured workspace and
+  view, with Browser observations and browser-tab actions gated by their lease.
 - `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
   document correlation, bounded FX observations, independent file authorization
   and workspace-relative resolution results.
+- `desktop/src/main/fx-extension.ts` — admitted workspace lookup, protected-root
+  checks and Desktop-owned FX executable and viewer registration.
 - `desktop/src/main/fx-workspace-files.ts` and its tests — workbench-only file
   preparation, workspace containment, and immutable verified raster snapshots.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated
   favicon fetching and document-lifetime cache.
+- `desktop/src/main/browser-favicon-decoder.ts` — image-only Chromium
+  sandbox and bounded raster output.
+- `desktop/src/main/web-preview.ts` — bounded credential-free metadata and
+  image reads, provider admission and bounded per-attachment lookup lifetime.
+- `desktop/src/main/web-preview-provider.ts` — exact and unambiguous matching
+  of provider declarations against page metadata, for display only.
+- `desktop/src/main/public-link-preview.ts` and its tests — verified public
+  destinations and pinned, credential-free transport for public link previews.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly
   recognized legacy browser cleanup without account/provider partition access.
 - `desktop/src/main/browser-history.ts` and its tests — bounded shared history,
   private persistence and ordered removal/clear barriers.
-- `desktop/src/browser-guest-preload.ts` and its tests — approved isolated,
-  one-use native link intent without a website-exposed Grida bridge.
+- `desktop/src/browser-guest-preload.ts` and its tests — isolated one-use
+  native link intent and document-scoped favicon metadata.
 - `desktop/src/main/browser-site-policy.ts` and its tests — actual frame origins,
   native website consent/choosers, session grants and scoped development TLS.
 - `desktop/src/main/browser-auth-dialog.ts` and its tests — isolated native

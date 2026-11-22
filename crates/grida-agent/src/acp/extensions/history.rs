@@ -61,6 +61,8 @@ struct RevisionTargetResponse(RevisionTarget);
 #[request(method = "_co.grida/session/revise", response = ReviseResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Revise {
+    #[serde(rename = "_meta")]
+    meta: Option<Meta>,
     session_id: SessionId,
     request_id: ChangeId,
     expected_session_revision: SessionRevision,
@@ -156,6 +158,8 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             async move |request: Revise, responder, _| {
                 let result = async {
                     require(&sessions, REVISE, Some(&request.session_id))?;
+                    let (questions, question_batches) =
+                        questions::support(&sessions, request.meta.as_ref())?;
                     let revised = host
                         .revise_session(
                             ConversationDerivation {
@@ -172,7 +176,8 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                                     .into_iter()
                                     .map(prompt_part)
                                     .collect::<Result<_>>()?,
-                                questions: questions::available(&sessions),
+                                questions,
+                                question_batches,
                                 operating_regime: operating_regime(
                                     &sessions,
                                     request.operating_regime,

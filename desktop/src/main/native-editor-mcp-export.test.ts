@@ -6,7 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { expect, it, vi } from "vitest";
+import browserToolCatalog from "../../../extensions/browser/tools.json";
 import { NativeEditorMcpExport } from "./native-editor-mcp-export";
+import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const token = "6a".repeat(32);
@@ -53,7 +55,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         resources!,
         { editorOrigin: origin, admits: () => true, workspaceRoot: lookup }
       );
-      const read = async () => {
+      const request = async (
+        method: "tools/list" | "tools/call",
+        args = {}
+      ) => {
+        const calling = method === "tools/call";
         const response = await fetch(url, {
           method: "POST",
           headers: {
@@ -61,16 +67,20 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
             accept: "application/json, text/event-stream",
             "content-type": "application/json",
             "mcp-protocol-version": "2026-07-28",
-            "mcp-method": "tools/call",
-            "mcp-name": "surface_list_open",
+            "mcp-method": method,
+            ...(calling && {
+              "mcp-name": DesktopWorkbenchInventory.definition.name,
+            }),
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
             id: 1,
-            method: "tools/call",
+            method,
             params: {
-              name: "surface_list_open",
-              arguments: {},
+              ...(calling && {
+                name: DesktopWorkbenchInventory.definition.name,
+                arguments: args,
+              }),
               _meta: {
                 "io.modelcontextprotocol/protocolVersion": "2026-07-28",
                 "io.modelcontextprotocol/clientInfo": {
@@ -86,6 +96,23 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         expect(response.status).toBe(200);
         return (await response.json()).result;
       };
+      const read = () => request("tools/call");
+      await expect(request("tools/list")).resolves.toMatchObject({
+        tools: [DesktopWorkbenchInventory.definition],
+      });
+      await expect(
+        request("tools/call", { workspace: "other" })
+      ).resolves.toMatchObject({
+        isError: true,
+        content: [{ type: "text", text: "invalid_editor_surface_arguments" }],
+      });
+      await expect(
+        request("tools/call", { workspace: "x".repeat(32 * 1024 - 32) })
+      ).resolves.toMatchObject({
+        isError: true,
+        content: [{ type: "text", text: "desktop_tool_invalid_request" }],
+      });
+      expect(lookup).not.toHaveBeenCalled();
       const first = workbench();
       const replacement = workbench();
       const held = Promise.withResolvers<string>();
@@ -98,6 +125,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(await read()).toMatchObject({
         isError: true,
         content: [{ text: "editor_surface_endpoint_unavailable" }],
+      });
+      await expect(request("tools/list")).resolves.toMatchObject({
+        tools: [DesktopWorkbenchInventory.definition],
       });
       expect(await owner!.publish(first.event, empty)).toBe(true);
       expect(await read()).toMatchObject({
@@ -164,6 +194,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const admitted = workbench();
       const entered = Promise.withResolvers<void>();
       const close = vi.fn<() => void>();
+      const closeArguments: unknown[] = [];
+      const visibleTarget = { kind: "workbench", tabId: "visible-browser-tab" };
       owner = await NativeEditorMcpExport.start(
         [
           `--native-chat-export-mcp-root=${root}`,
@@ -184,6 +216,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
               close,
               invoke: async (operation, args) => {
                 requireCurrent();
+                if (operation === "browser_close") {
+                  closeArguments.push(args);
+                  return {
+                    disposition: "dispatched_verified",
+                    data: { closed: true },
+                  };
+                }
                 expect(operation).toBe("browser_open");
                 const marker = (args as { url: string }).url;
                 if (marker.endsWith("/first")) {
@@ -198,7 +237,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       expect(await owner!.publish(admitted.event, empty)).toBe(true);
       let id = 0;
-      const invoke = async (marker: string) => {
+      const request = async (call?: { name: string; arguments: object }) => {
+        const method = call ? "tools/call" : "tools/list";
         const response = await fetch(url, {
           method: "POST",
           headers: {
@@ -206,16 +246,15 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
             accept: "application/json, text/event-stream",
             "content-type": "application/json",
             "mcp-protocol-version": "2026-07-28",
-            "mcp-method": "tools/call",
-            "mcp-name": "browser_open",
+            "mcp-method": method,
+            ...(call && { "mcp-name": call.name }),
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
             id: ++id,
-            method: "tools/call",
+            method,
             params: {
-              name: "browser_open",
-              arguments: { url: marker },
+              ...call,
               _meta: {
                 "io.modelcontextprotocol/protocolVersion": "2026-07-28",
                 "io.modelcontextprotocol/clientInfo": {
@@ -231,6 +270,26 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         expect(response.status).toBe(200);
         return (await response.json()).result;
       };
+      const listing = await request();
+      expect(listing.tools).toEqual(
+        browserToolCatalog.map(
+          ({ name, description, inputSchema, outputSchema }) => ({
+            name,
+            description,
+            inputSchema,
+            outputSchema,
+          })
+        )
+      );
+      expect(listing.tools.map((tool: { name: string }) => tool.name)).toEqual(
+        expect.arrayContaining([
+          "surface_list_open",
+          "surface_open",
+          "browser_close",
+        ])
+      );
+      const invoke = (marker: string) =>
+        request({ name: "browser_open", arguments: { url: marker } });
       const firstUrl = "http://localhost:3000/first";
       const secondUrl = "http://localhost:3000/second";
       const first = invoke(firstUrl);
@@ -246,6 +305,16 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         isError: false,
         structuredContent: { marker: firstUrl },
       });
+      expect(
+        await request({
+          name: "browser_close",
+          arguments: { target: visibleTarget },
+        })
+      ).toMatchObject({
+        isError: false,
+        structuredContent: { closed: true },
+      });
+      expect(closeArguments).toEqual([{ target: visibleTarget }]);
       admitted.sender.emit("did-start-navigation", { isMainFrame: true });
       expect(close).toHaveBeenCalledTimes(1);
       expect(await invoke(secondUrl)).toMatchObject({

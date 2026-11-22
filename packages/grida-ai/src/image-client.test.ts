@@ -3,7 +3,9 @@ import { fixtureGGDiscovery } from "./testing/gg-discovery";
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { describe, expect, it, vi } from "vitest";
 import { catalog as models } from "./catalogue/grida";
+import { bundledModelCatalogue, VisualModels } from "./catalogue";
 import { ImageClient, ProviderHttp, GridaGatewaySessionStore } from "./index";
+import { OPENAI_PROJECT_PROVIDER_ID } from "./provider-ids";
 
 const view = models.snapshot.view();
 // These wire assertions target GPT Image 2's controls, independent of recommendations.
@@ -13,6 +15,7 @@ const BASE64 = "iVBORw0KGgo=";
 const PROMPT = "synthetic-private-prompt";
 const KEY = "synthetic-private-key";
 const TOKEN = "synthetic-scoped-gg-token";
+const OPENAI_FLARE = "openai/gpt-image-2.5-flare";
 
 function setup(overrides: Partial<ImageClient.Options> = {}) {
   const request = vi.fn<typeof fetch>(async () =>
@@ -45,6 +48,143 @@ async function failure(
 }
 
 describe("ImageClient public operations", () => {
+  it("generates one supported OpenAI image with the named project key", async () => {
+    const { client, request, download, get } = setup({
+      runtime_catalogue: async () => bundledModelCatalogue(),
+    });
+    const operation = await client.resolve({
+      model_id: OPENAI_FLARE,
+      provider: OPENAI_PROJECT_PROVIDER_ID,
+      background: "transparent",
+    });
+    expect(operation).toMatchObject({
+      model_id: OPENAI_FLARE,
+      provider_id: OPENAI_PROJECT_PROVIDER_ID,
+      binding_id: "gpt-image-2.5-flare",
+    });
+    expect(
+      await operation.generate({
+        prompt: PROMPT,
+        size: "1536x1024",
+        quality: "medium",
+      })
+    ).toEqual({ images: [{ data: PNG, media_type: "image/png" }] });
+    expect(get.mock.calls).toEqual([
+      [OPENAI_PROJECT_PROVIDER_ID],
+      [OPENAI_PROJECT_PROVIDER_ID],
+    ]);
+    expect(request).toHaveBeenCalledOnce();
+    const [url, init] = request.mock.calls[0];
+    expect(url).toBe("https://api.openai.com/v1/images/generations");
+    expect(init).toMatchObject({
+      method: "POST",
+      redirect: "error",
+      credentials: "omit",
+    });
+    expect(new Headers(init?.headers).get("authorization")).toBe(
+      "Bearer " + KEY
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({
+      model: "gpt-image-2.5-flare",
+      prompt: PROMPT,
+      n: 1,
+      size: "1536x1024",
+      quality: "medium",
+      background: "transparent",
+      output_format: "png",
+    });
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("offers catalogue-backed OpenAI prompt routes and retains existing automatic precedence", async () => {
+    const snapshot = bundledModelCatalogue();
+    const { client, get, request } = setup({
+      runtime_catalogue: async () => snapshot,
+    });
+    expect(
+      VisualModels.list(snapshot, "image")
+        .filter(({ providers }) => providers[OPENAI_PROJECT_PROVIDER_ID]?.text)
+        .map(({ id }) => id)
+    ).toEqual(
+      expect.arrayContaining([
+        OPENAI_FLARE,
+        "openai/gpt-image-2.5-sunburst",
+        "openai/gpt-image-2.6-flare",
+        "openai/gpt-image-2.6-sunburst",
+      ])
+    );
+    expect(VisualModels.providers("video")).not.toContain(
+      OPENAI_PROJECT_PROVIDER_ID
+    );
+    expect(
+      (await client.resolve({ model_id: OPENAI_FLARE, provider: "auto" }))
+        .provider_id
+    ).toBe("openrouter");
+    expect(get).toHaveBeenCalledExactlyOnceWith("openrouter");
+    await failure(
+      client.resolve({
+        model_id: OPENAI_FLARE,
+        provider: OPENAI_PROJECT_PROVIDER_ID,
+        references: true,
+      }),
+      "references_unsupported"
+    );
+    await failure(
+      client.resolve({
+        model_id: "google/gemini-nano-banana-2.1",
+        provider: OPENAI_PROJECT_PROVIDER_ID,
+      }),
+      "provider_unavailable"
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("keeps OpenAI failure and removal on the selected project route", async () => {
+    const { client, request, download, get } = setup({
+      runtime_catalogue: async () => bundledModelCatalogue(),
+    });
+    const operation = await client.resolve({
+      model_id: OPENAI_FLARE,
+      provider: OPENAI_PROJECT_PROVIDER_ID,
+    });
+    await failure(
+      operation.generate({ prompt: PROMPT, seed: 0 }),
+      "invalid_input"
+    );
+    const authFailure = new Response("upstream-private", { status: 403 });
+    request.mockResolvedValueOnce(authFailure);
+    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
+    expect(request).toHaveBeenCalledOnce();
+    get.mockReturnValue(null);
+    await failure(
+      operation.generate({ prompt: PROMPT }),
+      "provider_unavailable"
+    );
+    expect(request).toHaveBeenCalledOnce();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized or remote OpenAI image results without downloading them", async () => {
+    const { client, request, download } = setup({
+      runtime_catalogue: async () => bundledModelCatalogue(),
+    });
+    const operation = await client.resolve({
+      model_id: OPENAI_FLARE,
+      provider: OPENAI_PROJECT_PROVIDER_ID,
+    });
+    request
+      .mockResolvedValueOnce(
+        new Response(BASE64, { headers: { "content-length": "100000000" } })
+      )
+      .mockResolvedValueOnce(
+        Response.json({ data: [{ url: "https://example.test/image.png" }] })
+      );
+    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
+    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it("resolves before asset reads, maps capped references/options, and returns only bytes", async () => {
     const { client, request, download } = setup();
     const operation = await client.resolve({

@@ -5,23 +5,30 @@
  * transforms in {@link CanvasDeck}); each slide is one `<src>.svg` edited with
  * the keynote camera + mtime-safe save.
  *
- * Reuses the props-only slide UI from the web demo (`SlideRow`,
- * `TemplatePicker`, `Presentation`) — promoting those to a shared module is a
- * follow-up; importing them here keeps this pass focused on the desktop wiring.
+ * Shares the slide sidebar and layer tree with the web SVG editor.
+ * See test/desktop-canvas-slide-layers.md.
  */
 "use client";
 
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { Play, Plus, Trash2 } from "lucide-react";
+import type { SvgEditor } from "@grida/svg-editor";
 import { SvgEditorProvider } from "@grida/svg-editor/react";
 import { dotcanvas } from "dotcanvas";
 import { Button } from "@app/ui/components/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@app/ui/components/resizable";
 import {
   SlideListFocusScope,
   SlideRow,
@@ -31,21 +38,25 @@ import { Presentation } from "@/app/(canvas)/svg/examples/slides/_components/pre
 import type { SlideTemplate } from "@/app/(canvas)/svg/examples/slides/_components/templates";
 import { EMPTY_SLIDE_SVG } from "@/app/(canvas)/svg/examples/slides/_components/types";
 import { svgToDataUri } from "@/app/(canvas)/svg/_storage/thumbnails";
-import { SvgToolbar } from "@/app/(canvas)/svg/_components/svg-toolbar";
+import { SvgToolbarControls } from "@/app/(canvas)/svg/_components/svg-toolbar";
 import {
   PathToolbar,
   PathToolbarPosition,
 } from "@/app/(canvas)/svg/_components/path-toolbar";
+import { HierarchyPanel } from "@/scaffolds/svg-editor/hierarchy-panel";
+import { SlideSidebar } from "@/scaffolds/svg-editor/slide-sidebar";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
-import type { DocumentSurfaceHost } from "../file/document-surface-host";
 import {
   useWorkspaceChanges,
   useWorkspaceFileRevision,
 } from "../workbench/workspace-changes";
 import { WorkspaceFileProjectionDependencies } from "../workbench/workspace-file-projection-dependencies";
 import { CanvasDeck, type Slide } from "./deck-store";
-import { SlideSurface } from "./slide-surface";
+import {
+  SlideSurface,
+  SLIDE_VIEWPORT_PADDING,
+  type BindSlideEditor,
+} from "./slide-surface";
 import { materializeSlideSvgResources } from "./slide-svg-resources";
 import { SlideThumbnailProjectionController } from "./slide-thumbnail-projection-controller";
 
@@ -54,7 +65,7 @@ export function DesktopCanvasShell({
   basePath = "",
   active = true,
   onDirtyChange,
-  slideSurfaceHost,
+  bindSlideEditor,
 }: {
   workspaceId: string;
   /** Workspace-relative dir of the `.canvas` bundle; "" when it IS the
@@ -64,7 +75,7 @@ export function DesktopCanvasShell({
    *  background deck doesn't grab the save. Defaults true (standalone). */
   active?: boolean;
   onDirtyChange: (dirty: boolean) => void;
-  slideSurfaceHost?: DocumentSurfaceHost;
+  bindSlideEditor?: BindSlideEditor;
 }) {
   const [deck] = useState(
     () => new CanvasDeck(workspaceId, workspacesNs, basePath)
@@ -106,12 +117,39 @@ export function DesktopCanvasShell({
     if (activeSlide && activeSlide.id !== activeId) setActiveId(activeSlide.id);
   }, [activeSlide, activeId]);
 
+  const scope = JSON.stringify([workspaceId, basePath]);
+  const [presented, setPresented] = useState<{ scope: string; slide: Slide }>();
+  const shown = presented?.scope === scope ? presented.slide : undefined;
+  const waiting = activeSlide !== null && activeSlide.src !== shown?.src;
+  const sessions = activeSlide
+    ? waiting && shown
+      ? [shown, activeSlide]
+      : [activeSlide]
+    : [];
+  const showSlide = useCallback(
+    (slide: Slide) => setPresented({ scope, slide }),
+    [scope]
+  );
+  useLayoutEffect(() => {
+    if (activeSlide === null) setPresented(undefined);
+  }, [activeSlide]);
+
+  const [toolbarEditor, setToolbarEditor] = useState<SvgEditor | null>(null);
+  const bindToolbarEditor = useCallback((editor: SvgEditor) => {
+    setToolbarEditor(editor);
+    return () =>
+      setToolbarEditor((current) => (current === editor ? null : current));
+  }, []);
+
   const { map: thumbnails, refresh } = useSlideThumbnails(
     workspaceId,
     slides,
     basePath
   );
   const [presenting, setPresenting] = useState(false);
+  const [layersContainer, setLayersContainer] = useState<HTMLDivElement | null>(
+    null
+  );
 
   const pages = slides.map((s, i) => ({
     id: s.id,
@@ -147,10 +185,16 @@ export function DesktopCanvasShell({
   // tab (`active` false), so a background deck never steals the keys. Clamps at
   // the ends (no wrap).
   const mainRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.defaultPrevented) return;
+      const command = e.metaKey || e.ctrlKey;
+      if (waiting && command && e.key.toLowerCase() === "s" && !e.shiftKey) {
+        e.preventDefault();
+        return;
+      }
+      if (command || e.altKey) return;
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
       const el = document.activeElement as HTMLElement | null;
       if (
@@ -158,65 +202,120 @@ export function DesktopCanvasShell({
         (el.tagName === "INPUT" ||
           el.tagName === "TEXTAREA" ||
           el.isContentEditable ||
+          el.getAttribute("role") === "separator" ||
+          layersContainer?.contains(el) ||
           mainRef.current?.contains(el))
       ) {
         return;
       }
       if (slides.length === 0) return;
-      const cur = Math.max(
-        0,
-        slides.findIndex((s) => s.id === activeSlide?.id)
-      );
-      const next = e.key === "ArrowUp" ? cur - 1 : cur + 1;
-      if (next < 0 || next >= slides.length) return;
+      const step = e.key === "ArrowUp" ? -1 : 1;
       e.preventDefault();
-      setActiveId(slides[next].id);
+      setActiveId((requestedId) => {
+        const current = Math.max(
+          0,
+          slides.findIndex((slide) => slide.id === requestedId)
+        );
+        return slides[current + step]?.id ?? requestedId;
+      });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, slides, activeSlide]);
+  }, [active, slides, layersContainer, waiting]);
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-56 shrink-0 flex-col border-r border-border">
-          <SlideStrip
-            pages={pages}
-            slideIds={slides.map((s) => s.id)}
-            activeId={activeSlide?.id ?? null}
-            onSelect={setActiveId}
-            onRemove={onRemove}
-            onReorder={onReorder}
-            onAdd={() => onAdd(EMPTY_SLIDE_SVG)}
-            onAddTemplate={(tpl: SlideTemplate) => onAdd(tpl.svg)}
-            removable={slides.length > 1}
-          />
-        </aside>
-        <main ref={mainRef} className="relative min-w-0 flex-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            className="absolute right-3 top-3 z-20 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
-            disabled={slides.length === 0}
-            onClick={() => setPresenting(true)}
-            title="Present from current slide"
-            aria-label="Present from current slide"
-          >
-            <Play />
-          </Button>
-          <ActiveSlide
-            key={activeSlide ? activeSlide.src : "__empty__"}
-            workspaceId={workspaceId}
-            slide={activeSlide}
-            basePath={basePath}
-            slideSurfaceHost={slideSurfaceHost}
-            editable={active}
-            thumbnail={activeSlide ? thumbnails[activeSlide.src] : undefined}
-            onDirtyChange={onDirtyChange}
-            onSaved={() => activeSlide && refresh(activeSlide.src)}
-          />
-        </main>
-      </div>
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+        <ResizablePanel
+          defaultSize="224px"
+          minSize="144px"
+          maxSize="55%"
+          groupResizeBehavior="preserve-pixel-size"
+        >
+          <aside className="flex h-full min-w-0 flex-col">
+            <SlideListFocusScope className="h-full">
+              <SlideSidebar
+                collapsibleLayers={{ openHeight: 160, minHeight: 48 }}
+                slides={
+                  <SlideStrip
+                    pages={pages}
+                    slideIds={slides.map((s) => s.id)}
+                    activeId={activeSlide?.id ?? null}
+                    onSelect={setActiveId}
+                    onRemove={onRemove}
+                    onReorder={onReorder}
+                    onAdd={() => onAdd(EMPTY_SLIDE_SVG)}
+                    onAddTemplate={(tpl: SlideTemplate) => onAdd(tpl.svg)}
+                    removable={slides.length > 1}
+                  />
+                }
+                layers={
+                  <div
+                    ref={setLayersContainer}
+                    tabIndex={-1}
+                    className="outline-none"
+                  />
+                }
+              />
+            </SlideListFocusScope>
+          </aside>
+        </ResizablePanel>
+        {/* Cover the panel group's resize hit area above the canvas. */}
+        <ResizableHandle
+          aria-label="Resize slide sidebar"
+          className="z-10 after:w-2.5 pointer-coarse:after:w-5"
+        />
+        <ResizablePanel>
+          <main ref={mainRef} className="relative h-full min-w-0 bg-muted">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="absolute right-3 top-3 z-20 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
+              disabled={slides.length === 0}
+              onClick={() => setPresenting(true)}
+              title="Present from current slide"
+              aria-label="Present from current slide"
+            >
+              <Play />
+            </Button>
+            {activeSlide === null && (
+              <div className="flex h-full items-center justify-center text-xs italic text-muted-foreground">
+                This deck has no slides yet. Add one from the sidebar.
+              </div>
+            )}
+            {/* Keep the outgoing frame mounted while the requested file is
+                prepared. Only the displayed session owns a DOM editor.
+                See test/desktop-canvas-slide-navigation.md. */}
+            {sessions.map((slide) => {
+              const requested = slide.src === activeSlide?.src;
+              return (
+                <ActiveSlide
+                  key={JSON.stringify([scope, slide.src])}
+                  workspaceId={workspaceId}
+                  slide={slide}
+                  basePath={basePath}
+                  bindSlideEditor={presenting ? undefined : bindSlideEditor}
+                  editable={active && requested}
+                  shown={slide.src === shown?.src}
+                  hasFrame={shown !== undefined}
+                  thumbnail={thumbnails[slide.src]}
+                  layersContainer={layersContainer}
+                  onPrepared={requested ? showSlide : undefined}
+                  bindToolbarEditor={bindToolbarEditor}
+                  onDirtyChange={onDirtyChange}
+                  onSaved={() => refresh(slide.src)}
+                />
+              );
+            })}
+            <SvgToolbarControls
+              editor={toolbarEditor}
+              disabled={
+                !active || waiting || activeSlide === null || presenting
+              }
+            />
+          </main>
+        </ResizablePanel>
+      </ResizablePanelGroup>
       <Presentation
         open={presenting}
         pages={pages}
@@ -363,7 +462,7 @@ function SlideStrip({
   };
 
   return (
-    <SlideListFocusScope className="h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-2">
         <TemplatePicker
           onPick={onAddTemplate}
@@ -437,12 +536,11 @@ function SlideStrip({
           </div>
         ))}
       </div>
-    </SlideListFocusScope>
+    </div>
   );
 }
 
 type ActiveState =
-  | { kind: "empty" }
   | { kind: "loading" }
   | { kind: "ready"; content: string; mtime: number }
   | { kind: "error"; message: string };
@@ -452,33 +550,34 @@ function ActiveSlide({
   slide,
   basePath,
   editable,
+  shown,
+  hasFrame,
   thumbnail,
+  layersContainer,
+  onPrepared,
+  bindToolbarEditor,
   onDirtyChange,
   onSaved,
-  slideSurfaceHost,
+  bindSlideEditor,
 }: {
   workspaceId: string;
-  slide: Slide | null;
+  slide: Slide;
   basePath: string;
-  /** Whether Cmd+S in the slide editor applies (false for a hidden tab). */
+  /** Whether the displayed slide is still the current editing target. */
   editable: boolean;
-  /** The active slide's rendered thumbnail (data URI), shown full-surface WHILE
-   *  the slide file loads so switching pages doesn't blink a "Loading…"
-   *  placeholder — the deck strip already has these, so a revisit is instant. */
+  shown: boolean;
+  hasFrame: boolean;
   thumbnail?: string;
+  layersContainer: HTMLElement | null;
+  onPrepared?: (slide: Slide) => void;
+  bindToolbarEditor: (editor: SvgEditor) => () => void;
   onDirtyChange: (dirty: boolean) => void;
   onSaved: () => void;
-  slideSurfaceHost?: DocumentSurfaceHost;
+  bindSlideEditor?: BindSlideEditor;
 }) {
   // The slide file's workspace-relative path (the bundle may sit at `basePath`).
-  const relPath = slide
-    ? basePath
-      ? `${basePath}/${slide.src}`
-      : slide.src
-    : null;
-  const [state, setState] = useState<ActiveState>(
-    slide ? { kind: "loading" } : { kind: "empty" }
-  );
+  const relPath = basePath ? `${basePath}/${slide.src}` : slide.src;
+  const [state, setState] = useState<ActiveState>({ kind: "loading" });
   const [projectionDependencies] = useState(
     () => new WorkspaceFileProjectionDependencies(basePath)
   );
@@ -490,7 +589,6 @@ function ActiveSlide({
   );
   const prepareContentForEditor = useCallback(
     async (diskContent: string) => {
-      if (!relPath) return { content: diskContent };
       const request = projectionDependencies.begin();
       try {
         const materialized = await materializeSlideSvgResources(diskContent, {
@@ -523,16 +621,14 @@ function ActiveSlide({
     return restoreRef.current(serialized);
   }, []);
 
-  useEffect(() => {
-    if (!relPath) {
-      setState({ kind: "empty" });
-      return;
-    }
+  // Layout cleanup ends a superseded request before its completion can publish
+  // a frame. Reading and resource materialization run asynchronously.
+  useLayoutEffect(() => {
     let cancelled = false;
-    setState({ kind: "loading" });
     workspacesNs
       .readSvgDocument(workspaceId, relPath)
       .then(async (r) => {
+        if (cancelled) return;
         const prepared = await prepareContentForEditor(r.content);
         if (!cancelled) {
           prepared.commit?.();
@@ -559,62 +655,65 @@ function ActiveSlide({
     };
   }, [workspaceId, relPath, prepareContentForEditor]);
 
-  if (state.kind === "empty") {
-    return (
-      <div className="flex h-full items-center justify-center text-xs italic text-muted-foreground">
-        This deck has no slides yet. Add one from the sidebar.
-      </div>
-    );
-  }
-  if (state.kind === "loading") {
-    // Show the slide's thumbnail while its file loads so switching pages doesn't
-    // flash a "Loading…" placeholder (the SVG is re-read on each page change).
-    // Falls back to a neutral surface — never the jarring text — before the
-    // first thumbnail is ready.
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-muted">
-        {thumbnail ? (
-          // eslint-disable-next-line @next/next/no-img-element -- data URI; next/image can't optimize it
-          <img
-            src={thumbnail}
-            alt=""
-            className="h-full w-full object-contain"
-          />
-        ) : null}
-      </div>
-    );
-  }
+  useLayoutEffect(() => {
+    if (state.kind === "ready" && !shown) onPrepared?.(slide);
+  }, [state, shown, onPrepared, slide]);
+
   if (state.kind === "error") {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
+      <div
+        role="status"
+        className={
+          hasFrame
+            ? "absolute top-3 right-14 left-3 z-10 rounded-md border bg-background px-3 py-2 text-sm text-destructive shadow-sm"
+            : "flex h-full items-center justify-center px-6 text-center text-sm text-destructive"
+        }
+      >
         {state.message}
       </div>
     );
   }
+  if (!shown || state.kind !== "ready") {
+    if (hasFrame || !thumbnail) return null;
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ padding: SLIDE_VIEWPORT_PADDING }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- data URI, next/image can't optimize it */}
+        <img src={thumbnail} alt="" className="size-full object-contain" />
+      </div>
+    );
+  }
 
-  const slidePath = slide && WorkspaceArtifact.toAgentPath(slide.src);
   return (
-    <SvgEditorProvider initialSvg={state.content}>
-      <SlideSurface
-        workspaceId={workspaceId}
-        relPath={relPath!}
-        initialMtime={state.mtime}
-        resourceRevision={resourceRevision}
-        active={editable}
-        onDirtyChange={onDirtyChange}
-        onSaved={onSaved}
-        liveText={
-          slideSurfaceHost && slidePath?.toLowerCase().endsWith(".svg")
-            ? { host: slideSurfaceHost, path: slidePath }
-            : undefined
-        }
-        prepareContentForEditor={prepareContentForEditor}
-        prepareContentForWrite={prepareContentForWrite}
-      />
-      <SvgToolbar />
-      <PathToolbarPosition>
-        <PathToolbar />
-      </PathToolbarPosition>
-    </SvgEditorProvider>
+    <div className="absolute inset-0" inert={!editable}>
+      <SvgEditorProvider initialSvg={state.content}>
+        {editable &&
+          layersContainer &&
+          createPortal(<HierarchyPanel />, layersContainer)}
+        <SlideSurface
+          workspaceId={workspaceId}
+          relPath={relPath}
+          initialMtime={state.mtime}
+          resourceRevision={resourceRevision}
+          active={editable}
+          bindToolbarEditor={bindToolbarEditor}
+          onDirtyChange={onDirtyChange}
+          onSaved={onSaved}
+          binding={
+            bindSlideEditor ? { slide, bindEditor: bindSlideEditor } : undefined
+          }
+          prepareContentForEditor={prepareContentForEditor}
+          prepareContentForWrite={prepareContentForWrite}
+        />
+        {editable && (
+          <PathToolbarPosition>
+            <PathToolbar />
+          </PathToolbarPosition>
+        )}
+      </SvgEditorProvider>
+    </div>
   );
 }

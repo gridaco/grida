@@ -44,6 +44,16 @@
         "default": "./dist/catalogue/index.cjs"
       }
     },
+    "./model-catalogue": {
+      "import": {
+        "types": "./dist/catalogue/public-models.d.mts",
+        "default": "./dist/catalogue/public-models.mjs"
+      },
+      "require": {
+        "types": "./dist/catalogue/public-models.d.cts",
+        "default": "./dist/catalogue/public-models.cjs"
+      }
+    },
     "./discovery": {
       "import": {
         "types": "./dist/gg-discovery.d.mts",
@@ -66,7 +76,7 @@
   "dependencies": {
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/provider": "3.0.10",
-    "@grida/ai-models": "2.20261117.0",
+    "@grida/ai-models": "2.20261121.1",
     "ai": "6.0.197"
   },
   "devDependencies": {

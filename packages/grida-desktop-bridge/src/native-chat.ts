@@ -3,6 +3,7 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "./native-editor-surfaces";
+import type { NativeEditorSelection } from "./native-editor-selection";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
 import type { NativeSubagentClient } from "./native-subagents";
 import type {
@@ -32,6 +33,7 @@ export type NativeChatMessageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext: NativeChatMessageContext;
 }>;
 
@@ -51,7 +53,10 @@ export type NativeEditorObservation = Readonly<{
   payload: Readonly<Record<string, EditorObservationValue | undefined>>;
 }>;
 /** Full access deliberately removes command filesystem and network confinement. */
-export type NativeChatPermissionMode = "restricted" | "full_access";
+export type NativeChatPermissionMode =
+  | "restricted"
+  | "approve_for_me"
+  | "full_access";
 export type NativeChatPermissionReview = Readonly<{
   reviewId: string;
   chatTitle: string;
@@ -77,12 +82,23 @@ export type NativeChatEffort =
   | "ultra"
   | "standard";
 
+export type NativeChatSpeed = "standard" | "fast" | "ultrafast";
+
+/** Optional features under the selected account and model, observed by Main. */
+export type NativeChatTurnCapabilities =
+  import("@grida/ai-host").ChatGptTurnCapabilities;
+
+/** A new chat's effective connection and model, resolved without opening it. */
+export type NativeWelcomeTurnCapabilities = NativeChatTurnCapabilities &
+  Readonly<{ profileId: string | null; modelId: string }>;
+
 /** Saved choices contain public identities only; never credentials or paths. */
 export type NativeChatSelection = Readonly<{
   profileId: string | null;
   /** The exact wire model identity, not its display label. */
   modelId: string;
   effort: NativeChatEffort;
+  speed?: NativeChatSpeed;
 }>;
 
 /** Exactly one logical chat or stable unsent draft, scoped by native Main. */
@@ -190,6 +206,7 @@ export type NativeChatImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -207,6 +224,7 @@ export type NativeChatSelectedImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -219,6 +237,7 @@ export type NativeChatFileInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -249,6 +268,7 @@ export type NativeChatFileReferenceInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -302,6 +322,15 @@ export type NativeChatProfileCatalog = Readonly<{
   modelChanges?: true;
   /** The live host can resolve each accepted input's saved connection independently. */
   inputRoutes?: true;
+  /** A signed-in subscription could not supply its model list. Other connections remain usable. */
+  subscriptionIssue?: "unavailable" | "reauthenticationRequired";
+  /** Status of model discovery for a saved OpenAI project key. */
+  openAiIssue?:
+    | "loading"
+    | "unavailable"
+    | "keyRejected"
+    | "modelsForbidden"
+    | "noCompatibleModels";
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */
@@ -389,6 +418,8 @@ export type NativeChatStartupResult = Readonly<{
 
 export type NativeChatTurn = Readonly<{
   turnId: string;
+  /** Model captured for the foreground turn, when recorded. */
+  modelId?: string;
   epoch: number;
   journalPosition: number;
   historyPosition: number;
@@ -582,6 +613,12 @@ export type NativeChatActivityOutcome =
   | "cancelled"
   | "uncertain";
 
+/** One display action inferred by the host from an exec_command invocation. */
+export type NativeChatCommandAction =
+  | Readonly<{ kind: "read"; path: string }>
+  | Readonly<{ kind: "list_files"; path?: string; piped?: true }>
+  | Readonly<{ kind: "search"; query: string; path?: string; piped?: true }>;
+
 /** Captured pixels from one successful tool result, retained by the native host. */
 export type NativeChatToolImage = Readonly<{
   /** Main-issued identity for this exact chat, turn, call and result image. */
@@ -600,9 +637,11 @@ export type NativeChatActivity = Readonly<{
   /** The tool's identifier. */
   title: string;
   kind: NativeChatActivityKind;
-  /** The configured integration name for an integration tool. */
+  /** The configured integration name, or "provider" for a hosted search. */
   source?: string;
   outcome: NativeChatActivityOutcome;
+  /** Ordered display metadata for recognized commands. Omitted on older hosts. */
+  commandActions?: readonly NativeChatCommandAction[];
   /** The call's arguments for display; long values are shortened. */
   input?: unknown;
   /** The call's result for display, once it has one. */
@@ -619,8 +658,19 @@ export type NativeChatActivity = Readonly<{
   }>;
 }>;
 
+/** A provider-attributed link. Offsets count Unicode characters in the
+ * complete assistant message and the end is exclusive. */
+export type NativeChatUrlCitation = Readonly<{
+  url: string;
+  title?: string;
+  startIndex: number;
+  endIndex: number;
+}>;
+
 export type NativeChatMessage = Readonly<{
   messageId: string;
+  /** The accepted input that authored this user message, where known. */
+  inputId?: string;
   /** First nonempty public publication, compared only within the same turn. */
   activityOrder?: number;
   /** Missing retained order is explicit; clients must not infer it from arrival. */
@@ -635,14 +685,19 @@ export type NativeChatMessage = Readonly<{
    */
   phase?: "answer" | "progress";
   activity?: readonly NativeChatActivity[];
+  citations?: readonly NativeChatUrlCitation[];
   /** Files the person attached to this message. Their bytes stay with the host. */
   attachments?: readonly NativeChatMessageAttachment[];
   /** Passive display parts retained with this accepted message. */
   displayParts?: readonly NativeChatDisplayPart[];
   /** This user message carried a live SVG text binding when accepted. */
   svgTextSelection?: true;
+  /** This user message carried a live SVG selection binding when accepted. */
+  svgSelection?: true;
   /** A host-attributed question reply. The message text is the person's answer. */
   questionReply?: Readonly<{ waitId: string; question: string }>;
+  /** The host-attributed replies to one question batch, in prompt order. */
+  questionReplies?: readonly NativeChatQuestionReply[];
 }>;
 
 /** A file attached to a person's message, named for display. */
@@ -660,14 +715,27 @@ export type NativeChatMessageAttachment = Readonly<{
   previewId?: string;
 }>;
 
-/** Recorded outcome and wall-clock interval of a turn in a transcript page. */
+/** Recorded facts about a turn in a transcript page. */
 export type NativeChatTurnRecord = Readonly<{
   turnId: string;
+  /** Model captured for the foreground turn, when recorded. */
+  modelId?: string;
   status: NonNullable<NativeChatTurn["status"]> | null;
   /** UTC milliseconds at which the turn started. */
   startedAtMs: number;
   /** UTC milliseconds at which the turn first settled; absent until then. */
   settledAtMs?: number;
+  approvalReviews?: readonly Readonly<{
+    decision: "reviewing" | "approved" | "declined" | "needs_human";
+    action: string;
+    /** Present only on a policy denial eligible for user-requested reconsideration. */
+    reviewId?: string;
+    reconsidered?: true;
+    userAuthorization?: "unknown" | "low" | "medium" | "high";
+    failure?: NativeApprovalReviewFailure;
+    riskLevel?: "low" | "medium" | "high" | "critical";
+    rationale?: string;
+  }>[];
   /** The turn's input started a goal. */
   goalStart?: true;
   /**
@@ -882,16 +950,93 @@ export type NativeChatControlReceipt = Readonly<{
   journalPosition: number;
 }>;
 
-export type NativeChatApproval = Readonly<{
-  reviewId: string;
-  /** Writes are asked only for the workspace's agent settings file. */
-  tool: "read_file" | "list_files" | "search_text" | "write_file" | "edit_file";
-  root: string;
-  relativePath: string;
-  query?: string;
+/** Captured filesystem and environment reach of one command. */
+export type NativeChatCommandScope = Readonly<{
+  diskRead: boolean;
+  resolvedExecutable: string;
+  resolvedCwd: string;
+  readRoots: readonly string[];
+  writeRoots: readonly string[];
+  runtimeRoots: readonly string[];
+  privateTempWrite: boolean;
+  environmentNames: readonly string[];
 }>;
 
+export type NativeChatApprovalAction =
+  | Readonly<{
+      tool:
+        | "read_file"
+        | "list_files"
+        | "search_text"
+        | "write_file"
+        | "edit_file";
+      relativePath: string;
+      query?: string;
+    }>
+  | Readonly<{
+      tool: "exec_command";
+      command: string;
+      executable: string;
+      cwd: string;
+      sandboxPermissions?: "use_default";
+      process?: "session" | "terminal";
+      managedNetwork?: true;
+      access: "read" | "read_write";
+      network?: Readonly<{ host: string; port: number }>;
+      scope?: NativeChatCommandScope;
+    }>
+  | Readonly<{
+      tool: "exec_command";
+      command: string;
+      executable: string;
+      cwd: string;
+      sandboxPermissions: "require_escalated";
+      justification: string;
+      environmentNames: readonly string[];
+      scope?: NativeChatCommandScope;
+      access?: "read" | "read_write";
+      network?: NativeChatEscalatedCommandNetwork;
+    }>;
+
+export type NativeChatEscalatedCommandNetwork =
+  | Readonly<{ kind: "denied" }>
+  | Readonly<{ kind: "managed" }>
+  | Readonly<{ kind: "listen"; port: number }>;
+
+export type NativeApprovalReviewFailure =
+  | "timed_out"
+  | "interrupted"
+  | "unavailable"
+  | "invalid_reply"
+  | "needs_human";
+
+export type NativeChatApproval = Readonly<{
+  reviewId: string;
+  root: string;
+  reviewFailure?: NativeApprovalReviewFailure;
+}> &
+  NativeChatApprovalAction;
+
 export type NativeChatApprovalDecision = "approve_once" | "decline";
+
+export type NativeChatQuestionReply = Readonly<{
+  waitId: string;
+  id: string;
+  question: string;
+  answer: string;
+  skipped?: true;
+}>;
+
+export type NativeChatQuestionItem = Readonly<{
+  id: string;
+  header?: string;
+  question: string;
+  options: readonly Readonly<{ label: string; description?: string }>[];
+}>;
+
+export type NativeChatQuestionPrompt =
+  | Readonly<{ question: string; options: readonly string[] }>
+  | Readonly<{ questions: readonly NativeChatQuestionItem[] }>;
 
 export type NativeChatQuestion = Readonly<{
   questionId: string;
@@ -899,14 +1044,23 @@ export type NativeChatQuestion = Readonly<{
   style: "answer_dependent" | "nonblocking";
   /** This optional question can be dismissed until its turn finishes. */
   expiresWithTurn?: true;
-  question: string;
-  options: readonly string[];
-}>;
+}> &
+  NativeChatQuestionPrompt;
 
-export type NativeChatQuestionAnswer =
+export type NativeChatSingleQuestionAnswer =
   | { kind: "choice"; index: number }
   | { kind: "text"; text: string }
   | { kind: "skipped" };
+
+export type NativeChatQuestionAnswer =
+  | NativeChatSingleQuestionAnswer
+  | {
+      kind: "batch";
+      answers: readonly Readonly<{
+        id: string;
+        answer: NativeChatSingleQuestionAnswer;
+      }>[];
+    };
 
 export type NativeChatLibrarySelection = Readonly<{
   selectionId: string;
@@ -930,10 +1084,12 @@ export type NativeChatTextUpdate = Readonly<{
   turnId: string;
   offsetBytes: number;
   replace: boolean;
+  citations?: readonly NativeChatUrlCitation[];
   /** The same first-publication coordinate retained by replayed messages. */
   activityOrder?: number;
   activityOrderIncomplete?: true;
-}>;
+}> &
+  Pick<NativeChatMessage, "inputId" | "questionReply" | "questionReplies">;
 
 export type NativeChatActivityUpdate = Readonly<{
   kind: "activity";
@@ -999,6 +1155,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   readonly nestedDeck?: true;
   /** The file window can lend its active slide's live SVG text selection. */
   readonly deckSvgText?: true;
+  /** The host accepts active SVG identities and text operations on SVG captures. */
+  readonly svgSelectionContext?: true;
+  /** The host accepts typed editor selections, including SVGs placed on boards. */
+  readonly editorSelectionContext?: true;
   /** This native package offers chat for the exact selected standalone SVG. */
   readonly document?: true;
   /**
@@ -1019,9 +1179,18 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * workspace opens, with nothing active or saved. Listing starts nothing.
    */
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** On Welcome only: inspect a new chat's selected route without opening it. */
+  welcomeTurnCapabilities?(
+    workspaceId: string,
+    profileId: string | null
+  ): Promise<NativeWelcomeTurnCapabilities | null>;
   /** The review survives same-document Welcome navigation changing only the preset. */
   readonly welcomeFullAccessAcrossPresets?: true;
-  /** Review Full access for one reserved new chat. Available only on Welcome. */
+  /** Reserve automatic review for a new project chat on Welcome. */
+  prepareWelcomeAutomaticReview?(
+    workspaceId: string
+  ): Promise<NativeChatPermissionReview>;
+  /** Review Full access for one reserved new chat on Welcome. */
   prepareWelcomeFullAccess?(
     workspaceId: string
   ): Promise<NativeChatPermissionReview>;
@@ -1034,6 +1203,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
       workspaceId: string;
       profileId: string | null;
       effort?: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }>
   ): Promise<Readonly<{ sessionId: string; profileId: string | null }>>;
   /** Inspect reviewed definitions and retained results without running handlers. */
@@ -1042,8 +1212,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   importHook?(): Promise<NativeHookInspection | null>;
   removeHook?(id: string, revision: string): Promise<NativeHookInspection>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
-  /** Read saved identity, initializing a new draft from defaults, without a worker. */
-  /** Negotiated native permission selection; absent/false keeps Default. */
+  /** This native build can select a bounded automatic reviewer for workspace chat. */
+  acceptsAutomaticApprovalReview?(): Promise<boolean>;
+  /** New project drafts start with automatic review when the live host supports it. */
+  readonly defaultsToAutomaticReview?: true;
+  /** Whether this workspace supports native permission selection. */
   acceptsPermissionMode?(): Promise<boolean>;
   permissionMode?(attachmentId: string): Promise<NativeChatPermissionState>;
   /** Main issues a short-lived intent bound to this exact chat and revision. */
@@ -1060,6 +1233,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     mode: NativeChatPermissionMode,
     review?: Readonly<{ reviewId: string; confirmed: boolean }>
   ): Promise<NativeChatPermissionState | null>;
+  turnCapabilities?(
+    target: NativeChatSelectionTarget
+  ): Promise<NativeChatTurnCapabilities>;
   selection?(
     target: NativeChatSelectionTarget
   ): Promise<NativeChatSelectionState>;
@@ -1076,6 +1252,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     choice: Readonly<{
       profileId: string | null;
       effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }>
   ): Promise<NativeChatSelectionState>;
   observeCatalog?(onChanged: () => void): Promise<(() => void) | null>;
@@ -1097,7 +1274,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<boolean>;
   create(): Promise<NativeChatAttachment>;
   /** Reopening the same draft reuses its durable destination and first input. */
-  createFromDraft?(draftId: string): Promise<NativeChatDraftAttachment>;
+  createFromDraft?(
+    draftId: string,
+    manualApproval?: true
+  ): Promise<NativeChatDraftAttachment>;
   commands?(attachmentId: string): Promise<readonly NativeChatCommand[]>;
   runCommand?(
     attachmentId: string,
@@ -1135,6 +1315,12 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     invoke: (request: NativeEditorSvgText.Request) => NativeEditorSvgText.Result
   ): () => void;
+  onEditorSvgSelection?(
+    attachmentId: string,
+    invoke: (
+      request: NativeEditorSelection.Request
+    ) => NativeEditorSelection.Result
+  ): () => void;
   /** Freeze the current workbench observation. Only its opaque ID leaves Main. */
   captureEditorContext?(): Promise<string | null>;
   submit(
@@ -1156,7 +1342,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     effort?: NativeChatEffort,
     editorSvgTargetId?: string,
     selectionRevision?: number,
-    editorContextId?: string
+    editorContextId?: string,
+    editorToolContext?: string | NativeEditorSelection.Capture,
+    webSearch?: true
   ): Promise<NativeChatAcceptance>;
   submitMessage?(
     attachmentId: string,
@@ -1185,7 +1373,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     operatingRegime?: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContextId?: string
+    editorContextId?: string,
+    webSearch?: true
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(
@@ -1222,6 +1411,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   observe(attachmentId: string): Promise<NativeChatObservation>;
   /** Whether this attached chat is actually on screen for notification gating. */
   setPresented?(attachmentId: string, visible: boolean): Promise<void>;
+  /** One optional suggestion for the observed reply. Accepting it only edits a draft. */
+  predictPrompt?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<string | null>;
   turnSummary?(
     attachmentId: string,
     observationId: string,
@@ -1299,10 +1493,19 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     change: NativeChatGoalControl
   ): Promise<NativeChatGoalReceipt>;
+  /** A renderer that can show the complete command retry scope may allow it once. */
   approvals?(
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    acceptsCommandRetries?: true,
+    acceptsManagedOutbound?: true,
+    acceptsCommandSessions?: true
   ): Promise<readonly NativeChatApproval[]>;
+  reconsiderDenial?(
+    attachmentId: string,
+    turnId: string,
+    reviewId: string
+  ): Promise<void>;
   answerApproval?(
     attachmentId: string,
     reviewId: string,
@@ -1335,9 +1538,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     control: NativeChatControl
   ): Promise<NativeChatControlResult>;
+  /** Pass true when this attachment can render and settle a question batch. */
   subscribe(
     attachmentId: string,
-    update: (update: NativeChatUpdate) => void
+    update: (update: NativeChatUpdate) => void,
+    acceptsQuestionBatches?: true
   ): Promise<string>;
   unsubscribe(subscriptionId: string): Promise<void>;
 };

@@ -90,11 +90,14 @@ It establishes startup independence; Desktop bundles `@grida/ai-host`.
 The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,
 Desktop lifecycle or chat state.
 
-Small, non-secret native preferences live in `preferences.json` under
+Small native preferences live in `preferences.json` under
 Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
-with owner-only atomic writes. Account cookies remain in Chromium's default
+with owner-only atomic writes. Voice stores its preferences and one dedicated
+provider key encrypted with Electron `safeStorage` in this document. Main sends
+completed recordings to the selected provider and returns transcript text.
+Account cookies remain in Chromium's default
 session cookie jar, while macOS/Linux BYOK API keys use the shared native
 `providers/credentials.toml` under Grida home through the sidecar's secret adapter.
 ChatGPT OAuth stays in the
@@ -300,8 +303,12 @@ Desktop lockfile into `resources/bundled-programs`. The verifier checks the
 target binary and runs `grida-fx --version` on the matching platform. Install
 the target FX package at build time for cross-target packaging. Electron Main
 uses the installed resource for its own lookups and exposes a verified
-read-only command copy through the agent command environment. Coordinate FX
-version changes with the CLI using the [maintainer guidance for externals](../.agents/skills/externals/SKILL.md).
+read-only command copy and the `desktop-fx` skill through the workspace agent
+launch profile. The [FX declaration](../extensions/desktop-fx/extension.json) supplies the
+supported targets, resource names, and skill declarations to Desktop packaging and Main's
+[FX registration](src/main/fx-extension.ts) binds the viewer to the authorized
+workspace. Coordinate FX version changes with the CLI using the
+[maintainer guidance for externals](../.agents/skills/externals/SKILL.md).
 
 The main-process chat client creates or loads a session in its selected
 workspace and sends identified text input over ACP. It reads retained input
@@ -409,13 +416,12 @@ Ordinary macOS and Linux launches offer connected subscription models in the
 Welcome and workspace model pickers. Sign in under **Settings → LLM Providers
 → ChatGPT Subscription**. A new chat without a saved or explicit model choice
 prefers a ready subscription; explicit choices and existing chats retain their
-connection. The subscription's current default is **GPT-6.2 Sol**. Its closed
-membership and default are authored in `data/ai/chatgpt-subscription.json`,
-validated by `data/ai/schemas/chatgpt-subscription.schema.json`, and generated
-for TypeScript and the native host. Runtime consumers use those bundled
-projections. The catalogue does not use authenticated discovery, and access
-depends on the ChatGPT plan and
-workspace. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
+connection. The preferred subscription default is **GPT-6.2 Sol**
+when offered. Desktop intersects the signed-in account's listed models with the
+public Models V2 subscription selectors and installed adapter capabilities.
+Main refreshes the public catalogue in the background and retains a local
+snapshot for offline use. The preferred default and historical IDs live in
+`data/ai/chatgpt-subscription.json`. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
 require an explicit replacement. Text, tools, reasoning settings, attached images
 and image-viewing tools are supported. Provider-native compaction is unavailable;
 Grida can summarize conversation context through its own compaction workflow.
@@ -547,3 +553,20 @@ pnpm --dir desktop typecheck
 
 Use `@grida/ai-host` tests for retained-service behavior. Use desktop tests for Electron
 adapter behavior.
+
+Run the shared browser favicon fixtures in Electron and an installed Chrome
+from the repository root. Both use disposable profiles and a loopback server.
+
+```bash
+GRIDA_DESKTOP_TEST_ELECTRON=1 pnpm --dir desktop exec vitest run src/main/browser-host.electron.test.ts
+node desktop/scripts/verify-browser-favicons-chrome.cjs
+```
+
+Visible chat link cards can request display metadata for a loopback URL.
+Bundled extensions can supply product labels by placing `web-preview.json`
+next to their `extension.json` and declaring an exact named HTML meta match.
+Desktop reads the page once for every shared lookup. It falls back to ordinary
+page metadata when two contributions match. For a custom lookup, add a sibling
+`web-preview.ts` that exports a `resolve` function typed as
+`NonNullable<WebPreviewProvider["resolve"]>`. Desktop calls a matched resolver
+with a bounded same-origin reader and an abort signal.

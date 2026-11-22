@@ -2,6 +2,14 @@
 
 import { createContext, useContext, type ComponentProps } from "react";
 import { defaultRehypePlugins, type StreamdownProps } from "streamdown";
+import { chatWebLinkIcon } from "@/components/chat-web-link";
+import {
+  BrowserOpen,
+  handleBrowserLinkClick,
+  usePagePreview,
+} from "@/lib/desktop/browser-open-context";
+import { LinkPreviewCard } from "./link-preview-card";
+import "@/components/chat-web-link.css";
 
 /**
  * Links in agent replies that point at files in the person's workspace: a
@@ -12,7 +20,8 @@ import { defaultRehypePlugins, type StreamdownProps } from "streamdown";
  * before hardening as links on a reserved, non-routable origin carrying the
  * original path, and renders them as links that open the file in the
  * workspace. The opener validates the path against the workspace; with no
- * opener, the link text is shown without a link. Web links are unchanged.
+ * opener, the link text is shown without a link. Web links use the host's
+ * browser opener when one is supplied.
  */
 export namespace workspace_links {
   /** A reserved origin (`.invalid` never resolves) for marked links. */
@@ -96,24 +105,54 @@ export namespace workspace_links {
     href,
     children,
     className,
+    onClick,
     node: _node,
     ...props
   }: ComponentProps<"a"> & { node?: unknown }) {
     const open = useContext(Opener);
+    const openWeb = useContext(BrowserOpen);
     const target = marked(href);
+    const isDownload = props.download != null && props.download !== false;
+    const preview = usePagePreview(
+      target === null && !isDownload ? href : undefined
+    );
     const style = "wrap-anywhere font-medium text-primary underline";
-    if (target === null)
-      return (
+    if (target === null) {
+      const icon = chatWebLinkIcon(href);
+      const link = (
         <a
           {...props}
           href={href}
-          className={className ?? style}
+          className={className ?? (icon ? undefined : style)}
+          data-chat-web-link={icon}
           rel="noreferrer"
           target="_blank"
+          onClick={
+            openWeb && href
+              ? (event) => {
+                  onClick?.(event);
+                  handleBrowserLinkClick(event, openWeb);
+                }
+              : onClick
+          }
         >
           {children}
         </a>
       );
+      return href && icon && preview ? (
+        <LinkPreviewCard
+          key={href}
+          url={href}
+          icon={icon}
+          openLink={openWeb}
+          preview={preview}
+        >
+          {link}
+        </LinkPreviewCard>
+      ) : (
+        link
+      );
+    }
     if (!open) return <span>{children}</span>;
     return (
       <a

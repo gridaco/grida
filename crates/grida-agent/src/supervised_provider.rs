@@ -3,8 +3,8 @@
 use crate::custody::CapturedCredential;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::{Client, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
-use agent_kit_core::inference::RequestControl;
-use agent_kit_core::{Error, ErrorKind, Result};
+use agent_kit_core::inference::{RequestControl, ResponseSpeed};
+use agent_kit_core::{Error, ErrorKind, ModelId, Result};
 use agent_kit_providers::{TransportFailure, TransportResponse};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
@@ -16,6 +16,8 @@ use uuid::Uuid;
 
 pub(crate) const CAPABILITY: &str = "co.grida/provider/egress";
 pub(crate) const ROUTES: &str = "co.grida/provider/routes";
+pub(crate) const PREDICTION_ROUTE: &str = "co.grida/provider/prediction-route";
+pub(crate) const TURN_CAPABILITIES: &str = "co.grida/provider/turn-capabilities";
 const UPLOAD_CHUNK: usize = 64 * 1024;
 const READ_CHUNK: usize = 32 * 1024;
 const REQUEST_LIMIT: usize = 8 * 1024 * 1024;
@@ -25,8 +27,36 @@ const TIMEOUT: Duration = Duration::from_secs(120);
 #[derive(Clone, Default)]
 pub struct SupervisedProvider {
     connection: Arc<Mutex<Connection>>,
+    pub(crate) model_binding: Option<SupervisedModel>,
     configured_endpoint_key: Option<String>,
     route_id: Option<Uuid>,
+}
+
+/// Exact wire selector admitted by the private supervisor for this route.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SupervisedModel {
+    pub selector: ModelId,
+    pub image_input: bool,
+}
+
+/// Hints from the accepted input. The supervisor still has to authorize this binding.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RetainedModel {
+    retained_wire_model: ModelId,
+    retained_image_input: bool,
+    #[serde(default, skip_serializing_if = "ResponseSpeed::is_standard")]
+    retained_speed: ResponseSpeed,
+}
+
+impl SupervisedModel {
+    pub(crate) fn retained(&self, speed: ResponseSpeed) -> RetainedModel {
+        RetainedModel {
+            retained_wire_model: self.selector.clone(),
+            retained_image_input: self.image_input,
+            retained_speed: speed,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -38,6 +68,24 @@ enum Connection {
 }
 
 impl SupervisedProvider {
+    pub fn with_model_binding(
+        mut self,
+        wire_model: Option<ModelId>,
+        image_input: bool,
+    ) -> Result<Self> {
+        if image_input && wire_model.is_none() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "supervised_model_binding_required",
+            ));
+        }
+        self.model_binding = wire_model.map(|selector| SupervisedModel {
+            selector,
+            image_input,
+        });
+        Ok(self)
+    }
+
     pub fn for_configured_endpoint(key: &str) -> Result<Self> {
         if !key.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
             || key.len() > 32
@@ -83,6 +131,8 @@ impl SupervisedProvider {
         &self,
         connection_id: Option<String>,
         model: agent_kit_core::ModelId,
+        purpose: Option<RoutePurpose>,
+        retained: Option<RetainedModel>,
     ) -> Result<ProviderRoute> {
         let unavailable = || Error::new(ErrorKind::Unavailable, "chat_selection_route_unavailable");
         let client = match &*self.connection.lock().unwrap() {
@@ -94,12 +144,37 @@ impl SupervisedProvider {
                 .send_request(Resolve {
                     connection_id,
                     model,
+                    purpose,
+                    retained,
                 })
                 .block_task()
                 .await
         })
         .await
         .map_err(|_| unavailable())?
+        .map_err(|_| unavailable())
+    }
+
+    pub(crate) async fn turn_capabilities(
+        &self,
+        route_id: Option<Uuid>,
+        model: agent_kit_core::ModelId,
+    ) -> Result<grida_agent_master::turn_options::Offer> {
+        let unavailable =
+            || Error::new(ErrorKind::Unavailable, "chat_turn_capabilities_unavailable");
+        let client = match &*self.connection.lock().unwrap() {
+            Connection::Attached(client) => client.clone(),
+            _ => return Err(unavailable()),
+        };
+        tokio::time::timeout(Duration::from_secs(15), async {
+            client
+                .send_request(TurnCapabilities { route_id, model })
+                .block_task()
+                .await
+        })
+        .await
+        .map_err(|_| unavailable())?
+        .map(|reply| reply.0)
         .map_err(|_| unavailable())
     }
 
@@ -371,7 +446,39 @@ struct Cancel {
 struct Resolve {
     connection_id: Option<String>,
     model: agent_kit_core::ModelId,
+    #[serde(flatten)]
+    purpose: Option<RoutePurpose>,
+    #[serde(flatten)]
+    retained: Option<RetainedModel>,
 }
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(
+    tag = "purpose",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum RoutePurpose {
+    ComposerPrediction {
+        /// The verified foreground exchange's supervisor handle. The process
+        /// launch, including a named launch, has no alternate route handle.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source_route_id: Option<Uuid>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/provider/turnCapabilities", response = TurnCapabilitiesReply)]
+#[serde(rename_all = "camelCase")]
+struct TurnCapabilities {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    route_id: Option<Uuid>,
+    model: agent_kit_core::ModelId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(transparent)]
+struct TurnCapabilitiesReply(grida_agent_master::turn_options::Offer);
 
 /// Private supervisor descriptor. Endpoints and credential custody are supplied by
 /// the same owner that supplied the launch configuration, never by a prompt.
@@ -387,6 +494,9 @@ pub(crate) enum ProviderRoute {
         model: agent_kit_core::ModelId,
     },
     Http {
+        wire_model: Option<ModelId>,
+        #[serde(default)]
+        image_input: bool,
         route_id: Uuid,
         model: agent_kit_core::ModelId,
         endpoint: String,
@@ -411,6 +521,9 @@ pub(crate) enum ProviderRoute {
         gateway_billing: bool,
     },
     Chatgpt {
+        wire_model: Option<ModelId>,
+        #[serde(default)]
+        image_input: bool,
         route_id: Uuid,
         model: agent_kit_core::ModelId,
         endpoint: String,

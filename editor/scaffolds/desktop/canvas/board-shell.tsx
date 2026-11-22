@@ -21,11 +21,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { DEFAULT_STYLE as SVG_EDITOR_STYLE } from "@grida/svg-editor";
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import {
@@ -36,6 +38,9 @@ import { WorkspaceFileRevision } from "../workbench/workspace-file-revision";
 import { CanvasBoard, isUriSrc, type Frame } from "./board-store";
 
 type Camera = { x: number; y: number; zoom: number };
+export type BindBoardSelection = (
+  board: CanvasBoard
+) => (() => void) | undefined;
 
 /** Default pin box for an unplaced (`layout: null`) document, laid out in a
  *  simple cascade so it's visible until the agent/user places it. */
@@ -85,9 +90,11 @@ function pinSrc(
 export function DesktopBoardShell({
   workspaceId,
   basePath = "",
+  bindSelection,
 }: {
   workspaceId: string;
   basePath?: string;
+  bindSelection?: BindBoardSelection;
 }) {
   const board = useMemo(
     () => new CanvasBoard(workspaceId, workspacesNs, basePath),
@@ -96,6 +103,12 @@ export function DesktopBoardShell({
   const frames = useSyncExternalStore(board.subscribe, board.getFrames, () =>
     board.getFrames()
   );
+  const selected = useSyncExternalStore(
+    board.subscribe,
+    board.getSelectedId,
+    board.getSelectedId
+  );
+  useLayoutEffect(() => bindSelection?.(board), [bindSelection, board]);
   const localPinPaths = useMemo(() => {
     const paths = new Set<string>();
     for (const frame of frames) {
@@ -133,7 +146,6 @@ export function DesktopBoardShell({
   }, [board]);
 
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
-  const [selected, setSelected] = useState<string | null>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
 
   // Pointer gesture: pan the camera (empty space) or drag the pressed frame.
@@ -219,7 +231,7 @@ export function DesktopBoardShell({
       if (id) {
         const f = frames.find((fr) => fr.id === id);
         const r = f ? placedRect(f, frames.indexOf(f)) : null;
-        setSelected(id);
+        board.selectFrame(id);
         if (r)
           gesture.current = {
             kind: "frame",
@@ -233,7 +245,7 @@ export function DesktopBoardShell({
             z: f?.layout?.z,
           };
       } else {
-        setSelected(null);
+        board.selectFrame(null);
         gesture.current = {
           kind: "pan",
           startX: e.clientX,
@@ -243,7 +255,7 @@ export function DesktopBoardShell({
         };
       }
     },
-    [frames, camera.x, camera.y]
+    [board, frames, camera.x, camera.y]
   );
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -291,8 +303,15 @@ export function DesktopBoardShell({
     setDragPreview(null);
   }, [board, camera.zoom, dragPreview]);
 
+  const selectedIndex = frames.findIndex((frame) => frame.id === selected);
+  const selection =
+    selectedIndex >= 0
+      ? placedRect(frames[selectedIndex], selectedIndex)
+      : undefined;
+  const selectedDrag = dragPreview?.id === selected ? dragPreview : null;
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-muted/30">
+    <div className="relative h-full w-full overflow-hidden bg-muted/30 select-none">
       <div
         ref={surfaceRef}
         className="absolute inset-0 touch-none"
@@ -317,12 +336,7 @@ export function DesktopBoardShell({
               <div
                 key={frame.id}
                 data-frame-id={frame.id}
-                className={
-                  "absolute cursor-grab overflow-hidden rounded-md border bg-background shadow-sm " +
-                  (selected === frame.id
-                    ? "border-primary ring-2 ring-primary/40"
-                    : "border-border")
-                }
+                className="absolute cursor-grab overflow-hidden rounded-md border border-border bg-background shadow-sm"
                 style={{
                   left: r.x + dx,
                   top: r.y + dy,
@@ -344,6 +358,26 @@ export function DesktopBoardShell({
             );
           })}
         </div>
+        {/* Keep the outline outside the scaled world so its stroke stays fixed. */}
+        {selection && (
+          <div
+            aria-hidden="true"
+            data-board-selection
+            className="pointer-events-none absolute"
+            style={{
+              left:
+                camera.x + selection.x * camera.zoom + (selectedDrag?.dx ?? 0),
+              top:
+                camera.y + selection.y * camera.zoom + (selectedDrag?.dy ?? 0),
+              width: selection.w * camera.zoom,
+              height: selection.h * camera.zoom,
+              outlineColor: SVG_EDITOR_STYLE.chrome_color,
+              outlineStyle: "solid",
+              outlineWidth: SVG_EDITOR_STYLE.selection_outline_width,
+              outlineOffset: -SVG_EDITOR_STYLE.selection_outline_width / 2,
+            }}
+          />
+        )}
       </div>
 
       {frames.length === 0 && (

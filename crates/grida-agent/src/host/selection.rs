@@ -28,6 +28,8 @@ pub struct ChatSelection {
     pub connection_id: Option<String>,
     pub model: ModelId,
     pub effort: SelectionEffort,
+    #[serde(default, skip_serializing_if = "ResponseSpeed::is_standard")]
+    pub speed: ResponseSpeed,
 }
 
 impl ChatSelection {
@@ -700,7 +702,11 @@ impl Host {
                 if ledger.retired {
                     return Err(unavailable());
                 }
-                Some(ledger.head.selection)
+                // A fork is a new chat with its own speed preference.
+                Some(ChatSelection {
+                    speed: ResponseSpeed::Standard,
+                    ..ledger.head.selection
+                })
             }
             None => None,
         };
@@ -965,6 +971,7 @@ mod tests {
             connection_id: Some("a".repeat(64)),
             model: ModelId::new(model).unwrap(),
             effort,
+            speed: ResponseSpeed::Standard,
         }
     }
 
@@ -1003,7 +1010,8 @@ mod tests {
         );
         let a_pair = pair("model-a", SelectionEffort::Low);
         let b_pair = pair("model-b", SelectionEffort::High);
-        host.attach_routes(Default::default()).unwrap();
+        host.attach_routes(Default::default(), true, false, false)
+            .unwrap();
         let (_, revision) = host.for_derived_session(&a).await.unwrap();
         let revision = revision.expect("routed derivation must recheck the first selection");
         assert_eq!(
@@ -1385,6 +1393,7 @@ mod tests {
                 text: "Do not dispatch".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Some(ReasoningEffort::Low),
@@ -1463,6 +1472,7 @@ mod tests {
                 text: "Retained request".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: None,
@@ -1527,6 +1537,7 @@ mod tests {
                 text: "Remember this route".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: None,

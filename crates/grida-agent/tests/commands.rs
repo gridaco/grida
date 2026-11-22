@@ -104,6 +104,7 @@ impl Fixture {
             temporary_parent: temporary.clone(),
             termination: Termination::ProcessGroup,
             disk_read: false,
+            listen_port: None,
         };
         Self {
             _base: base,

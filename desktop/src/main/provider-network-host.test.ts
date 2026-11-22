@@ -12,6 +12,7 @@ vi.mock("electron", () => ({
   net: { request: vi.fn<(...args: unknown[]) => unknown>() },
 }));
 
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { ServicesSidecarChannel } from "../services-sidecar-channel";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
 import {
@@ -44,6 +45,122 @@ describe("ProviderNetworkHost", () => {
     expect(setProxy).toHaveBeenCalledWith({ mode: "system" });
     expect(net.request).not.toHaveBeenCalled();
   });
+
+  it("pins authenticated subscription discovery to a bodyless GET on the Main-only grant", async () => {
+    const { CHATGPT_MODELS_URL } = await import("../chatgpt-configuration");
+    const authority = new ProviderNetworkAuthority("https://gg.example.test");
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy: vi.fn<() => Promise<void>>(async () => {}),
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
+    mockEmptyProviderResponse();
+    const subscription = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
+    );
+    await subscription.getSubscriptionModels!(
+      new Headers({
+        accept: "application/json",
+        authorization: "Bearer fixture",
+        "chatgpt-account-id": "fixture-account",
+      }),
+      new AbortController().signal
+    );
+    expect(net.request).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        url: CHATGPT_MODELS_URL,
+        method: "GET",
+        redirect: "manual",
+        credentials: "omit",
+      })
+    );
+    const ordinary = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
+    expect(ordinary.getSubscriptionModels).toBeUndefined();
+  });
+
+  it("issues the project model GET only from the dedicated Main grant", async () => {
+    const authority = new ProviderNetworkAuthority("https://gg.example.test");
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy: vi.fn<() => Promise<void>>(async () => {}),
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
+    mockEmptyProviderResponse();
+    const project = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.OPENAI_PROJECT_GRANT_ID
+    );
+    const headers = new Headers({
+      authorization: "Bearer project-fixture",
+      accept: "application/json",
+    });
+    await project.getOpenAiModels!(headers, new AbortController().signal);
+    expect(net.request).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        url: ProviderNetworkPolicy.OPENAI_MODELS_URL,
+        method: "GET",
+        redirect: "manual",
+        credentials: "omit",
+      })
+    );
+    const builtIn = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
+    expect(builtIn.getOpenAiModels).toBeUndefined();
+    expect(project.getSubscriptionModels).toBeUndefined();
+  });
+
+  it.each(["openai", "openrouter"] as const)(
+    "sends %s Voice only through the private Chromium session and refuses redirects",
+    async (provider) => {
+      const networkSession = {
+        setProxy: vi.fn<() => Promise<void>>(async () => {}),
+        setUserAgent: vi.fn<(value: string) => void>(),
+      } as never;
+      vi.mocked(session.fromPartition).mockReturnValue(networkSession);
+      const request = new EventEmitter() as EventEmitter & {
+        end: (body: Buffer) => void;
+        setHeader: () => void;
+      };
+      request.end = vi.fn<(body: Buffer) => void>(() => {
+        request.emit("redirect", 307, "POST", "https://elsewhere.invalid/", {});
+      });
+      request.setHeader = vi.fn<() => void>();
+      vi.mocked(net.request).mockReturnValueOnce(request as never);
+
+      const send = ProviderNetworkHost.voiceTranscriptionNetwork();
+      expect(session.fromPartition).not.toHaveBeenCalled();
+      const response = await send(
+        provider,
+        new Headers({
+          authorization: "Bearer voice-fixture",
+          "content-type":
+            provider === "openrouter"
+              ? "application/json"
+              : "multipart/form-data; boundary=fixture",
+        }),
+        new Uint8Array([1, 2, 3]).buffer,
+        new AbortController().signal
+      );
+
+      expect(response.status).toBe(307);
+      expect(net.request).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          url: ProviderNetworkPolicy.voiceRoutes[provider].url,
+          method: "POST",
+          session: networkSession,
+          redirect: "manual",
+          credentials: "omit",
+        })
+      );
+      expect(request.end).toHaveBeenCalledExactlyOnceWith(
+        Buffer.from([1, 2, 3])
+      );
+    }
+  );
 
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {
     const pending = Promise.withResolvers<void>();
@@ -1311,4 +1428,46 @@ it("refuses even same-origin signed Tripo upload redirects without replaying byt
   expect((await harness.untilFrame("response.error")).code).toBe("denied");
   expect(fetch).toHaveBeenCalledTimes(1);
   harness.host.close();
+});
+
+it("never replays a paid OpenAI image POST after a same-route redirect", async () => {
+  const { OPENAI_IMAGE_URL, OPENAI_IMAGE_GRANT_ID } = ProviderNetworkPolicy;
+  const fetch = vi.fn<() => Promise<Response>>(async () =>
+    Response.redirect(OPENAI_IMAGE_URL, 307)
+  );
+  const harness = createHarness({ fetch });
+  try {
+    await harness.start();
+    const requestId = "req_openai_image";
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId,
+      grantId: OPENAI_IMAGE_GRANT_ID,
+      method: "POST",
+      url: OPENAI_IMAGE_URL,
+      headers: [
+        ["content-type", "application/json"],
+        ["authorization", "Bearer project-fixture"],
+      ],
+      hasBody: true,
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.chunk",
+      requestId,
+      sequence: 0,
+      data: Buffer.from("{}").toString("base64"),
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.end",
+      requestId,
+      sequence: 1,
+    });
+    expect((await harness.untilFrame("response.error")).code).toBe("denied");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    harness.host.close();
+  }
 });

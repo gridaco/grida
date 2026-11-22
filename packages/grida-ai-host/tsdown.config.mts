@@ -22,6 +22,7 @@ export default defineConfig([
       "src/chatgpt-host.ts",
       "src/media-server.ts",
       "src/media-transport.ts",
+      "src/model-catalogue.ts",
     ],
     platform: "node",
   },

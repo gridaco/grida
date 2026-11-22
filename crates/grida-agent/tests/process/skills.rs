@@ -99,7 +99,9 @@ async fn headless_selected_skills_apply_without_granting_tool_capabilities() {
     assert!(messages.contains("Host-supplied workspace-relative skill directory"));
     assert!(messages.contains(".agents/skills/slides"));
     assert!(messages.contains("Use this project guidance."));
-    assert!(messages.contains("live render of what you wrote"));
+    assert!(messages.contains("A standalone SVG is renderable when it parses"));
+    assert!(!messages.contains("first meaningful renderable checkpoint"));
+    assert!(!messages.contains("workbench_show"));
     assert!(!messages.contains("also_in_load"));
     assert!(!messages.contains("Build a Grida slides deck"));
     // Without workspace tools the turn lists no skills to read on its own.

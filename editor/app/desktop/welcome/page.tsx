@@ -42,6 +42,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
   getDesktopBridge,
@@ -63,13 +64,14 @@ import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace
 import {
   ComposerDropArea,
   type ComposerCatalog,
+  type ComposerController,
   type ComposerTransfer,
 } from "@/kits/composer";
 import {
   LibraryExplorerView,
   type LibraryExplorerViewHandle,
 } from "@/kits/library-explorer";
-import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
+import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { resolveLibraryExplorerPage } from "@/scaffolds/desktop/shared/design-search";
 import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
 import {
@@ -258,6 +260,19 @@ function WelcomeSurface({
   }, [staged.permissionError]);
   const filePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<
+    | (Pick<ComposerController, "readDocument" | "restoreDocument"> & {
+        draftKey: string;
+      })
+    | null
+  >(null);
+  useLayoutEffect(() => {
+    window.addEventListener("pagehide", composer.flushNextDraft);
+    return () => {
+      window.removeEventListener("pagehide", composer.flushNextDraft);
+      composer.flushNextDraft();
+    };
+  }, [composer]);
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryMotionRef = useRef<HTMLDivElement>(null);
   // The home's single page-scroll container — everything (composer, gallery)
@@ -265,19 +280,36 @@ function WelcomeSurface({
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
   const [openingFolder, setBusy] = useState(false);
-  const busy = openingFolder || staged.busy || staged.permissionBusy;
+  const busy =
+    openingFolder || staged.busy || staged.permissionBusy || !!staged.outgoing;
   const {
+    acceptsAutomaticApprovalReview,
+    defaultsToAutomaticReview,
+    welcomeProfiles,
+    welcomeTurnCapabilities,
     prepareWelcomeFullAccess,
+    prepareWelcomeAutomaticReview,
     answerWelcomeFullAccess,
     startWelcomeFullAccess,
     welcomeFullAccessAcrossPresets,
   } = bridge?.nativeChat ?? {};
-  const fullAccess =
+  useEffect(
+    () =>
+      composer.connectAutomaticReview(
+        acceptsAutomaticApprovalReview,
+        defaultsToAutomaticReview
+      ),
+    [composer, acceptsAutomaticApprovalReview, defaultsToAutomaticReview]
+  );
+  const accessHost =
     prepareWelcomeFullAccess &&
     answerWelcomeFullAccess &&
     startWelcomeFullAccess
       ? {
           prepare: prepareWelcomeFullAccess,
+          prepareAutomatic: staged.automaticReviewAvailable
+            ? prepareWelcomeAutomaticReview
+            : undefined,
           answer: answerWelcomeFullAccess,
           start: startWelcomeFullAccess,
         }
@@ -305,23 +337,20 @@ function WelcomeSurface({
     () => composer.draftFor(target?.id ?? "default"),
     [composer, target?.id]
   );
+  useEffect(() => {
+    composer.recoverDraft(
+      composerDraft.key,
+      (workspaceId, requestId) =>
+        welcome_message.pending(workspaceId)?.message.requestId === requestId
+    );
+  }, [composer, composerDraft.key]);
   const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
   const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
     null
   );
-  useEffect(() => {
-    let active = true;
-    void workspacesNs
-      .getDefault()
-      .then((workspace) => {
-        if (active) setDefaultWorkspace(workspace);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-  const mentions = useWorkspaceFileMentions((target ?? defaultWorkspace)?.id);
+  const defaultWorkspaceRead = useRef<Promise<Workspace | null> | null>(null);
+  const destination = target ?? defaultWorkspace;
+  const mentions = useWorkspaceFileMentions(destination?.id);
   const catalog = useMemo<ComposerCatalog>(
     () => ({ commands: [], mentions }),
     [mentions]
@@ -397,14 +426,15 @@ function WelcomeSurface({
         const opened = nextWorkspaces.find(
           (workspace) => workspace.id === pendingId
         );
-        if (opened) setTarget((current) => current ?? opened);
+        if (opened && !composer.read().outgoing)
+          setTarget((current) => current ?? opened);
         pendingInitialWorkspaceId.current = null;
       }
     } catch (err) {
       // Non-fatal — the welcome page can still create or open a folder.
       console.warn("[welcome] workspaces.list failed:", err);
     }
-  }, []);
+  }, [composer]);
 
   useEffect(() => {
     void refreshWorkspaces();
@@ -523,30 +553,63 @@ function WelcomeSurface({
     modelSelection.read,
     modelSelection.read
   );
-  const awaitingProfiles =
-    !!bridge?.nativeChat?.welcomeProfiles && !profilesLoaded;
+  const awaitingProfiles = !!welcomeProfiles && !profilesLoaded;
+  useLayoutEffect(
+    () =>
+      composer.connectTurnCapabilities(
+        destination?.id,
+        profileId,
+        !awaitingProfiles ? welcomeTurnCapabilities : undefined
+      ),
+    [
+      composer,
+      destination?.id,
+      profileId,
+      awaitingProfiles,
+      welcomeTurnCapabilities,
+    ]
+  );
   useEffect(() => {
     composer.initializeEffort(profiles?.newChatDefault?.effort);
   }, [composer, profiles?.newChatDefault?.effort]);
   const readProfiles = useCallback(() => {
-    const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
-    if (!list) return;
-    void modelSelection.refresh(list);
-  }, [modelSelection]);
+    if (welcomeProfiles) void modelSelection.refresh(welcomeProfiles);
+  }, [modelSelection, welcomeProfiles]);
+  const refreshOptions = useCallback(() => {
+    void composer.refreshTurnCapabilities();
+    if (defaultWorkspaceRead.current) return;
+    const request = workspacesNs.getDefault();
+    defaultWorkspaceRead.current = request;
+    void request
+      .then((workspace) => {
+        if (defaultWorkspaceRead.current === request)
+          setDefaultWorkspace(workspace);
+      }, NOOP)
+      .finally(() => {
+        if (defaultWorkspaceRead.current === request)
+          defaultWorkspaceRead.current = null;
+      });
+  }, [composer]);
   useEffect(() => {
-    readProfiles();
-    // Settings can add a provider key or endpoint in another window.
-    window.addEventListener("focus", readProfiles);
-    return () => {
-      window.removeEventListener("focus", readProfiles);
-      modelSelection.release();
+    const refresh = () => {
+      readProfiles();
+      refreshOptions();
+      composer.refreshAutomaticReview();
     };
-  }, [readProfiles, modelSelection]);
+    refresh();
+    // Settings can add a provider key or endpoint in another window.
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      modelSelection.release();
+      defaultWorkspaceRead.current = null;
+    };
+  }, [bridge, composer, readProfiles, refreshOptions, modelSelection]);
 
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
-  const start = useCallback(
-    async (text: string) => {
+  const submission = useCallback(
+    (text: string): HomeComposer.Input => {
       const template = pickedTemplate;
       const workflowReferences = selectedWorkflows?.map(
         ({ number, showcase }) => ({
@@ -579,31 +642,24 @@ function WelcomeSurface({
             "Update Grida Desktop to send this request. Your draft is still here."
           );
       }
-      await composer.submit(
-        {
-          text,
-          prompt: ApplicationPreset.prompt(preset, text),
-          profileId,
-          target,
-          references: [],
-          messageContext,
-          ...(template && {
-            template: {
-              name: template.name,
-              copy: async (workspaceId: string) => ({
-                title: template.title,
-                slides: template.pages.length,
-                path: await WorkspaceCanvasCreation.copy(workspaceId, template),
-              }),
-            },
-          }),
-        },
-        {
-          defaultWorkspace: workspacesNs.getDefault,
-          stash: welcome_message.stash,
-          open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
-        }
-      );
+      return {
+        text,
+        prompt: ApplicationPreset.prompt(preset, text),
+        profileId,
+        target: destination,
+        references: [],
+        messageContext,
+        ...(template && {
+          template: {
+            name: template.name,
+            copy: async (workspaceId: string) => ({
+              title: template.title,
+              slides: template.pages.length,
+              path: await WorkspaceCanvasCreation.copy(workspaceId, template),
+            }),
+          },
+        }),
+      };
     },
     [
       pickedTemplate,
@@ -611,13 +667,59 @@ function WelcomeSurface({
       selectedWorkflows,
       showWorkflows,
       showImages,
-      target,
+      destination,
       profileId,
-      router,
       composer,
       preset,
     ]
   );
+  const submissionHost: HomeComposer.Host = {
+    defaultWorkspace: () =>
+      defaultWorkspaceRead.current ?? workspacesNs.getDefault(),
+    stash: welcome_message.stash,
+    open: (workspace) => router.push(WorkspaceOpening.href(workspace)),
+  };
+  const reportSubmitError = (error: unknown) =>
+    toast.error(
+      error instanceof Error ? error.message : "Couldn't start a session."
+    );
+
+  const capture = (text: string, document: unknown) => {
+    try {
+      return composer.capture(submission(text), document, submissionHost, {
+        ...composerDraft,
+        read: () =>
+          editorRef.current?.draftKey === composerDraft.key
+            ? editorRef.current.readDocument()
+            : undefined,
+      });
+    } catch (error) {
+      reportSubmitError(error);
+      return false;
+    }
+  };
+
+  const restoreOutgoing = () => {
+    const editor = editorRef.current;
+    if (
+      !editor ||
+      !composer.restoreCaptured((document) =>
+        document == null
+          ? editor.readDocument() == null
+          : editor.restoreDocument(document)
+      )
+    )
+      toast.error(
+        "Keep or clear your current text before restoring the earlier draft."
+      );
+  };
+
+  const discardOutgoing = () => {
+    composer.discardCaptured();
+    setPickedTemplate(null);
+    setPickedRefs([]);
+    setWorkflowSelection([]);
+  };
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
@@ -736,13 +838,17 @@ function WelcomeSurface({
                 style={docked ? { height: heroHeight } : undefined}
               >
                 <WelcomeHeading question={presetSpec.composerQuestion}>
-                  <WorkspacePicker
-                    inline
-                    value={target}
-                    onChange={setTarget}
-                    workspaces={workspaces}
-                    onOpenFolder={onOpen}
-                  />
+                  <span className="contents" inert={busy}>
+                    <WorkspacePicker
+                      inline
+                      value={target}
+                      onChange={(workspace) => {
+                        if (!composer.read().outgoing) setTarget(workspace);
+                      }}
+                      workspaces={workspaces}
+                      onOpenFolder={onOpen}
+                    />
+                  </span>
                 </WelcomeHeading>
                 {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
@@ -767,7 +873,7 @@ function WelcomeSurface({
                   accent) — it reads as an attachment, and starting is the
                   composer's own send. Its X removes; the gallery card also
                   toggles it. */}
-                  {pickedTemplate && (
+                  {!staged.outgoing && pickedTemplate && (
                     <div className="flex items-center gap-2 rounded-lg border bg-background p-1.5 shadow-sm">
                       <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
@@ -805,7 +911,7 @@ function WelcomeSurface({
                   composer's own send. When docked the row floats above the input
                   in the same stack — same design language, lifted by shadow, not
                   boxed in a container. */}
-                  {showImages && pickedRefs.length > 0 && (
+                  {!staged.outgoing && showImages && pickedRefs.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-0.5">
                       {pickedRefs.map((p) => (
                         <div
@@ -840,42 +946,56 @@ function WelcomeSurface({
                       ))}
                     </div>
                   )}
-                  {selectedWorkflows && selectedWorkflows.length > 0 && (
-                    <WorkflowReferenceTray
-                      picks={selectedWorkflows}
-                      disabled={busy}
-                      onToggle={toggleWorkflowReference}
-                    />
-                  )}
+                  {!staged.outgoing &&
+                    selectedWorkflows &&
+                    selectedWorkflows.length > 0 && (
+                      <WorkflowReferenceTray
+                        picks={selectedWorkflows}
+                        disabled={busy}
+                        onToggle={toggleWorkflowReference}
+                      />
+                    )}
                   <AgentComposer
                     access={{
                       mode: staged.permissionMode,
-                      available: !!fullAccess,
+                      available: !!accessHost,
+                      automaticReview:
+                        staged.automaticReviewAvailable &&
+                        (!!defaultsToAutomaticReview ||
+                          !!accessHost?.prepareAutomatic),
                       staged: true,
                       busy,
+                      onOpen: composer.refreshAutomaticReview,
                       onChange: (mode) => {
                         composer.selectPermissionMode(
                           mode,
                           {
-                            workspace: target ?? defaultWorkspace,
+                            workspace: destination,
                             defaultWorkspace: workspacesNs.getDefault,
                           },
-                          fullAccess
+                          accessHost
                         );
                       },
                     }}
                     draft={composerDraft}
+                    draftRef={(editor) => {
+                      editorRef.current =
+                        editor?.readDocument && editor.restoreDocument
+                          ? {
+                              draftKey: composerDraft.key,
+                              readDocument: editor.readDocument,
+                              restoreDocument: editor.restoreDocument,
+                            }
+                          : null;
+                    }}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
-                    className={cn("@container", docked && "shadow-xl")}
-                    onSubmit={start}
-                    onSubmitError={(error) =>
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Couldn't start a session."
-                      )
+                    className={docked ? "shadow-xl" : undefined}
+                    onCapture={capture}
+                    onSubmit={(text) =>
+                      composer.submit(submission(text), submissionHost)
                     }
+                    onSubmitError={reportSubmitError}
                     awaitSubmission
                     submitting={staged.busy}
                     canSubmit={!busy}
@@ -980,6 +1100,7 @@ function WelcomeSurface({
                             {
                               id: preset,
                               label: presetSpec.label,
+                              tooltip: presetSpec.composerTooltip,
                               icon: <PresetIcon />,
                               disabled: busy,
                               onRemove: () =>
@@ -993,6 +1114,8 @@ function WelcomeSurface({
                       initialError: awaitingProfiles ? profileReadError : null,
                       profiles: {
                         active: profileId,
+                        subscriptionIssue: profiles?.subscriptionIssue,
+                        openAiIssue: profiles?.openAiIssue,
                         choices: profiles?.choices ?? [],
                         saved: profiles?.saved ?? [],
                       },
@@ -1001,6 +1124,15 @@ function WelcomeSurface({
                       onRefresh: readProfiles,
                       refreshError: profileReadError,
                       effort: staged.effort,
+                      speed:
+                        !staged.goal && welcomeTurnCapabilities
+                          ? {
+                              value: staged.speed ?? "standard",
+                              capabilities: staged.turnCapabilities,
+                              onChange: composer.selectSpeed,
+                              refresh: refreshOptions,
+                            }
+                          : undefined,
                       onEffort: composer.selectEffort,
                       goal: staged.goal,
                     }}
@@ -1034,6 +1166,48 @@ function WelcomeSurface({
                       event.currentTarget.value = "";
                     }}
                   />
+                  <div role="status" className="sr-only">
+                    {staged.outgoing?.status === "opening"
+                      ? "Opening workspace"
+                      : ""}
+                  </div>
+                  {staged.outgoing?.status === "failed" && (
+                    <div className="flex flex-wrap items-center gap-2 px-1">
+                      <p
+                        role="status"
+                        className="grow text-xs text-destructive"
+                      >
+                        {staged.outgoing.error}
+                      </p>
+                      {staged.outgoing.retryable && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => composer.retryCaptured(submissionHost)}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                      {!staged.outgoing.handedOff && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={restoreOutgoing}
+                          >
+                            Restore draft
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={discardOutgoing}
+                          >
+                            Discard
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {staged.notice && (
                     <p
                       role="status"

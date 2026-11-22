@@ -11,17 +11,103 @@ Open Settings from the application menu, or press **Command+,** on macOS.
 Settings opens in its own window; opening it again focuses that window.
 Select a category in its sidebar:
 
-| Category        | What it contains                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| Account         | Your Grida account and sign-out action.                                                          |
-| Appearance      | Light, Dark or System theme, remembered on this device.                                          |
-| Browser         | [Downloads, site permissions, shared history and browser cleanup](../editor/desktop/browser.md). |
-| Credits         | Your Grida AI credit information.                                                                |
-| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                     |
-| Media Providers | Connections for image, video, audio and 3D generation.                                           |
-| Hooks           | Global hook definitions, configuration diagnostics and command trust review.                     |
-| Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                |
-| About           | Desktop version and platform information.                                                        |
+| Category        | What it contains                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Account         | Your Grida account and sign-out action.                                                                      |
+| Appearance      | Light, Dark or System theme, remembered on this device.                                                      |
+| Personalization | Suggested prompts and web search.                                                                            |
+| Voice           | Dictation key, microphone, language, and voice dictionary.                                                   |
+| Browser         | [Link destinations, downloads, site permissions, history and browser cleanup](../editor/desktop/browser.md). |
+| Credits         | Your Grida AI credit information.                                                                            |
+| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                                 |
+| Media Providers | Connections for image, video, audio and 3D generation.                                                       |
+| Hooks           | Global hook definitions, configuration diagnostics and command trust review.                                 |
+| Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                            |
+| About           | Desktop version and platform information.                                                                    |
+
+## Personalization
+
+These settings apply across your Desktop workspaces. Each control also reads
+and writes the user-wide `~/.grida/config.toml`. An absolute `GRIDA_HOME`
+selects a different Grida home.
+
+**Web search** is on by default. In eligible ChatGPT Subscription chats, the
+agent can search the live web when a question needs current information.
+You can also ask it to search in your message.
+
+## Suggest the next prompt
+
+Turn on **Personalization → Suggested prompts** to let Grida suggest a follow-up after a successful reply. The preview starts off. An eligible reply in an open, empty composer can trigger one additional model request using that chat’s connection and retained context. Provider rates or usage limits can apply even if you ignore the suggestion.
+
+For hosted chats, Grida looks for its economy model on the same connection and account. For example, a ChatGPT subscription can supply the suggestion even when you have also connected OpenRouter. Your conversation keeps its selected model. If the economy model is unavailable, the composer stays empty. A local connection, including Ollama at its default `http://localhost:11434/v1` address, can use its configured model.
+
+Press **Tab** to put the full suggestion into your draft. Edit it and press **Send** when ready, or start typing your own message to dismiss it. Turning the switch off clears suggestions across open windows and cancels requests still waiting for a model or authorization. Turning it back on applies to future replies. A request already sent to the provider can still count toward usage. Any text you already accepted stays in your draft.
+
+To set the same preferences by hand, edit the matching keys in the existing global file:
+
+```toml
+schema_version = 1
+web_search = "automatic"
+
+[desktop]
+composer-predictions-enabled = true
+```
+
+Set `web_search` to `"automatic"` or omit the key to offer search in eligible
+chats. Use `"disabled"` to block hosted search. The switch writes
+`"automatic"` when on and `"disabled"` when off. Disabling hosted search can
+block a queued request that already includes it.
+
+Desktop reads an existing `"live"` setting as automatic. It reads older
+`"on_demand"`, `"cached"`, and `"indexed"` settings as disabled.
+
+If you upgraded from a build with the Fast mode switch, eligible chats use
+their saved speeds even when your config still contains
+`[features].fast_mode = false`. Choose **Standard** in the chat’s speed picker
+to use standard speed again. [Choose a response speed](./models-and-usage.md#choose-a-response-speed)
+
+Desktop 0.7.0’s hook reader rejects the `[desktop]` table. Upgrade builds sharing this file before saving the setting, or give a concurrently used older build its own `GRIDA_HOME`. To reopen the same home with 0.7.0, remove the personalization keys and tables introduced since that build, keeping `schema_version` and any `[[hooks]]` entries.
+
+## OpenAI API project key
+
+On macOS or Linux, open **LLM Providers → OpenAI API**. Create an API key in
+the OpenAI project you want to bill, paste it into Settings, and choose
+**Save**. For a restricted key, grant **List models** read access and
+**Responses API** write access.
+[OpenAI project keys](https://platform.openai.com/api-keys) · [OpenAI permissions](https://developers.openai.com/api/docs/guides/rbac)
+
+Choose a model in the **OpenAI API · Project billing** picker group to use
+that project for streamed text chat and agent tool calls. The same key appears
+under **Media Providers → OpenAI API** and can generate images from text for
+models with a direct OpenAI badge in the catalogue. The image tool uses the
+first connected provider that can serve the request in its usual provider
+order. A restricted key needs write
+access to the Images API for generation. Removing the key from either
+Settings tab disconnects it from both. [Choose a model](./models-and-usage.md#choose-a-model)
+
+## Voice dictation
+
+Open **Voice**, then choose **Configure** next to **GPT-Transcribe**. Create
+an API key for OpenAI, OpenRouter, Vercel AI Gateway, or Grida Gateway. Select
+its logo, paste its key, and choose **Save**. The model row shows the saved
+provider and **Delete**. **Use API key for dictation** is on when you first
+save a key. Turn it off to pause dictation and keep your key. The composer mic
+opens Voice settings while dictation is paused. Pausing cancels any active
+dictation. Turn the switch back on to resume. To switch providers, choose
+**Delete**, confirm, then choose **Configure**.
+
+Grida Gateway keys start with `sk-gg-v1-` and need Media access. Choose a
+microphone, leave the language on **Auto-detect** or select one, and add names
+or phrases to the voice dictionary as needed. OpenAI, OpenRouter, and Vercel AI
+Gateway use supported language selections and dictionary entries as hints.
+Grida Gateway detects the language automatically and keeps your preferences
+available for use with other providers.
+
+In the composer, select the microphone, speak, and choose **Stop**. Grida
+sends the completed recording to your selected provider and adds the transcript
+to your draft so you can edit it before sending. Choose **Send** while recording
+to stop, transcribe, and send in one step. When Voice needs a key, the
+microphone offers a link back to Voice settings.
 
 ## Compatible endpoints and Ollama
 

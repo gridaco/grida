@@ -11,6 +11,8 @@ use subtle::ConstantTimeEq;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
+pub(crate) const DESKTOP_OPENAI_PROJECT: &str = "desktop-openai-project-credential";
+
 pub(crate) enum CredentialSource {
     Environment { name: String },
     Stored { home: PathBuf, provider: String },
@@ -157,12 +159,15 @@ impl CapturedCredential {
 }
 
 impl Lookup {
-    /// These stored provider keys previously used a trimmed value for Desktop
-    /// transport. Capture and continuity still compare the original bytes.
+    /// Desktop named connections use the trimmed value on the wire.
+    /// Capture and continuity compare the original bytes.
     fn bearer_key<'a>(&self, secret: &'a str) -> &'a str {
         match self {
             Self::Stored { provider, .. }
-                if matches!(provider.as_str(), "openrouter" | "vercel") =>
+                if matches!(
+                    provider.as_str(),
+                    "openrouter" | "vercel" | DESKTOP_OPENAI_PROJECT
+                ) =>
             {
                 secret.trim()
             }

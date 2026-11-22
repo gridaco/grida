@@ -35,33 +35,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@app/ui/components/collapsible";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { catalog as models } from "@grida/ai/catalogue";
-import {
-  AlibabaCloudLogo,
-  BlackForestLabsLogo,
-  ByteDanceLogo,
-  ElevenLabsLogo,
-  TripoLogo,
-  FalLogo,
-  GoogleLogo,
-  MetaLogo,
-  MicrosoftLogo,
-  OllamaLogo,
-  OpenAILogo,
-  OpenRouterLogo,
-  RecraftLogo,
-  SpaceXAILogo,
-  TencentLogo,
-  VercelLogo,
-} from "@grida/react-icons/logos";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
+import { OllamaLogo, OpenAILogo } from "@grida/react-icons/logos";
 import {
   DesktopBridgeMissingError,
   getDesktopBridge,
@@ -82,19 +59,34 @@ import {
   type EndpointModelEntry,
 } from "@/lib/desktop/bridge";
 import * as gridaGateway from "@/lib/desktop/gg-session";
-import { useGGModels } from "@/lib/desktop/gg-models";
+import {
+  mediaModelChoices,
+  newestMediaModels,
+  promptModels,
+  useVisualModels,
+  useGGModels,
+  type MediaModelChoice,
+} from "@/lib/desktop/gg-models";
 import { musicModelChoices } from "@/scaffolds/desktop/audio-gen/music-generation-controls";
 import Link from "next/link";
 import { DesktopPageShell } from "@/scaffolds/desktop/chrome/page-shell";
 import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry";
 import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
+import { PersonalizationSettings } from "./_components/personalization-settings";
 import { HooksSettings } from "./_components/hooks-settings";
 import { AppearanceSettings } from "./_components/appearance-settings";
 import { BrowserSettings } from "./_components/browser-settings";
 import { ArchivedChatsSettings } from "./_components/archived-chats-settings";
 import { CreditsSection } from "./_components/credits-section";
 import { MediaModelReadiness } from "./_components/media-model-readiness";
+import {
+  BYOK_PROVIDER_LOGOS,
+  ModelVendorLogo,
+  ProviderLogos,
+} from "./_components/model-logos";
+import { VoiceSettings } from "./_components/voice-settings";
+import { SettingsGroup, SettingsSection } from "./_components/settings-layout";
 
 /**
  * Desktop settings — BYOK key slots, version/platform.
@@ -117,6 +109,7 @@ export default function DesktopSettingsPage() {
     SettingsNavigation.getSnapshot,
     SettingsNavigation.getServerSnapshot
   );
+  const bridge = getDesktopBridge();
   const [providerKeysRevision, setProviderKeysRevision] = useState(0);
   // Keep the archive request alive while its tab mounts or unmounts.
   const [archives] = useState(
@@ -160,6 +153,12 @@ export default function DesktopSettingsPage() {
           <TabsContent value="appearance" className="m-0">
             <AppearanceSettings />
           </TabsContent>
+          <TabsContent value="personalization" className="m-0">
+            <PersonalizationSettings
+              api={bridge?.personalization}
+              legacyPredictions={bridge?.composerPredictions}
+            />
+          </TabsContent>
           <TabsContent value="browser" className="m-0">
             <BrowserSettings />
           </TabsContent>
@@ -171,7 +170,7 @@ export default function DesktopSettingsPage() {
               title="LLM Providers"
               description="Text model providers for Grida's native agent."
             >
-              <ProviderListCard
+              <ProviderList
                 title="Providers"
                 description={
                   <>
@@ -185,22 +184,17 @@ export default function DesktopSettingsPage() {
                 leading={<ChatGptProviderRow />}
               >
                 <OllamaProviderRow />
-              </ProviderListCard>
+              </ProviderList>
             </SettingsSection>
           </TabsContent>
           <TabsContent value="media" className="m-0">
-            <SettingsSection
-              title="Media Providers"
-              description="Generation providers for image, video, 3D, and audio workflows."
-            >
-              <ProviderListCard
-                title="Media Provider Keys"
-                description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
-                providerIds={MEDIA_PROVIDER_IDS}
-                onKeyChanged={onProviderKeyChanged}
-              />
-              <MediaModelsSection providerKeysRevision={providerKeysRevision} />
-            </SettingsSection>
+            <MediaProviderSettings
+              providerKeysRevision={providerKeysRevision}
+              onKeyChanged={onProviderKeyChanged}
+            />
+          </TabsContent>
+          <TabsContent value="voice" className="m-0">
+            <VoiceSettings />
           </TabsContent>
           <TabsContent value="hooks" className="m-0">
             <HooksSettings />
@@ -279,7 +273,7 @@ function ChatGptProviderRow() {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
@@ -312,7 +306,7 @@ function ChatGptProviderRow() {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="px-6 pb-5 text-sm text-muted-foreground">
+        <div className="px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             {ready
               ? "ChatGPT is connected."
@@ -371,26 +365,6 @@ function ChatGptProviderRow() {
   );
 }
 
-function SettingsSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <header>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </header>
-      <div className="flex flex-col gap-3">{children}</div>
-    </section>
-  );
-}
-
 /* ───────────────────────────── Account ───────────────────────────── */
 
 type AccountState =
@@ -444,14 +418,11 @@ function AccountSection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Account</CardTitle>
-        <CardDescription>
-          The Grida account this app is signed in with.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <SettingsSection
+      title="Account"
+      description="The Grida account this app is signed in with."
+    >
+      <SettingsGroup className="px-4 py-3">
         {state.kind === "loading" ? (
           <Skeleton className="h-9 w-full" />
         ) : state.kind === "unavailable" ? (
@@ -459,8 +430,8 @@ function AccountSection() {
             Account status unavailable
           </span>
         ) : (
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <span className="min-w-0 wrap-anywhere text-sm">
               {state.kind === "signed-in" && state.email
                 ? state.email
                 : "Signed in"}
@@ -475,41 +446,14 @@ function AccountSection() {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </SettingsSection>
   );
 }
 
 /* ───────────────────────────── Providers ──────────────────────────── */
 
 type ProviderModality = "text" | "image" | "video";
-
-const BYOK_PROVIDER_LOGOS: Partial<
-  Record<ByokProviderId, React.ComponentType<React.ComponentProps<"svg">>>
-> = {
-  openrouter: OpenRouterLogo,
-  vercel: VercelLogo,
-  fal: FalLogo,
-  elevenlabs: ElevenLabsLogo,
-  tripo: TripoLogo,
-};
-
-const MODEL_VENDOR_LOGOS: Partial<
-  Record<string, React.ComponentType<React.ComponentProps<"svg">>>
-> = {
-  alibaba: AlibabaCloudLogo,
-  openai: OpenAILogo,
-  "recraft-ai": RecraftLogo,
-  google: GoogleLogo,
-  "black-forest-labs": BlackForestLabsLogo,
-  bytedance: ByteDanceLogo,
-  meta: MetaLogo,
-  elevenlabs: ElevenLabsLogo,
-  tripo: TripoLogo,
-  microsoft: MicrosoftLogo,
-  tencent: TencentLogo,
-  xai: SpaceXAILogo,
-};
 
 const BYOK_PROVIDER_SETUP: Record<
   ByokProviderId,
@@ -519,6 +463,7 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleLabel: string;
     consoleHref: string;
     placeholder: string;
+    note?: string;
   }
 > = {
   openrouter: {
@@ -534,6 +479,14 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleLabel: "Vercel AI Gateway's console",
     consoleHref: "https://vercel.com/ai-gateway",
     placeholder: "vck_00000000000000000000000000000000",
+  },
+  [OPENAI_PROJECT_PROVIDER_ID]: {
+    label: "OpenAI API",
+    article: "an",
+    consoleLabel: "OpenAI’s project settings",
+    consoleHref: "https://platform.openai.com/api-keys",
+    placeholder: "sk-proj-…",
+    note: "Chat usage is billed to your OpenAI project. A restricted key needs permission to list models and create Responses.",
   },
   fal: {
     label: "fal",
@@ -567,12 +520,13 @@ function providerServesAny(
   );
 }
 
-function ProviderListCard({
+function ProviderList({
   title,
   description,
   modalities,
   providerIds,
   excludeModalities = [],
+  openAiImages = false,
   onKeyChanged,
   leading,
   children,
@@ -583,14 +537,18 @@ function ProviderListCard({
   /** Exact provider identities for provider-shaped, non-resolver surfaces. */
   providerIds?: readonly ByokProviderId[];
   excludeModalities?: readonly ProviderModality[];
+  openAiImages?: boolean;
   onKeyChanged?: () => void;
   leading?: ReactNode;
   children?: ReactNode;
 }) {
+  const openAiSupported =
+    openAiImages || getDesktopBridge()?.caps?.native?.openai_api === true;
   const byokProviders = secrets
     .byokProviderMetadata()
     .filter(
       (provider) =>
+        (provider.id !== OPENAI_PROJECT_PROVIDER_ID || openAiSupported) &&
         (provider.id !== "tripo" ||
           modelGeneration.isSupported() ||
           rigging.isSupported()) &&
@@ -600,25 +558,24 @@ function ProviderListCard({
         !providerServesAny(provider, excludeModalities)
     );
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="divide-y">
-          {leading}
-          {byokProviders.map((provider) => (
-            <ByokRow
-              key={provider.id}
-              provider={provider}
-              onKeyChanged={onKeyChanged}
-            />
-          ))}
-          {children}
-        </div>
-      </CardContent>
-    </Card>
+    <section className="space-y-2">
+      <header className="space-y-1">
+        <h3 className="text-sm font-medium">{title}</h3>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </header>
+      <SettingsGroup>
+        {leading}
+        {byokProviders.map((provider) => (
+          <ByokRow
+            key={provider.id}
+            provider={provider}
+            openAiImages={openAiImages}
+            onKeyChanged={onKeyChanged}
+          />
+        ))}
+        {children}
+      </SettingsGroup>
+    </section>
   );
 }
 
@@ -632,9 +589,11 @@ type RowState =
 
 function ByokRow({
   provider,
+  openAiImages,
   onKeyChanged,
 }: {
   provider: ByokProviderMetadata;
+  openAiImages: boolean;
   onKeyChanged?: () => void;
 }) {
   const providerId = provider.id;
@@ -647,6 +606,11 @@ function ByokRow({
       : undefined;
   const setup = BYOK_PROVIDER_SETUP[providerId];
   const label = setup.label;
+  const openAi = providerId === OPENAI_PROJECT_PROVIDER_ID;
+  const note =
+    openAi && openAiImages
+      ? "Image usage is billed to your OpenAI project. A restricted key needs permission to generate images."
+      : setup.note;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<RowState>({ kind: "loading" });
@@ -711,7 +675,7 @@ function ByokRow({
   const handleRemove = useCallback(async () => {
     let confirmed = false;
     try {
-      confirmed = await secrets.confirmDeleteKey(providerId);
+      confirmed = await secrets.confirmDeleteKey(providerId, label);
     } catch (err) {
       setState({
         kind: "error",
@@ -734,7 +698,7 @@ function ByokRow({
         previous: "configured",
       });
     }
-  }, [providerId, refresh, onKeyChanged]);
+  }, [providerId, label, refresh, onKeyChanged]);
 
   const handleErrorDismiss = useCallback(() => {
     void refresh();
@@ -755,7 +719,7 @@ function ByokRow({
         <button
           ref={triggerRef}
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <ProviderLogo providerId={providerId} label={label} />
@@ -775,12 +739,15 @@ function ByokRow({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="px-6 pb-5 text-sm text-muted-foreground">
+        <div className="px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             {statusKind === "configured"
-              ? `${label} is connected.`
+              ? openAi
+                ? "Your OpenAI project key is saved."
+                : `${label} is connected.`
               : `To use Grida with ${label}, add ${setup.article} API key.`}
           </p>
+          {note && <p className="mt-2">{note}</p>}
           {statusKind !== "configured" && (
             <>
               <p className="mt-2">Follow these steps:</p>
@@ -924,6 +891,7 @@ const MEDIA_PROVIDER_IDS = [
   "openrouter",
   "vercel",
   "fal",
+  OPENAI_PROJECT_PROVIDER_ID,
   "elevenlabs",
   "tripo",
 ] as const satisfies readonly ByokProviderId[];
@@ -934,6 +902,42 @@ const VISUAL_BYOK_PROVIDER_IDS = [
   "fal",
 ] as const satisfies readonly ByokProviderId[];
 
+function MediaProviderSettings({
+  providerKeysRevision,
+  onKeyChanged,
+}: {
+  providerKeysRevision: number;
+  onKeyChanged: () => void;
+}) {
+  const visual = useVisualModels();
+  const openAiImages = providers.supportsOpenAiImages();
+  return (
+    <SettingsSection
+      title="Media Providers"
+      description="Generation providers for image, video, 3D, and audio workflows."
+    >
+      <ProviderList
+        title="Media Provider Keys"
+        description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
+        providerIds={
+          openAiImages
+            ? MEDIA_PROVIDER_IDS
+            : MEDIA_PROVIDER_IDS.filter(
+                (id) => id !== OPENAI_PROJECT_PROVIDER_ID
+              )
+        }
+        openAiImages={openAiImages}
+        onKeyChanged={onKeyChanged}
+      />
+      <MediaModelsSection
+        providerKeysRevision={providerKeysRevision}
+        visual={visual}
+        openAiImages={openAiImages}
+      />
+    </SettingsSection>
+  );
+}
+
 /**
  * Media-generation models. Readiness is scoped to each callable route rather
  * than inferred from one unrelated provider key: fal for 3D, ElevenLabs for
@@ -941,8 +945,12 @@ const VISUAL_BYOK_PROVIDER_IDS = [
  */
 function MediaModelsSection({
   providerKeysRevision,
+  visual,
+  openAiImages,
 }: {
   providerKeysRevision: number;
+  visual: ReturnType<typeof useVisualModels>;
+  openAiImages: boolean;
 }) {
   const [connectedVisualProviders, setConnectedVisualProviders] =
     useState<ReadonlySet<ByokProviderId> | null>(null);
@@ -967,8 +975,21 @@ function MediaModelsSection({
   const musicSupported = audio.music.isSupported();
   const soundEffectSupported = audio.soundEffects.isSupported();
   const voiceSupported = audio.textToSpeech.isSupported();
-  const imageModels = imageSupported ? models.image.listed_models() : [];
-  const videoModels = videoSupported ? models.video.listed_models() : [];
+  const currentGG = useGGModels();
+  const imageModels = imageSupported
+    ? mediaModelChoices(
+        visual ? promptModels(visual.image) : models.image.listed_models(),
+        currentGG,
+        "image"
+      )
+    : [];
+  const videoModels = videoSupported
+    ? mediaModelChoices(
+        visual ? promptModels(visual.video) : models.video.listed_models(),
+        currentGG,
+        "video"
+      )
+    : [];
   const threeDModels = threeDSupported ? models.three_d.ordered_models() : [];
   const tripoModels = tripoSupported
     ? models.three_d.model_generation.ordered_models()
@@ -976,7 +997,6 @@ function MediaModelsSection({
   const riggingModels = riggingSupported
     ? models.three_d.rigging.listed_models()
     : [];
-  const currentGG = useGGModels();
   const musicModels = musicSupported
     ? musicModelChoices(currentGG).map((model) => ({
         ...model,
@@ -998,18 +1018,15 @@ function MediaModelsSection({
   useEffect(() => {
     let live = true;
     if (imageSupported || videoSupported) {
+      const providerIds: readonly ByokProviderId[] = openAiImages
+        ? [...VISUAL_BYOK_PROVIDER_IDS, OPENAI_PROJECT_PROVIDER_ID]
+        : VISUAL_BYOK_PROVIDER_IDS;
       void Promise.all(
-        VISUAL_BYOK_PROVIDER_IDS.map((id) =>
-          secrets.hasKey(id).catch(() => false)
-        )
+        providerIds.map((id) => secrets.hasKey(id).catch(() => false))
       ).then((present) => {
         if (!live) return;
         setConnectedVisualProviders(
-          new Set(
-            VISUAL_BYOK_PROVIDER_IDS.filter(
-              (_provider, index) => present[index]
-            )
-          )
+          new Set(providerIds.filter((_provider, index) => present[index]))
         );
       });
     }
@@ -1054,6 +1071,7 @@ function MediaModelsSection({
     providerKeysRevision,
     imageSupported,
     musicSupported,
+    openAiImages,
     soundEffectSupported,
     threeDSupported,
     tripoSupported,
@@ -1078,15 +1096,15 @@ function MediaModelsSection({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Media models</CardTitle>
-        <CardDescription>
+    <section className="space-y-2">
+      <header className="space-y-1">
+        <h3 className="text-sm font-medium">Media models</h3>
+        <p className="text-xs text-muted-foreground">
           Each group reports the provider or hosted session it actually uses.
           You can still open the playground to finish setup there.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+        </p>
+      </header>
+      <SettingsGroup>
         {imageSupported && (
           <MediaModelGroup
             title="Image"
@@ -1096,10 +1114,11 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                MediaModelReadiness.hosted(card.id, "image", currentGG)
+                MediaModelReadiness.hosted(card.id, "image", currentGG) ??
+                  (visual ? false : undefined)
               )
             }
-            hrefForModel={mediaToolHref}
+            hrefForModel={(id) => DesktopMediaTool.href("image-generator", id)}
             actionLabel="Open in image generator"
           />
         )}
@@ -1112,10 +1131,11 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                MediaModelReadiness.hosted(card.id, "video", currentGG)
+                MediaModelReadiness.hosted(card.id, "video", currentGG) ??
+                  (visual ? false : undefined)
               )
             }
-            hrefForModel={mediaToolHref}
+            hrefForModel={(id) => DesktopMediaTool.href("video-generator", id)}
             actionLabel="Open in video generator"
           />
         )}
@@ -1185,20 +1205,10 @@ function MediaModelsSection({
             actionLabel="Open in voice generator"
           />
         )}
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </section>
   );
 }
-
-type MediaModelCard = {
-  id: string;
-  label: string;
-  short_description: string;
-  vendor: string;
-  provider?: string;
-  providers?: object;
-  deprecated?: boolean;
-};
 
 function MediaModelGroup({
   title,
@@ -1208,18 +1218,18 @@ function MediaModelGroup({
   actionLabel,
 }: {
   title: string;
-  models: readonly MediaModelCard[];
-  readyForModel: (card: MediaModelCard) => boolean | null;
+  models: readonly MediaModelChoice[];
+  readyForModel: (card: MediaModelChoice) => boolean | null;
   hrefForModel: (id: string) => string;
   actionLabel: string;
 }) {
   return (
-    <section className="border-t first:border-t-0">
-      <header className="px-6 py-3">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+    <section>
+      <header className="px-4 py-3">
+        <h4 className="text-sm font-medium text-muted-foreground">{title}</h4>
       </header>
       <div className="divide-y">
-        {models.map((card) => (
+        {newestMediaModels(models).map((card) => (
           <MediaModelRow
             key={card.id}
             card={card}
@@ -1239,16 +1249,16 @@ function MediaModelRow({
   href,
   actionLabel,
 }: {
-  card: MediaModelCard;
+  card: MediaModelChoice;
   ready: boolean | null;
   href: string;
   actionLabel: string;
 }) {
   return (
-    <div className="flex gap-3 px-6 py-4 text-sm">
-      <MediaVendorLogo vendor={card.vendor} />
+    <div className="flex gap-3 px-4 py-3 text-sm">
+      {card.vendor && <ModelVendorLogo vendor={card.vendor} />}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-medium">{card.label}</span>
           {card.deprecated && (
             <span className="text-xs text-muted-foreground">Legacy</span>
@@ -1264,9 +1274,11 @@ function MediaModelRow({
             {ready === null ? "Checking" : ready ? "Ready" : "Setup required"}
           </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {card.short_description}
-        </span>
+        {card.short_description && (
+          <span className="text-xs text-muted-foreground">
+            {card.short_description}
+          </span>
+        )}
         <Button
           asChild
           variant="link"
@@ -1280,54 +1292,14 @@ function MediaModelRow({
   );
 }
 
-function MediaVendorLogo({ vendor }: { vendor: string }) {
-  const Logo = Object.hasOwn(MODEL_VENDOR_LOGOS, vendor)
-    ? MODEL_VENDOR_LOGOS[vendor]
-    : undefined;
-  if (!Logo) {
-    return (
-      <span
-        aria-hidden="true"
-        className="flex size-8 shrink-0 items-center justify-center rounded border bg-muted text-[10px] font-medium uppercase text-muted-foreground"
-      >
-        {vendor.slice(0, 1)}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="flex size-8 shrink-0 items-center justify-center rounded border bg-background"
-      aria-hidden="true"
-    >
-      <Logo focusable="false" className="size-5 text-foreground" />
-    </span>
-  );
-}
-
-function MediaProviderLogos({ card }: { card: MediaModelCard }) {
+function MediaProviderLogos({ card }: { card: MediaModelChoice }) {
   const providerIds = MEDIA_PROVIDER_IDS.filter((id) =>
     card.providers
       ? Object.prototype.hasOwnProperty.call(card.providers, id)
       : card.provider === id
   );
 
-  return (
-    <div className="flex shrink-0 -space-x-1" aria-hidden="true">
-      {providerIds.map((id) => {
-        const Logo = BYOK_PROVIDER_LOGOS[id];
-        if (!Logo) return null;
-        return (
-          <span
-            key={id}
-            className="flex size-5 items-center justify-center rounded border bg-background ring-1 ring-background"
-          >
-            <Logo focusable="false" className="size-3.5 text-foreground" />
-          </span>
-        );
-      })}
-    </div>
-  );
+  return <ProviderLogos providerIds={providerIds} />;
 }
 
 function mediaToolHref(id: string): string {
@@ -1389,7 +1361,7 @@ function OllamaProviderRow() {
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
@@ -1415,7 +1387,7 @@ function OllamaProviderRow() {
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="flex flex-col gap-4 px-6 pb-5 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-4 px-4 pb-4 text-sm text-muted-foreground">
           <p className="text-foreground">
             Run LLMs locally on your machine with{" "}
             <a
@@ -1885,25 +1857,26 @@ function AboutSection() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>About</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">Version</dt>
-          <dd>{info ? info.version : <Skeleton className="h-4 w-16" />}</dd>
-          <dt className="text-muted-foreground">Platform</dt>
-          <dd>
-            {info ? (
-              app.describePlatform(info.platform)
-            ) : (
-              <Skeleton className="h-4 w-20" />
-            )}
-          </dd>
+    <SettingsSection title="About">
+      <SettingsGroup>
+        <dl className="divide-y text-sm">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="font-medium">Version</dt>
+            <dd>{info ? info.version : <Skeleton className="h-4 w-16" />}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="font-medium">Platform</dt>
+            <dd>
+              {info ? (
+                app.describePlatform(info.platform)
+              ) : (
+                <Skeleton className="h-4 w-20" />
+              )}
+            </dd>
+          </div>
         </dl>
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </SettingsSection>
   );
 }
 

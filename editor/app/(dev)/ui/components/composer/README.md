@@ -1,113 +1,112 @@
 # Composer playground
 
-`/ui/components/composer` is the canonical local surface for composer UI work.
-Start the normal editor development server and open
-`http://localhost:3000/ui/components/composer`. No Desktop bridge, account,
-provider or running agent is needed.
+Start the editor development server and open
+[Composer playground](http://localhost:3000/ui/components/composer).
+Each Desktop chat example mounts `NativeAgentPane` with a local
+`DesktopNativeChat` fixture. The production pane owns transcript scrolling,
+question placement, the composer, and its focus behavior. The fixture supplies
+chat data, events, and acknowledgements, so the page runs without Electron,
+an account, or a model.
 
-The default **Desktop chat** example uses the production `AgentComposer` assembly (input, completion/+ menu,
-access control, intent chips and model/effort picker), `NativeComposerQueue`, and
-`ChatTabPreviewContent`. Its conversation uses the production `Conversation`,
-`ChatMessageView`, native message/attachment projection, and `NativeTurnActivity`.
-Change those production components when refining the
-experience; keep this page as their fixture consumer. File/image actions stage
-local examples. The **Kit and files** tab preserves the reusable kit's existing
-file picker, drop/reference examples, and message log.
+Dictation uses the microphone for the waveform and the browser’s speech
+recognition throughout the playground. The browser may send audio to its speech
+service. If recognition is unavailable, the playground inserts a labeled
+sample transcript.
 
-Useful scenarios:
+## Examples
 
-- Switch **Surface** between **Workspace** and **Home**. Both use the same mounted
-  production composer. Home hides conversation, queue and context usage while
-  retaining Files/Image, Goal/Plan, model and effort controls. Switching surfaces
-  keeps the text, attachment, modes and effort, so this is also a quick way to
-  compare their control layout. Home sends stay in the local conversation, which
-  is visible again on the Workspace surface. Destination admission, real file
-  preparation and the Home-to-workspace handoff are covered by their owning
-  controller tests rather than simulated here.
+- **Question batch** opens a three-question request. Pick an option to
+  advance, skip or revisit an item, then submit on the last question.
+  Use Left and Right to change questions, and Up and Down to select an
+  answer or reach the write-in. Enter confirms the answer. **Reset** brings
+  back the batch.
+- **Question** shows the production prompt above the composer. Select a
+  choice or type a custom answer. **Streaming** replays local commentary so
+  you can test typing while the transcript updates. Close the question to
+  reopen it from the transcript. After submission, the answer appears with
+  the original question. **Compact pane** constrains the actual Desktop pane
+  to a short, narrow frame for checking scroll and clipping. **Hold answer**
+  lets you accept or refuse a pending answer. **Expire question** ends the
+  turn while the prompt is open. **Reset** brings back the prompt.
+- **Blocking question** shows a text-only prompt with **Skip**. **Long choices
+  and multiple questions** starts in a compact pane with six wrapped choices
+  and two other questions you can open from the transcript.
+- **Chat composer** exercises the + menu, slash commands, Goal and
+  Plan, model and effort, and inline message edits. **Hold submission** lets
+  you exercise pending, accepted, and refused sends or edits.
+- **Transcript time dividers** shows a quick follow-up after a long reply,
+  a same-day idle gap, and a new local calendar day.
+- **Suggested prompt** opens with a sample suggestion. Focus the composer,
+  press **Tab**, then clear the draft to see it return.
+- **Dictate** uses the production Desktop composer with browser speech
+  recognition. Start with an empty or existing draft to see both recording
+  layouts. **Cancel dictation** keeps the draft in place. **Stop dictation** or
+  **Esc** inserts the transcript. **Send** while recording transcribes and
+  submits the draft to the local preview.
+- **Links** uses the production composer and transcript components with local
+  sample messages. Compare ordinary web links and the recognized site icons in
+  the draft, the user bubble, and the agent response. Edit a draft link and send
+  it to see the result. Hover **Grida docs** for a favicon and preview image,
+  **CSS Grid guide** for a text preview, or **Linear** for the domain-only
+  fallback.
+- **Markdown comparison** shows the same paragraphs, inline formatting, lists,
+  quote, and code block in the draft, sent message, and agent response. Send an
+  edited draft to update both transcript examples. **Extended Markdown** adds
+  six heading levels, a table, task list, image, footnote, math, Mermaid,
+  and highlighted code. User bubbles show unsupported formats as source text.
+- **Web preview** shows the gallery's title, favicon, and description. Scroll up
+  and hover **workflow viewer** to see the FX Viewer label shared with its
+  response card. The transcript also includes an unavailable preview and replies
+  with ambiguous local links. Click **Finish reply** to reveal the print
+  preview and see its details arrive after a short delay. Click the card, an
+  inline link, or **Open in default browser** to see the request in the demo
+  controls.
+  **Copy link** copies the card's URL.
+- **Web preview refresh** shows two cards for the same local address. Start
+  the sample server and hover **workflow viewer** to update both cards and
+  the inline favicon from one check. Stop the server and hover again to see
+  the shared fallback.
+- **Message queue** shows previews, dragging and keyboard reordering,
+  editing in the composer, and Steer. **Running turn** controls whether a send
+  enters the queue and whether queued messages can be steered.
+- **Attachments** shows image captions, image-only messages, file and folder
+  cards, and an unavailable preview. The + menu and file drops stage local
+  attachments. Image previews and fullscreen use the production interaction.
+- **Long pasted text** opens with a sample card and accepts text pastes of at
+  least 1,000 characters or 12 lines. **Show in text field** moves the whole
+  passage to the end of the editable draft. Use **Add sample paste** to try
+  another card. The demo keeps the cards in local UI state with sending disabled.
+- **Slide selection** shows the selected text in the composer and a selection
+  marker on eligible sent messages. Toggle the selection to check that sent
+  context stays put.
+- **Tool activity**, **Streaming**, and **Empty conversation** show recorded
+  work, a partial reply, and an empty chat with a working composer. Scroll up
+  during **Streaming** to see the animated scroll-to-bottom button. Turn
+  **Streaming** off to see the arrow.
+- **Compaction** shows the production transcript rows for a saved summary
+  and compaction in progress on load. To try the full flow, send `/compact`
+  in the example below and select **Finish compaction**.
+- **Pause and resume** opens on a paused reply. Use **Resume** and **Pause**
+  in the composer to switch states.
+- **Subagents** shows overlapping work with finished, failed, and stopped
+  outcomes. Expand **Worked for 12s** to see the events in the parent’s chat.
+- **Model and access loading** holds the first reads. Complete or fail each
+  one, then use the composer’s retry actions. The saved access mode is Full access.
+- **Reconnection** lets you disconnect a loaded chat, hold or fail its
+  reconnect, and recover the same chat with the composer draft intact.
+- **Permission approval** and **Library request** use the same floating cards
+  above the composer as questions. The Library picker uses one local image that
+  you can select or skip.
+- **Kit and files** starts with a compact folder, a square image, a sample
+  PDF thumbnail, and a file without a preview. Add more files to scroll the
+  attachment strip, or change the drop mode to insert inline references.
 
-- Drag an operating-system file over the whole simulated Home or chat surface,
-  including its empty surrounding space. The production `ComposerDropArea`
-  shows the same full-surface overlay and uses the same intake as an editor
-  drop; dropping on the editor stages one attachment. Image/file transfers use
-  the local reference image/file examples. Text and in-page drags keep their
-  normal behavior, and leaving, cancelling or blurring clears the overlay.
-- Choose a **Conversation** example to inspect user/agent text, Markdown and
-  code; image captions and image-only messages; file/folder cards and unavailable
-  previews; settled tool activity; partial streaming and an empty conversation.
-  Image thumbnails use the real preview/fullscreen components with local bytes.
-- Choose **SVG text selection** to preview the selection indicator in the
-  composer and above a sent message. Use **SVG text selected** to change the
-  simulated selection, or turn on Plan mode or attach a file to check when the
-  composer omits the indicator. A local Send captures the selection state for
-  that message. Changing it afterward leaves the sent indicator in place.
-- Turn **Running turn** off and hover a text user bubble to choose **Edit and
-  resubmit**. The production inline message editor replaces that bubble with
-  a multiline input and **Cancel** / **Send**; the composer and its unsent draft
-  stay in place. Enter sends, Shift+Enter adds a line, and Cancel or Escape
-  restores the bubble. Send updates the local
-  request and removes its later example messages. **Hold submission** also
-  applies to inline Send: inspect its spinner, refuse it to retain the edit, or
-  accept it to return to the transcript. Attachment messages keep editing
-  unavailable. These are local presentation examples; retained history and
-  retry receipts remain the native integration's responsibility.
-- Type `/` or `@`; dismiss outside or with Escape; continue editing to reopen.
-- Open `+` and compare its full-composer placement and keyboard behavior.
-- Choose **Goal** or **Plan mode** from `+`, or select `/goal` and `/plan`.
-  Both preserve the draft and use Desktop's icon chips, remove controls,
-  a constant “Ask anything…” placeholder and Goal-specific model-picker copy. The modes can coexist;
-  **Plan mode** toggles off from `+`. **Goal** prevents attachment selection,
-  and an existing attachment prevents Goal entry. **Access: Default** opens
-  the same informational popover as Desktop. All actions remain local fixtures.
-- Hover, focus or click queued text to inspect its paragraphs and line breaks.
-  Every row keeps its queue icon; the image row adds a thumbnail alongside it.
-  The unavailable row exercises the read failure state.
-- Drag a queued row by its left handle to reorder it. With the keyboard, focus
-  the handle, press Space, move with arrow keys, then press Space to drop (Escape
-  cancels). The row's menu also provides Move up/down and text editing.
-- Choose a text or attachment row's **… → Edit**. It opens in the same composer
-  and leaves the row marked **Editing**. Save replaces only the queued text;
-  Cancel or Escape restores your existing draft, attachment and mode chips.
-  Attachment captions can be cleared while retaining the attachment, and
-  captured Plan/Ultra settings stay with the queued entry. Ordinary draft
-  autosave never stores the temporary edit. Goal entries keep Edit disabled;
-  older hosts without text-preserving replacement also disable attachment edits.
-- Submit with **Running turn** on to append a local queued message; turn it off
-  to send to the local conversation through the production message renderer.
-  Add an example attachment through `+`; its image or file card remains visible
-  in the sent user message.
-  A running empty composer shows **Pause**. Focus the input and press Escape to
-  see the hint, then press it again within two seconds to pause. Typing shows
-  **Send**. Plan, Goal and Ultra queue entries retain their labels and cannot
-  be steered.
-- With **Running turn** on, choose **Steer** on a plain text row. It leaves the
-  queue and its full text appears in a local steering preview. Image and
-  unavailable rows keep Steer disabled; turning **Running turn** off hides it.
-- Toggle **Hold submission**, then Send to inspect the pending spinner without a running agent. **Accept submission** settles the send; **Refuse submission** keeps the draft for retry. The spinner remains visible if you edit or clear the text while the send waits.
-- Toggle **Narrow composer** to inspect clipping, model picker and menu width.
-- **Reset examples** restores the initial state and clears the composer.
+Examples are independent. The local bridge lives in `desktop-chat-fixture.ts`.
+Its example records live in `desktop-conversation-fixtures.ts` and
+`desktop-fixtures.ts`.
 
-Fixture definitions live in `desktop-fixtures.ts` and
-`desktop-conversation-fixtures.ts`; `DesktopQueueFixture` handles
-their local ordering, removal, editing and steering examples. Neither makes
-provider calls.
-`AgentComposer` receives caller-owned capabilities, actions, modes, model state
-and submission callbacks. Desktop keeps its real capability
-and permission conditions, while this page supplies deterministic example state.
-Streaming is a frozen partial answer controlled by **Running turn**, and tool
-results are deterministic records. No timer simulates model work. The inline
-edit fixture changes only its local messages; native history revision and
-file actions remain covered by their owning integration.
-Production attachment authorization and queue mutation semantics remain covered
-by their native/controller tests, rather than being simulated as security
-claims here.
-
-Automated browser integration, following the composer kit's Vitest/Chrome setup:
+## Browser checks
 
 ```sh
 pnpm --filter editor exec vitest run --config 'app/(dev)/ui/components/composer/vitest.browser.config.ts'
-pnpm --filter editor exec vitest run --config kits/composer/vitest.browser.config.ts
 ```
-
-Use these fixtures and focused regressions when iterating on composer UI. A real
-agent session is needed only for uncertainty about host integration that the
-fixture and native tests do not settle.

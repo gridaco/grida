@@ -7,7 +7,7 @@ import type {
   WebContents,
   WebPreferences,
 } from "electron";
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, type WebPreview } from "@grida/desktop-bridge";
 
 const historyDirectories: string[] = [];
 
@@ -20,6 +20,7 @@ type FakeImage = {
   toJPEG: Mock<(quality: number) => Buffer>;
 };
 type FakeContents = EventEmitter & {
+  ipc: EventEmitter;
   id: number;
   url: string;
   mainFrame: { url: string };
@@ -125,6 +126,7 @@ afterEach(async () => {
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
   class Contents extends EventEmitter {
+    ipc = new EventEmitter();
     id = mock.next++;
     url = "https://grida.co/desktop/workspace?id=eac20941e6a410aa";
     mainFrame = { url: this.url };
@@ -322,6 +324,8 @@ async function fixture(
       editorOrigin: "https://grida.co",
       history,
       downloads,
+      decodeFavicon: async (dataUrl) =>
+        DesktopBrowser.parseFavicon({ dataUrl }),
       admitWindow: () => admitted,
       workspaceExists: async () => true,
     });
@@ -394,6 +398,155 @@ async function fixture(
     },
   };
 }
+
+it("admits preview lookups only for the current workspace attachment and discards a late result on detach", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  let finish!: (value: { title: string }) => void;
+  const lookup = vi.fn<Resolver["lookup"]>(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const clear = vi.fn<Resolver["clear"]>();
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: { lookup, clear },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const peer = await fixture("abcd1234e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "request",
+    url: "http://127.0.0.1:8080/",
+  };
+  await expect(host.preview(peer.event, request)).rejects.toThrow(
+    "browser_attachment_expired"
+  );
+  await expect(
+    host.preview(first.event, { ...request, url: "https://example.com:8080/" })
+  ).rejects.toThrow("browser_preview_invalid");
+  expect(lookup).not.toHaveBeenCalled();
+  const result = host.preview(first.event, request);
+  const signal = lookup.mock.calls[0][2];
+  await expect(host.preview(first.event, request)).resolves.toBeNull();
+  expect(() => host.cancelPreview(peer.event, request)).toThrow(
+    "browser_attachment_expired"
+  );
+  expect(signal.aborted).toBe(false);
+  await host.detach(first.event, request.attachmentId);
+  expect(signal.aborted).toBe(true);
+  expect(clear).toHaveBeenCalledWith(request.attachmentId);
+  finish({ title: "Late title" });
+  await expect(result).resolves.toBeNull();
+  host.closeAll();
+});
+
+it("leases public preview reads separately and cancels them with their owning workspace", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  const publicLink = Promise.withResolvers<WebPreview.LinkMetadata | null>();
+  const lookupPublicLink = vi.fn<NonNullable<Resolver["lookupPublicLink"]>>(
+    () => publicLink.promise
+  );
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: {
+      lookup: vi.fn<Resolver["lookup"]>().mockResolvedValue(null),
+      lookupPublicLink,
+      clear: vi.fn<Resolver["clear"]>(),
+    },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const peer = await fixture("abcd1234e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "request",
+    url: "https://example.com/#section",
+  };
+  await expect(host.previewPublicLink(peer.event, request)).rejects.toThrow(
+    "browser_attachment_expired"
+  );
+  await expect(
+    host.previewPublicLink(first.event, {
+      ...request,
+      url: "http://localhost:8080/",
+    })
+  ).rejects.toThrow("browser_preview_invalid");
+  expect(lookupPublicLink).not.toHaveBeenCalled();
+  const pending = host.previewPublicLink(first.event, request);
+  expect(lookupPublicLink).toHaveBeenCalledWith(
+    request.attachmentId,
+    "https://example.com/",
+    expect.any(AbortSignal)
+  );
+  const signal = lookupPublicLink.mock.calls[0]![2];
+  host.cancelPreview(first.event, request);
+  expect(signal.aborted).toBe(false);
+  expect(() => host.cancelPublicLinkPreview(peer.event, request)).toThrow(
+    "browser_attachment_expired"
+  );
+  host.cancelPublicLinkPreview(first.event, request);
+  expect(signal.aborted).toBe(true);
+  publicLink.resolve({ title: "Late result" });
+  await expect(pending).resolves.toBeNull();
+  host.closeAll();
+});
+
+it("offers completed preview outcomes through the existing attachment-scoped operations", async () => {
+  type Resolver = NonNullable<DesktopBrowserHost["options"]["webPreview"]>;
+  type LookupResult = NonNullable<Resolver["lookupResult"]>;
+  const lookupResult = vi.fn<LookupResult>();
+  lookupResult
+    .mockResolvedValueOnce({ metadata: null })
+    .mockResolvedValueOnce({ metadata: { title: "Public page" } })
+    .mockResolvedValueOnce(null);
+  const host = new DesktopBrowserHost({
+    editorOrigin: "https://grida.co",
+    admitWindow: () => true,
+    workspaceExists: async () => true,
+    webPreview: {
+      lookup: vi
+        .fn<Resolver["lookup"]>()
+        .mockResolvedValue({ title: "Legacy" }),
+      lookupResult,
+      clear: vi.fn<Resolver["clear"]>(),
+    },
+  });
+  const first = await fixture("eac20941e6a410aa", host);
+  const request = {
+    attachmentId: first.attached.attachmentId,
+    id: "preview",
+    url: "http://127.0.0.1:8080/",
+  };
+  await expect(host.preview(first.event, request)).resolves.toEqual({
+    title: "Legacy",
+  });
+  await expect(
+    host.preview(first.event, { ...request, result: true })
+  ).resolves.toEqual({ metadata: null });
+  await expect(
+    host.previewPublicLink(first.event, {
+      ...request,
+      url: "https://example.com/#section",
+      result: true,
+    })
+  ).resolves.toEqual({ metadata: { title: "Public page" } });
+  await expect(
+    host.preview(first.event, { ...request, result: true })
+  ).resolves.toBeNull();
+  expect(
+    lookupResult.mock.calls.map(([kind, owner, url]) => [kind, owner, url])
+  ).toEqual([
+    ["loopback", request.attachmentId, request.url],
+    ["public", request.attachmentId, "https://example.com/"],
+    ["loopback", request.attachmentId, request.url],
+  ]);
+  host.closeAll();
+});
 
 it("creates a descriptor then registers only its actual guest with Main-owned session/preferences before website load", async () => {
   const f = await fixture();
@@ -513,6 +666,33 @@ it("expires one-use mount claims with a bounded mount failure and permits an exp
     { src: old.src }
   );
   expect(denied).toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("retires the workspace browser when the shell navigates in page to Welcome", async () => {
+  const f = await fixture();
+  const page = f.descriptor();
+  const { guest } = f.mount(page);
+  const { webContents: shell } = f.window;
+  const workspace = shell.url;
+  const welcome = "https://grida.co/desktop/welcome";
+  shell.emit("did-start-navigation", {
+    isMainFrame: true,
+    isSameDocument: true,
+    url: welcome,
+  });
+  shell.url = welcome;
+  shell.mainFrame.url = welcome;
+  shell.emit("did-navigate-in-page", {}, welcome, true);
+
+  expect(guest.close).toHaveBeenCalledWith({ waitForBeforeUnload: false });
+  // Returning to the same URL cannot revive the previous page attachment.
+  shell.url = workspace;
+  shell.mainFrame.url = workspace;
+  shell.emit("did-navigate-in-page", {}, workspace, true);
+  expect(() => f.host.snapshot(f.event, f.attached.attachmentId)).toThrow(
+    "browser_attachment_expired"
+  );
   f.host.closeAll();
 });
 
@@ -1407,6 +1587,11 @@ it("publishes icon cache changes through ordinary page revisions without changin
   const first = f.host.snapshot(f.event, f.attached.attachmentId);
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
   guest.emit("page-favicon-updated", {}, [faviconDataUrl]);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).toEqual({
+      dataUrl: faviconDataUrl,
+    })
+  );
   const changed = f.host.snapshot(f.event, f.attached.attachmentId);
   expect(changed.revision).toBeGreaterThan(first.revision);
   expect(DesktopBrowser.parseSnapshot(changed)).not.toBeNull();
@@ -1506,7 +1691,7 @@ it.each([
   }
 );
 
-it("revokes a late old-document icon again when the replacement document commits", async () => {
+it("ignores late native icon events while a replacement document is committing", async () => {
   const f = await fixture();
   const page = f.create();
   const guest = mock.guests.at(-1)!;
@@ -1516,9 +1701,7 @@ it("revokes a late old-document icon again when the replacement document commits
     isSameDocument: false,
   });
   guest.emit("page-favicon-updated", {}, [faviconDataUrl]);
-  expect(f.host.favicon(f.event, f.target(page))).toEqual({
-    dataUrl: faviconDataUrl,
-  });
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
   guest.url = "https://next.example/page";
   guest.emit("did-navigate", {}, guest.url);
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
@@ -1533,6 +1716,44 @@ it("revokes a late old-document icon again when the replacement document commits
     )
   );
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  f.host.closeAll();
+});
+
+it("accepts favicon metadata only from the current guest frame and document nonce", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.mainFrame.url = guest.url;
+  const channel = "grida:browser-guest:favicons";
+  const top = { sender: guest, senderFrame: guest.mainFrame };
+  const candidates = [{ url: faviconDataUrl, type: "image/png", sizes: "" }];
+  guest.emit("dom-ready");
+  const token = guest.send.mock.lastCall![1];
+  guest.ipc.emit(
+    channel,
+    { ...top, senderFrame: { ...top.senderFrame } },
+    token,
+    candidates
+  );
+  guest.ipc.emit(channel, top, "wrong-token", candidates);
+  expect(guest.session!.fetch).not.toHaveBeenCalled();
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  guest.ipc.emit(channel, top, token, candidates);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).not.toBeNull()
+  );
+  guest.emit("did-navigate", {}, guest.url, 200);
+  guest.emit("dom-ready");
+  const next = guest.send.mock.lastCall![1];
+  expect(next).not.toBe(token);
+  guest.ipc.emit(channel, top, token, candidates);
+  await Promise.resolve();
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  expect(guest.session!.fetch).not.toHaveBeenCalled();
+  guest.ipc.emit(channel, top, next, candidates);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).not.toBeNull()
+  );
   f.host.closeAll();
 });
 

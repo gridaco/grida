@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { FxExtension } from "./fx-extension";
 import { NativeCommandRuntime } from "./native-command-runtime";
 
 describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
@@ -10,16 +11,23 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     it("projects only the pinned executable and required helper outside the denied install", async () => {
       const { root, install, resources, workspace } = await createFixture();
       try {
-        const first = await NativeCommandRuntime.prepare(resources, workspace, [
-          install,
-        ]);
+        const command = await FxExtension.command(resources);
+        expect(command).toMatchObject({ extension: "desktop-fx" });
+        const first = await NativeCommandRuntime.prepare(
+          resources,
+          workspace,
+          [install],
+          command
+        );
         const second = await NativeCommandRuntime.prepare(
           resources,
           workspace,
-          [install]
+          [install],
+          command
         );
         expect(first).toEqual(second);
-        const directory = first.programDirectory!;
+        const directory = first.program!.directory;
+        expect(first.program!.extension).toBe("desktop-fx");
         expect(first.helper.path.startsWith(install + path.sep)).toBe(false);
         expect(directory.startsWith(install + path.sep)).toBe(false);
         expect(await fs.readdir(directory)).toEqual(["grida-fx"]);
@@ -39,11 +47,17 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
       const { root, install, resources, workspace } = await createFixture();
       const previousExitListeners = new Set(process.listeners("exit"));
       try {
+        const command = await FxExtension.command(resources);
         // Reload the module so each simulated process owns its own cache and cleanup.
         vi.resetModules();
         const first = (await import("./native-command-runtime"))
           .NativeCommandRuntime;
-        const exiting = await first.prepare(resources, workspace, [install]);
+        const exiting = await first.prepare(
+          resources,
+          workspace,
+          [install],
+          command
+        );
         const exit = process
           .listeners("exit")
           .find((listener) => !previousExitListeners.has(listener));
@@ -52,7 +66,12 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
         vi.resetModules();
         const second = (await import("./native-command-runtime"))
           .NativeCommandRuntime;
-        const surviving = await second.prepare(resources, workspace, [install]);
+        const surviving = await second.prepare(
+          resources,
+          workspace,
+          [install],
+          command
+        );
 
         process.removeListener("exit", exit);
         exit(0);
@@ -60,9 +79,11 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
           code: "ENOENT",
         });
         await expect(
-          second.prepare(resources, workspace, [install])
+          second.prepare(resources, workspace, [install], command)
         ).resolves.toEqual(surviving);
-        expect(surviving.programDirectory).not.toBe(exiting.programDirectory);
+        expect(surviving.program!.directory).not.toBe(
+          exiting.program!.directory
+        );
       } finally {
         for (const listener of process.listeners("exit")) {
           if (previousExitListeners.has(listener)) continue;

@@ -1,21 +1,6 @@
 {
   "$schema": "./schemas/chatgpt-subscription.schema.json",
-  "$comment": "GRIDA-SEC-008 — explicit product compatibility, not account entitlement. Generate TypeScript and native consumers with scripts/ai-catalogue/generate.mjs.",
+  "$comment": "GRIDA-SEC-008 — product default and historical identities. Active selectors are published by Models in agents.json.",
   "default_model_id": "openai/gpt-6.2-sol",
-  "model_ids": [
-    "openai/gpt-6.2-sol",
-    "openai/gpt-6.2-astra",
-    "openai/gpt-6.1-sol",
-    "openai/gpt-6-astra",
-    "openai/gpt-6.1-terra",
-    "openai/gpt-6-luna",
-    "openai/gpt-6-sol",
-    "openai/gpt-5.6-sol",
-    "openai/gpt-5.6-terra",
-    "openai/gpt-5.6-luna"
-  ],
-  "retired_model_ids": [
-    "openai/gpt-5.5",
-    "openai/gpt-5.4"
-  ]
+  "retired_model_ids": ["openai/gpt-5.5", "openai/gpt-5.4"]
 }

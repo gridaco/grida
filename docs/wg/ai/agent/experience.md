@@ -209,21 +209,14 @@ that setting as part of its strategy for fulfilling the chosen agent effort.
 
 ## Change how the agent works
 
-The person can ask the agent to explain a supported setting, change a default,
-or restore automatic behavior. For example, “use a smaller context budget for
-future tasks” or “show which settings applied to this answer.” Settings live in
-a plain settings file that the agent reads and edits with its ordinary file
-tools. The product has no separate settings screen or send-time permission for
-them.
+The person can set a default, restore automatic behavior, or inspect the
+effective setting through a trusted client. Persistent defaults live in
+protected configuration, managed by the person or their authorized tooling.
 
-Because a settings file can loosen the rules that guard the agent, every change
-to it asks the person, the way a write outside the project would, and no
-standing or earlier approval covers the next change. Programs the agent runs
-can neither read nor change the file. The host validates the file before it
-saves an edit and whenever it loads one: an invalid edit is reported and never
-silently applied. A change states when it takes effect. A default change
-applies to later accepted requests; already accepted work keeps its recorded
-settings. Missing information about model capacity remains visible.
+The host validates changes before activation and reports invalid content.
+A default change applies to later accepted requests. Already accepted work
+keeps its recorded settings. Missing information about model capacity remains
+visible.
 
 The person can choose another model in the composer while a turn runs.
 The next message they send uses that model with the earlier turns as context.
@@ -231,10 +224,8 @@ The running turn and messages already accepted in the queue keep their model
 and permission profile. Without a usable default model, the
 conversation still opens and its composer asks the person to choose one.
 
-Using this feature requires no knowledge of field names: the agent finds and
-edits the file, and the person approves the change. The person can also edit
-the file directly. The compact catalog identifies which settings and scopes the
-product currently supports.
+The compact catalog identifies which settings and scopes the product
+currently supports.
 
 ## Automate lifecycle checks
 
@@ -502,10 +493,11 @@ change to the target or material action requires a decision covering that change
 After a refusal, the agent can use the remaining authority to pursue the request,
 or explain the dependency that prevents completion.
 
-An automatic denial or unavailable reviewer has a visible reason and a clear
-next action. The product follows its declared fallback, which may ask the person
-or stop the affected work. An unanswered or failed review cannot silently permit
-the action.
+While Auto reviews an action, the chat can show progress. Approval buttons
+appear when the host asks the person to decide. A denial or timed-out review
+shows why the action was blocked. Choosing **Request reconsideration** on an
+eligible denial records the person’s instruction for a future attempt.
+See [Automatic review](./permissions.md#automatic-review).
 
 Questions explain what decision the answer will affect. Suggested answers are
 short and the person can supply their own. An unanswered question stays visible

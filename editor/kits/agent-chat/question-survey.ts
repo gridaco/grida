@@ -8,33 +8,28 @@
  * update is just `setSurvey(survey.next())` and the logic is testable on its own
  * with zero rendering.
  *
- * ## Answer model (the subtle part)
+ * ## Answer model
  *
- * The tool returns `{ answers: string[][] }` — one array per question. A question
- * is answered by picking option(s) and/or writing a custom answer; picking and
- * writing are MUTUALLY EXCLUSIVE (when there's custom text, it IS the answer).
- *
- * "Skip" is **per question**, not per survey. Skipping the last question of a
- * three-question survey you answered the first two of yields
- * `{ answers: [a, b, []] }` — the kept answers plus an empty array for the
- * skipped one. The `skipped: true` sentinel is reserved for the case where the
- * user resolved NOTHING (declined the entire survey); the model reads that as
- * "the user passed on the whole thing" — distinct from the headless refusal.
+ * Native questions submit a choice, write-in, or explicit skip, correlated by
+ * question ID for a batch. A draft stays unresolved until answered or skipped.
+ * Older survey consumers use a positional array with an empty array for each
+ * skip and a `skipped: true` sentinel when the entire survey was skipped.
  */
 
 export type QuestionOption = { label: string; description?: string };
 
 export type QuestionSpec = {
+  id?: string;
   question: string;
   header?: string;
   options?: QuestionOption[];
   multi_select?: boolean;
 };
 
-/** The `question` tool's result shape (mirrors the package `outputSchema`). */
+/** The legacy positional survey result. */
 export type QuestionAnswerOutput = { answers: string[][]; skipped?: boolean };
 
-type SingleAnswer =
+type QuestionAnswer =
   | { kind: "choice"; index: number }
   | { kind: "text"; text: string }
   | { kind: "skipped" };
@@ -44,7 +39,7 @@ export class QuestionSurvey {
     readonly questions: readonly QuestionSpec[],
     private readonly picked: readonly (readonly string[])[],
     private readonly writeIns: readonly string[],
-    private readonly customSelected: readonly boolean[],
+    private readonly writeInSelected: readonly boolean[],
     private readonly skipped: readonly boolean[],
     readonly step: number
   ) {}
@@ -77,11 +72,11 @@ export class QuestionSurvey {
   pickedFor(qi: number): readonly string[] {
     return this.picked[qi] ?? [];
   }
-  writeInFor(qi: number): string {
-    return this.writeIns[qi] ?? "";
+  isWriteInSelected(qi: number): boolean {
+    return this.writeInSelected[qi] === true && !this.isSkipped(qi);
   }
-  isCustomSelected(qi: number): boolean {
-    return this.customSelected[qi] === true;
+  writeInFor(qi: number): string {
+    return this.isWriteInSelected(qi) ? (this.writeIns[qi] ?? "") : "";
   }
   isSkipped(qi: number): boolean {
     return this.skipped[qi] === true;
@@ -91,7 +86,7 @@ export class QuestionSurvey {
    *  A custom write-in wins over a pick (they are mutually exclusive). */
   answersFor(qi: number): string[] {
     if (this.skipped[qi]) return [];
-    const wi = (this.writeIns[qi] ?? "").trim();
+    const wi = this.writeInFor(qi).trim();
     const q = this.questions[qi];
     if (q?.multi_select) {
       return [...(this.picked[qi] ?? []), ...(wi ? [wi] : [])];
@@ -102,16 +97,14 @@ export class QuestionSurvey {
   isAnswered(qi: number): boolean {
     return this.answersFor(qi).length > 0;
   }
-  /** The current step's question is answered — Next / Submit require this. */
-  get currentAnswered(): boolean {
-    return this.isAnswered(this.step);
+  get unanswered(): readonly number[] {
+    return this.questions.flatMap((_, index) =>
+      this.isAnswered(index) || this.isSkipped(index) ? [] : [index]
+    );
   }
   /** Every question is RESOLVED — answered OR explicitly skipped. */
   get canSubmit(): boolean {
-    return (
-      this.count > 0 &&
-      this.questions.every((_, i) => this.isAnswered(i) || this.skipped[i])
-    );
+    return this.count > 0 && this.unanswered.length === 0;
   }
 
   // ── transitions (each returns a NEW survey) ───────────────────────────────
@@ -128,69 +121,69 @@ export class QuestionSurvey {
       : [label];
     return this.with({
       picked: replace(this.picked, qi, next),
-      writeIns: replace(this.writeIns, qi, ""),
-      customSelected: replace(this.customSelected, qi, false),
-      skipped: replace(this.skipped, qi, false),
-    });
-  }
-
-  /** Make the custom write-in the active answer for `qi` — deselect options and
-   *  un-skip (e.g. on focus). No-op once already exclusive. */
-  selectCustom(qi: number): QuestionSurvey {
-    if (!this.questions[qi]) return this;
-    if (
-      (this.picked[qi] ?? []).length === 0 &&
-      this.customSelected[qi] &&
-      !this.skipped[qi]
-    )
-      return this;
-    return this.with({
-      picked: replace(this.picked, qi, []),
-      customSelected: replace(this.customSelected, qi, true),
+      writeInSelected: replace(this.writeInSelected, qi, false),
       skipped: replace(this.skipped, qi, false),
     });
   }
 
   /** Set the custom write-in text for `qi` (also makes it exclusive + un-skips). */
   setWriteIn(qi: number, text: string): QuestionSurvey {
+    return this.selectWriteIn(qi).with({
+      writeIns: replace(this.writeIns, qi, text),
+    });
+  }
+
+  /** Choose the write-in as the answer source, keeping any text already entered. */
+  selectWriteIn(qi: number): QuestionSurvey {
+    if (this.isWriteInSelected(qi)) return this;
     return this.with({
       picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, text),
-      customSelected: replace(this.customSelected, qi, true),
+      writeInSelected: replace(this.writeInSelected, qi, true),
       skipped: replace(this.skipped, qi, false),
     });
   }
 
   /** Clear and deselect the custom write-in for `qi`, leaving the question blank. */
   clearCustom(qi: number): QuestionSurvey {
-    return this.with({
-      picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, ""),
-      customSelected: replace(this.customSelected, qi, false),
-      skipped: replace(this.skipped, qi, false),
-    });
+    return this.setWriteIn(qi, "");
   }
 
-  /** Skip the CURRENT question: clear its inputs and mark it skipped. Does not
+  /** Skip the current question while retaining its write-in draft. Does not
    *  move the step — the view decides whether to advance or finalize. */
   skipCurrent(): QuestionSurvey {
     const qi = this.step;
     return this.with({
       picked: replace(this.picked, qi, []),
-      writeIns: replace(this.writeIns, qi, ""),
-      customSelected: replace(this.customSelected, qi, false),
+      writeInSelected: replace(this.writeInSelected, qi, false),
       skipped: replace(this.skipped, qi, true),
     });
   }
 
+  skipUnanswered(): QuestionSurvey {
+    return this.with({
+      skipped: this.questions.map(
+        (_, index) => this.isSkipped(index) || !this.isAnswered(index)
+      ),
+    });
+  }
+
+  goTo(step: number): QuestionSurvey {
+    return step >= 0 && step < this.count && step !== this.step
+      ? this.with({ step })
+      : this;
+  }
+
+  /** Move forward, recording a skip when the current question is blank. */
   next(): QuestionSurvey {
-    // Guard the defensive-parse empty case so `step` never goes below 0
-    // (`Math.min(-1, …)` would otherwise produce -1 and corrupt `isLast`).
-    if (this.count === 0) return this;
-    return this.withStep(Math.min(this.count - 1, this.step + 1));
+    if (this.step + 1 >= this.count) return this;
+    const current =
+      this.isAnswered(this.step) || this.isSkipped(this.step)
+        ? this
+        : this.skipCurrent();
+    return current.goTo(this.step + 1);
   }
   back(): QuestionSurvey {
-    return this.withStep(Math.max(0, this.step - 1));
+    return this.goTo(this.step - 1);
   }
 
   // ── output ────────────────────────────────────────────────────────────────
@@ -204,23 +197,42 @@ export class QuestionSurvey {
     return { answers };
   }
 
-  singleAnswer(): SingleAnswer | null {
-    const question = this.questions[0];
-    if (this.count !== 1 || question.multi_select) return null;
-    if (this.isSkipped(0)) return { kind: "skipped" };
-    const text = this.writeInFor(0).trim();
+  singleAnswer(): QuestionAnswer | null {
+    return this.count === 1 ? this.answerAt(0) : null;
+  }
+
+  batchAnswers(): readonly { id: string; answer: QuestionAnswer }[] | null {
+    if (!this.canSubmit) return null;
+    const answers = [];
+    const ids = new Set<string>();
+    for (const [index, question] of this.questions.entries()) {
+      const answer = this.answerAt(index);
+      if (!question.id || ids.has(question.id) || !answer) return null;
+      ids.add(question.id);
+      answers.push({ id: question.id, answer });
+    }
+    return answers;
+  }
+
+  private answerAt(index: number): QuestionAnswer | null {
+    const question = this.questions[index];
+    if (!question || question.multi_select) return null;
+    if (this.isSkipped(index)) return { kind: "skipped" };
+    const text = this.writeInFor(index).trim();
     if (text) return { kind: "text", text };
-    const index = question.options?.findIndex(
-      (option) => option.label === this.pickedFor(0)[0]
+    const choiceIndex = question.options?.findIndex(
+      (option) => option.label === this.pickedFor(index)[0]
     );
-    return index !== undefined && index >= 0 ? { kind: "choice", index } : null;
+    return choiceIndex !== undefined && choiceIndex >= 0
+      ? { kind: "choice", index: choiceIndex }
+      : null;
   }
 
   // ── internals ───────────────────────────────────────────────────────────
   private with(p: {
     picked?: readonly (readonly string[])[];
     writeIns?: readonly string[];
-    customSelected?: readonly boolean[];
+    writeInSelected?: readonly boolean[];
     skipped?: readonly boolean[];
     step?: number;
   }): QuestionSurvey {
@@ -228,13 +240,10 @@ export class QuestionSurvey {
       this.questions,
       p.picked ?? this.picked,
       p.writeIns ?? this.writeIns,
-      p.customSelected ?? this.customSelected,
+      p.writeInSelected ?? this.writeInSelected,
       p.skipped ?? this.skipped,
       p.step ?? this.step
     );
-  }
-  private withStep(step: number): QuestionSurvey {
-    return step === this.step ? this : this.with({ step });
   }
 }
 
@@ -252,6 +261,7 @@ export function parseQuestions(input: unknown): QuestionSpec[] {
   return questions
     .filter((q): q is QuestionSpec => Boolean(q) && typeof q === "object")
     .map((q) => ({
+      ...(typeof q.id === "string" && { id: q.id }),
       question: String(q.question ?? ""),
       header: typeof q.header === "string" ? q.header : undefined,
       options: Array.isArray(q.options)

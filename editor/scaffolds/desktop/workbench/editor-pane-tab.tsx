@@ -34,13 +34,18 @@ import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
 import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
 import { EditorPaneBinaryFile } from "./editor-pane-binary-file";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
+import type { BindBoardSelection } from "../canvas/board-shell";
+import type { BindSlideEditor } from "../canvas/slide-surface";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 import { WorkspaceFileKind } from "./workspace-file-kind";
-import type { WorkspaceSvgText } from "./workspace-svg-text";
+import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 
 export type EditorPaneTabProps = {
   workspace: Workspace;
-  svgText?: WorkspaceSvgText;
+  surfaceHost?: Pick<
+    WorkspaceSurfaceHost,
+    "bindSvgEditor" | "bindBoardSelection"
+  >;
   relPath: string;
   active: boolean;
   /** Parent collects dirty state across all open tabs for the tab
@@ -52,7 +57,7 @@ export type EditorPaneTabProps = {
 
 export function EditorPaneTab({
   workspace,
-  svgText,
+  surfaceHost,
   relPath,
   active,
   onDirtyChange,
@@ -100,7 +105,7 @@ export function EditorPaneTab({
         <ModeBody
           mode={mode}
           workspace={workspace}
-          svgText={svgText}
+          surfaceHost={surfaceHost}
           relPath={relPath}
           active={active}
           onDirtyChange={reportDirty}
@@ -116,7 +121,7 @@ export function EditorPaneTab({
 function ModeBody({
   mode,
   workspace,
-  svgText,
+  surfaceHost,
   relPath,
   active,
   onDirtyChange,
@@ -124,19 +129,28 @@ function ModeBody({
 }: {
   mode: WorkspaceFileKind.Kind;
   workspace: Workspace;
-  svgText?: WorkspaceSvgText;
+  surfaceHost?: EditorPaneTabProps["surfaceHost"];
   relPath: string;
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
 }) {
   const workspaceId = workspace.id;
+  const bindSlideEditor = useCallback<BindSlideEditor>(
+    (editor, slide) =>
+      surfaceHost?.bindSvgEditor(relPath, slide.relPath, editor),
+    [surfaceHost, relPath]
+  );
+  const bindBoardSelection = useCallback<BindBoardSelection>(
+    (board) => surfaceHost?.bindBoardSelection(relPath, board),
+    [surfaceHost, relPath]
+  );
   switch (mode) {
     case "svg":
       return (
         <EditorPaneSvgEditor
           workspaceId={workspaceId}
-          svgText={svgText}
+          bindSvgEditor={surfaceHost?.bindSvgEditor}
           relPath={relPath}
           active={active}
           onDirtyChange={onDirtyChange}
@@ -153,6 +167,8 @@ function ModeBody({
           basePath={relPath}
           active={active}
           onDirtyChange={onDirtyChange}
+          bindSlideEditor={surfaceHost ? bindSlideEditor : undefined}
+          bindBoardSelection={surfaceHost ? bindBoardSelection : undefined}
         />
       );
     case "markdown":

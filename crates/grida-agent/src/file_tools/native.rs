@@ -4,12 +4,13 @@ use super::*;
 use crate::host::MAX_IMAGE_BYTES;
 use crate::workspace::FileAccess;
 use agent_kit_core::messages::ResultContent;
-use agent_kit_core::{Envelope, SchemaId};
+use agent_kit_core::{Envelope, Fingerprint, SchemaId};
 use rustix::fs::{self as unix, AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use rustix::io::Errno;
 use serde::Serialize;
 use std::fs::File;
 use std::io::{self, Read};
+use std::os::unix::fs::MetadataExt;
 
 const MAX_LIST_ENTRIES: usize = 128;
 const MAX_SEARCH_MATCHES: usize = 64;
@@ -66,14 +67,23 @@ impl FileTools {
         }
         let path = request.path.as_deref().unwrap_or_else(|| Path::new(""));
         let directory = request.directory.as_ref();
+        if let Some(open) = &self.external_file
+            && directory.is_some_and(|id| id.as_str() == EXTERNAL_FILE_DIRECTORY)
+        {
+            if !matches!(operation, Operation::Read | Operation::ReadScoped) {
+                return Err(problem(ErrorKind::Unavailable, "permission_denied"));
+            }
+            let mut file = open(&budget.invocation)?;
+            let outcome = read_text(&mut file, budget)?;
+            // Withhold the bytes if the approved file, its location, or its authority
+            // changed while reading through the checked descriptor.
+            open(&budget.invocation)?;
+            return Ok(outcome);
+        }
         let outcome = match operation {
-            Operation::Read => {
+            Operation::Read | Operation::ReadScoped => {
                 let mut file = self.open(directory, path, Kind::File, budget)?;
-                let (bytes, limited) = read(&mut file, budget.output.min(MAX_FILE_BYTES), budget)?;
-                if limited {
-                    return Err(problem(ErrorKind::LimitExceeded, "file_read_limit"));
-                }
-                text_outcome(decode(bytes)?, false, budget.output)
+                read_text(&mut file, budget)
             }
             Operation::View => self.view_image(directory, path, budget),
             Operation::CaptureReference => self.capture_reference(path, budget),
@@ -200,7 +210,7 @@ impl FileTools {
     ) -> Result<Vec<u8>> {
         let mut file = self.open(directory, path, Kind::File, budget)?;
         let before = unix::fstat(&file).map_err(open_error)?;
-        let (bytes, limited) = read(&mut file, maximum, budget)?;
+        let (bytes, limited) = read(&mut file, maximum, || budget.check())?;
         if limited {
             return Err(problem(ErrorKind::LimitExceeded, "image_size_limit"));
         }
@@ -282,7 +292,7 @@ impl FileTools {
         .map_err(open_error)?
         .into();
         same_inode(&before, &unix::fstat(&file).map_err(open_error)?)?;
-        let (bytes, limited) = read(&mut file, MAX_FILE_BYTES, budget)?;
+        let (bytes, limited) = read(&mut file, MAX_FILE_BYTES, || budget.check())?;
         if limited {
             return Err(problem(ErrorKind::LimitExceeded, "file_too_large"));
         }
@@ -600,7 +610,7 @@ impl Search {
         self.files += 1;
         let remaining = MAX_SEARCH_BYTES - self.bytes;
         let maximum = MAX_FILE_BYTES.min(remaining.saturating_sub(1));
-        let (bytes, limited) = read(file, maximum, budget)?;
+        let (bytes, limited) = read(file, maximum, || budget.check())?;
         self.bytes += bytes.len();
         if limited {
             self.truncated = true;
@@ -629,14 +639,18 @@ impl Search {
     }
 }
 
-fn read(file: &mut File, maximum: usize, budget: &Budget) -> Result<(Vec<u8>, bool)> {
+fn read(
+    file: &mut File,
+    maximum: usize,
+    check: impl Fn() -> Result<()>,
+) -> Result<(Vec<u8>, bool)> {
     if file.metadata().map_err(|_| unavailable())?.len() > maximum as u64 {
         return Ok((Vec::new(), true));
     }
     let mut bytes = Vec::new();
     let mut buffer = [0; 8192];
     while bytes.len() <= maximum {
-        budget.check()?;
+        check()?;
         let want = (maximum + 1 - bytes.len()).min(buffer.len());
         match file.read(&mut buffer[..want]) {
             Ok(0) => return Ok((bytes, false)),
@@ -654,6 +668,23 @@ fn decode(bytes: Vec<u8>) -> Result<String> {
         return Err(invalid());
     }
     String::from_utf8(bytes).map_err(|_| invalid())
+}
+
+fn read_text(file: &mut File, budget: &Budget) -> Result<ToolOutcome> {
+    let text = read_bounded_text(file, budget.output.min(MAX_FILE_BYTES), || budget.check())?;
+    text_outcome(text, false, budget.output)
+}
+
+pub(crate) fn read_bounded_text(
+    file: &mut File,
+    maximum: usize,
+    check: impl Fn() -> Result<()>,
+) -> Result<String> {
+    let (bytes, limited) = read(file, maximum, check)?;
+    if limited {
+        return Err(problem(ErrorKind::LimitExceeded, "file_read_limit"));
+    }
+    decode(bytes)
 }
 
 fn child(parent: &File, raw_name: &[u8]) -> Result<Option<Entry>> {
@@ -685,6 +716,99 @@ fn read_flags(kind: Kind) -> OFlags {
         flags |= OFlags::DIRECTORY;
     }
     flags
+}
+
+/// Open the single ordinary file named by an escalation. Read no contents before
+/// approval. Repeating this capture at dispatch also binds restart to the same
+/// file, including its version. Never install its parent as a directory grant.
+pub(crate) fn open_external_file(
+    relative: &Path,
+    protected: &ProtectedRoots,
+    workspace: &WorkspaceSnapshot,
+) -> Result<(File, Fingerprint)> {
+    validate_path(relative)?;
+    let path = Path::new("/").join(relative);
+    let denied = || problem(ErrorKind::Unavailable, "permission_denied");
+    if relative.as_os_str().is_empty()
+        || relative.components().any(|part| {
+            let name = part.as_os_str();
+            PROTECTED_METADATA
+                .iter()
+                .chain([".ssh", ".gnupg"].iter())
+                .any(|protected| name.eq_ignore_ascii_case(protected))
+        })
+        || workspace
+            .directories()
+            .any(|dir| path.starts_with(dir.root()))
+    {
+        return Err(denied());
+    }
+    protected.check(&path)?;
+    // Home can live on a separate filesystem. macOS also exposes writable data
+    // at /private and /Users on its split system/data volumes. Within the
+    // selected anchor, retain the file tools' normal no-symlink/no-mount policy.
+    let home = std::env::home_dir().and_then(|p| p.canonicalize().ok());
+    let anchor = home
+        .as_deref()
+        .filter(|p| path.starts_with(p))
+        .unwrap_or_else(|| {
+            #[cfg(target_os = "macos")]
+            for data in [Path::new("/private"), Path::new("/Users")] {
+                if path.starts_with(data) {
+                    return data;
+                }
+            }
+            Path::new("/")
+        });
+    let root = File::open(anchor).map_err(|_| unavailable())?;
+    let file = open_root_file(
+        &root,
+        anchor,
+        path.strip_prefix(anchor).map_err(|_| denied())?,
+    )?;
+    // Reject alternate spellings on case-insensitive filesystems and moved
+    // descriptors. The kernel-reported path is also checked against host custody.
+    let actual = observed_path(&file)?;
+    if actual.as_os_str() != path.as_os_str() {
+        return Err(denied());
+    }
+    protected.check(&actual)?;
+    // An existing protected directory can have a different name on a
+    // case-insensitive volume. Compare filesystem identity at every ancestor
+    // as well as the names captured by the launch profile.
+    let ancestors = actual
+        .ancestors()
+        .map(|p| {
+            let meta = std::fs::metadata(p).map_err(|_| unavailable())?;
+            Ok((meta.dev(), meta.ino()))
+        })
+        .collect::<Result<std::collections::BTreeSet<_>>>()?;
+    for entry in protected
+        .scope_paths()
+        .iter()
+        .map(PathBuf::as_path)
+        .chain(workspace.directories().map(|directory| directory.root()))
+    {
+        match std::fs::metadata(entry) {
+            Ok(meta) if ancestors.contains(&(meta.dev(), meta.ino())) => return Err(denied()),
+            Ok(_) => (),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+            Err(_) => return Err(unavailable()),
+        }
+    }
+    let metadata = file.metadata().map_err(|_| unavailable())?;
+    if !metadata.is_file() || metadata.nlink() != 1 || metadata.len() > MAX_FILE_BYTES as u64 {
+        return Err(denied());
+    }
+    let identity = Fingerprint::of(&(
+        metadata.dev(),
+        metadata.ino(),
+        metadata.created().map_err(|_| unavailable())?,
+        metadata.ctime(),
+        metadata.ctime_nsec(),
+        metadata.len(),
+    ))?;
+    Ok((file, identity))
 }
 
 pub(crate) fn open_root_file(directory: &File, root: &Path, path: &Path) -> Result<File> {
@@ -817,6 +941,16 @@ fn open_beneath(
 
 pub(crate) fn verify_open_path(file: &File, root: &Path) -> Result<()> {
     if !observed_path(file)?.starts_with(root) {
+        return Err(problem(ErrorKind::Conflict, "file_path_changed"));
+    }
+    Ok(())
+}
+
+/// Revalidate the exact file named by the request before releasing its contents.
+pub(crate) fn verify_named_file(file: &File, path: &Path) -> Result<()> {
+    if file.metadata().map_err(|_| unavailable())?.nlink() != 1
+        || observed_path(file)?.as_os_str() != path.as_os_str()
+    {
         return Err(problem(ErrorKind::Conflict, "file_path_changed"));
     }
     Ok(())

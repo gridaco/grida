@@ -60,6 +60,13 @@ import type {
 } from "@/lib/agent-chat/native-chat-controller";
 import { NativeQueuedMessagePreview } from "./native-queued-message-preview";
 
+const EMPTY_QUEUE: NativeChatQueuePage = {
+  items: [],
+  offset: 0,
+  previousOffset: null,
+  nextOffset: null,
+};
+
 /**
  * The stack attached above the composer: a held-queue notice, waiting
  * messages, then the chat's goal. Each row offers only its direct actions.
@@ -68,9 +75,11 @@ export function NativeComposerTray({
   controller,
   view,
   onReturnedText,
+  renderOutgoingStatus,
 }: {
   controller: NativeChatController;
   view: NativeChatView;
+  renderOutgoingStatus: (item: NativeChatView["outgoing"][number]) => ReactNode;
   /** Text that left the queue but could not reach the current turn. */
   onReturnedText: (text: string) => void;
 }) {
@@ -79,13 +88,14 @@ export function NativeComposerTray({
   const pendingGoal = !!view.observation?.snapshot.pendingGoalId;
   const showGoal = pendingGoal || (!!goal && goal.state.status !== "cleared");
   const items = queue?.items ?? [];
+  const outgoing = view.outgoing.filter((item) => item.placement === "queue");
   const count = view.observation?.snapshot.queuedInputs ?? items.length;
   // An interrupted turn pauses the queue. An idle queue can also wait with
   // nothing paused (after a restart); a goal that is starting is its own row.
   const interrupted = !!view.observation?.snapshot.admissionPaused;
   const held =
     count > 0 && controller.canResumeQueue && (interrupted || !pendingGoal);
-  if (!count && !showGoal) return null;
+  if (!count && !outgoing.length && !showGoal) return null;
   return (
     <div
       data-testid="workspace-composer-tray"
@@ -112,19 +122,35 @@ export function NativeComposerTray({
           </Button>
         </div>
       )}
-      {count > 0 && !items.length && !held && (
+      {count > 0 && !items.length && !outgoing.length && !held && (
         <p role="status" className="text-muted-foreground px-3 py-2">
           {count === 1 ? "1 queued message" : `${count} queued messages`}
         </p>
       )}
-      {queue && items.length > 0 && (
+      {(items.length > 0 || outgoing.length > 0) && (
         <NativeComposerQueue
           controller={controller}
           view={view}
-          queue={queue}
+          queue={queue ?? EMPTY_QUEUE}
           count={count}
           onReturnedText={onReturnedText}
-        />
+        >
+          {outgoing.map((item) => (
+            <div
+              key={item.id}
+              className="flex min-h-8 flex-wrap items-center gap-2 py-1 pr-1.5 pl-3"
+            >
+              <NativeQueuedMessagePreview
+                inputId={item.id}
+                preview={item.text || null}
+                label={item.text || item.attachment?.name || "Queued message"}
+                attachments={item.attachment ? [item.attachment] : undefined}
+                displayParts={item.displayParts}
+              />
+              {renderOutgoingStatus(item)}
+            </div>
+          ))}
+        </NativeComposerQueue>
       )}
       {showGoal && (
         <GoalStrip controller={controller} view={view} goal={goal ?? null} />
@@ -140,6 +166,7 @@ export function NativeComposerQueue({
   queue,
   count,
   onReturnedText,
+  children,
 }: NativeComposerQueue.Props) {
   const ids = queue.items.map((item) => item.inputId);
   // Show a drop immediately; the next queue page replaces it.
@@ -213,6 +240,7 @@ export function NativeComposerQueue({
           })}
         </SortableContext>
       </DndContext>
+      {children}
       {(queue.previousOffset !== null || queue.nextOffset !== null) && (
         <div className="flex gap-1 px-2 py-1">
           {queue.previousOffset !== null && (
@@ -264,6 +292,7 @@ export namespace NativeComposerQueue {
     "acting" | "queueDraft" | "queueLoading"
   >;
   export type Props = Readonly<{
+    children?: ReactNode;
     controller: Controller;
     view: View;
     queue: NativeChatQueuePage;

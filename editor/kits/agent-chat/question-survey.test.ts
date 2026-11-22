@@ -22,6 +22,18 @@ const SURVEY = {
   ],
 };
 
+const NATIVE_BATCH = {
+  questions: [
+    {
+      id: "color",
+      question: "Color?",
+      options: [{ label: "Warm" }, { label: "Cool" }],
+    },
+    { id: "sections", question: "Sections?" },
+    { id: "other", question: "Anything else?" },
+  ],
+};
+
 describe("parseQuestions", () => {
   it("drops malformed entries and coerces shapes", () => {
     const qs = parseQuestions({
@@ -64,6 +76,31 @@ describe("QuestionSurvey — answer building", () => {
     expect(survey.skipCurrent().singleAnswer()).toEqual({ kind: "skipped" });
   });
 
+  it("builds a native batch with choices, write-ins, and explicit skips in prompt order", () => {
+    const survey = QuestionSurvey.from(NATIVE_BATCH)
+      .setWriteIn(2, "  Add a gallery  ")
+      .togglePick(0, "Cool");
+    expect(survey.batchAnswers()).toBeNull();
+    expect(survey.skipUnanswered().batchAnswers()).toEqual([
+      { id: "color", answer: { kind: "choice", index: 1 } },
+      { id: "sections", answer: { kind: "skipped" } },
+      { id: "other", answer: { kind: "text", text: "Add a gallery" } },
+    ]);
+    expect(survey.unanswered).toEqual([1]);
+  });
+
+  it("requires distinct native batch question IDs", () => {
+    const duplicate = NATIVE_BATCH.questions[0];
+    expect(
+      QuestionSurvey.from({ questions: [duplicate, duplicate] })
+        .skipUnanswered()
+        .batchAnswers()
+    ).toBeNull();
+    expect(
+      QuestionSurvey.from(SINGLE).skipUnanswered().batchAnswers()
+    ).toBeNull();
+  });
+
   it("single-select: a pick is the answer", () => {
     const s = QuestionSurvey.from(SINGLE).togglePick(0, "Warm");
     expect(s.answersFor(0)).toEqual(["Warm"]);
@@ -92,41 +129,50 @@ describe("QuestionSurvey — answer building", () => {
     expect(custom.answersFor(0)).toEqual(["Pastel"]);
   });
 
-  it("picking after a write-in clears the custom text", () => {
+  it("keeps an inactive write-in draft for each step", () => {
     const s = QuestionSurvey.from(SINGLE)
       .setWriteIn(0, "Pastel")
       .togglePick(0, "Cool");
     expect(s.writeInFor(0)).toBe("");
     expect(s.answersFor(0)).toEqual(["Cool"]);
+    expect(s.singleAnswer()).toEqual({ kind: "choice", index: 1 });
+    expect(s.selectWriteIn(0).singleAnswer()).toEqual({
+      kind: "text",
+      text: "Pastel",
+    });
+
+    const batch = QuestionSurvey.from(SURVEY)
+      .setWriteIn(0, "Pastel")
+      .skipCurrent()
+      .next()
+      .setWriteIn(1, "Program")
+      .back();
+    expect(batch.answersFor(0)).toEqual([]);
+    expect(batch.selectWriteIn(0).writeInFor(0)).toBe("Pastel");
+    expect(batch.selectWriteIn(0).writeInFor(1)).toBe("Program");
+    expect(batch.clearCustom(0).selectWriteIn(0).writeInFor(0)).toBe("");
   });
 
-  it("selectCustom deselects options for that question", () => {
-    const s = QuestionSurvey.from(SINGLE).togglePick(0, "Warm").selectCustom(0);
-    expect(s.pickedFor(0)).toEqual([]);
-    expect(s.isCustomSelected(0)).toBe(true);
-    expect(s.answersFor(0)).toEqual([]); // nothing typed yet
+  it("keeps a choice through navigation and replaces it only when a write-in is edited", () => {
+    const answered = QuestionSurvey.from(SURVEY)
+      .togglePick(0, "Warm")
+      .next()
+      .setWriteIn(1, "Program")
+      .back();
+
+    expect(answered.answersFor(0)).toEqual(["Warm"]);
+    expect(answered.answersFor(1)).toEqual(["Program"]);
+    const changed = answered.setWriteIn(0, "Pastel");
+    expect(changed.answersFor(0)).toEqual(["Pastel"]);
+    expect(changed.pickedFor(0)).toEqual([]);
+    expect(changed.answersFor(1)).toEqual(["Program"]);
   });
 
-  it("custom selection starts on focus and lives until cleared or another option is picked", () => {
-    const focused = QuestionSurvey.from(SINGLE).selectCustom(0);
-    expect(focused.isCustomSelected(0)).toBe(true);
-    expect(focused.answersFor(0)).toEqual([]);
-
-    const typedThenCleared = focused.setWriteIn(0, "Pastel").setWriteIn(0, "");
-    expect(typedThenCleared.isCustomSelected(0)).toBe(true);
-    expect(typedThenCleared.answersFor(0)).toEqual([]);
-
-    const picked = typedThenCleared.togglePick(0, "Cool");
-    expect(picked.isCustomSelected(0)).toBe(false);
-    expect(picked.answersFor(0)).toEqual(["Cool"]);
-  });
-
-  it("clearCustom clears the write-in and deselects the custom row", () => {
+  it("clearCustom clears a write-in", () => {
     const s = QuestionSurvey.from(SINGLE)
       .setWriteIn(0, "Pastel")
       .clearCustom(0);
     expect(s.writeInFor(0)).toBe("");
-    expect(s.isCustomSelected(0)).toBe(false);
     expect(s.answersFor(0)).toEqual([]);
   });
 });
@@ -178,10 +224,32 @@ describe("QuestionSurvey — validation & stepping", () => {
     expect(s.canSubmit).toBe(true); // all answered-or-skipped
   });
 
-  it("currentAnswered tracks the active step", () => {
-    const s = QuestionSurvey.from(SURVEY);
-    expect(s.currentAnswered).toBe(false);
-    expect(s.togglePick(0, "Warm").currentAnswered).toBe(true);
+  it("revisits unanswered questions without changing other answers", () => {
+    const last = QuestionSurvey.from(NATIVE_BATCH)
+      .goTo(2)
+      .setWriteIn(2, "A saved draft");
+    expect(last.unanswered).toEqual([0, 1]);
+    const first = last.goTo(last.unanswered[0]);
+    expect(first.step).toBe(0);
+    expect(first.next().back().step).toBe(0);
+    expect(first.next().next().writeInFor(2)).toBe("A saved draft");
+  });
+
+  it("skips a blank question on Next and keeps answers when moving forward", () => {
+    const middle = QuestionSurvey.from(NATIVE_BATCH).next();
+    expect(middle.step).toBe(1);
+    expect(middle.isSkipped(0)).toBe(true);
+    expect(middle.unanswered).toEqual([1, 2]);
+
+    const last = middle.setWriteIn(1, "Gallery").next();
+    expect(last.step).toBe(2);
+    expect(last.next()).toBe(last);
+    expect(last.back().writeInFor(1)).toBe("Gallery");
+    expect(last.skipCurrent().batchAnswers()).toEqual([
+      { id: "color", answer: { kind: "skipped" } },
+      { id: "sections", answer: { kind: "text", text: "Gallery" } },
+      { id: "other", answer: { kind: "skipped" } },
+    ]);
   });
 
   it("next / back clamp to range and isLast is correct", () => {

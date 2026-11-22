@@ -10,7 +10,7 @@
       <key>NSCameraUsageDescription</key>
       <string>Websites you allow in Grida's browser can use your camera.</string>
       <key>NSMicrophoneUsageDescription</key>
-      <string>Websites you allow in Grida's browser can use your microphone.</string>
+      <string>Grida uses your microphone for dictation. Websites you allow in Grida's browser can also use it.</string>
       <key>NSLocationUsageDescription</key>
       <string>Websites you allow in Grida's browser can use your location.</string>
       <key>NSLocationWhenInUseUsageDescription</key>

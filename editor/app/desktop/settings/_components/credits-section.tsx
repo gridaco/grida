@@ -16,16 +16,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@app/ui/components/badge";
 import { Button } from "@app/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { getDesktopBridge } from "@/lib/desktop/bridge";
 import type { DesktopBillingSummaryResponse } from "@/lib/desktop/billing";
+import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 type ReadySummary = Extract<DesktopBillingSummaryResponse, { state: "ready" }>;
 
@@ -111,15 +105,11 @@ export function CreditsSection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Credits</CardTitle>
-        <CardDescription>
-          AI credit balance for your organization. Top-ups and plan changes are
-          managed on the web.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <SettingsSection
+      title="Credits"
+      description="AI credit balance for your organization. Top-ups and plan changes are managed on the web."
+    >
+      <SettingsGroup className="px-4 py-3">
         {state.kind === "loading" ? (
           <Skeleton className="h-9 w-full" />
         ) : state.kind === "signed-out" ? (
@@ -146,8 +136,8 @@ export function CreditsSection() {
             onManage={() => void openBilling(state.summary.manage_path)}
           />
         )}
-      </CardContent>
-    </Card>
+      </SettingsGroup>
+    </SettingsSection>
   );
 }
 
@@ -168,9 +158,9 @@ function CreditsRow({
     : null;
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex flex-col gap-1">
-        <span className="flex items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="flex flex-wrap items-center gap-2 wrap-anywhere text-sm">
           {organization.display_name}
           <Badge variant="secondary">{PLAN_LABELS[plan]}</Badge>
         </span>

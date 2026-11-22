@@ -1,7 +1,9 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+mod annotation;
 pub mod catalog;
 pub mod catalog_reader;
+pub mod checkpoint;
 pub mod context;
 mod control_pair;
 pub mod deletion;
@@ -122,6 +124,7 @@ struct Inner {
     /// Unsettled turns as this store last wrote or read them.
     turns: Mutex<turn_layout::TurnCache>,
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<catalog_reader::TurnOwner>>>,
+    private_contexts: Mutex<checkpoint::Reservations>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
     conversations: Option<catalog::ConversationProjection>,
@@ -316,6 +319,7 @@ impl SqliteStore {
                 connection: Mutex::new(connection),
                 turns: Mutex::new(turn_layout::TurnCache::default()),
                 owners: Mutex::new(BTreeMap::new()),
+                private_contexts: Mutex::default(),
                 changed: Notify::new(),
                 catalog,
                 conversations,
@@ -504,6 +508,39 @@ impl SqliteStore {
         execute(Arc::clone(&self.inner), move |inner, connection| {
             load_turn(inner, connection, &session, &turn)?;
             turn_inputs(connection, &session, &turn)
+        })
+        .await
+    }
+
+    /// Read the selected submission of a turn with exactly one input.
+    /// Observers need only the submission and can leave the journal unloaded.
+    pub async fn sole_turn_submission(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+    ) -> Result<Option<Submission>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT s.id FROM turns t
+                     LEFT JOIN submissions s ON s.session=t.session AND s.turn=t.id
+                     WHERE t.session=?1 AND t.id=?2 LIMIT 2",
+                )
+                .map_err(database_error)?;
+            let mut rows = statement
+                .query(params![session.as_str(), turn.as_str()])
+                .map_err(database_error)?;
+            let id: Option<String> = rows
+                .next()
+                .map_err(database_error)?
+                .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?
+                .get(0)
+                .map_err(database_error)?;
+            if rows.next().map_err(database_error)?.is_some() {
+                return Ok(None);
+            }
+            id.map(|id| Ok(load_input(connection, &session, &ChangeId::new(id)?)?.input))
+                .transpose()
         })
         .await
     }
@@ -2096,6 +2133,7 @@ fn apply_turn_change(
         (state.is_suspended(), requests)
     };
     let previous_activity = changes_activity.then(|| activity(state));
+    checkpoint::release_answered(tx, state.binding(), change.actions())?;
     let receipt = state.apply(change)?;
     if previous_activity.is_some_and(|previous| previous != activity(state)) {
         catalog_reader::Marker::stage_turn(tx, &state.binding().session)?;

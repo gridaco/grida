@@ -10,7 +10,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
-import { HierarchyPanel } from "./hierarchy-panel";
+import { HierarchyPanel } from "@/scaffolds/svg-editor/hierarchy-panel";
 import { useSvgDocStore } from "../_storage/context";
 
 /**

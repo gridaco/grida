@@ -148,13 +148,26 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
     let session = &created["result"]["sessionId"];
     let prompt = plain
         .request(
-            "session/prompt",
-            json!({"sessionId":session,"prompt":[{"type":"text","text":"Saved question"}]}),
+            "_co.grida/session/submit",
+            json!({"sessionId":session,"inputId":"saved-question","prompt":[{"type":"text","text":"Saved question"}]}),
         )
         .await;
-    assert_eq!(prompt["result"]["stopReason"], "end_turn", "{prompt}");
+    assert_eq!(prompt["result"]["inputId"], "saved-question", "{prompt}");
     endpoint.request().await;
     endpoint.request().await;
+    timeout(WAIT, async {
+        loop {
+            let observed = plain
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            if observed["result"]["latest"]["status"] == "succeeded" {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
     let mut load = json!({"sessionId":session,"cwd":workspace,"mcpServers":[]});
     let attach = json!({CAPABILITY:{"kind":"attach"}});
     let read = json!({CAPABILITY:{"kind":"read","requestId":"page-1"}});
@@ -231,6 +244,7 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
             let meta = &params["_meta"][CAPABILITY];
             if params["update"]["sessionUpdate"] == "tool_call" {
                 assert!(correlated, "standard replay stays text-only: {frame}");
+                assert!(meta.get("inputId").is_none(), "{frame}");
                 assert_eq!(params["update"]["title"], "read_file");
                 assert_eq!(params["update"]["kind"], "read");
                 assert_eq!(params["update"]["status"], "completed");
@@ -251,6 +265,11 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
                 assert_eq!(frame["method"], "session/update");
                 assert_eq!(params["sessionId"], *session);
                 assert_eq!(meta["requestId"].as_str(), correlated.then_some("page-1"),);
+                assert_eq!(
+                    meta.get("inputId"),
+                    (correlated && text == "Saved question").then_some(&json!("saved-question")),
+                    "{frame}"
+                );
                 if correlated {
                     assert!(meta["turnId"].is_string(), "{frame}");
                     turn.get_or_insert_with(|| meta["turnId"].clone());
@@ -275,16 +294,34 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
+    check_editor_context_transcript(true).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn a_missing_catalog_keeps_its_context_identity_and_exact_transcript_marker() {
+    check_editor_context_transcript(false).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+async fn check_editor_context_transcript(legacy: bool) {
     use super::approvals::Stdio as PrivateStdio;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     const WINDOW: &str = "co.grida/session/transcript-window";
     const SVG_TEXT: &str = "co.grida/session/editor-svg-text";
+    const DESKTOP_TOOLS: &str = "co.grida/session/desktop-tools";
+    const TOOL_CONTEXT: &str = "co.grida/session/editor-tool-context";
     const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
     const TARGET: &str = "5f9619ff-8b86-4011-b42d-00c04fc964ff";
     const PROMPT: &str = "Inspect the selected material.";
 
-    async fn replay(client: &mut PrivateStdio, workspace: &Path, session: &Value) -> Vec<bool> {
+    async fn replay(
+        client: &mut PrivateStdio,
+        workspace: &Path,
+        session: &Value,
+        marker: &str,
+    ) -> Vec<bool> {
         let id = client
             .send(
                 "session/load",
@@ -307,12 +344,12 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
             if update["sessionUpdate"] == "user_message_chunk" {
                 assert_eq!(update["content"], json!({"type":"text","text":PROMPT}));
                 assert_eq!(attribution["requestId"], "selection-page");
-                let selected = attribution.get("svgTextSelection");
+                let selected = attribution.get(marker);
                 assert!(selected.is_none() || selected == Some(&json!(true)));
                 assert!(attribution["turnId"].is_string(), "{frame}");
                 selections.push(selected.is_some());
             } else {
-                assert!(attribution.get("svgTextSelection").is_none(), "{frame}");
+                assert!(attribution.get(marker).is_none(), "{frame}");
             }
         }
     }
@@ -334,7 +371,12 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
                 .unwrap(),
         )
     };
-    let offer = |svg| {
+    let (capability, input_field, marker) = if legacy {
+        (SVG_TEXT, "editorSvgTargetId", "svgTextSelection")
+    } else {
+        (TOOL_CONTEXT, "editorToolContextId", "editorToolContext")
+    };
+    let offer = |editor| {
         let mut capabilities = extension_initialize();
         let meta = capabilities["clientCapabilities"]["_meta"]
             .as_object_mut()
@@ -342,9 +384,13 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
         for name in ["co.grida/provider/egress", WINDOW] {
             meta.insert(name.into(), 1.into());
         }
-        if svg {
-            for name in ["co.grida/session/editor-surfaces", SVG_TEXT] {
+        if editor {
+            for name in ["co.grida/session/editor-surfaces", capability] {
                 meta.insert(name.into(), 1.into());
+            }
+            if !legacy {
+                meta.insert(DESKTOP_TOOLS.into(), 1.into());
+                meta.insert("co.grida/session/browser-tools".into(), 1.into());
             }
         }
         capabilities
@@ -352,7 +398,7 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
     let mut client = launch();
     let ready = client.request("initialize", offer(true)).await;
     assert_eq!(
-        ready["result"]["agentCapabilities"]["_meta"][SVG_TEXT], 1,
+        ready["result"]["agentCapabilities"]["_meta"][capability], 1,
         "{ready}"
     );
     let created = client
@@ -380,16 +426,68 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
         }
     }
 
-    let queued = client
-        .request(
-            "_co.grida/session/enqueue",
-            json!({"sessionId":session,
+    let selection = json!({"sessionId":session,
         "inputId":"svg-input","prompt":[{"type":"text","text":PROMPT}],
-        "operatingRegime":"act","editorEndpointId":ENDPOINT,"editorSvgTargetId":TARGET}),
-        )
+        "operatingRegime":"act","editorEndpointId":ENDPOINT,input_field:TARGET});
+    let id = client
+        .send("_co.grida/session/enqueue", selection.clone())
         .await;
+    let queued = loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == id {
+            break frame;
+        }
+        if frame["method"] == "_co.grida/editor/desktop-tools" {
+            assert!(!legacy, "{frame}");
+            let params = &frame["params"];
+            assert_eq!(params["scope"], json!({"contextId":TARGET}));
+            assert_eq!(params["message"]["method"], "tools/list");
+            client
+                .respond(
+                    &frame["id"],
+                    json!({"sessionId":session,"endpointId":ENDPOINT,
+                "message":{"jsonrpc":"2.0","id":params["message"]["id"],"error":{
+                    "code":-32001,"message":"editor_surface_endpoint_unavailable"}}}),
+                )
+                .await;
+        }
+    };
     assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
-    assert_eq!(replay(&mut client, &workspace, session).await, [false]);
+    if !legacy {
+        let retried = client
+            .request("_co.grida/session/enqueue", selection.clone())
+            .await;
+        assert_eq!(retried["result"], queued["result"]);
+        let mut changed = selection.clone();
+        changed[input_field] = "34fc5a36-da85-4542-a75c-e882530da09b".into();
+        changed["editorBrowserTools"] = true.into();
+        let conflict = client
+            .request("_co.grida/session/enqueue", changed.clone())
+            .await;
+        assert_eq!(
+            conflict["error"]["data"],
+            "submission_editor_tool_context_changed"
+        );
+        changed.as_object_mut().unwrap().remove(input_field);
+        let omitted = client.request("_co.grida/session/enqueue", changed).await;
+        assert_eq!(
+            omitted["error"]["data"],
+            "submission_editor_tool_context_changed"
+        );
+
+        let mut plan = selection.clone();
+        plan["inputId"] = "plan-input".into();
+        plan["operatingRegime"] = "plan".into();
+        let forbidden = client.request("_co.grida/session/enqueue", plan).await;
+        assert_eq!(
+            forbidden["error"]["data"],
+            "editor_surface_requires_workspace_act_text"
+        );
+    }
+    assert_eq!(
+        replay(&mut client, &workspace, session, marker).await,
+        [false]
+    );
 
     let mut frame = open.unwrap();
     for has_selection in [false, true] {
@@ -399,12 +497,15 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
             .decode(frame["params"]["initial"].as_str().unwrap())
             .unwrap();
         let body = std::str::from_utf8(&body).unwrap();
-        assert_eq!(body.contains("svg_read_selected_text"), has_selection);
+        assert_eq!(
+            body.contains("svg_read_selected_text"),
+            has_selection && legacy
+        );
         assert!(!body.contains(TARGET));
-        assert!(!body.contains("svgTextSelection"));
+        assert!(!body.contains(marker));
         if has_selection {
             assert_eq!(
-                replay(&mut client, &workspace, session).await,
+                replay(&mut client, &workspace, session, marker).await,
                 [false, true]
             );
         }
@@ -452,22 +553,39 @@ async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
     .unwrap();
     client.close().await;
 
-    let mut reopened = launch();
-    let ready = reopened.request("initialize", offer(false)).await;
-    assert!(ready["result"].is_object(), "{ready}");
-    let attached = reopened
-        .request(
-            "session/load",
-            json!({"sessionId":session,
-        "cwd":workspace,"mcpServers":[],"_meta":{WINDOW:{"kind":"attach"}}}),
-        )
-        .await;
-    assert!(attached["result"].is_object(), "{attached}");
-    assert_eq!(
-        replay(&mut reopened, &workspace, session).await,
-        [false, true]
-    );
-    reopened.close().await;
+    for negotiate in [false, true] {
+        if legacy && negotiate {
+            continue;
+        }
+        let mut reopened = launch();
+        let ready = reopened.request("initialize", offer(negotiate)).await;
+        assert!(ready["result"].is_object(), "{ready}");
+        let attached = reopened
+            .request(
+                "session/load",
+                json!({"sessionId":session,
+            "cwd":workspace,"mcpServers":[],"_meta":{WINDOW:{"kind":"attach"}}}),
+            )
+            .await;
+        assert!(attached["result"].is_object(), "{attached}");
+        if negotiate {
+            let mut retry = selection.clone();
+            retry["editorEndpointId"] = "af787f84-9ccf-4744-90ee-13231e26ff1b".into();
+            retry["editorBrowserTools"] = true.into();
+            let recovered = reopened.request("_co.grida/session/enqueue", retry).await;
+            assert_eq!(recovered["result"]["inputId"], "svg-input", "{recovered}");
+            assert!(queued["result"]["inputPosition"].is_number());
+            assert_eq!(
+                recovered["result"]["inputPosition"], queued["result"]["inputPosition"],
+                "{recovered}"
+            );
+        }
+        assert_eq!(
+            replay(&mut reopened, &workspace, session, marker).await,
+            [false, legacy || negotiate]
+        );
+        reopened.close().await;
+    }
 }
 
 async fn after_owner_release(

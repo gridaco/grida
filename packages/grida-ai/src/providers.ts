@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — trusted provider implementations, not the safe operation API.
 // GRIDA-GG: token — shared adapters never own account credentials or persistence.
 export { ProviderCredentials } from "./provider-credentials";
+export { GptTranscription } from "./gpt-transcription";
 export {
   catalogView,
   catalogViewOnMiss,
@@ -29,6 +30,7 @@ export {
   BYOK_PROVIDER_IDS,
   byokProvidersFor,
   isByokProviderId,
+  OPENAI_PROJECT_PROVIDER_ID,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
   isGgProviderId,

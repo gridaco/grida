@@ -11,14 +11,12 @@
  *   - **the editor** — the SVG canvas vs the slides deck.
  * The chrome (title bar + chat-left AI sidebar) is shared.
  *
- * A deck can use native chat scoped to the bundle. A standalone SVG can use
- * its own saved chats and share the selected text with the agent.
+ * Native chat is scoped to the file or bundle and can use its live SVG selection.
  */
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SvgEditor } from "@grida/svg-editor";
 import { cn } from "@app/ui/lib/utils";
 import {
   ResizableHandle,
@@ -26,8 +24,10 @@ import {
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
 import { getDesktopBridge, useDesktopBridge } from "@/lib/desktop/bridge";
+import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
+import type { BindSlideEditor } from "../canvas/slide-surface";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
 import {
@@ -80,8 +80,11 @@ export function DesktopFileShell({
   // The file window has no tabbed editor region; its side chats show inline
   // under the chat, the latest one at a time.
   const [sideChat] = useState(() => new SideChatInlinePlacement());
-  const setActiveEditor = useCallback(
-    (editor: SvgEditor | null) => fileSurface.setEditor(editor),
+  const bindSlideEditor = useCallback<BindSlideEditor>(
+    (editor, slide) => {
+      const path = WorkspaceArtifact.toAgentPath(slide.src);
+      if (path) return fileSurface.bindEditor(editor, path);
+    },
     [fileSurface]
   );
   const reportDeckDirty = useCallback((dirty: boolean) => {
@@ -149,11 +152,7 @@ export function DesktopFileShell({
                     mode === "deck" && !basePath ? workspaceId : undefined
                   }
                   initialSession={null}
-                  editorSurfaces={
-                    mode === "doc" || nativeChat.deckSvgText
-                      ? fileSurface
-                      : undefined
-                  }
+                  editorSurfaces={fileSurface}
                   sideChatPlacement={sideChat}
                 />
                 <SideChatInlineRegion
@@ -179,7 +178,7 @@ export function DesktopFileShell({
             {mode === "doc" ? (
               <SingleFileSvgSurface
                 docId={docId}
-                onActiveEditor={setActiveEditor}
+                bindEditor={fileSurface.bindEditor}
                 onMeta={setMeta}
               />
             ) : (
@@ -191,9 +190,12 @@ export function DesktopFileShell({
                   workspaceId={workspaceId!}
                   basePath={basePath}
                   onDirtyChange={reportDeckDirty}
-                  slideSurfaceHost={
-                    nativeChat?.deckSvgText && fileChatAvailable
-                      ? fileSurface
+                  bindSlideEditor={
+                    fileChatAvailable ? bindSlideEditor : undefined
+                  }
+                  bindBoardSelection={
+                    fileChatAvailable
+                      ? fileSurface.bindBoardSelection
                       : undefined
                   }
                 />

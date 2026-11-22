@@ -53,21 +53,18 @@ export function AgentPane({
   // Read per workspace; the chat takes the complete request when it sends.
   const workspaceId = workspace.id;
   const firstMessage = useMemo<NativeFirstMessage | undefined>(() => {
-    const message = initialSession ? null : welcome_message.peek(workspaceId);
-    if (!message) return;
-    // An older pane may still be finishing setup when Home replaces its handoff.
-    // Consume only the request with the same prepared chat identity.
-    const waiting = () => {
-      const pending = welcome_message.peek(workspaceId);
-      return (
-        !!pending && pending.preparedSessionId === message.preparedSessionId
-      );
-    };
+    const pending = initialSession
+      ? null
+      : welcome_message.pending(workspaceId);
+    if (!pending) return;
+    const { message, waiting, peek, take } = pending;
     return {
       profileId: message.profileId,
       composer: message,
       waiting,
-      take: () => (waiting() ? welcome_message.takeMessage(workspaceId) : null),
+      peek,
+      take,
+      transferNextDraft: message.transferNextDraft,
     };
   }, [workspaceId, initialSession]);
   // The route can still be resolving the next workspace after navigation.
@@ -104,6 +101,7 @@ export function AgentPane({
           bridge={chat}
           selectionKey={workspace.id}
           workspaceId={workspace.id}
+          workingDirectory={workspace.root}
           initialSession={initialSession}
           editorSurfaces={surfaceHost}
           sideChatPlacement={sideChatPlacement}

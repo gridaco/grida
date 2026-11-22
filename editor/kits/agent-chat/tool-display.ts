@@ -1,6 +1,7 @@
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { getToolName } from "ai";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
+import type { NativeChatCommandAction } from "@grida/desktop-bridge";
 import { SurfaceToolCall } from "./surface-tool";
 
 const GENERATE_IMAGE = "generate_image";
@@ -11,7 +12,9 @@ export type ToolDisplayAction =
   | "edit"
   | "write"
   | "list"
+  | "web_search"
   | "search"
+  | "tool_search"
   | "pick_references"
   | "view_image"
   | "generate_image"
@@ -22,6 +25,7 @@ export type ToolDisplayAction =
   | "skill"
   | "open_tab"
   | "list_tabs"
+  | "desktop_tool"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -98,6 +102,29 @@ export namespace toolDisplay {
           tone,
         };
 
+      case "web_search": {
+        const queries = Array.isArray(args.queries)
+          ? args.queries
+              .filter((q): q is string => typeof q === "string")
+              .join(", ")
+          : undefined;
+        const label: [string, string, string] =
+          args.type === "open_page"
+            ? ["Opening web page", "Opened web page", "Couldn't open web page"]
+            : args.type === "find_in_page"
+              ? ["Searching page", "Searched page", "Couldn't search page"]
+              : ["Searching the web", "Searched the web", "Web search failed"];
+        return {
+          action: "web_search",
+          title: describeTitle(tone, ...label),
+          detail:
+            stringValue(args.query) ||
+            queries ||
+            stringValue(args.pattern) ||
+            stringValue(args.url),
+          tone,
+        };
+      }
       case chat_vocabulary.TOOL_NAMES.grep_files:
         return {
           action: "search",
@@ -108,6 +135,19 @@ export namespace toolDisplay {
             "Failed to search files"
           ),
           detail: stringValue(args.pattern),
+          tone,
+        };
+
+      case "tool_search":
+        return {
+          action: "tool_search",
+          title: describeTitle(
+            tone,
+            "Searching tools",
+            "Searched tools",
+            "Failed to search tools"
+          ),
+          detail: stringValue(args.query),
           tone,
         };
 
@@ -166,17 +206,7 @@ export namespace toolDisplay {
       }
 
       case chat_vocabulary.TOOL_NAMES.exec_command:
-        return {
-          action: "command",
-          title: describeTitle(
-            tone,
-            "Running command",
-            "Ran command",
-            "Command failed"
-          ),
-          detail: describeCommandDetail(entry),
-          tone,
-        };
+        return describeCommand(entry, tone);
 
       case "question":
       case "question_async":
@@ -193,6 +223,7 @@ export namespace toolDisplay {
         };
 
       case SKILL:
+      case "read_skill":
         return {
           action: "skill",
           title: describeTitle(
@@ -272,7 +303,10 @@ export namespace toolDisplay {
 
       default:
         return {
-          action: "tool",
+          action:
+            toolName.startsWith("workbench_") || toolName.startsWith("browser_")
+              ? "desktop_tool"
+              : "tool",
           title: describeTitle(tone, "Using tool", "Used tool", "Tool failed"),
           detail: toolName,
           tone,
@@ -299,10 +333,14 @@ export namespace toolDisplay {
         count: (ranking.get(desc.action)?.count ?? 0) + 1,
         last: index,
       });
+      const count =
+        desc.action === "question"
+          ? asArray(asRecord(readToolInput(entry)).questions)?.length || 1
+          : 1;
       if (desc.tone === "running") {
         runningCounts.set(
           desc.action,
-          (runningCounts.get(desc.action) ?? 0) + 1
+          (runningCounts.get(desc.action) ?? 0) + count
         );
       } else if (desc.tone === "warn" || desc.tone === "error") {
         failedCounts.set(desc.action, (failedCounts.get(desc.action) ?? 0) + 1);
@@ -311,7 +349,7 @@ export namespace toolDisplay {
         targets.add(desc.target);
         files.set(desc.action, targets);
       } else {
-        counts.set(desc.action, (counts.get(desc.action) ?? 0) + 1);
+        counts.set(desc.action, (counts.get(desc.action) ?? 0) + count);
       }
     });
     for (const [action, targets] of files) {
@@ -356,6 +394,8 @@ const GROUP_VERBS: Record<
   view_image: ["viewed", "viewing", "view"],
   pick_references: ["picked", "picking", "pick"],
   search: ["searched", "searching", "search"],
+  web_search: ["searched", "searching", "search"],
+  tool_search: ["searched", "searching", "search"],
   list: ["listed", "listing", "list"],
   command: ["ran", "running", "run"],
   process: ["used", "using", "use"],
@@ -364,6 +404,7 @@ const GROUP_VERBS: Record<
   skill: ["loaded", "loading", "load"],
   open_tab: ["opened", "opening", "open"],
   list_tabs: ["checked", "checking", "check"],
+  desktop_tool: ["used", "using", "use"],
   tool: ["used", "using", "use"],
 };
 
@@ -373,7 +414,24 @@ function pushGroupClause(
   action: ToolDisplayAction,
   verb: string
 ) {
-  if (action === "pick_references")
+  if (
+    action === "web_search" ||
+    action === "tool_search" ||
+    action === "search" ||
+    action === "list"
+  ) {
+    const count = counts.get(action);
+    if (count) {
+      const target =
+        action === "web_search"
+          ? "the web"
+          : action === "tool_search"
+            ? "tools"
+            : "files";
+      const clause = `${verb} ${target}`;
+      clauses.push(count === 1 ? clause : `${clause} ${count} times`);
+    }
+  } else if (action === "pick_references")
     pushReferencePickerClause(clauses, counts, verb);
   else if (action === "list_tabs") pushTabsCheckClause(clauses, counts, verb);
   else pushClause(clauses, counts, action, verb);
@@ -442,8 +500,12 @@ function nounForAction(action: ToolDisplayAction): string {
     case "edit":
     case "write":
       return "file";
+    case "web_search":
+      return "web search";
     case "search":
       return "search";
+    case "tool_search":
+      return "tool search";
     case "pick_references":
       return "reference";
     case "view_image":
@@ -465,6 +527,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "tab";
     case "list_tabs":
       return "tab check";
+    case "desktop_tool":
+      return "desktop tool";
     case "tool":
       return "tool call";
   }
@@ -544,6 +608,116 @@ function describeQuestionDetail(entry: ToolCallEntry): string | undefined {
     return stringValue(asRecord(questions[0]).question);
   }
   return `${questions.length} questions`;
+}
+
+function describeCommand(
+  entry: ToolCallEntry,
+  tone: ToolDisplayTone
+): ToolDisplayDescription {
+  const result = asRecord(readToolOutput(entry));
+  const exitCode = numberValue(result.exit_code);
+  if (exitCode !== undefined && exitCode !== 0) tone = "error";
+  const activity = entry.commandActivity;
+  if (!activity?.actions.length || result.process_id !== undefined) {
+    return {
+      action: "command",
+      title: describeTitle(
+        tone,
+        "Running command",
+        "Ran command",
+        "Command failed"
+      ),
+      detail: describeCommandDetail(entry),
+      tone,
+    };
+  }
+
+  const stoppedTitle =
+    activity.outcome === "cancelled"
+      ? "Command stopped"
+      : activity.outcome === "uncertain"
+        ? "Command outcome unconfirmed"
+        : undefined;
+  const actions = activity.actions.map(describeCommandAction);
+  const firstAction = activity.actions[0];
+  const piped = "piped" in firstAction && firstAction.piped === true;
+  if (actions.length === 1 && !piped && !stoppedTitle) {
+    const commandAction = activity.actions[0];
+    const { action, target, intent, running, succeeded } = actions[0];
+    return {
+      action,
+      title: `${describeTitle(tone, running, succeeded, `Failed to ${intent}`)} ${target}`,
+      ...(commandAction.kind === "read" && {
+        target: commandReadTarget(entry, commandAction.path),
+      }),
+      tone,
+    };
+  }
+
+  // A command has one outcome, even when the input contains several actions.
+  // Some of those actions may have been skipped by shell control flow.
+  return {
+    action: "command",
+    title:
+      stoppedTitle ??
+      describeTitle(
+        tone,
+        "Exploring files",
+        piped && actions.length === 1 ? "Ran command" : "Explored files",
+        "Command failed"
+      ),
+    detail: actions
+      .map(({ intent, target }) => `${intent} ${target}`)
+      .join(", "),
+    tone,
+  };
+}
+
+function commandReadTarget(entry: ToolCallEntry, path: string): string {
+  if (path.startsWith("/")) return path;
+  const input = asRecord(readToolInput(entry));
+  const workdir = stringValue(input.workdir);
+  const directory = stringValue(input.directory);
+  return workdir || directory
+    ? `${workdir ?? ""}\0${directory ?? ""}\0${path}`
+    : path;
+}
+
+function describeCommandAction(action: NativeChatCommandAction): {
+  action: "read" | "list" | "search";
+  target: string;
+  intent: string;
+  running: string;
+  succeeded: string;
+} {
+  switch (action.kind) {
+    case "read":
+      return {
+        action: "read",
+        target: shortPath(action.path) ?? action.path,
+        intent: "read",
+        running: "Reading",
+        succeeded: "Read",
+      };
+    case "list_files":
+      return {
+        action: "list",
+        target: action.path ? `files in ${action.path}` : "files",
+        intent: "list",
+        running: "Listing",
+        succeeded: "Listed",
+      };
+    case "search":
+      return {
+        action: "search",
+        target: action.path
+          ? `${action.query} in ${action.path}`
+          : action.query,
+        intent: "search for",
+        running: "Searching for",
+        succeeded: "Searched for",
+      };
+  }
 }
 
 function describeCommandDetail(entry: ToolCallEntry): string | undefined {

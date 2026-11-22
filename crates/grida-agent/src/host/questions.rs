@@ -6,7 +6,8 @@ use agent_kit_core::turn::{OperationInput, TurnState, WaitRecord};
 use agent_kit_core::{GrantId, ToolId, WaitId};
 use agent_kit_runtime::{AdmissionContext, ToolAdmission, ToolDecision, ToolGate, TurnOperations};
 use grida_agent_master::questions::{
-    QuestionAnswer, QuestionStyle, QuestionTool, defer_for_answer, prepare_answer, read_question,
+    QuestionAnswer, QuestionItem, QuestionItemAnswer, QuestionReply, QuestionStyle, QuestionTool,
+    defer_for_answer, prepare_answer, prepare_batch_answer, read_question,
 };
 
 pub(super) struct QuestionAccess {
@@ -36,9 +37,14 @@ impl QuestionAccess {
         operations: TurnOperations,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
+        batches: bool,
     ) -> Result<()> {
         for style in [QuestionStyle::AnswerDependent, QuestionStyle::Nonblocking] {
-            let tool = QuestionTool::new(operations.clone(), style)?;
+            let tool = if batches {
+                QuestionTool::new(operations.clone(), style)?
+            } else {
+                QuestionTool::legacy(operations.clone(), style)?
+            };
             grants.insert(tool.definition().id.clone(), self.selection.clone());
             inventory.insert(Arc::new(tool))?;
         }
@@ -131,30 +137,63 @@ pub struct PendingQuestion {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Questions {
+pub struct PendingQuestionBatch {
+    pub wait_id: WaitId,
+    pub style: QuestionStyle,
+    pub questions: Vec<QuestionItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PendingQuestionV2 {
+    Legacy(PendingQuestion),
+    Batch(PendingQuestionBatch),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionList<T> {
     pub session_id: SessionId,
     pub turn_id: TurnId,
     pub control_revision: ControlRevision,
     pub history_position: HistoryPosition,
-    pub questions: Vec<PendingQuestion>,
+    pub questions: Vec<T>,
 }
 
-pub(super) fn pending(state: &TurnState) -> Result<Questions> {
+pub type Questions = QuestionList<PendingQuestion>;
+pub type QuestionsV2 = QuestionList<PendingQuestionV2>;
+
+pub(super) fn pending(state: &TurnState) -> Result<QuestionsV2> {
     let questions = state
         .waits()
         .values()
         .filter(|wait| !state.controls().cancelled && wait.is_pending() && is_question(wait))
         .map(|wait| {
             let request = read_question(wait)?;
-            Ok(PendingQuestion {
-                wait_id: wait.id.clone(),
-                style: request.style,
-                question: request.prompt.question,
-                options: request.prompt.options,
-            })
+            if request.version == 1 {
+                let [item]: [QuestionItem; 1] = request.questions.try_into().map_err(|_| {
+                    problem(ErrorKind::InvalidState, "legacy_question_shape_invalid")
+                })?;
+                Ok(PendingQuestionV2::Legacy(PendingQuestion {
+                    wait_id: wait.id.clone(),
+                    style: request.style,
+                    question: item.question,
+                    options: item
+                        .options
+                        .into_iter()
+                        .map(|option| option.label)
+                        .collect(),
+                }))
+            } else {
+                Ok(PendingQuestionV2::Batch(PendingQuestionBatch {
+                    wait_id: wait.id.clone(),
+                    style: request.style,
+                    questions: request.questions,
+                }))
+            }
         })
         .collect::<Result<_>>()?;
-    Ok(Questions {
+    Ok(QuestionList {
         session_id: state.binding().session.clone(),
         turn_id: state.binding().turn.clone(),
         control_revision: state.controls().revision,
@@ -167,8 +206,44 @@ pub(super) fn is_question(wait: &WaitRecord) -> bool {
     wait.request.schema().as_str() == grida_agent_master::questions::REQUEST_SCHEMA
 }
 
+pub(crate) fn reply_text(replies: &[QuestionReply]) -> String {
+    if let [reply] = replies
+        && reply.question_id.is_none()
+    {
+        return reply.answer.clone();
+    }
+    replies
+        .iter()
+        .map(|reply| format!("Question: {}\nAnswer: {}", reply.question, reply.answer))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+enum QuestionResponse {
+    Legacy(QuestionAnswer),
+    Batch(Vec<QuestionItemAnswer>),
+}
+
 impl Host {
     pub async fn questions(&self, session: SessionId, turn: TurnId) -> Result<Questions> {
+        let listed = self.questions_v2(session, turn).await?;
+        Ok(QuestionList {
+            session_id: listed.session_id,
+            turn_id: listed.turn_id,
+            control_revision: listed.control_revision,
+            history_position: listed.history_position,
+            questions: listed
+                .questions
+                .into_iter()
+                .filter_map(|entry| match entry {
+                    PendingQuestionV2::Legacy(question) => Some(question),
+                    PendingQuestionV2::Batch(_) => None,
+                })
+                .collect(),
+        })
+    }
+
+    pub async fn questions_v2(&self, session: SessionId, turn: TurnId) -> Result<QuestionsV2> {
         self.store.inspect_turn_with(session, turn, pending).await
     }
 
@@ -178,6 +253,38 @@ impl Host {
         expected_history: HistoryPosition,
         wait_id: WaitId,
         answer: QuestionAnswer,
+    ) -> Result<ControlReceipt> {
+        self.answer_question_with(
+            control,
+            expected_history,
+            wait_id,
+            QuestionResponse::Legacy(answer),
+        )
+        .await
+    }
+
+    pub async fn answer_question_v2(
+        &self,
+        control: TurnControl,
+        expected_history: HistoryPosition,
+        wait_id: WaitId,
+        answers: Vec<QuestionItemAnswer>,
+    ) -> Result<ControlReceipt> {
+        self.answer_question_with(
+            control,
+            expected_history,
+            wait_id,
+            QuestionResponse::Batch(answers),
+        )
+        .await
+    }
+
+    async fn answer_question_with(
+        &self,
+        control: TurnControl,
+        expected_history: HistoryPosition,
+        wait_id: WaitId,
+        response: QuestionResponse,
     ) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
             let (prepared, can_wake) = host
@@ -199,7 +306,32 @@ impl Host {
                                 "question_no_longer_answerable",
                             ));
                         }
-                        let mut prepared = prepare_answer(wait, answer)?;
+                        let mut prepared = match response {
+                            QuestionResponse::Legacy(answer) => prepare_answer(wait, answer)?,
+                            QuestionResponse::Batch(answers) => {
+                                let request = read_question(wait)?;
+                                if request.version == 1 {
+                                    let [answer]: [QuestionItemAnswer; 1] =
+                                        answers.try_into().map_err(|_| {
+                                            problem(
+                                                ErrorKind::InvalidInput,
+                                                "question_answer_invalid",
+                                            )
+                                        })?;
+                                    if request.questions.first().map(|item| item.id.as_str())
+                                        != Some(answer.id.as_str())
+                                    {
+                                        return Err(problem(
+                                            ErrorKind::InvalidInput,
+                                            "question_answer_invalid",
+                                        ));
+                                    }
+                                    prepare_answer(wait, answer.answer)?
+                                } else {
+                                    prepare_batch_answer(wait, answers)?
+                                }
+                            }
+                        };
                         if wait.answer.is_some() {
                             // Replay exactly the original control, including the
                             // contribution format of a previous host version.
@@ -289,11 +421,12 @@ impl Host {
         let reply = match &request.action {
             SessionControl::ResolveAndAppend { records, .. } => records.iter().find_map(|record| {
                 let HistoryRecord::Message(message) = record;
-                grida_agent_master::questions::visible_reply(message).map(|_| message.id.clone())
+                grida_agent_master::questions::visible_replies(message)
+                    .map(|replies| (message.id.clone(), replies))
             }),
             _ => None,
         };
-        let receipt = if let Some(id) = reply {
+        let receipt = if let Some((id, replies)) = reply {
             if let Some(existing) = self.store.control_receipt(request.clone()).await? {
                 existing
             } else {
@@ -302,6 +435,20 @@ impl Host {
                 // observed acceptance before the scheduler can resume it.
                 self.activity_order
                     .record_message(&control.session, &control.turn, &id);
+                if replies.iter().any(|reply| reply.question_id.is_some()) {
+                    let text = Arc::from(reply_text(&replies));
+                    let _ = self
+                        .live_updates
+                        .send(live::LiveUpdate::Text(live::LiveText {
+                            session: control.session.clone(),
+                            turn: control.turn.clone(),
+                            message: id,
+                            offset: 0,
+                            replace: true,
+                            text,
+                            kind: live::LiveTextKind::QuestionReply(replies),
+                        }));
+                }
                 receipt
             }
         } else {

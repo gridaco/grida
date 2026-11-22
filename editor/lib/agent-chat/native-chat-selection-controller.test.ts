@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   DesktopNativeChat,
+  DesktopPersonalizationSettings,
+  NativeChatPermissionMode,
   NativeChatSelectionState,
   NativeChatSelectionTarget,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
+import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
+import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
+import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
+import { welcome_message } from "@/lib/desktop/welcome-message";
+import type { Workspace } from "@/lib/desktop/bridge";
 
 function fixture() {
   const a = "a".repeat(64),
@@ -105,7 +112,8 @@ function fixture() {
         if (old.revision !== expected)
           throw new Error("selection_revision_changed");
         defaults = {
-          ...choice,
+          profileId: choice.profileId,
+          effort: choice.effort,
           modelId:
             choice.profileId === null
               ? "default-model"
@@ -116,7 +124,10 @@ function fixture() {
         const state = {
           target,
           revision: expected + 1,
-          selection: defaults,
+          selection: {
+            ...defaults,
+            ...(choice.speed && { speed: choice.speed }),
+          },
           available: true,
         };
         states.set(key(target), state);
@@ -178,7 +189,559 @@ async function ready(controller: NativeChatController) {
   await vi.waitFor(() => expect(controller.read().loading).toBe(false));
 }
 
+function enableAutomaticSearch(controller: NativeChatController) {
+  return controller.connectPersonalization({
+    get: async () => ({
+      suggestedPrompts: false,
+      webSearch: "live",
+      revision: 1,
+    }),
+    onChange: () => () => {},
+  });
+}
+
 describe("durable chat selection controller", () => {
+  it("carries a Home send through a slow workspace opening without consuming the follow-up draft", async () => {
+    const f = fixture();
+    const controller = f.make();
+    const workspace: Workspace = {
+      id: "project",
+      name: "Project",
+      root: "/project",
+      opened_at: 1,
+      pinned: false,
+    };
+    const records = new Map<string, ComposerDraftBlob>();
+    const store = new ComposerDrafts(null, {
+      get: async (key) => records.get(key) ?? null,
+      put: async (key, value) => {
+        records.set(key, value);
+      },
+      delete: async (key) => {
+        records.delete(key);
+      },
+    });
+    const entries = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => entries.set(key, value),
+      removeItem: (key: string) => entries.delete(key),
+    };
+    const resolveWorkspace = Promise.withResolvers<Workspace>();
+    const allowSubmit = Promise.withResolvers<void>();
+    const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, sessionId, inputId) => {
+        await allowSubmit.promise;
+        return {
+          sessionId,
+          inputId,
+          disposition: "claimed",
+          inputPosition: 1,
+          turnId: "first-turn",
+        };
+      }
+    );
+    f.bridge.submitInRegime = submit;
+    const home = new HomeComposer(store);
+    const source = home.draftFor("default");
+    const first = "Make a poster";
+    const second = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Use blue" }] },
+      ],
+    };
+    try {
+      expect(
+        home.capture(
+          {
+            text: first,
+            prompt: first,
+            target: null,
+            profileId: f.b,
+            references: [],
+          },
+          {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: first }] },
+            ],
+          },
+          {
+            defaultWorkspace: () => resolveWorkspace.promise,
+            stash: (id, message) => welcome_message.stash(id, message, storage),
+            open: WorkspaceOpening.href,
+          },
+          { ...source, read: () => store.read(source.key) }
+        )
+      ).toBe(true);
+      expect(home.read().outgoing).toEqual({ status: "opening" });
+      store.write(source.key, second);
+      expect(WorkspaceOpening.peek(workspace.id)).toBeUndefined();
+
+      resolveWorkspace.resolve(workspace);
+      await vi.waitFor(() =>
+        expect(WorkspaceOpening.peek(workspace.id)).toBe(workspace)
+      );
+      const handoff = welcome_message.pending(workspace.id, storage)!;
+      expect(handoff.peek()?.text).toBe(first);
+      expect(submit).not.toHaveBeenCalled();
+      controller.keepDrafts(store, workspace.id, {
+        sessionId: null,
+        home: handoff.message,
+      });
+      handoff.message.transferNextDraft?.(controller.composerDraft()!);
+      const start = controller.startChat(
+        handoff.message.profileId,
+        handoff.take,
+        handoff.message
+      );
+      await vi.waitFor(() => {
+        const view = controller.read();
+        expect(
+          view.error ?? view.profileError ?? view.outgoing[0]?.error ?? null
+        ).toBeNull();
+        expect(submit).toHaveBeenCalledOnce();
+      });
+      expect(controller.read().outgoing).toMatchObject([
+        { text: first, status: "sending" },
+      ]);
+      expect(submit.mock.calls[0]?.slice(0, 4)).toEqual([
+        "submit",
+        "created",
+        "stable-first-input",
+        first,
+      ]);
+      f.bridge.transcript = async () => [
+        {
+          messageId: "authored",
+          inputId: "stable-first-input",
+          role: "user",
+          text: first,
+          turnId: "first-turn",
+        },
+      ];
+      allowSubmit.resolve();
+      await start;
+      expect(controller.read().messages.map((m) => m.text)).toEqual([first]);
+      expect(controller.read().outgoing).toEqual([]);
+      expect(store.read(controller.composerDraft()!.key)).toEqual(second);
+      expect(store.read(source.key)).toBeNull();
+      expect(handoff.waiting()).toBe(false);
+      expect(submit).toHaveBeenCalledOnce();
+    } finally {
+      resolveWorkspace.resolve(workspace);
+      allowSubmit.resolve();
+      WorkspaceOpening.arrived(workspace);
+      controller.disconnect();
+    }
+  });
+  it("recovers the next draft through reloads on both sides of the Home handoff", async () => {
+    const f = fixture();
+    const entries = new Map<string, string>();
+    const storage: Storage = {
+      get length() {
+        return entries.size;
+      },
+      key: (i) => [...entries.keys()][i] ?? null,
+      getItem: (key) => entries.get(key) ?? null,
+      setItem: (key, value) => {
+        entries.set(key, value);
+      },
+      removeItem: (key) => {
+        entries.delete(key);
+      },
+      clear: () => entries.clear(),
+    };
+    const records = new Map<string, ComposerDraftBlob>();
+    const store = () =>
+      new ComposerDrafts(storage, {
+        get: async (key) => records.get(key) ?? null,
+        put: async (key, value) => {
+          records.set(key, value);
+        },
+        delete: async (key) => {
+          records.delete(key);
+        },
+      });
+    const workspace = "home-project";
+    const first = "Build the deck";
+    const followup = { nextDraft: "Use blue" };
+    welcome_message.stash(workspace, { text: first, profileId: f.b }, storage);
+    const handoff = welcome_message.pending(workspace, storage)!;
+    const options = { sessionId: null, home: handoff.message };
+    const selecting = Promise.withResolvers<void>();
+    const selection = vi.mocked(f.bridge.selection!).getMockImplementation()!;
+    vi.mocked(f.bridge.selection!).mockImplementationOnce(async (target) => {
+      await selecting.promise;
+      return selection(target);
+    });
+    const creating = Promise.withResolvers<void>();
+    const create = vi
+      .mocked(f.bridge.createFromDraft!)
+      .getMockImplementation()!;
+    vi.mocked(f.bridge.createFromDraft!).mockImplementationOnce(
+      async (...args) => {
+        await creating.promise;
+        return create(...args);
+      }
+    );
+    const sent = vi.mocked(f.bridge.submitInRegime!);
+    const before = f.make();
+    const during = f.make();
+    const after = f.make();
+    try {
+      before.keepDrafts(store(), workspace, options);
+      const opening = before.startChat(f.b, handoff.take, handoff.message);
+      const draft = before.composerDraft()!;
+      draft.store.write(draft.key, followup);
+      before.disconnect();
+      selecting.resolve();
+      await opening;
+      expect(handoff.waiting()).toBe(true);
+
+      during.keepDrafts(store(), workspace, options);
+      expect(
+        during.composerDraft()!.store.read(during.composerDraft()!.key)
+      ).toEqual(followup);
+      const starting = during.startChat(f.b, handoff.take, handoff.message);
+      await vi.waitFor(() =>
+        expect(f.bridge.createFromDraft).toHaveBeenCalledOnce()
+      );
+      expect(handoff.waiting()).toBe(false);
+      during.disconnect();
+      creating.resolve();
+      await starting;
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+
+      after.keepDrafts(store(), workspace, { sessionId: null });
+      after.connect(null);
+      await vi.waitFor(() =>
+        expect(after.read().outgoing).toMatchObject([
+          { text: first, status: "failed" },
+        ])
+      );
+      expect(
+        after.composerDraft()!.store.read(after.composerDraft()!.key)
+      ).toEqual(followup);
+      after.retryOutgoing(after.read().outgoing[0]!.id);
+      await vi.waitFor(() =>
+        expect(f.bridge.submitInRegime).toHaveBeenCalledOnce()
+      );
+      expect(
+        vi.mocked(f.bridge.createFromDraft!).mock.calls.map(([id]) => id)
+      ).toEqual([handoff.message.requestId, handoff.message.requestId]);
+      expect(sent.mock.calls[0]?.slice(0, 4)).toEqual([
+        "submit",
+        "created",
+        "stable-first-input",
+        first,
+      ]);
+      expect(
+        after.composerDraft()!.store.read(after.composerDraft()!.key)
+      ).toEqual(followup);
+    } finally {
+      selecting.resolve();
+      creating.resolve();
+      before.disconnect();
+      during.disconnect();
+      after.disconnect();
+    }
+  });
+  it("keeps speed on the saved chat and starts a new draft at Standard without Personalization", async () => {
+    const f = fixture();
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: ["fast"],
+      webSearch: false,
+    });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await controller.refreshTurnCapabilities();
+      expect(controller.read().speed).toBe("standard");
+      controller.selectSpeed("fast");
+      await vi.waitFor(() => expect(controller.read().speed).toBe("fast"));
+      expect(f.states.get("chat-a")?.selection?.speed).toBe("fast");
+      await controller.select(null);
+      expect(controller.read().speed).toBe("standard");
+      await controller.select("chat-a");
+      expect(controller.read().speed).toBe("fast");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("offers automatic web search according to Personalization and model availability", async () => {
+    const f = fixture();
+    const saved = f.states.get("chat-a")!;
+    f.states.set("chat-a", {
+      ...saved,
+      selection: { ...saved.selection!, speed: "fast" },
+    });
+    let offered = true;
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: ["fast"],
+      webSearch: offered,
+    });
+    const controller = f.make();
+    const initial = {
+      webSearch: "live" as const,
+      suggestedPrompts: false,
+      revision: 1,
+    };
+    let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+    const get = Promise.withResolvers<DesktopPersonalizationSettings>();
+    const stop = controller.connectPersonalization({
+      get: () => get.promise,
+      onChange: (cb) => {
+        receive = cb;
+        return () => {};
+      },
+    });
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().webSearch).toBe(false);
+      receive({ ...initial, revision: 2 });
+      get.resolve({ ...initial, webSearch: "disabled" });
+      await vi.waitFor(() => expect(controller.read().webSearch).toBe(true));
+      expect(controller.read().speed).toBe("fast");
+      await controller.submit("Use the chat");
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      expect(send.mock.calls[0][10]).toBe(true);
+      expect(controller.read().webSearch).toBe(true);
+      await controller.submit("Look it up");
+      expect(send.mock.calls[1][10]).toBe(true);
+      receive({
+        ...initial,
+        webSearch: "disabled",
+        revision: 3,
+      });
+      expect(controller.read().speed).toBe("fast");
+      expect(controller.read().webSearch).toBe(false);
+      await controller.submit("No search");
+      expect(send.mock.calls[2][10]).toBeUndefined();
+      offered = false;
+      receive({ ...initial, revision: 4 });
+      await controller.refreshTurnCapabilities();
+      expect(controller.read().webSearch).toBe(false);
+      await controller.submit("No compatible tool");
+      expect(send.mock.calls[3][10]).toBeUndefined();
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it("sends ordinary chat if an automatic search offer is lost during preflight", async () => {
+    const f = fixture();
+    let offered = true;
+    f.bridge.turnCapabilities = async () => ({
+      status: offered ? "available" : "unavailable",
+      speeds: [],
+      webSearch: offered,
+    });
+    const controller = f.make();
+    const stop = enableAutomaticSearch(controller);
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().webSearch).toBe(true);
+      offered = false;
+      await controller.submit("Ordinary fallback");
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      expect(send).toHaveBeenCalledOnce();
+      expect(send.mock.calls[0][10]).toBeUndefined();
+      offered = true;
+      await controller.submit("Search after discovery recovers");
+      expect(send.mock.calls[1][10]).toBe(true);
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it.each([true, false])(
+    "checks the original search receipt after opting out before sending again (accepted: %s)",
+    async (accepted) => {
+      const f = fixture();
+      f.bridge.turnCapabilities = async () => ({
+        status: "available",
+        speeds: [],
+        webSearch: true,
+      });
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      send.mockRejectedValueOnce(new Error("timeout"));
+      let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+      const prefs = {
+        suggestedPrompts: false,
+        webSearch: "live",
+        revision: 1,
+      } as const;
+      const controller = f.make();
+      const stop = controller.connectPersonalization({
+        get: async () => prefs,
+        onChange: (cb) => {
+          receive = cb;
+          return () => {};
+        },
+      });
+      try {
+        controller.connect("chat-a");
+        await ready(controller);
+        await expect(controller.submit("Question")).rejects.toThrow("timeout");
+        const [, sessionId, inputId] = send.mock.calls[0];
+        receive({ ...prefs, webSearch: "disabled", revision: 2 });
+        if (accepted)
+          vi.mocked(f.bridge.inputReceipt).mockResolvedValueOnce({
+            sessionId,
+            inputId,
+            disposition: "completed",
+            inputPosition: 1,
+            turnId: "turn",
+          });
+        const error = await controller.submit("Question").then(
+          () => null,
+          (err: Error) => err.message
+        );
+        expect(error).toBe(
+          accepted ? null : "Web search is disabled in Personalization."
+        );
+        expect(send).toHaveBeenCalledTimes(1);
+        await controller.submit("Question");
+        expect(send.mock.calls[1][10]).toBeUndefined();
+      } finally {
+        stop();
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("keeps an unavailable speed for the chat until Standard is selected", async () => {
+    const f = fixture();
+    const saved = f.states.get("chat-a")!;
+    f.states.set("chat-a", {
+      ...saved,
+      selection: { ...saved.selection!, speed: "fast" },
+    });
+    f.bridge.turnCapabilities = async () => ({
+      status: "reauthenticationRequired",
+      speeds: [],
+      webSearch: false,
+    });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().speed).toBe("fast");
+      expect(controller.turnOptionsError).toContain("Sign in");
+      expect(controller.canSubmit).toBe(false);
+      controller.selectSpeed("standard");
+      await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+      expect(f.bridge.updateSelection).toHaveBeenCalledWith(
+        { sessionId: "chat-a" },
+        1,
+        expect.any(String),
+        { profileId: f.a, effort: "low", speed: "standard" }
+      );
+      expect(controller.read().speed).toBe("standard");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("uses the new model’s search offer immediately after switching models", async () => {
+    const f = fixture();
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: [],
+      webSearch: f.states.get("chat-a")?.selection?.profileId === f.b,
+    });
+    const controller = f.make();
+    const stop = enableAutomaticSearch(controller);
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().webSearch).toBe(false);
+      await controller.selectProfile({ kind: "new", id: f.b });
+      await vi.waitFor(() => expect(controller.read().webSearch).toBe(true));
+      expect(controller.turnOptionsError).toBeNull();
+      expect(controller.canSubmit).toBe(true);
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it("resumes ordinary chat when search is unavailable after an unconfirmed send is found absent", async () => {
+    const f = fixture();
+    let available = true;
+    f.bridge.turnCapabilities = async () => ({
+      status: available ? "available" : "unsupported",
+      speeds: [],
+      webSearch: available,
+    });
+    const send = vi.mocked(f.bridge.submitInRegime!);
+    send.mockRejectedValueOnce(new Error("timeout"));
+    const controller = f.make();
+    const stop = enableAutomaticSearch(controller);
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await expect(controller.submit("Forecast")).rejects.toThrow("timeout");
+      available = false;
+      await expect(controller.submit("Forecast")).rejects.toThrow(
+        "Web search is unavailable"
+      );
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(controller.read().webSearch).toBe(false);
+      await controller.submit("Forecast");
+      expect(send.mock.calls[1][10]).toBeUndefined();
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it("reconciles a search-enabled send before accepting another message", async () => {
+    const f = fixture();
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: ["fast"],
+      webSearch: true,
+    });
+    const send = vi.mocked(f.bridge.submitInRegime!);
+    send.mockRejectedValueOnce(new Error("timeout"));
+    const controller = f.make();
+    const stop = enableAutomaticSearch(controller);
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await expect(controller.submit("Search again")).rejects.toThrow(
+        "timeout"
+      );
+      const [, sessionId, inputId] = send.mock.calls[0];
+      expect(send.mock.calls[0][10]).toBe(true);
+      vi.mocked(f.bridge.inputReceipt).mockResolvedValueOnce({
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-a",
+      });
+      await controller.submit("Search again");
+      expect(send).toHaveBeenCalledTimes(1);
+      await controller.submit("Continue");
+      expect(send.mock.calls[1][10]).toBe(true);
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
   it.each([false, true])(
     "keeps pending Send feedback through initial route activation (switch chat: %s)",
     async (switchChat) => {
@@ -525,6 +1088,32 @@ describe("durable chat selection controller", () => {
     controller.disconnect();
   });
 
+  it.each(["first request", "/compact"])(
+    "keeps %s on Home when the handoff cannot be retired",
+    async (text) => {
+      const f = fixture();
+      const controller = f.make();
+      const release = vi.fn<() => void>();
+      const input = {
+        requestId: crypto.randomUUID(),
+        text,
+        commit: () => {
+          throw new Error("Home handoff is still pending");
+        },
+        release,
+      };
+      try {
+        await controller.startChat(f.b, () => input);
+        expect(release).toHaveBeenCalledOnce();
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+        expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+        expect(f.bridge.submit).not.toHaveBeenCalled();
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
   it("waits for Home's saved effort before consuming and submitting the message", async () => {
     const f = fixture(),
       controller = f.make();
@@ -567,6 +1156,133 @@ describe("durable chat selection controller", () => {
       controller.disconnect();
     }
   });
+
+  it.each([
+    { speed: "standard", searchAvailable: true },
+    { speed: "standard", searchAvailable: false },
+    { speed: "fast", searchAvailable: true },
+  ] as const)(
+    "sends Home's first message at $speed with automatic search (available: $searchAvailable)",
+    async ({ speed, searchAvailable }) => {
+      const f = fixture();
+      f.bridge.turnCapabilities = async () => ({
+        status: searchAvailable ? "available" : "unsupported",
+        speeds: searchAvailable ? ["fast"] : [],
+        webSearch: searchAvailable,
+      });
+      const controller = f.make();
+      const stop = enableAutomaticSearch(controller);
+      try {
+        const options =
+          speed === "fast"
+            ? { turnOptions: { profileId: f.b, modelId: "model-b", speed } }
+            : undefined;
+        const text = "Find sources";
+        expect(
+          await controller.startChat(f.b, () => ({ text }), options)
+        ).toBeNull();
+        expect(f.states.get("created")?.selection?.speed ?? "standard").toBe(
+          speed
+        );
+        const send = vi.mocked(f.bridge.submitInRegime!);
+        expect(send).toHaveBeenCalledOnce();
+        expect(send.mock.calls[0][3]).toBe(text);
+        expect(send.mock.calls[0][10]).toBe(searchAvailable || undefined);
+      } finally {
+        stop();
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("does not use a different speed after Home's draft becomes a chat", async () => {
+    const f = fixture();
+    const profiles = (await f.bridge.profiles!())!;
+    f.bridge.profiles = async () => ({ ...profiles, inputRoutes: true });
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: ["fast"],
+      webSearch: true,
+    });
+    const create = f.bridge.createFromDraft!;
+    f.bridge.createFromDraft = async (...args) => {
+      const chat = await create(...args);
+      const state = f.states.get(chat.sessionId)!;
+      f.states.set(chat.sessionId, {
+        ...state,
+        revision: state.revision + 1,
+        selection: { ...state.selection!, speed: "standard" },
+      });
+      return chat;
+    };
+    const controller = f.make();
+    try {
+      expect(
+        await controller.startChat(f.b, () => ({ text: "Keep this request" }), {
+          turnOptions: { profileId: f.b, modelId: "model-b", speed: "fast" },
+        })
+      ).toBe("Keep this request");
+      expect(controller.read().error).toContain("speed selected on Home");
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it.each(["connection changed", "search disabled"] as const)(
+    "keeps a previously staged search request from Home as a draft when the %s",
+    async (reason) => {
+      const f = fixture();
+      f.bridge.turnCapabilities = async () => ({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: true,
+      });
+      const controller = f.make();
+      const stop =
+        reason === "connection changed"
+          ? enableAutomaticSearch(controller)
+          : controller.connectPersonalization({
+              get: async () => ({
+                suggestedPrompts: false,
+                webSearch: "disabled",
+                revision: 1,
+              }),
+              onChange: () => () => {},
+            });
+      try {
+        expect(
+          await controller.startChat(f.b, () => ({ text: "Find sources" }), {
+            turnOptions: {
+              profileId: f.b,
+              modelId:
+                reason === "connection changed"
+                  ? "formerly-model-b"
+                  : "model-b",
+              speed: "fast",
+              webSearch: true,
+            },
+          })
+        ).toBe("Find sources");
+        expect(controller.read().error).toContain(
+          reason === "connection changed"
+            ? "model connection changed"
+            : "Web search selected on Home is unavailable"
+        );
+        expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+        expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+        await controller.submit("Find sources");
+        const send = vi.mocked(f.bridge.submitInRegime!);
+        expect(send).toHaveBeenCalledOnce();
+        expect(send.mock.calls[0][10]).toBe(
+          reason === "search disabled" ? undefined : true
+        );
+      } finally {
+        stop();
+        controller.disconnect();
+      }
+    }
+  );
 
   it.each([
     { inputRoutes: false, supported: false },
@@ -1045,8 +1761,14 @@ describe("incomplete draft creation settings recovery", () => {
     const unsubscribe = f.controller.subscribe(() => {
       const draft = f.controller.composerDraft();
       if (!draft) return;
-      if (binding.meet(draft.key) === "switch") {
-        document = draft.store.read(draft.key) ?? { text: "" };
+      const meeting = binding.meet(draft.key, draft.promotedFrom);
+      if (meeting !== "held") {
+        const saved = draft.store.read(draft.key);
+        if (
+          meeting === "switch" ||
+          JSON.stringify(saved) !== JSON.stringify(document)
+        )
+          document = saved ?? { text: "" };
         binding.restored(draft.key);
       }
       if (binding.held === draft.key) draft.store.write(draft.key, document);
@@ -1093,6 +1815,7 @@ describe("incomplete draft creation settings recovery", () => {
         expect(f.controller.read().profileBusy).toBe(false)
       );
       expect(f.controller.draftKey()).toBe("workspace:created");
+      expect(f.controller.composerDraft()?.promotedFrom).toBe(f.key);
       expect(document).toEqual({ text: "Keep this draft" });
       expect(
         seen
@@ -1114,11 +1837,16 @@ describe("incomplete draft creation settings recovery", () => {
 });
 
 describe("per-chat permission selection controller", () => {
-  function permissions() {
+  function permissions(
+    available: readonly NativeChatPermissionMode[] = [
+      "restricted",
+      "full_access",
+    ]
+  ) {
     const f = fixture();
     const modes = new Map<
       string,
-      { revision: number; mode: "restricted" | "full_access" }
+      { revision: number; mode: NativeChatPermissionMode }
     >();
     f.bridge.reviewPermissionMode = vi.fn<
       NonNullable<DesktopNativeChat["reviewPermissionMode"]>
@@ -1135,7 +1863,7 @@ describe("per-chat permission selection controller", () => {
     >(async (id) => ({
       sessionId: id,
       ...(modes.get(id) ?? { revision: 0, mode: "restricted" as const }),
-      available: ["restricted", "full_access"],
+      available,
     }));
     f.bridge.setPermissionMode = vi.fn<
       NonNullable<DesktopNativeChat["setPermissionMode"]>
@@ -1145,11 +1873,95 @@ describe("per-chat permission selection controller", () => {
       return {
         sessionId: id,
         ...next,
-        available: ["restricted", "full_access"],
+        available,
       };
     });
     return { ...f, modes };
   }
+
+  function automaticDefaults() {
+    const f = permissions(["restricted", "approve_for_me", "full_access"]);
+    Object.assign(f.bridge, { defaultsToAutomaticReview: true });
+    f.bridge.acceptsAutomaticApprovalReview = async () => true;
+    const create = f.bridge.createFromDraft!;
+    f.bridge.createFromDraft = vi.fn<typeof create>(async (id, manual) => {
+      const result = await create(id);
+      if (!manual)
+        f.modes.set(result.sessionId, { revision: 1, mode: "approve_for_me" });
+      return result;
+    });
+    return f;
+  }
+
+  it("opens existing manual chats as Ask for approval and starts new workspace chats in Auto", async () => {
+    const f = automaticDefaults();
+    f.modes.set("chat-a", { revision: 2, mode: "restricted" });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.composerPermissionMode).toBe("restricted");
+      await controller.select(null);
+      await vi.waitFor(() =>
+        expect(controller.composerPermissionMode).toBe("approve_for_me")
+      );
+      await controller.submit("First workspace message");
+      expect(f.bridge.createFromDraft).toHaveBeenCalledExactlyOnceWith(
+        expect.any(String)
+      );
+      expect(controller.composerPermissionMode).toBe("approve_for_me");
+      expect(f.modes.get("chat-a")).toEqual({
+        revision: 2,
+        mode: "restricted",
+      });
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("requests Ask for approval when creating a Home chat with that choice", async () => {
+    const f = automaticDefaults();
+    const controller = f.make();
+    try {
+      expect(
+        await controller.startChat(
+          f.b,
+          () => ({ text: "First Home message" }),
+          {
+            manualApproval: true,
+          }
+        )
+      ).toBeNull();
+      expect(f.bridge.createFromDraft).toHaveBeenCalledExactlyOnceWith(
+        expect.any(String),
+        true
+      );
+      expect(f.bridge.submitInRegime).toHaveBeenCalledOnce();
+      expect(controller.composerPermissionMode).toBe("restricted");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("requests Ask for approval before opening a workspace draft", async () => {
+    const f = automaticDefaults();
+    const controller = f.make();
+    try {
+      controller.connect(null);
+      await vi.waitFor(() =>
+        expect(controller.composerPermissionMode).toBe("approve_for_me")
+      );
+      await controller.selectPermissionMode("restricted");
+      expect(f.bridge.createFromDraft).toHaveBeenCalledExactlyOnceWith(
+        expect.any(String),
+        true
+      );
+      expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+      expect(controller.composerPermissionMode).toBe("restricted");
+    } finally {
+      controller.disconnect();
+    }
+  });
 
   async function choose(controller: NativeChatController, accepted = true) {
     const changing = controller.selectPermissionMode("full_access");
@@ -1160,43 +1972,68 @@ describe("per-chat permission selection controller", () => {
     await changing;
   }
 
-  it("sends Home's first message through the prepared session's saved route and grant", async () => {
-    const f = permissions();
-    f.modes.set("chat-b", { revision: 1, mode: "full_access" });
-    const controller = f.make();
-    const take = vi.fn<() => { text: string } | null>(() => null);
-    take.mockReturnValueOnce({ text: "First Home message" });
-    try {
-      const composer = {
-        preparedSessionId: "chat-b",
-        operatingRegime: "plan" as const,
-      };
-      expect(await controller.startChat(f.b, take, composer)).toBeNull();
-      expect(await controller.startChat(f.b, take, composer)).toBeNull();
-      expect(f.bridge.selectProfile).toHaveBeenCalledWith({
-        kind: "saved",
-        id: f.b,
+  it.each(["approve_for_me", "full_access"] as const)(
+    "sends Home's first message through the prepared session's saved route and %s grant",
+    async (mode) => {
+      const f = permissions(["restricted", "approve_for_me", "full_access"]);
+      f.modes.set("chat-b", { revision: 1, mode });
+      const prepared = f.states.get("chat-b")!;
+      f.states.set("chat-b", {
+        ...prepared,
+        selection: { ...prepared.selection!, speed: "fast" },
       });
-      expect(f.bridge.load).toHaveBeenCalledWith("chat-b");
-      expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
-        "submit",
-        "chat-b",
-        expect.any(String),
-        "First Home message",
-        "plan",
-        "high",
-        undefined,
-        2
-      );
-      expect(f.bridge.updateSelection).not.toHaveBeenCalled();
-      expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
-      expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
-      expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
-      expect(controller.read().selected).toBe("chat-b");
-    } finally {
-      controller.disconnect();
+      f.bridge.turnCapabilities = async () => ({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: true,
+      });
+      const controller = f.make();
+      const stop = enableAutomaticSearch(controller);
+      const take = vi.fn<() => { text: string } | null>(() => null);
+      take.mockReturnValueOnce({ text: "First Home message" });
+      try {
+        const composer = {
+          preparedSessionId: "chat-b",
+          ...(mode === "approve_for_me" && { preparedMode: mode }),
+          operatingRegime: "plan" as const,
+          turnOptions: {
+            profileId: f.b,
+            modelId: "model-b",
+            speed: "fast" as const,
+            webSearch: true as const,
+          },
+        };
+        expect(await controller.startChat(f.b, take, composer)).toBeNull();
+        expect(await controller.startChat(f.b, take, composer)).toBeNull();
+        expect(f.bridge.selectProfile).toHaveBeenCalledWith({
+          kind: "saved",
+          id: f.b,
+        });
+        expect(f.bridge.load).toHaveBeenCalledWith("chat-b");
+        expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
+          "submit",
+          "chat-b",
+          expect.any(String),
+          "First Home message",
+          "plan",
+          "high",
+          undefined,
+          2,
+          undefined,
+          undefined,
+          true
+        );
+        expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+        expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+        expect(controller.read().selected).toBe("chat-b");
+      } finally {
+        stop();
+        controller.disconnect();
+      }
     }
-  });
+  );
 
   it("sends context with the identity of the prepared Full access chat", async () => {
     const f = permissions();
@@ -1274,7 +2111,7 @@ describe("per-chat permission selection controller", () => {
         expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
         expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
         expect(controller.read().selected).toBe("chat-b");
-        expect(controller.read().error).toContain("Full access");
+        expect(controller.read().error).toContain("chat’s access");
       } finally {
         controller.disconnect();
       }
@@ -1313,6 +2150,28 @@ describe("per-chat permission selection controller", () => {
       controller.disconnect();
     }
   });
+
+  it.each([false, true])(
+    "uses the installed host’s automatic review support (%s) for an empty workspace chat",
+    async (supported) => {
+      const f = permissions();
+      f.bridge.acceptsAutomaticApprovalReview = vi.fn<
+        NonNullable<DesktopNativeChat["acceptsAutomaticApprovalReview"]>
+      >(async () => supported);
+      const controller = f.make();
+      try {
+        controller.connect(null);
+        await ready(controller);
+        await vi.waitFor(() =>
+          expect(controller.read().permissionModeAvailable).toBe(true)
+        );
+        expect(controller.read().draftAutomaticReviewAvailable).toBe(supported);
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
 
   it("opens an exact blank chat without inference before choosing Full access and keeps new chats restricted", async () => {
     const f = permissions();

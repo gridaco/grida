@@ -131,14 +131,21 @@ pub(crate) struct CatalogListing {
 
 /// Whether an open wait is a decision the person can answer. Scheduled
 /// wakeups and other host-owned waits do not request a person's attention.
-pub fn needs_user_input(schemas: &BTreeSet<SchemaId>) -> bool {
-    schemas.iter().any(|schema| {
-        matches!(
-            schema.as_str(),
-            grida_agent_master::questions::REQUEST_SCHEMA
-                | crate::permissions::REQUEST
-                | library::REQUEST
-        )
+pub fn needs_user_input(
+    schemas: &BTreeSet<SchemaId>,
+    disposition: Option<agent_kit_sessions::TurnDisposition>,
+) -> bool {
+    schemas.iter().any(|schema| match schema.as_str() {
+        grida_agent_master::questions::REQUEST_SCHEMA
+        | library::REQUEST
+        | crate::permissions::REQUEST => true,
+        crate::permissions::NETWORK_HANDOFF => {
+            disposition == Some(agent_kit_sessions::TurnDisposition::Running)
+        }
+        crate::permissions::SCOPED_REVIEW => {
+            disposition == Some(agent_kit_sessions::TurnDisposition::Suspended)
+        }
+        _ => false,
     })
 }
 

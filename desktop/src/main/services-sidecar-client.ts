@@ -1,3 +1,6 @@
+import type { ChatModels } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
+import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
 /**
  * GRIDA-SEC-004 — main-process client for the services sidecar.
  *
@@ -263,13 +266,24 @@ export namespace servicesSidecarClient {
     );
   }
 
-  export function nativeBuiltInByok(providerId: string, modelId: string) {
+  export function nativeBuiltInByok(
+    providerId: string,
+    modelId: string,
+    binding?: ChatModels.Binding,
+    modelCatalogue?: ModelCatalogueSnapshot
+  ) {
     const transport = client();
-    return NativeProviderSelection.builtInByok(providerId, modelId, {
-      ...nativeAgentByokSettings(),
-      hasKey: transport.secrets.has,
-      imageRequest: (init) => transport.fetch("/images/generate", init),
-    });
+    return NativeProviderSelection.builtInByok(
+      providerId,
+      modelId,
+      {
+        ...nativeAgentByokSettings(providerId === OPENAI_PROJECT_PROVIDER_ID),
+        hasKey: transport.secrets.has,
+        imageRequest: (init) => transport.fetch("/images/generate", init),
+        modelCatalogue,
+      },
+      binding
+    );
   }
 
   export async function setProviderEndpoint(

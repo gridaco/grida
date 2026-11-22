@@ -22,7 +22,7 @@ import { servicesSidecarClient } from "./main/services-sidecar-client";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
 import { openAboutWindow } from "./main/about-window";
-import { IPC_CHANNELS } from "./bridge/contract";
+import { IPC_CHANNELS, type DesktopSettingsSection } from "./bridge/contract";
 
 export type DesktopWindowAdmission = {
   can_open: () => boolean;
@@ -42,15 +42,37 @@ export type DesktopWindowAdmission = {
  */
 export function open_or_focus_settings(
   app: App,
-  admission?: DesktopWindowAdmission
+  admission?: DesktopWindowAdmission,
+  section?: DesktopSettingsSection
 ) {
   if (admission && !admission.can_open()) {
     admission.focus_entry();
     return;
   }
-  if (focusWindowByUrl("/desktop/settings")) return;
+  const settings = new URL("/desktop/settings", EDITOR_BASE_URL);
+  const existing = BrowserWindow.getAllWindows().find((window) => {
+    if (window.isDestroyed()) return false;
+    const url = URL.parse(window.webContents.getURL());
+    return (
+      url?.origin === settings.origin && url.pathname === settings.pathname
+    );
+  });
+  if (existing) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
+    if (section) {
+      settings.hash = section;
+      if (existing.webContents.getURL() !== settings.href)
+        return existing.loadURL(settings.href);
+    }
+    return;
+  }
   if (!getServicesSidecarInfo()) return; // pre-ready / between restarts
-  const window = open_settings_window({ app, base_url: EDITOR_BASE_URL });
+  const window = open_settings_window({
+    app,
+    base_url: EDITOR_BASE_URL,
+    ...(section && { section }),
+  });
   admission?.register(window);
 }
 
@@ -490,6 +512,17 @@ export function create_default_menu(
         { role: "cut", accelerator: "CmdOrCtrl+X" },
         { role: "copy", accelerator: "CmdOrCtrl+C" },
         { role: "paste", accelerator: "CmdOrCtrl+V" },
+        { role: "pasteAndMatchStyle", accelerator: "Shift+CmdOrCtrl+V" },
+        ...(process.platform === "darwin"
+          ? [
+              {
+                role: "pasteAndMatchStyle" as const,
+                accelerator: "Command+Option+Shift+V",
+                visible: false,
+                acceleratorWorksWhenHidden: true,
+              },
+            ]
+          : []),
         { role: "selectAll", accelerator: "CmdOrCtrl+A" },
       ],
     },

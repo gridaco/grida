@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, type WebPreview } from "@grida/desktop-bridge";
 import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import { EditorGroup } from "./editor-group";
 import { WorkbenchTab } from "./workbench-tab";
@@ -26,6 +26,11 @@ class BrowserHost implements DesktopBrowser.Bridge {
   utilities?: DesktopBrowser.Utilities.Bridge;
   thumbnail?: NonNullable<DesktopBrowser.Bridge["thumbnail"]>;
   favicon?: NonNullable<DesktopBrowser.Bridge["favicon"]>;
+  preview?: DesktopBrowser.Bridge["preview"];
+  lookupPreview?: DesktopBrowser.Bridge["lookupPreview"];
+  cancelPreview?: DesktopBrowser.Bridge["cancelPreview"];
+  previewPublicLink?: DesktopBrowser.Bridge["previewPublicLink"];
+  cancelPublicLinkPreview?: DesktopBrowser.Bridge["cancelPublicLinkPreview"];
   revision = 0;
   pages = new Map<string, DesktopBrowser.Page>();
   listeners = new Set<(event: DesktopBrowser.Event) => void>();
@@ -150,6 +155,202 @@ function setup(host: BrowserHost | null = new BrowserHost()) {
 }
 
 describe("WorkspaceBrowserTabs", () => {
+  it("accepts an open request only when its workbench is ready", async () => {
+    const { group, tabs, storage } = setup();
+    expect(tabs.open("http://localhost:4173/")).toBe(false);
+    expect(group.getSnapshot().tabs).toEqual([]);
+
+    await tabs.start(storage, async () => []);
+    expect(tabs.open("http://localhost:4173/")).toBe(true);
+    expect(group.getSnapshot().active).toBeTruthy();
+  });
+
+  it("owns preview lookups by attachment and drops a canceled response", async () => {
+    const { tabs, storage, host } = setup();
+    let complete!: (metadata: WebPreview.Metadata) => void;
+    host.preview = vi.fn<NonNullable<DesktopBrowser.Bridge["preview"]>>(
+      () =>
+        new Promise<WebPreview.Metadata>((resolve) => {
+          complete = resolve;
+        })
+    );
+    host.cancelPreview = vi.fn<
+      NonNullable<DesktopBrowser.Bridge["cancelPreview"]>
+    >(async () => {});
+    const url = "http://localhost:4173/plan";
+    const request = new AbortController();
+    expect(tabs.canLoadPreview()).toBe(false);
+    expect(await tabs.loadPreview(url, request.signal)).toBeNull();
+    await tabs.start(storage, async () => []);
+    expect(tabs.canLoadPreview()).toBe(true);
+
+    const lookup = tabs.loadPreview(url, request.signal);
+    const [{ attachmentId, id }] = vi.mocked(host.preview).mock.calls[0];
+    expect(attachmentId).toBe("owner");
+    expect(id).toMatch(/^[a-f\d-]{36}$/);
+    request.abort();
+    expect(host.cancelPreview).toHaveBeenCalledExactlyOnceWith({
+      attachmentId,
+      id,
+    });
+    complete({ title: "Stale plan" });
+    await expect(lookup).resolves.toBeNull();
+
+    const current = tabs.loadPreview(url, new AbortController().signal);
+    complete({ productLabel: "FX Viewer" });
+    await expect(current).resolves.toEqual({
+      metadata: { productLabel: "FX Viewer" },
+    });
+    tabs.stop();
+  });
+
+  it("routes public previews through their own cancellable capability", async () => {
+    const { tabs, storage, host } = setup();
+    const signal = new AbortController().signal;
+    const url = "https://example.com/guide#intro";
+    await tabs.start(storage, async () => []);
+    expect(tabs.canLoadPreview()).toBe(false);
+    await expect(tabs.loadPreview(url, signal)).resolves.toBeNull();
+
+    const pending = Promise.withResolvers<WebPreview.Result | null>();
+    host.lookupPreview = vi.fn<
+      NonNullable<DesktopBrowser.Bridge["lookupPreview"]>
+    >(() => pending.promise);
+    host.cancelPublicLinkPreview = vi.fn<
+      NonNullable<DesktopBrowser.Bridge["cancelPublicLinkPreview"]>
+    >(async () => {});
+    expect(tabs.canLoadPreview()).toBe(true);
+    await expect(
+      tabs.loadPreview("http://localhost:3000", signal)
+    ).resolves.toBeNull();
+    expect(host.lookupPreview).not.toHaveBeenCalled();
+
+    const request = new AbortController();
+    const result = tabs.loadPreview(url, request.signal);
+    const [, { id }] = vi.mocked(host.lookupPreview).mock.calls[0];
+    expect(host.lookupPreview).toHaveBeenCalledExactlyOnceWith("public", {
+      id,
+      attachmentId: "owner",
+      url: "https://example.com/guide",
+    });
+    request.abort();
+    expect(host.cancelPublicLinkPreview).toHaveBeenCalledExactlyOnceWith({
+      id,
+      attachmentId: "owner",
+    });
+    pending.resolve({
+      metadata: { title: "Plan guide", productLabel: "FX Viewer" },
+    });
+    await expect(result).resolves.toBeNull();
+    await expect(tabs.loadPreview(url, signal)).resolves.toEqual({
+      metadata: { title: "Plan guide", productLabel: "FX Viewer" },
+    });
+    vi.mocked(host.lookupPreview).mockResolvedValueOnce({ metadata: null });
+    await expect(tabs.loadPreview(url, signal)).resolves.toEqual({
+      metadata: null,
+    });
+    tabs.stop();
+  });
+
+  it("requests address focus for a new blank tab or an explicit location command", async () => {
+    const { tabs, storage } = setup();
+    await tabs.start(storage, async () => []);
+
+    tabs.open("http://localhost:4173/");
+    const [resolved] = tabs.getSnapshot().entries.values();
+    expect(resolved.locationRevision).toBe(0);
+    tabs.focusLocation();
+    expect(tabs.getSnapshot().entries.get(resolved.id)?.locationRevision).toBe(
+      1
+    );
+
+    tabs.open();
+    const blank = [...tabs.getSnapshot().entries.values()].find(
+      ({ url }) => url === null
+    );
+    expect(blank?.locationRevision).toBe(1);
+    await settle();
+    tabs.stop();
+  });
+
+  it("reuses an exact URL during creation and later focuses the same live tab", async () => {
+    const { group, tabs, storage, host } = setup();
+    const create = vi.spyOn(host, "create");
+    await tabs.start(storage, async () => []);
+
+    expect(tabs.openOrFocus("http://localhost:4173")).toBe(true);
+    const browserTab = group.getSnapshot().active;
+    expect(tabs.openOrFocus("http://localhost:4173/")).toBe(true);
+    expect(group.getSnapshot().tabs).toEqual([browserTab]);
+    expect(create).toHaveBeenCalledExactlyOnceWith({
+      attachmentId: "owner",
+      url: "http://localhost:4173/",
+    });
+
+    await settle();
+    const page = tabs.activeAutomationPageId();
+    expect(page).toBeTruthy();
+    group.open(WorkbenchTab.file("notes.md"));
+    expect(tabs.openOrFocus("http://localhost:4173/")).toBe(true);
+    expect(group.getSnapshot().active).toBe(browserTab);
+    expect(tabs.activeAutomationPageId()).toBe(page);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(host.navigated).toEqual([]);
+    expect([...tabs.getSnapshot().entries.values()][0].locationRevision).toBe(
+      0
+    );
+    tabs.stop();
+  });
+
+  it("uses the live location and keeps query strings and fragments distinct", async () => {
+    const { group, tabs, storage, host } = setup();
+    await tabs.start(storage, async () => []);
+    tabs.open("http://localhost:4173/");
+    const original = group.getSnapshot().active;
+    await settle();
+
+    const page = {
+      ...[...host.pages.values()][0],
+      url: "http://localhost:4173/preview?mode=wide#top",
+      revision: ++host.revision,
+    };
+    host.pages.set(page.id, page);
+    host.emit({
+      type: "changed",
+      attachmentId: "owner",
+      revision: page.revision,
+      page,
+    });
+
+    expect(tabs.openOrFocus(page.url)).toBe(true);
+    expect(group.getSnapshot().active).toBe(original);
+    expect(group.getSnapshot().tabs).toHaveLength(1);
+    for (const url of [
+      "http://localhost:4173/",
+      "http://localhost:4173/preview?mode=narrow#top",
+      "http://localhost:4173/preview?mode=wide#bottom",
+    ]) {
+      expect(tabs.openOrFocus(url)).toBe(true);
+      await settle();
+    }
+    expect(group.getSnapshot().tabs).toHaveLength(4);
+    tabs.stop();
+  });
+
+  it("prefers the active match when a URL is open in multiple tabs", async () => {
+    const { group, tabs, storage } = setup();
+    await tabs.start(storage, async () => []);
+    const url = "http://localhost:4173/";
+    tabs.open(url);
+    tabs.open(url);
+    const [first, second] = group.getSnapshot().tabs;
+    expect(tabs.openOrFocus(url)).toBe(true);
+    expect(group.getSnapshot().active).toBe(second);
+    expect(group.getSnapshot().tabs).toEqual([first, second]);
+    await settle();
+    tabs.stop();
+  });
+
   it("reveals only the exact live page of the current attachment", async () => {
     const { group, tabs, storage, host } = setup();
     await tabs.start(storage, async () => []);

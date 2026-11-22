@@ -24,6 +24,8 @@ export interface ApplicationPresetSpec {
   id: ApplicationPresetId;
   /** Rail tooltip + composer chip label. */
   label: string;
+  /** Short description of the selected preset shown on the composer chip. */
+  composerTooltip?: string;
   /** Icon-only rail glyph + composer chip glyph. */
   icon: ComponentType<{ className?: string }>;
   /** Question above the composer, before the workspace picker. */
@@ -65,6 +67,7 @@ export namespace ApplicationPreset {
     {
       id: "slides",
       label: "Slides",
+      composerTooltip: "Create a slide deck",
       icon: PresentationIcon,
       composerQuestion: "What deck are we making",
       description: "Create editable decks.",
@@ -76,6 +79,7 @@ export namespace ApplicationPreset {
     {
       id: "image",
       label: "Images",
+      composerTooltip: "Generate an image",
       icon: ImageIcon,
       composerQuestion: "What image should we make",
       description: "Generate images from a prompt.",
@@ -85,6 +89,7 @@ export namespace ApplicationPreset {
     {
       id: "workflows",
       label: "Workflows",
+      composerTooltip: "Create a workflow",
       icon: WorkflowIcon,
       composerQuestion: "What should we automate",
       description: "Build and run FX workflows.",
@@ -94,6 +99,7 @@ export namespace ApplicationPreset {
     {
       id: "video",
       label: "Videos",
+      composerTooltip: "Generate a video",
       icon: VideoIcon,
       composerQuestion: "What should we bring to life",
       description: "Generate short video loops.",

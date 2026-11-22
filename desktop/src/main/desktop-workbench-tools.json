@@ -1,0 +1,187 @@
+{
+  "list": {
+    "name": "workbench_list_tabs",
+    "description": "List the visible tabs and the active tab in the attached Workbench. File paths are relative to the workspace and can be passed directly to workbench_show.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "activeTabId": {
+          "type": ["string", "null"]
+        },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "file"
+                  },
+                  "tabId": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "tabId", "path"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "browser"
+                  },
+                  "tabId": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": ["string", "null"]
+                  },
+                  "title": {
+                    "type": ["string", "null"]
+                  },
+                  "state": {
+                    "enum": ["ready", "pending", "failed"]
+                  }
+                },
+                "required": ["kind", "tabId", "url", "title", "state"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": ["activeTabId", "tabs", "truncated"],
+      "additionalProperties": false
+    },
+    "version": 4,
+    "effect": "read"
+  },
+  "show": {
+    "name": "workbench_show",
+    "description": "Show an existing workspace file or bundle, an exact tab, or an HTTP(S) URL when offered. File targets accept paths relative to the workspace root or native absolute paths inside it. The acknowledgment confirms dispatch. Reveal without moving windows unless the user explicitly requests window focus.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "file"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "required": ["kind", "path"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "tab"
+                },
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "url"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "required": ["kind", "url"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "presentation": {
+          "enum": ["reveal", "focus"]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        },
+        "requested": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "tabId": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 4,
+    "effect": "presentation"
+  },
+  "close": {
+    "name": "workbench_close_browser_tab",
+    "description": "When the user asks to close a visible browser tab, use its exact tab ID from workbench_list_tabs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tabId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": ["tabId"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  }
+}

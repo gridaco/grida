@@ -2,112 +2,57 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { catalog } from "@grida/ai/catalogue";
 import {
-  CHATGPT_PROVIDER_ID,
-  CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
-  CHATGPT_SUBSCRIPTION_MODEL_IDS,
-  CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
-  GG_PROVIDER_ID,
-} from "@grida/ai-host";
+  bundledModelCatalogue,
+  catalog,
+  ChatModels,
+} from "@grida/ai/catalogue";
+import { CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS } from "@grida/ai-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 
+const seed = bundledModelCatalogue();
+const selectors = Object.keys(seed.agents["openai-codex"] ?? {});
+const offered = ChatModels.list(seed, { provider: "chatgpt", selectors });
+
 describe("NativeChatProfiles image eligibility", () => {
-  it("intersects exact canonical input facts with the implemented native routes", async () => {
-    const generated = JSON.parse(
-      await fs.readFile(
-        new URL(
-          "../../../crates/grida-agent/data/openrouter-png-models.json",
-          import.meta.url
-        ),
-        "utf8"
-      )
-    ) as { models: string[] };
-    const choices = catalog.text.listed_models().map((model) => model.id);
-    expect(
-      choices
-        .filter((model) => NativeChatProfiles.imageInput("openrouter", model))
-        .sort()
-    ).toEqual([...generated.models].sort());
-    const responses = JSON.parse(
-      await fs.readFile(
-        new URL(
-          "../../../crates/grida-agent/data/responses-png-models.json",
-          import.meta.url
-        ),
-        "utf8"
-      )
-    ) as { models: string[] };
-    for (const model of CHATGPT_SUBSCRIPTION_MODEL_IDS) {
-      expect(NativeChatProfiles.imageInput("chatgpt", model)).toBe(
-        responses.models.includes(model.replace(/^openai\//, ""))
-      );
-      expect(NativeChatProfiles.imageInput("vercel", model)).toBe(false);
-      expect(NativeChatProfiles.imageInput("local-endpoint", model)).toBe(
-        false
-      );
-    }
-    expect(
-      NativeChatProfiles.imageInput(GG_PROVIDER_ID, "openai/gpt-5.6-sol")
-    ).toBe(true);
-    expect(
-      NativeChatProfiles.imageInput(GG_PROVIDER_ID, "openai/gpt-6.1-sol")
-    ).toBe(false);
-    expect(NativeChatProfiles.imageInput("openrouter", "unknown/model")).toBe(
+  it("keeps the gateway adapter on its supported image route", () => {
+    expect(NativeChatProfiles.gatewayImageInput("openai/gpt-5.6-sol")).toBe(
+      true
+    );
+    expect(NativeChatProfiles.gatewayImageInput("openai/gpt-6.1-sol")).toBe(
       false
     );
   });
 });
 
 describe("NativeChatProfiles subscription identity", () => {
-  it("offers only supported subscription models under the captured OAuth connection", () => {
-    const choices = NativeChatProfiles.subscriptionChoices("a".repeat(64));
-    expect(
-      choices.map(({ providerId, modelId, connection }) => ({
-        providerId,
-        modelId,
-        connection,
-      }))
-    ).toEqual(
-      CHATGPT_SUBSCRIPTION_MODEL_IDS.map((modelId) => ({
-        providerId: "chatgpt",
-        modelId,
-        connection: "ChatGPT Subscription",
-      }))
+  it("uses the account offer order and binds each receipt to its sign-in", () => {
+    const ordered = ChatModels.list(seed, {
+      provider: "chatgpt",
+      selectors: ["gpt-6.2-astra", "unknown", "gpt-6.2-sol"],
+    });
+    const choices = NativeChatProfiles.subscriptionChoices(
+      "a".repeat(64),
+      ordered
     );
-    expect(new Set(choices.map(({ id }) => id)).size).toBe(choices.length);
-    expect(
-      choices.every(
-        ({ id, model }) => NativeChatProfiles.validId(id) && model.length > 0
-      )
-    ).toBe(true);
-    expect(
-      NativeChatProfiles.subscriptionChoices("b".repeat(64)).map(({ id }) => id)
-    ).not.toEqual(choices.map(({ id }) => id));
-    expect(NativeChatProfiles.subscriptionChoices("a".repeat(64))).toEqual(
-      choices
-    );
-    expect(choices[0].modelId).toBe(CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID);
     expect(choices.map(({ model }) => model)).toEqual([
-      "GPT-6.2 Sol",
       "GPT-6.2 Astra",
-      "GPT-6.1 Sol",
-      "GPT-6 Astra",
-      "GPT-6.1 Terra",
-      "GPT-6 Luna",
-      "GPT-6 Sol",
-      "GPT-5.6 Sol",
-      "GPT-5.6 Terra",
-      "GPT-5.6 Luna",
+      "GPT-6.2 Sol",
     ]);
-    for (const { modelId } of choices.slice(0, 2)) {
-      expect(
-        NativeChatProfiles.contextWindow(modelId, CHATGPT_PROVIDER_ID)
-      ).toBe(1_050_000);
-      expect(NativeChatProfiles.imageInput(CHATGPT_PROVIDER_ID, modelId)).toBe(
-        true
+    for (const choice of choices) {
+      expect(choice).toMatchObject({
+        contextWindow: 1_050_000,
+        imageInput: true,
+        reasoning: true,
+        connection: "ChatGPT Subscription",
+        providerId: "chatgpt",
+      });
+      expect(choice.id).toBe(
+        NativeChatProfiles.subscriptionBinding("a".repeat(64), choice.modelId)
       );
-      expect(catalog.text.modelSpecById(modelId)).toBeUndefined();
+      expect(choice.id).not.toBe(
+        NativeChatProfiles.subscriptionBinding("b".repeat(64), choice.modelId)
+      );
     }
   });
 
@@ -119,7 +64,16 @@ describe("NativeChatProfiles subscription identity", () => {
       );
       try {
         const scope = "a".repeat(64);
-        const choices = NativeChatProfiles.subscriptionChoices(scope);
+        const choices = NativeChatProfiles.subscriptionChoices(
+          scope,
+          offered
+        ).map(({ id, model, modelId, connection, providerId }) => ({
+          id,
+          model,
+          modelId,
+          connection,
+          providerId,
+        }));
         const entries = [
           choices.find(({ modelId }) => modelId === "openai/gpt-5.6-sol")!,
           ...CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS.map((modelId) => ({
@@ -145,7 +99,11 @@ describe("NativeChatProfiles subscription identity", () => {
           filename,
           JSON.stringify([
             ...entries,
-            { ...entries[0], id: "f".repeat(64), modelId: "openai/unreviewed" },
+            {
+              ...entries[0],
+              id: "f".repeat(64),
+              modelId: "openai/invalid model",
+            },
           ])
         );
         await expect(NativeChatProfiles.read(directory)).rejects.toThrow(

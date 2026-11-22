@@ -55,7 +55,7 @@ impl MessageContext {
 
     pub(super) fn model_message(&self, authored: &MessageId) -> Result<Message> {
         Ok(Message {
-            id: MessageId::new(format!("{SOURCE}/{authored}"))?,
+            id: MessageId::new(supplemental_id(authored))?,
             role: Role::User,
             phase: None,
             content: vec![Content::Text(format!(
@@ -124,6 +124,14 @@ pub(crate) fn is_supplemental(message: &Message) -> bool {
         && message.provenance.source == SOURCE
 }
 
+fn supplemental_id(authored: &MessageId) -> String {
+    format!("{SOURCE}/{authored}")
+}
+
+pub(super) fn is_supplemental_for(message: &Message, authored: &MessageId) -> bool {
+    is_supplemental(message) && message.id.as_str() == supplemental_id(authored)
+}
+
 fn identifier(value: &str) -> bool {
     (1..=64).contains(&value.len())
         && value.as_bytes()[0].is_ascii_lowercase()
@@ -167,6 +175,8 @@ mod tests {
         assert_eq!(primary.content, ordinary[0].content);
         assert_eq!(primary.provenance.kind, ProvenanceKind::Supplied);
         assert!(is_supplemental(supplemental));
+        assert!(is_supplemental_for(supplemental, &primary.id));
+        assert!(!is_supplemental_for(supplemental, &supplemental.id));
         assert_ne!(primary.id, supplemental.id);
         let without_text = super::super::prompt_input(&id, &[part]).unwrap();
         assert_eq!(without_text[0].id, primary.id);

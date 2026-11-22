@@ -7,6 +7,7 @@ import type {
   NativeChatAttachment,
   NativeChatDraftAttachment,
   NativeChatEffort,
+  NativeChatSpeed,
   NativeChatFileInput,
   NativeChatFileReferenceInput,
   NativeChatGoal,
@@ -250,6 +251,7 @@ describe("DesktopNativeChat saved selection", () => {
         choice: Readonly<{
           profileId: string | null;
           effort: NativeChatEffort;
+          speed?: NativeChatSpeed;
         }>,
       ]
     >();
@@ -261,7 +263,10 @@ describe("DesktopNativeChat saved selection", () => {
   it("returns the native-bound first-input identity with the draft attachment", () => {
     expectTypeOf<
       Parameters<NonNullable<DesktopNativeChat["createFromDraft"]>>
-    >().toEqualTypeOf<[draftId: string]>();
+    >().toEqualTypeOf<[draftId: string, manualApproval?: true]>();
+    expectTypeOf<
+      DesktopNativeChat["defaultsToAutomaticReview"]
+    >().toEqualTypeOf<true | undefined>();
     expectTypeOf<
       Awaited<ReturnType<NonNullable<DesktopNativeChat["createFromDraft"]>>>
     >().toEqualTypeOf<NativeChatDraftAttachment>();

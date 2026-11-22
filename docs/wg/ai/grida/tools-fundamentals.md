@@ -1,6 +1,6 @@
 ---
-title: Fundamental Tools (Grida binding)
-description: How the locked fundamental-tool RFC lands in Grida. Naming map (RFC id → Grida id), backend adapter table, per-tool deviations Grida ships, and where each tool lives in the monorepo.
+title: Embedded Agent Tool Proposal
+description: The earlier Grida web-agent tool profile for embedded hosts with restricted or virtual file access.
 keywords: [ai, tools, agent, filesystem, planning, grida, binding]
 format: md
 tags:
@@ -10,64 +10,62 @@ tags:
   - grida
 ---
 
-# Fundamental Tools (Grida binding)
+# Embedded Agent Tool Proposal
 
-This document binds the locked fundamental-tool RFC
-([`../agent/tools.md`](../agent/tools.md)) to Grida's host surfaces.
-The RFC names the **shapes** every conforming implementation MUST
-honor; this page records the **identifiers, backends, and shipped
-deviations** as Grida currently implements them.
+Grida's first web agent used explicit file tools because the host exposed
+a virtual filesystem and had no system shell. This proposal preserves that
+design for embedded environments where the host mediates file access,
+such as a browser or a tightly scoped sandbox without command execution.
+
+The [tool profile framework](../agent/tools.md#tool-profiles) gives
+each host room to choose the operations it can support. Grida's shipping
+agent runs in the native Desktop or headless host. The
+[native tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
+describes its current inventory and permissions.
 
 For canvas-specific tools (scene-graph search, specialized inserts,
 canvas exec / lint / format, resource lookup), see
 [`tools-canvas.md`](./tools-canvas.md). For image-generation tools,
 see [`tools-image.md`](./tools-image.md).
 
-## Naming map (RFC → Grida)
+## Embedded tool profile
 
-The RFC locks 13 ids (`read`, `write`, `edit`, `glob`, `grep`,
-`bash`, `todo`, `task`, `question`, `web_search`, `web_fetch`,
-`skill`, `tool_search`). Grida currently ships a `_file` / `_files`
-suffix on the fs tools and splits command execution into a start and
-an interaction tool. The divergence is recorded here, not endorsed — a future
-RFC item should reconcile (see [Adding a new fundamental
-tool](#adding-a-new-fundamental-tool)).
+Each tool exposes one operation the host can authorize and bound separately.
+A structured read supplies edit context. A directory listing supplies names.
+A text search supplies matching lines and their locations.
 
-| RFC id        | Grida id                      | Notes                                                                                                                                                           |
-| ------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`        | `read_file`                   | Same shape; Grida's name is more specific.                                                                                                                      |
-| `write`       | `write_file`                  | Same full-file upsert shape; creates or overwrites.                                                                                                             |
-| `edit`        | `edit_file`                   | Same current-content replacement shape; Grida adds a strict ambiguity rule on multi-match.                                                                      |
-| `glob`        | `list_files`                  | Grida binding uses a path-scoped directory-listing shape; VFS hosts should provide it, real-fs hosts may omit it when command/search tools are stronger.        |
-| `grep`        | `grep_files`                  | Same shape; literal substring search (regex is not shipped).                                                                                                    |
-| `bash`        | `exec_command`, `write_stdin` | A command may outlive one call: the first starts it and waits briefly; the second reads, types into, or interrupts it.                                          |
-| `todo`        | `todo_write`                  | Same shape; replace-all semantics.                                                                                                                              |
-| `task`        | _not yet shipped_             | Subagent spawn surfaced behind editor flows; expose as `task` once stable.                                                                                      |
-| `question`    | `question`                    | Shipped. Pauses the run on a human (client-resolved survey card); interactive hosts (desktop, `serve` daemon) answer it, headless hosts return a fixed refusal. |
-| `web_search`  | _not yet shipped_             | Host-bound provider; out of scope for the first cut.                                                                                                            |
-| `web_fetch`   | _not yet shipped_             | As above.                                                                                                                                                       |
-| `skill`       | _not yet shipped_             | Discovery layer pending.                                                                                                                                        |
-| `tool_search` | `tool_search` _(proposed)_    | Two-level (literal + semantic) proposed below; not yet implemented.                                                                                             |
+| Operation      | Tool          | Role                                                           |
+| -------------- | ------------- | -------------------------------------------------------------- |
+| Read text      | `read_file`   | Return bounded current text.                                   |
+| Write text     | `write_file`  | Create a file or replace its full contents.                    |
+| Edit text      | `edit_file`   | Replace a unique fragment of current content.                  |
+| List files     | `list_files`  | List the direct children of a directory.                       |
+| Search text    | `search_text` | Find a literal within readable files.                          |
+| Track work     | `todo_write`  | Replace a list of tasks and their statuses.                    |
+| Ask a question | `question`    | Request a reply from the person.                               |
+| View an image  | `view_image`  | Return bounded pixels from an authorized source.               |
+| Run a program  | Host-defined  | Optional when the host can grant command execution.            |
+| Discover tools | `tool_search` | Proposed lookup when a catalog outgrows the available context. |
+
+Task delegation, web search, web fetching, and skill discovery were outside
+this proposed profile.
 
 ## Backends
 
-Grida's filesystem tools are storage-agnostic by signature. The same
-`read_file({ path })` call works against any backend; what differs is
-**the adapter under the fs, not the schema the model sees**.
+The proposal uses the same `read_file({ path })` signature across file
+backends. The host resolves the path within the scope it issued.
 
 | Backend category    | Where                 | Use case                                                                          |
 | ------------------- | --------------------- | --------------------------------------------------------------------------------- |
 | In-process storage  | application memory    | Tests, scratch documents, ad-hoc agent runs.                                      |
 | Browser storage     | browser origin        | Web environment (per [`agent/environments / web`](../agent/environments.md#web)). |
-| Host-scoped storage | local host filesystem | Opened Desktop/agent workspaces under the host's containment policy.              |
+| Host-scoped storage | local host filesystem | File access through a host that mediates path operations.                         |
 | Remote storage      | service boundary      | Multi-tenant cloud product surfaces.                                              |
 
 A path can be **bound** to live state (an editor, a doc model) or
 **pure** in-memory storage (notes, scratch). Both shapes share the API.
 
-## Per-tool deviations and Grida extensions
-
-Items where Grida's binding deviates from or extends the RFC shape.
+## Tool shapes
 
 ### `read_file`
 
@@ -108,15 +106,22 @@ Success means the full write has completed before the result returns.
 Content above the shared 1 MiB text bound is rejected with `too_large`, so every
 successful write can still be read and edited after a resumed run.
 
-### `list_files`
+### File discovery and search
 
-Grida adopts a path-scoped directory-listing shape for the RFC's
-filesystem-discovery primitive. Despite the current Grida id, this
-tool is **not** a whole-workspace inventory.
+An embedded host that can only expose file operations uses these tools to
+make reachable paths discoverable. A host with shell access can delegate
+listing, file discovery, text search, and reads to commands in its granted
+scope.
+
+#### `list_files`
+
+The earlier listing proposal returns the direct children of one directory
+within the virtual filesystem. It sorts the entries and groups folders
+separately from files. With no path, it lists the virtual workspace root.
 
 ```ts
 list_files({
-  path?: string,   // defaults to "/"
+  path?: string,
   offset?: number,
   limit?: number,
 }) -> {
@@ -128,47 +133,26 @@ list_files({
 }
 ```
 
-Contract:
+A partial listing reports truncation and the next offset when another page
+is available. An indexed, bounded, or ignore-filtered backend reports the
+limits on its coverage in the result. Filename patterns belong to a separate
+path search operation. A listing returns names, while reads and text search
+supply content.
 
-- `path` is rooted in the agent workspace or virtual filesystem. It
-  must not be a general host-absolute path.
-- The result lists only the direct children of `path`, grouped into
-  folders and files.
-- The result is sorted, paginated, and explicit about truncation.
-- `list_files` discovers names only. It does not return file content or provide
-  textual edit context.
-- For filename-pattern search, use a separate glob / find-path tool
-  rather than overloading this directory-listing result.
+#### `grep_files`
 
-Implementation guidance:
+The earlier proposal called literal search `grep_files`. The tool taxonomy
+later used `search_text` for this role. Literal search inspects readable
+UTF-8 files in the selected scope and returns each matching file path, its
+one-based line number, and the matched line. Like `grep -n -F`, it matches
+case-sensitive fixed strings by default. The proposal uses
+`case_sensitive: false` to request case-insensitive matching. A bounded result
+reports partial coverage.
 
-- **VFS / OPFS / memory backends:** provide `list_files`. A virtual
-  filesystem may not have a shell, `find`, `tree`, or `rg`, so the
-  structured directory-listing tool is the portable way for the agent
-  to discover reachable paths.
-- **Real filesystem backends:** treat this tool as optional. A
-  shell-capable real-fs agent often gets better behavior from explicit
-  commands (`rg --files`, `find`, `ls`, `tree`) because those tools
-  follow mature ignore rules, stream large output, and make scope
-  visible in the command. A flat "all known files" tool can degrade
-  agent quality by confusing the model into trusting an incomplete or
-  stale index as ground truth.
-- **Do not hide truncation.** If a backend is indexed, capped, or
-  ignore-filtered, the tool result must say so in-band.
-
-### `grep_files`
-
-Literal substring search across every known file. Returns one entry
-per matching line with a 1-indexed line number and the full line
-text. Mirrors `grep -n -F` (case-sensitive, fixed-string by default;
-pass `case_sensitive: false` for `-i`). A result may provide enough
-text for a unique edit, but the agent should read the file when it
-needs broader context.
-
-Roadmap:
-
-- **Level 1 (shipped):** literal substring search. Cheap, deterministic, works offline.
-- **Level 2 (future):** semantic / RAG search. Higher cost; will ship as a separate tool name (e.g. `semantic_search`) so the model picks the cost tier explicitly.
+The proposal considered semantic search a separate follow-up, for example
+`semantic_search`. Literal matching works offline with deterministic
+results. A distinct semantic operation makes the added processing cost and
+different result semantics visible when the caller chooses it.
 
 ### `todo_write`
 
@@ -194,88 +178,21 @@ prior list is replaced wholesale.
 Use it when the work is non-trivial (multiple edits, exploration,
 anything you'd break into steps). Skip it for one-shot edits.
 
-### `exec_command` and `write_stdin`
+### Optional command execution
 
-Grida's binding of the RFC's `bash`, split in two because a command can
-outlive the call that started it: a development server, a watcher, a long
-build, or an interactive program.
-
-```ts
-exec_command({
-  cmd: string,                // command line, run as `<shell> -c cmd`
-  workdir?: string,           // absolute; defaults to the selected directory's root
-  tty?: boolean,              // pseudo-terminal; otherwise pipes with stdin closed
-  yield_time_ms?: number,     // wait before returning; default 10000, 250–30000
-  max_output_tokens?: number, // output budget; default 10000, host-capped
-  // plus the host's approval fields where grants are scoped per directory
-})
-
-write_stdin({
-  session_id: number,         // from an earlier result
-  chars?: string,             // empty polls; "\u0003" interrupts
-  yield_time_ms?: number,     // writes: default 250, at most 30000; polls: 5000–300000
-  max_output_tokens?: number,
-})
-```
-
-Both return text:
-
-```text
-Wall time: 1.2345 seconds
-Process exited with code 0          (or: Process running with session ID 3)
-Original token count: 12            (only when the output was shortened)
-Output:
-<output>
-```
-
-The contract:
-
-- **The shell is named, not chosen by the model.** It is the user's own
-  POSIX shell when that is a known one at an absolute path, otherwise
-  `/bin/sh`, and never a login or interactive shell. The call carries no
-  environment, stdin, or shell selection.
-- **A call waits for its whole yield.** It returns at the end of its wait or
-  when the command ends, never at the first output, so one call sees
-  everything that arrived in that time.
-- **A command that ends within its wait has no session.** Its exit is
-  reported once and nothing is retained.
-- **A still-running command belongs to the conversation**, not to the call
-  or the turn. Ending, cancelling or pausing a turn, waiting for an approval,
-  and resuming elsewhere leave it running; a later turn reaches it by its
-  session ID. An explicit stop, revocation of its directory, deleting the
-  conversation, eviction, and host shutdown end it, and the host's own exit
-  ends it too.
-- **Session IDs are per conversation, increasing, and never reused.** The
-  end of a session is reported once; after that its ID is unknown.
-- **Pipes accept only an interrupt.** A terminal session receives the
-  characters as typed, including the interrupt character.
-- **Output keeps its start and end.** Over budget, the middle is replaced
-  with a counted truncation marker; bytes the host could not retain are
-  counted where they were dropped. An end by signal or stop is reported as
-  such, never as an exit code.
-- **Approval belongs to the start.** Input to an approved session needs no
-  approval of its own and reaches only the conversation's own sessions. A
-  pre-execution policy check therefore sees the command line, not later
-  input; a policy that must see every command refuses interactive shells.
-- **Recovery is honest.** A start or input whose result the host cannot
-  account for after an interruption is uncertain; an empty poll may be
-  repeated.
-- **Bounded.** A conversation keeps a bounded number of sessions. Starting
-  another evicts the least recently used one, never one of the most recently
-  used or one in use, ended ones first; if none qualifies, the start is
-  refused.
-
-Security expectation: command execution must run under a real
-sandbox boundary. Every command runs under execution confinement with its own
-authority set; see
-[execution authority](../agent/execution-authority.md#a4--raw-execution-is-capability-scoped-and-fail-closed).
+An embedded host can expose command execution when it can enforce a
+confinement boundary. The operation should describe whether it runs a
+shell or spawns an allowlisted executable with structured arguments.
+A command takes an explicit working directory within its granted scope.
+Expose timeout and truncation so callers can recognize partial results.
+[Execution authority](../agent/execution-authority.md#a4--raw-execution-is-capability-scoped-and-fail-closed)
+owns the confinement requirement.
 
 ### `view_image` (Grida extension)
 
-Grida's binding of the RFC [`visual perception`](../agent/vision.md)
-contract — the visual twin of `read_file`. `read_file` returns text and
-**stays** text-only; `view_image` returns a raster image the model sees as
-pixels.
+The proposal separates text from [visual perception](../agent/vision.md).
+`read_file` returns text. `view_image` returns a raster image the model sees
+as pixels.
 
 ```ts
 view_image({ path }) →
@@ -283,7 +200,7 @@ view_image({ path }) →
   | { ok: false, reason: "not_found" | "unsupported_type" | "too_large", message }
 ```
 
-Binding facts as Grida currently ships them:
+The earlier design assumed:
 
 - **v1 = raster bitmaps** (`png` / `jpeg` / `webp` / `gif`), identified by
   magic bytes (never the extension). Rendering non-bitmap sources
@@ -300,24 +217,18 @@ Binding facts as Grida currently ships them:
   [`vision / retention`](../agent/vision.md#retention-keep-recent-elide-old).
 - **Capability.** Needs only `fs.read` over the path — the same read scope
   as `read_file`; `view_image` joins the registry only when the host wires a
-  byte source. Grida's workspace agent passes its filesystem (it exposes a
-  raw-bytes read), so the tool sees workspace images by path.
+  byte source, so the tool can see workspace images by path.
 - **Known v1 gap.** A binary image is not yet surfaced by `list_files`
   (the text-hydrate skips it), so the agent perceives images the user
   **names by path**; autonomous discovery is a tracked follow-up.
 
-It lives alongside the other fundamentals (the perception module is a
-sibling of the fs tools, not part of `tools-image.md`, which is image
-**generation** — a different verb).
+This is an inspection operation. Image generation has its own
+[tool proposal](./tools-image.md).
 
 ### `tool_search` (proposed)
 
-As the toolkit grows — fs + todos + canvas (15+) + future env tools
-
-- user-installed MCP servers — the model can't reasonably hold
-  every tool's full schema in its working context. The RFC names a
-  two-level (literal + semantic) discovery shape; Grida's binding
-  will mirror it.
+A larger embedded catalog can provide a two-level lookup to keep full
+schemas out of the default context.
 
 | Level   | Search type          | Cost            | When                                                                  |
 | ------- | -------------------- | --------------- | --------------------------------------------------------------------- |
@@ -343,40 +254,9 @@ tool_search({
 }
 ```
 
-Status: **proposed**. The four shipped fundamentals plus the canvas
-tools are enough that we haven't felt the pinch. When the form-builder
-agent surface or the first MCP integration lands, this becomes the
-next thing to ship.
-
-## What lives where
-
-- `crates/grida-agent/src/file_tools.rs` — filesystem fundamentals
-  ([source](https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/file_tools.rs))
-- `tool_search` — _not yet created; see proposal above_
-- Document-specific tools belong to their editor implementations. See
-  [`tools-canvas.md`](./tools-canvas.md) for the canvas capability catalog.
-
-## Adding a new fundamental tool
-
-Bar: would every agent want this, regardless of env? If yes, it's
-fundamental. Examples that pass the bar: filesystem, planning, tool
-discovery, time/clock, env metadata. Examples that fail: anything
-canvas-specific, anything network-bound (those are MCP or per-env).
-
-Process:
-
-1. Confirm the RFC carries the shape — if not, propose it to
-   [`../agent/tools.md`](../agent/tools.md) first.
-2. Implement it in the native agent (`crates/grida-agent`) with its
-   own module, tool schema, and pure-logic tests.
-3. Add a row to the naming map above and a per-tool section below it.
-4. If it's vfs-only (only needed because we lack command execution),
-   mark it so — the host can then drop it when command execution is
-   available.
-
 ## See also
 
-- [Agent RFC / Tools](../agent/tools.md) — the locked-set contract this page binds.
+- [Agent RFC / Tools](../agent/tools.md) — shared invocation contracts and host-selected profiles.
 - [Agent RFC / Visual perception](../agent/vision.md) — the read/view split `view_image` binds.
 - [Agent RFC / Environments](../agent/environments.md) — which capabilities each environment exposes.
 - [Canvas Tools](./tools-canvas.md) — canvas-only tool surface.

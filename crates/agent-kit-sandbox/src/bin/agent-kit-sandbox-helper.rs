@@ -6,6 +6,9 @@ mod helper;
 #[cfg(target_os = "linux")]
 #[path = "../linux_seccomp.rs"]
 mod linux_seccomp;
+#[cfg(target_os = "linux")]
+#[path = "../proxy_environment.rs"]
+mod proxy_environment;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "../wire.rs"]
 mod wire;

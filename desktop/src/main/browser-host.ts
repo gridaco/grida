@@ -19,10 +19,11 @@ import {
 } from "electron";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { DesktopBrowser } from "@grida/desktop-bridge";
+import { DesktopBrowser, WebPreview } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
 import { BrowserFavicon } from "./browser-favicon";
+import { BrowserFaviconDecoder } from "./browser-favicon-decoder";
 import { BrowserLegacyProfiles } from "./browser-legacy-profiles";
 import type { BrowserHistory } from "./browser-history";
 import { BrowserSitePolicy } from "./browser-site-policy";
@@ -31,6 +32,7 @@ import type { BrowserDownloads } from "./browser-downloads";
 import { BrowserPageTools } from "./browser-page-tools";
 import { BrowserFindDialog } from "./browser-find-dialog";
 import { BrowserExternalLinks } from "./browser-external-links";
+import type { WebPreviewService } from "./web-preview";
 import {
   AUTOMATION_SHELL_URL,
   createBrowserAutomationWindow,
@@ -106,6 +108,7 @@ type Owner = {
   pages: Map<string, Page>;
   disposers: (() => void)[];
   thumbnail: { page: Page; token: symbol } | null;
+  previews?: Map<string, AbortController>;
   background?: {
     scope: BrowserAutomationScope;
     workbench: Owner;
@@ -160,6 +163,7 @@ export class DesktopBrowserHost {
   readonly #pendingAttach = new Map<number, symbol>();
   readonly #mounts = new Map<string, Mount>();
   readonly #acceptedMounts = new Map<number, Mount>();
+  readonly #faviconDecoder = new BrowserFaviconDecoder();
 
   constructor(
     readonly options: {
@@ -168,6 +172,9 @@ export class DesktopBrowserHost {
       workspaceExists(workspaceId: string): Promise<boolean>;
       history?: BrowserHistory;
       downloads?: BrowserDownloads;
+      decodeFavicon?: BrowserFaviconDecoder["decode"];
+      webPreview?: Pick<WebPreviewService, "lookup" | "clear"> &
+        Partial<Pick<WebPreviewService, "lookupPublicLink" | "lookupResult">>;
     }
   ) {
     options.history?.subscribe((change) => this.#publishHistory(change));
@@ -594,6 +601,7 @@ export class DesktopBrowserHost {
       browserSession,
       favicon: new BrowserFavicon({
         session: browserSession,
+        decode: this.options.decodeFavicon ?? this.#faviconDecoder.decode,
         current: () =>
           this.#live(owner) &&
           owner.pages.get(id) === page &&
@@ -873,6 +881,129 @@ export class DesktopBrowserHost {
     return page.favicon.get();
   }
 
+  async preview(
+    event: IpcMainInvokeEvent,
+    raw: unknown
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
+    return this.#readPreview(
+      event,
+      raw,
+      "loopback",
+      async (owner, url, signal) => {
+        const page = [...owner.pages.values()].find(
+          (candidate) =>
+            candidate.state.url === url &&
+            !candidate.state.loading &&
+            !candidate.state.failure &&
+            candidate.guest &&
+            !candidate.guest.isDestroyed() &&
+            candidate.guest.getURL() === url
+        );
+        const title =
+          page?.guest &&
+          this.#text(page.guest.getTitle(), WebPreview.MAX_TITLE_BYTES);
+        const favicon = page?.favicon.get();
+        const observed =
+          title || favicon
+            ? { ...(title && { title }), ...(favicon && { favicon }) }
+            : undefined;
+        return WebPreview.parseMetadata(
+          await this.options.webPreview?.lookup(
+            owner.attachmentId!,
+            url,
+            signal,
+            observed
+          )
+        );
+      }
+    );
+  }
+
+  async previewPublicLink(
+    event: IpcMainInvokeEvent,
+    raw: unknown
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
+    return this.#readPreview(event, raw, "public", async (owner, url, signal) =>
+      WebPreview.parseMetadata(
+        await this.options.webPreview?.lookupPublicLink?.(
+          owner.attachmentId!,
+          url,
+          signal
+        )
+      )
+    );
+  }
+
+  async #readPreview(
+    event: IpcMainInvokeEvent,
+    raw: unknown,
+    kind: WebPreview.Kind,
+    read: (
+      owner: Owner,
+      url: string,
+      signal: AbortSignal
+    ) => Promise<WebPreview.Metadata | null>
+  ): Promise<WebPreview.Metadata | WebPreview.Result | null> {
+    const request = this.#record(raw);
+    const owner = this.#attached(event, request.attachmentId);
+    const url =
+      kind === "public"
+        ? WebPreview.normalizePublicUrl(request.url)
+        : WebPreview.normalizeUrl(request.url);
+    const id = request.id;
+    if (
+      !url ||
+      !DesktopBrowser.isIdentity(id) ||
+      (request.result !== undefined && request.result !== true)
+    )
+      throw new Error("browser_preview_invalid");
+    if (!this.options.webPreview || this.#clearing || !this.#live(owner))
+      return null;
+
+    const requests = (owner.previews ??= new Map());
+    const key = `${kind}:${id}`;
+    if (requests.size >= 32 || requests.has(key)) return null;
+    const controller = new AbortController();
+    requests.set(key, controller);
+    try {
+      const result = request.result
+        ? WebPreview.parseResult(
+            await this.options.webPreview.lookupResult?.(
+              kind,
+              owner.attachmentId!,
+              url,
+              controller.signal
+            )
+          )
+        : await read(owner, url, controller.signal);
+      return controller.signal.aborted || !this.#live(owner) || this.#clearing
+        ? null
+        : result;
+    } finally {
+      requests.delete(key);
+    }
+  }
+
+  cancelPreview(event: IpcMainInvokeEvent, raw: unknown): void {
+    this.#cancelPreview(event, raw, "loopback");
+  }
+
+  cancelPublicLinkPreview(event: IpcMainInvokeEvent, raw: unknown): void {
+    this.#cancelPreview(event, raw, "public");
+  }
+
+  #cancelPreview(
+    event: IpcMainInvokeEvent,
+    raw: unknown,
+    kind: "loopback" | "public"
+  ): void {
+    const request = this.#record(raw);
+    const owner = this.#attached(event, request.attachmentId);
+    if (!DesktopBrowser.isIdentity(request.id))
+      throw new Error("browser_preview_invalid");
+    owner.previews?.get(`${kind}:${request.id}`)?.abort();
+  }
+
   async historyQuery(
     event: IpcMainInvokeEvent,
     raw: unknown
@@ -1085,11 +1216,13 @@ export class DesktopBrowserHost {
     this.#clearing = true;
     this.#pendingAttach.clear();
     try {
+      this.options.webPreview?.clear();
       this.options.downloads?.cancelAll();
       this.#externalLinks.reset();
       for (const popup of this.#popups.values()) this.#forcePopup(popup);
       const closing: Promise<void>[] = [];
       for (const owner of this.#owners.values()) {
+        for (const request of owner.previews?.values() ?? []) request.abort();
         if (owner.background) {
           closing.push(this.#destroy(owner));
           continue;
@@ -1123,6 +1256,8 @@ export class DesktopBrowserHost {
   closeAll(): void {
     this.#pendingAttach.clear();
     for (const owner of this.#owners.values()) this.#retire(owner);
+    this.#faviconDecoder.close();
+    this.options.webPreview?.clear();
   }
 
   #shell(event: Sender): BrowserWindow {
@@ -1281,7 +1416,13 @@ export class DesktopBrowserHost {
     return browserSession;
   }
   #load(owner: Owner, page: Page, url: string): void {
-    page.favicon.clear();
+    const previous = page.guest?.getURL();
+    if (
+      !previous ||
+      previous === url ||
+      previous.split("#")[0] !== url.split("#")[0]
+    )
+      page.favicon.clear();
     page.navigation++;
     page.rendered = false;
     page.state.url = url;
@@ -1299,6 +1440,8 @@ export class DesktopBrowserHost {
     });
   }
   #observe(owner: Owner, page: Page, contents: WebContents): void {
+    // Undefined while the previous document is being replaced.
+    let iconToken: string | null | undefined = null;
     let documentVisit: {
       url: string;
       finished: boolean;
@@ -1375,6 +1518,7 @@ export class DesktopBrowserHost {
       }
       page.navigation++;
       if (!details.isSameDocument) {
+        iconToken = undefined;
         page.favicon.clear();
         page.rendered = false;
         if (owner.background) owner.background.blocker = null;
@@ -1405,7 +1549,12 @@ export class DesktopBrowserHost {
     contents.on("did-start-loading", refresh);
     contents.on("did-stop-loading", () => {
       refresh();
-      if (current() && !page.state.loading && !page.state.failure)
+      if (
+        current() &&
+        iconToken === null &&
+        !page.state.loading &&
+        !page.state.failure
+      )
         page.favicon.ensure(contents.getURL());
     });
     contents.on("did-navigate", (_event, url, status) => {
@@ -1430,6 +1579,7 @@ export class DesktopBrowserHost {
           : null;
       // Old-document icon events can be queued after navigation start while
       // getURL() still reports the old page. A full commit revokes them again.
+      iconToken = null;
       page.favicon.clear();
       refresh();
     });
@@ -1453,6 +1603,8 @@ export class DesktopBrowserHost {
     });
     contents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
       refresh();
+      if (isMainFrame && current() && iconToken)
+        contents.send("grida:browser-guest:observe-favicons", iconToken);
       if (
         !current() ||
         !isMainFrame ||
@@ -1489,8 +1641,35 @@ export class DesktopBrowserHost {
         );
       refresh();
     });
+    contents.on("dom-ready", () => {
+      if (!current() || !DesktopBrowser.normalizeUrl(contents.getURL())) return;
+      iconToken = randomUUID();
+      contents.send("grida:browser-guest:observe-favicons", iconToken);
+    });
+    contents.ipc.on(
+      "grida:browser-guest:favicons",
+      (event, token, candidates) => {
+        if (
+          !current() ||
+          !iconToken ||
+          token !== iconToken ||
+          event.sender !== contents ||
+          !event.senderFrame ||
+          event.senderFrame !== contents.mainFrame ||
+          event.senderFrame.url !== contents.getURL() ||
+          !Array.isArray(candidates) ||
+          candidates.length > 8
+        )
+          return;
+        page.favicon.update(candidates, contents.getURL());
+      }
+    );
     contents.on("page-favicon-updated", (_event, candidates) => {
-      if (current()) page.favicon.update(candidates, contents.getURL());
+      if (!current()) return;
+      if (iconToken)
+        contents.send("grida:browser-guest:observe-favicons", iconToken);
+      else if (iconToken === null)
+        page.favicon.update(candidates, contents.getURL());
     });
     contents.on("focus", () => {
       if (!page.active) this.#blur(owner, page);
@@ -2650,6 +2829,8 @@ export class DesktopBrowserHost {
   async #closePage(owner: Owner, page: Page): Promise<void> {
     if (!owner.pages.delete(page.state.id)) return;
     page.favicon.clear();
+    if (![...this.#owners.values()].some((owner) => owner.pages.size))
+      this.#faviconDecoder.close();
     if (owner.thumbnail?.page === page) owner.thumbnail = null;
 
     this.#blur(owner, page);
@@ -2681,6 +2862,8 @@ export class DesktopBrowserHost {
   async #destroy(owner: Owner): Promise<void> {
     for (const popup of this.#popups.values())
       if (popup.owner === owner) this.#forcePopup(popup);
+    for (const request of owner.previews?.values() ?? []) request.abort();
+    if (owner.attachmentId) this.options.webPreview?.clear(owner.attachmentId);
     owner.attachmentId = null;
     owner.frame = null;
     if (this.#owners.get(owner.shellId) === owner)

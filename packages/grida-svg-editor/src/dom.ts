@@ -147,6 +147,33 @@ export type { DomComputedPaint, DomComputedResolver } from "./core/editor";
  *  {@link walk_to_id} below. */
 const ID_ATTR = "data-grida-id";
 
+/** Preserve title text in the detached render tree without native tooltips. */
+function project_svg_titles(svg: SVGSVGElement): void {
+  const titles = Array.from(
+    svg.getElementsByTagNameNS(svg.namespaceURI, "title")
+  );
+  const parents = new Set<Element>();
+  for (const title of titles) {
+    const parent = title.parentElement!;
+    if (!parents.has(parent)) {
+      parents.add(parent);
+      const name = title.textContent?.trim();
+      if (name && !parent.getAttribute("aria-label")?.trim())
+        parent.setAttribute("aria-label", name);
+    }
+
+    // Keep ids and SVG element order for ARIA references and the node-id walk.
+    const metadata = svg.ownerDocument.createElementNS(
+      svg.namespaceURI,
+      "metadata"
+    );
+    for (const attribute of Array.from(title.attributes))
+      metadata.setAttributeNodeNS(title.removeAttributeNode(attribute));
+    while (title.firstChild) metadata.appendChild(title.firstChild);
+    title.replaceWith(metadata);
+  }
+}
+
 /** Walk from `target` up through `parentElement`, returning the first id
  *  found on a `[data-grida-id]` ancestor. When `exclude_root` matches an
  *  encountered id, the walk stops and returns `null` — selection HUD
@@ -311,15 +338,22 @@ export type DomSurfaceOptions = {
    */
   clipboard?: boolean;
   /**
-   * Auto-fit the document into the viewport on initial attach. Default
-   * `false`. Mirrors Excalidraw's `initialData.scrollToContent`.
-   * Subsequent `editor.load()` calls do NOT re-fit — call
-   * `handle.camera.fit("<root>")` yourself if you want that behavior.
+   * Let the browser show hover tooltips from authored SVG `<title>` elements.
+   * Defaults to true. When false, titles still supply accessible names and
+   * can be referenced by ARIA. The document and serialized SVG stay intact.
    */
-  fit?: boolean;
+  native_title_tooltips?: boolean;
+  /**
+   * Fit the document once when the viewport first has a nonzero width and
+   * height. This is synchronous when the container has a size at attach.
+   * Pass `true` for the camera's default fit margin or `{ margin }` for an
+   * explicit screen-pixel margin. Default `false`. The host can call
+   * `handle.camera.fit("<root>")` after a later `editor.load()` to fit again.
+   */
+  fit?: boolean | { margin: number };
   /**
    * Initial camera transform. Default `cmath.transform.identity`. Ignored
-   * when `fit: true`.
+   * when an initial fit is requested.
    */
   initial_camera?: cmath.Transform;
   /**
@@ -462,11 +496,12 @@ class DomSurface implements Surface {
   readonly camera: Camera;
   /** Surface-scoped gesture layer. Public via `handle.gestures`. */
   readonly gestures: Gestures;
-  /** One-shot: cleared after the post-mount RAF honors `options.fit`. */
-  private fit_on_attach: boolean;
+  /** One-shot fit at the first nonzero viewport measurement. */
+  private pending_initial_fit?: { margin?: number };
   /** Native ClipboardEvent transport wired (`options.clipboard !== false`).
    *  See `DomSurfaceOptions.clipboard`. */
   private readonly clipboard_enabled: boolean;
+  private readonly native_title_tooltips: boolean;
   /** Container element (cached from options). */
   private readonly container: HTMLElement;
   /** Pointer/focus-attention tracker — gates the doc/window-level keydown
@@ -762,8 +797,11 @@ class DomSurface implements Surface {
   ) {
     this.container = options.container;
     const container = this.container;
-    this.fit_on_attach = options.fit === true;
+    if (options.fit) {
+      this.pending_initial_fit = options.fit === true ? {} : { ...options.fit };
+    }
     this.clipboard_enabled = options.clipboard !== false;
+    this.native_title_tooltips = options.native_title_tooltips !== false;
     this.attention = create_attention_tracker(container);
     this.attention_scope = {
       add: (element) => this.attention.add(element),
@@ -1027,16 +1065,10 @@ class DomSurface implements Surface {
     this.sync_canvas_size();
     this.sync_surface_selection();
     this.redraw();
-    // The container often gets its final size on the next frame (flex
-    // settle, etc.) — re-sync once after layout has flushed. Also where we
-    // honor `fit: true` (the camera needs the viewport size to compute
-    // a sensible fit transform).
+    // Re-measure after layout has settled for hosts that size the container
+    // on the next frame. The initial fit runs on the first usable measurement.
     const win = container.ownerDocument.defaultView ?? window;
-    const raf = win.requestAnimationFrame(() => {
-      this.sync_canvas_size();
-      this.honor_initial_fit();
-      this.redraw();
-    });
+    const raf = win.requestAnimationFrame(() => this.sync_canvas_size());
     this.teardown.push(() => win.cancelAnimationFrame(raf));
 
     // Gesture layer — sibling to editor.keymap. Constructed AFTER camera so
@@ -1683,6 +1715,7 @@ class DomSurface implements Surface {
     wrapper.innerHTML = svg_text;
     const new_svg = wrapper.querySelector("svg");
     if (!(new_svg instanceof SVGSVGElement)) return;
+    if (!this.native_title_tooltips) project_svg_titles(new_svg);
 
     if (this.svg_root) {
       this.svg_root.replaceWith(new_svg);
@@ -1743,6 +1776,11 @@ class DomSurface implements Surface {
     // Push viewport size to the camera so `camera.fit`, `bounds`, `center`
     // compute against the live container dimensions.
     this.camera._set_viewport_size(cr.width, cr.height);
+    if (this.pending_initial_fit && cr.width > 0 && cr.height > 0) {
+      const fit = this.pending_initial_fit;
+      this.pending_initial_fit = undefined;
+      this.camera.fit("<root>", fit);
+    }
     this.redraw();
   }
 
@@ -1847,13 +1885,6 @@ class DomSurface implements Surface {
     // Our cmath.Transform [[a, b, tx], [c, d, ty]] uses the same convention
     // with (a, c, b, d, tx, ty) ordering swap.
     this.svg_root.style.transform = `matrix(${t[0][0]}, ${t[1][0]}, ${t[0][1]}, ${t[1][1]}, ${t[0][2]}, ${t[1][2]})`;
-  }
-
-  /** One-shot fit-on-attach. Runs after layout has settled. */
-  private honor_initial_fit(): void {
-    if (!this.fit_on_attach) return;
-    this.fit_on_attach = false;
-    this.camera.fit("<root>");
   }
 
   /**

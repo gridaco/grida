@@ -8,7 +8,7 @@ const SUMMARY: &str = "co.grida/session/turn-summary";
 const PRIVATE_DIAGNOSTIC: &str = "fixture private provider diagnostic";
 const CONTEXT_LIMIT_SUMMARY: &str = "The request exceeds the selected model's context limit. Shorten the input or compact the conversation.";
 
-fn rejected(status: &str, code: &str) -> Reply {
+pub(super) fn rejected(status: &str, code: &str) -> Reply {
     let body = json!({"error":{"code":code,"message":PRIVATE_DIAGNOSTIC}}).to_string();
     Reply::RawHttp(format!(
         "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",

@@ -10,11 +10,24 @@ use tokio::process::{ChildStdin, ChildStdout};
 mod confinement;
 #[path = "approvals/deployments.rs"]
 mod deployments;
+#[path = "approvals/escalation.rs"]
+mod escalation;
 #[path = "approvals/reviewer.rs"]
 mod reviewer;
 
 const LIST: &str = "co.grida/session/approvals";
 const ANSWER: &str = "co.grida/session/answer-approval";
+
+/// Current authorization evidence follows any replayed private reviewer conversation.
+fn current_review_message(wire: &Value) -> &Value {
+    wire["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|message| message["role"] == "user")
+        .unwrap()
+}
 
 pub(super) struct Fixture {
     _base: TempDir,
@@ -22,6 +35,7 @@ pub(super) struct Fixture {
     pub(super) primary: PathBuf,
     pub(super) extra: PathBuf,
     pub(super) profile: PathBuf,
+    scoped_approvals: bool,
 }
 
 /// Fixture directories outside the system's shared temporary directory, which
@@ -93,6 +107,7 @@ impl Fixture {
             primary,
             extra,
             profile,
+            scoped_approvals: false,
         }
     }
 
@@ -101,6 +116,9 @@ impl Fixture {
         process.arg(mode);
         configured(&mut process, &self.state, endpoint);
         process.arg("--permission-profile").arg(&self.profile);
+        if self.scoped_approvals {
+            process.arg("--allow-scoped-approvals");
+        }
         process
     }
 
@@ -145,7 +163,7 @@ fn initialize() -> Value {
     let meta = request["clientCapabilities"]["_meta"]
         .as_object_mut()
         .unwrap();
-    for key in [LIST, ANSWER] {
+    for key in [LIST, ANSWER, "co.grida/session/reconsider-denial"] {
         meta.insert(key.into(), 1.into());
     }
     request
@@ -205,6 +223,13 @@ impl Stdio {
             .await;
     }
 
+    pub(super) async fn reject(&mut self, id: &Value, message: &str) {
+        self.write_frame(
+            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32603,"message":message}}),
+        )
+        .await;
+    }
+
     async fn write_frame(&mut self, frame: Value) {
         timeout(WAIT, self.stdin.write_all(format!("{frame}\n").as_bytes()))
             .await
@@ -227,13 +252,22 @@ impl Stdio {
 
     pub(super) async fn read_frame(&mut self) -> Value {
         let mut line = String::new();
-        assert_ne!(
-            timeout(WAIT, self.stdout.read_line(&mut line))
-                .await
-                .unwrap()
-                .unwrap(),
-            0
-        );
+        if timeout(WAIT, self.stdout.read_line(&mut line))
+            .await
+            .unwrap()
+            .unwrap()
+            == 0
+        {
+            use tokio::io::AsyncReadExt;
+            let mut error = String::new();
+            if let Some(stderr) = &mut self.child.stderr {
+                timeout(WAIT, stderr.take(4096).read_to_string(&mut error))
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+            panic!("native host closed stdio: {error}");
+        }
         serde_json::from_str(&line).unwrap()
     }
 
@@ -359,6 +393,10 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     let ready = ws_rpc(&mut observer, 1, "initialize", initialize()).await;
     assert_eq!(ready["result"]["agentCapabilities"]["_meta"][LIST], 1);
     assert!(ready["result"]["agentCapabilities"]["_meta"][ANSWER].is_null());
+    assert!(
+        ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/reconsider-denial"]
+            .is_null()
+    );
     let loaded = ws_rpc(
         &mut observer,
         2,
@@ -369,6 +407,17 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     )
     .await;
     assert!(loaded.get("error").is_none(), "{loaded}");
+    let unauthorized = ws_rpc(
+        &mut observer,
+        30,
+        "_co.grida/session/reconsider-denial",
+        json!({"sessionId":session,"turnId":turn,"reviewId":"untrusted-control"}),
+    )
+    .await;
+    assert_eq!(
+        unauthorized["error"]["data"], "approval_reviewer_required",
+        "{unauthorized}"
+    );
     let listed = ws_rpc(
         &mut observer,
         3,
@@ -409,69 +458,184 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     endpoint.done().await;
 }
 
-/// Changing the agent settings file is an ordinary file write that always
-/// waits for approval, even though the profile lets the agent write the
-/// project without asking. The saved change applies to later input.
+fn external_read_fixture() -> Fixture {
+    let mut fixture = Fixture::new(false);
+    fixture.scoped_approvals = true;
+    fixture
+}
+
+fn external_read(path: &Path) -> Reply {
+    let args = json!({"directory":"external-file","path":path.strip_prefix("/").unwrap()});
+    Reply::Tool("read_file", Box::leak(args.to_string().into_boxed_str()))
+}
+
 #[tokio::test]
-async fn headless_settings_change_waits_for_approval_and_applies_to_later_input() {
+async fn external_file_approval_after_restart_checks_the_same_file_version() {
+    for replace in [false, true] {
+        let fixture = external_read_fixture();
+        let outside = fixture.primary.parent().unwrap().join("outside.txt");
+        fs::write(&outside, "approved external reference").unwrap();
+        let relative = outside.strip_prefix("/").unwrap();
+        let mut endpoint =
+            Endpoint::start(vec![external_read(&outside), Reply::Finished("Done.")]).await;
+        let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+        let approval = &output[1]["approvals"][0];
+        assert_eq!(approval["request"]["root"], "/");
+        assert_eq!(approval["request"]["directory"], "external-file");
+        assert_eq!(
+            approval["request"]["effect"]["relative_path"],
+            json!(relative)
+        );
+        let session = output[0]["session_id"].as_str().unwrap();
+        let turn = output[0]["turn_id"].as_str().unwrap();
+        let wait = approval["waitId"].as_str().unwrap();
+        endpoint.request().await;
+        if replace {
+            let replacement = outside.with_extension("new");
+            fs::write(&replacement, "substituted external reference").unwrap();
+            fs::rename(replacement, &outside).unwrap();
+        }
+        let mut owner = approve(&fixture, &endpoint.url, session, turn, wait).await;
+        let continuation = endpoint.request().await["messages"].to_string();
+        assert_eq!(
+            continuation.contains("approved external reference"),
+            !replace,
+            "{continuation}"
+        );
+        assert_eq!(
+            continuation.contains("permission_action_changed"),
+            replace,
+            "{continuation}"
+        );
+        assert!(!continuation.contains("substituted external reference"));
+        settle(&mut owner, session).await;
+        owner.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+async fn external_file_approval_leaves_a_sibling_read_waiting_for_its_own_decision() {
+    let fixture = external_read_fixture();
+    let directory = fixture.primary.parent().unwrap();
+    let first = directory.join("a.txt");
+    let second = directory.join("b.txt");
+    fs::write(&first, "reference A contents").unwrap();
+    fs::write(&second, "reference B contents").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        external_read(&first),
+        external_read(&second),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+    let session = output[0]["session_id"].as_str().unwrap();
+    let turn = output[0]["turn_id"].as_str().unwrap();
+    let first_wait = output[1]["approvals"][0]["waitId"].as_str().unwrap();
+    endpoint.request().await;
+    let mut owner = approve(&fixture, &endpoint.url, session, turn, first_wait).await;
+    let continued = endpoint.request().await["messages"].to_string();
+    assert!(continued.contains("reference A contents"));
+    let second_pending = timeout(WAIT, async {
+        loop {
+            let view = owner
+                .request(
+                    "_co.grida/session/approvals",
+                    json!({"sessionId":session,"turnId":turn}),
+                )
+                .await;
+            if view["result"]["approvals"][0]["request"]["effect"]["relative_path"]
+                == json!(second.strip_prefix("/").unwrap())
+            {
+                break view["result"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let next_wait = second_pending["approvals"][0]["waitId"].as_str().unwrap();
+    assert_ne!(first_wait, next_wait);
+    let state = owner
+        .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+        .await;
+    let declined = owner.request("_co.grida/session/answer-approval", json!({
+        "sessionId":session,"turnId":turn,"waitId":next_wait,"decision":"decline","requestId":"decline-sibling",
+        "expectedSessionRevision":state["result"]["sessionRevision"],"expectedControlRevision":second_pending["controlRevision"],
+    })).await;
+    assert!(declined.get("error").is_none(), "{declined}");
+    let messages = endpoint.request().await["messages"].to_string();
+    assert!(messages.contains("permission_declined"));
+    assert!(!messages.contains("reference B contents"));
+    settle(&mut owner, session).await;
+    owner.close().await;
+    endpoint.done().await;
+}
+
+const HOST_SETTINGS: &str = "schema_version = 1\n# protected host settings\n";
+
+fn seed_host_settings(fixture: &Fixture) -> PathBuf {
+    fs::create_dir(&fixture.state).unwrap();
+    fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+    let config = fixture.state.join("config.toml");
+    fs::write(&config, HOST_SETTINGS).unwrap();
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o600)).unwrap();
+    config
+}
+
+#[tokio::test]
+async fn model_file_tools_cannot_read_write_or_edit_host_settings() {
     let fixture = Fixture::new(false);
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["directories"][0]["write"] = json!("allow");
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
-    let settings = r#"{"directory":"agent-settings","path":"config.toml","content":"schema_version = 1\n[context]\nmax_input_tokens = 64000\n"}"#;
+    let settings = seed_host_settings(&fixture);
     let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("read_file", r#"{"directory":"agent-settings","path":"config.toml"}"#),
+        Reply::Tool(
+            "write_file",
+            r#"{"directory":"agent-settings","path":"config.toml","content":"schema_version = 1\n"}"#,
+        ),
+        Reply::Tool(
+            "edit_file",
+            r#"{"directory":"agent-settings","path":"config.toml","old_string":"schema_version = 1","new_string":"schema_version = 2"}"#,
+        ),
         Reply::Tool("write_file", r#"{"path":"note.txt","content":"project"}"#),
-        Reply::Tool("write_file", settings),
-        Reply::Finished("Settings saved."),
+        Reply::Tool(
+            "edit_file",
+            r#"{"path":"note.txt","old_string":"project","new_string":"revised"}"#,
+        ),
+        Reply::Finished("Updated the project note."),
     ])
     .await;
-    let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
-    assert_eq!(output[1]["disposition"], "input_required");
+    let output = fixture.run(&endpoint.url, &fixture.primary, 0).await;
+    assert!(
+        output
+            .iter()
+            .all(|record| record.get("approvals").is_none())
+    );
+    let offered = endpoint.request().await;
+    assert!(
+        !offered["tools"].to_string().contains("agent-settings"),
+        "{offered}"
+    );
+    for _ in 0..3 {
+        let result = crate::full_access::last_tool(&endpoint.request().await);
+        assert_eq!(result["status"], "failed", "{result}");
+        assert!(
+            !result.to_string().contains("protected host settings"),
+            "{result}"
+        );
+    }
+    for _ in 0..2 {
+        let result = crate::full_access::last_tool(&endpoint.request().await);
+        assert_eq!(result["status"], "succeeded", "{result}");
+    }
     assert_eq!(
         fs::read_to_string(fixture.primary.join("note.txt")).unwrap(),
-        "project"
+        "revised"
     );
-    let request = &output[1]["approvals"][0]["request"];
-    assert_eq!(request["directory"], "agent-settings");
-    assert_eq!(request["effect"]["kind"], "write");
-    assert_eq!(request["effect"]["relative_path"], "config.toml");
-    let state = fixture.state.canonicalize().unwrap();
-    assert_eq!(request["root"], json!(state));
-    assert!(!state.join("config.toml").exists());
-    let session = output[0]["session_id"].as_str().unwrap();
-    let turn = output[0]["turn_id"].as_str().unwrap();
-    let wait = output[1]["approvals"][0]["waitId"].as_str().unwrap();
-    for _ in 0..2 {
-        endpoint.request().await;
-    }
-
-    let mut owner = approve(&fixture, &endpoint.url, session, turn, wait).await;
-    let saved = endpoint.request().await["messages"].to_string();
-    assert!(saved.contains("Saved config.toml"), "{saved}");
-    settle(&mut owner, session).await;
-    assert!(
-        fs::read_to_string(state.join("config.toml"))
-            .unwrap()
-            .contains("max_input_tokens = 64000")
-    );
-    let queued = owner
-        .request(
-            "_co.grida/session/enqueue",
-            json!({
-                "sessionId":session,"inputId":"after-settings",
-                "prompt":[{"type":"text","text":"Later input."}],
-            }),
-        )
-        .await;
-    assert!(queued.get("error").is_none(), "{queued}");
-    let settings = owner
-        .request(
-            "_co.grida/session/input",
-            json!({"sessionId":session,"inputId":"after-settings"}),
-        )
-        .await;
-    assert_eq!(settings["result"]["settings"]["maxInputTokens"], 64000);
-    owner.close().await;
+    assert_eq!(fs::read_to_string(settings).unwrap(), HOST_SETTINGS);
     endpoint.done().await;
 }
 
@@ -514,6 +678,8 @@ async fn headless_profile_defaults_to_primary_and_scopes_named_reads() {
         .map(|tool| tool["function"]["name"].as_str().unwrap())
         .collect();
     assert!(names.contains(&"read_file"));
+    assert!(names.contains(&"list_files"));
+    assert!(names.contains(&"search_text"));
     assert!(!names.contains(&"exec_command"));
     assert!(!names.contains(&"write_stdin"));
 
@@ -621,11 +787,184 @@ async fn unrelated_cwd_does_not_inherit_launch_permissions() {
 
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and OS confinement"]
-async fn plan_can_read_but_does_not_offer_the_provisioned_command_tool() {
+async fn command_ready_workspace_uses_the_shell_for_exploration() {
     let fixture = Fixture::new(true);
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["commandRead"] = json!("allow");
+    profile["directories"][0]["write"] = json!("allow");
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    fs::write(fixture.primary.join("note"), "permitted exploration input").unwrap();
+
+    let replies = vec![
+        Reply::Tool("exec_command", r#"{"cmd":"/bin/cat note","access":"read"}"#),
+        Reply::Finished("Exploration complete."),
+    ];
+    let mut endpoint = Endpoint::start(replies).await;
+    fixture.run(&endpoint.url, &fixture.primary, 0).await;
+    let first = endpoint.request().await;
+    let tools = first["tools"].as_array().unwrap();
+    let offered = |name| tools.iter().any(|tool| tool["function"]["name"] == name);
+    for name in ["exec_command", "write_stdin", "write_file", "edit_file"] {
+        assert!(offered(name), "Act omitted {name}: {tools:?}");
+    }
+    for name in ["read_file", "read_scoped_file", "list_files", "search_text"] {
+        assert!(!offered(name), "Act offered {name}: {tools:?}");
+    }
+    let result = crate::full_access::last_tool(&endpoint.request().await);
+    assert!(
+        result.to_string().contains("permitted exploration input"),
+        "{result}"
+    );
+    endpoint.done().await;
+}
+
+fn exec_input_file(arguments: Value) -> Reply {
+    Reply::Tool(
+        "exec_command",
+        Box::leak(arguments.to_string().into_boxed_str()),
+    )
+}
+
+fn assert_command_output(outcome: &Value, expected: &str) {
+    assert_eq!(outcome["status"], "succeeded", "{outcome}");
+    assert_eq!(outcome["structured"]["completion"]["code"], 0, "{outcome}");
+    assert_eq!(outcome["structured"]["cleanup_verified"], true, "{outcome}");
+    assert_eq!(outcome["truncated"], false, "{outcome}");
+    let text = outcome["content"][0].as_str().unwrap();
+    let (_, bytes) = text.split_once("\nOutput:\n").expect("command output");
+    assert_eq!(bytes, expected);
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn command_input_file_keeps_exact_named_and_external_approvals() {
+    for (outside_workspace, replace) in [(false, false), (true, false), (true, true)] {
+        let mut fixture = Fixture::new(true);
+        fixture.scoped_approvals = outside_workspace;
+        let mut profile: Value =
+            serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+        profile["directories"][0]["commandRead"] = json!("allow");
+        profile["directories"][0]["commandReadWrite"] = json!("allow");
+        profile["directories"][1]["commandReadWrite"] = json!("deny");
+        fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+        let (directory, root) = if outside_workspace {
+            ("external-file", Path::new("/"))
+        } else {
+            ("extra", fixture.extra.as_path())
+        };
+        let file = if outside_workspace {
+            fixture.primary.parent().unwrap().join("outside.txt")
+        } else {
+            fixture.extra.join("reference.txt")
+        };
+        let expected = "only for the approved target — UTF-8\r\nsecond line\n";
+        fs::write(&file, expected).unwrap();
+        fs::write(fixture.primary.join("note"), "unmodified project").unwrap();
+        let path = file.strip_prefix(root).unwrap();
+        let raw_source = if outside_workspace {
+            "../outside.txt"
+        } else {
+            "../extra/reference.txt"
+        };
+        let command = format!(
+            "if (: < {raw_source}) 2>/dev/null; then exit 41; fi; if (printf write > note) 2>/dev/null; then exit 42; fi; /bin/cat"
+        );
+        let mut endpoint = Endpoint::start(vec![
+            exec_input_file(json!({
+                "cmd":command,
+                "access":"read",
+                "input_file":{"directory":directory,"path":path},
+            })),
+            Reply::Finished("Inspected the approved file request."),
+        ])
+        .await;
+        let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+        let approval = &output[1]["approvals"][0];
+        assert_eq!(approval["request"]["directory"], directory, "{approval}");
+        assert_eq!(approval["request"]["root"], json!(root), "{approval}");
+        assert_eq!(
+            approval["request"]["effect"],
+            json!({"kind":"read","tool":"read_file","relative_path":path}),
+            "{approval}"
+        );
+        let first = endpoint.request().await;
+        assert!(
+            !first.to_string().contains("only for the approved target"),
+            "{first}"
+        );
+        if replace {
+            let replacement = file.with_extension("new");
+            fs::write(&replacement, "replacement file contents").unwrap();
+            fs::rename(replacement, &file).unwrap();
+        }
+        let session = output[0]["session_id"].as_str().unwrap();
+        let turn = output[0]["turn_id"].as_str().unwrap();
+        let wait = approval["waitId"].as_str().unwrap();
+        let mut owner = approve(&fixture, &endpoint.url, session, turn, wait).await;
+        let result = crate::full_access::last_tool(&endpoint.request().await);
+        if replace {
+            assert_eq!(result["status"], "failed", "{result}");
+            assert!(result["structured"].is_null(), "{result}");
+            let text = result.to_string();
+            assert!(text.contains("permission_action_changed"), "{result}");
+            assert!(!text.contains("replacement file contents"), "{result}");
+            assert!(!text.contains("only for the approved target"), "{result}");
+        } else {
+            assert_command_output(&result, expected);
+        }
+        assert_eq!(
+            fs::read_to_string(fixture.primary.join("note")).unwrap(),
+            "unmodified project"
+        );
+        settle(&mut owner, session).await;
+        owner.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn plan_explores_with_finite_read_only_commands() {
+    let fixture = Fixture::new(true);
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["commandRead"] = json!("allow");
+    profile["directories"][0]["commandReadWrite"] = json!("allow");
+    profile["directories"][0]["write"] = json!("allow");
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
     fs::write(fixture.primary.join("note"), "permitted plan input").unwrap();
+    fs::write(
+        fixture.primary.parent().unwrap().join("outside.txt"),
+        "outside narrow Plan read scope",
+    )
+    .unwrap();
+    let protected_settings = seed_host_settings(&fixture);
+
     let mut endpoint = Endpoint::start(vec![
-        Reply::Tool("read_file", r#"{"path":"note"}"#),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > new-note) 2>/dev/null; then exit 43; fi; printf scratch > \"$TMPDIR/plan-note\" && /bin/cat note"}"#,
+        ),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"printf UNSCOPED_WRITE","access":"read_write"}"#,
+        ),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"printf NETWORK_REQUEST","network":{"host":"example.invalid","port":443}}"#,
+        ),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"printf TTY_REQUEST","tty":true}"#,
+        ),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"printf SESSION_REQUEST","yield_time_ms":250}"#,
+        ),
+        Reply::Tool("exec_command", r#"{"cmd":"/bin/cat ../outside.txt"}"#),
+        Reply::Tool(
+            "exec_command",
+            r#"{"cmd":"/bin/cat","input_file":{"directory":"agent-settings","path":"config.toml"}}"#,
+        ),
         Reply::Finished("Proposed result and verification."),
     ])
     .await;
@@ -641,30 +980,190 @@ async fn plan_can_read_but_does_not_offer_the_provisioned_command_tool() {
     .await
     .unwrap()
     .unwrap();
+    let first = endpoint.request().await;
+    let assert_plan_tools = |request: &Value| {
+        let tools = request["tools"].as_array().unwrap();
+        let offered = |name| tools.iter().any(|tool| tool["function"]["name"] == name);
+        assert!(
+            offered("exec_command"),
+            "Plan omitted exec_command: {tools:?}"
+        );
+        for name in [
+            "read_file",
+            "read_scoped_file",
+            "list_files",
+            "search_text",
+            "write_stdin",
+            "write_file",
+            "edit_file",
+        ] {
+            assert!(!offered(name), "Plan offered {name}: {tools:?}");
+        }
+    };
+    assert_plan_tools(&first);
     assert!(
         output.status.success(),
-        "{}",
+        "stdout: {}
+stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let first = endpoint.request().await;
-    let tools = first["tools"].as_array().unwrap();
+    let after_read = endpoint.request().await;
+    let read = crate::full_access::last_tool(&after_read);
+    assert_eq!(read["status"], "succeeded", "{read}");
+    assert_eq!(read["structured"]["completion"]["code"], 0, "{read}");
+    assert!(read.to_string().contains("permitted plan input"), "{read}");
+    for forbidden in [
+        "UNSCOPED_WRITE",
+        "NETWORK_REQUEST",
+        "TTY_REQUEST",
+        "SESSION_REQUEST",
+    ] {
+        let request = endpoint.request().await;
+        assert_plan_tools(&request);
+        let result = crate::full_access::last_tool(&request);
+        assert_eq!(result["status"], "failed", "{result}");
+        assert!(!result.to_string().contains(forbidden), "{result}");
+    }
+    let outside = crate::full_access::last_tool(&endpoint.request().await);
+    assert_eq!(outside["status"], "failed", "{outside}");
     assert!(
-        tools
-            .iter()
-            .any(|tool| tool["function"]["name"] == "read_file")
+        outside["structured"]["completion"]["code"]
+            .as_i64()
+            .is_some_and(|code| code != 0),
+        "{outside}"
     );
-    assert!(!tools.iter().any(|tool| {
-        matches!(
-            tool["function"]["name"].as_str(),
-            Some("exec_command" | "write_stdin")
-        )
-    }));
     assert!(
-        endpoint.request().await["messages"]
+        !outside
             .to_string()
-            .contains("permitted plan input")
+            .contains("outside narrow Plan read scope"),
+        "{outside}"
     );
+    let settings_result = endpoint.request().await;
+    assert_plan_tools(&settings_result);
+    let settings = crate::full_access::last_tool(&settings_result);
+    assert_eq!(settings["status"], "failed", "{settings}");
+    assert!(settings["structured"].is_null(), "{settings}");
+    assert!(
+        !settings.to_string().contains("protected host settings"),
+        "{settings}"
+    );
+    assert_eq!(
+        fs::read_to_string(protected_settings).unwrap(),
+        HOST_SETTINGS
+    );
+    assert_eq!(
+        fs::read_to_string(fixture.primary.join("note")).unwrap(),
+        "permitted plan input"
+    );
+    assert!(!fixture.primary.join("new-note").exists());
     endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn plan_and_act_read_outside_the_workspace_with_a_broad_read_profile() {
+    for mode in ["plan", "act"] {
+        let mut fixture = Fixture::new(true);
+        fixture.scoped_approvals = true;
+        let root = fixture.primary.parent().unwrap();
+        let protected = root.join("protected");
+        fs::create_dir(&protected).unwrap();
+        fs::write(
+            protected.join("secret"),
+            "never readable under this profile",
+        )
+        .unwrap();
+        let outside = root.join("ordinary.txt");
+        let expected = "ordinary outside file contents\n";
+        fs::write(&outside, expected).unwrap();
+        fs::write(fixture.primary.join("note"), "workspace note").unwrap();
+        let protected_settings = seed_host_settings(&fixture);
+        let mut profile: Value =
+            serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+        profile["directories"][0]["commandRead"] = json!("allow");
+        profile["directories"][0]["commandReadWrite"] = json!("allow");
+        profile["command"]["diskRead"] = json!(true);
+        profile["protectedPaths"] = json!([protected]);
+        fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Tool(
+                "exec_command",
+                r#"{"cmd":"if (: < ../protected/secret) 2>/dev/null; then exit 41; fi; if (: < ../state/config.toml) 2>/dev/null; then exit 44; fi; if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > ../ordinary.txt) 2>/dev/null; then exit 43; fi; /bin/cat ../ordinary.txt","access":"read"}"#,
+            ),
+            exec_input_file(json!({
+                "cmd":"/bin/cat","access":"read", "input_file":{
+                    "directory":"external-file","path":outside.strip_prefix("/").unwrap(),
+                },
+            })),
+            Reply::Tool(
+                "exec_command",
+                r#"{"cmd":"/bin/cat","access":"read","input_file":{"directory":"agent-settings","path":"config.toml"}}"#,
+            ),
+            Reply::Finished("Read the ordinary file."),
+        ])
+        .await;
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .args(["--mode", mode, "--prompt", "Inspect the local file."])
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "{mode}: stdout {}\nstderr {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            records(&output.stdout)
+                .iter()
+                .all(|record| record.get("approvals").is_none()),
+            "{mode}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let first = endpoint.request().await;
+        let tools = first["tools"].as_array().unwrap();
+        let exec = tools
+            .iter()
+            .find(|tool| tool["function"]["name"] == "exec_command")
+            .unwrap();
+        assert!(
+            exec["function"]["parameters"]["properties"]
+                .get("input_file")
+                .is_none(),
+            "{mode}: {exec}"
+        );
+        assert!(!first.to_string().contains("protected host settings"));
+        let result = crate::full_access::last_tool(&endpoint.request().await);
+        assert_command_output(&result, expected);
+        for _ in 0..2 {
+            let refused = crate::full_access::last_tool(&endpoint.request().await);
+            assert_eq!(refused["status"], "failed", "{refused}");
+            assert!(refused["structured"].is_null(), "{refused}");
+            assert!(
+                !refused.to_string().contains("protected host settings"),
+                "{refused}"
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(protected_settings).unwrap(),
+            HOST_SETTINGS
+        );
+        assert_eq!(fs::read_to_string(outside).unwrap(), expected);
+        assert_eq!(
+            fs::read_to_string(fixture.primary.join("note")).unwrap(),
+            "workspace note"
+        );
+        endpoint.done().await;
+    }
 }
 
 #[tokio::test]

@@ -4,6 +4,7 @@ export default defineConfig({
     "src/index.ts",
     "src/providers.ts",
     "src/catalogue/index.ts",
+    "src/catalogue/public-models.mts",
     "src/gg-discovery.ts",
   ],
   format: ["cjs", "esm"],

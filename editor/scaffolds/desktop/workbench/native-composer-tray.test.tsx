@@ -244,10 +244,62 @@ describe("NativeComposerQueue", () => {
         controller={controller}
         view={{ ...controller.read(), queue }}
         onReturnedText={() => {}}
+        renderOutgoingStatus={() => null}
       />
     );
     expect(html).toContain('data-testid="workspace-composer-tray"');
     expect(html).toContain('data-testid="native-composer-queue"');
     expect(html).toContain("First message");
+  });
+
+  it("shows each captured follow-up in the queue from the first send through native admission", () => {
+    const controller = new NativeChatController({} as DesktopNativeChat);
+    const pending = ["one", "two"].map((id) => ({
+      id,
+      text: "Same follow-up",
+      placement: "queue" as const,
+      status: "sending" as const,
+    }));
+    for (const admitted of [0, 1, 2]) {
+      const html = render(
+        <NativeComposerTray
+          controller={controller}
+          view={{
+            ...controller.read(),
+            queue: admitted
+              ? {
+                  ...queue,
+                  items: pending
+                    .slice(0, admitted)
+                    .map((item) => ({ inputId: item.id, preview: item.text })),
+                }
+              : null,
+            outgoing: [
+              {
+                id: "first",
+                text: "Initial prompt",
+                placement: "transcript",
+                status: "accepted",
+              },
+              ...pending.slice(admitted),
+            ],
+          }}
+          onReturnedText={() => {}}
+          renderOutgoingStatus={() => <span>Waiting for admission</span>}
+        />
+      );
+      expect(html).toContain('data-testid="native-composer-queue"');
+      expect(html.match(/aria-label="Preview queued message"/g)).toHaveLength(
+        2
+      );
+      expect(html.match(/Same follow-up/g)).toHaveLength(2);
+      expect(html.match(/Waiting for admission/g) ?? []).toHaveLength(
+        2 - admitted
+      );
+      expect(html.match(/aria-label="Remove from queue"/g) ?? []).toHaveLength(
+        admitted
+      );
+      expect(html).not.toContain("Initial prompt");
+    }
   });
 });

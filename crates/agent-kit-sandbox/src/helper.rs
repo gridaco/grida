@@ -854,6 +854,10 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     if launch.enforcement == wire::Enforcement::Unconfined {
+        #[cfg(target_os = "linux")]
+        if launch.broker_password.is_some() || launch.http_proxy_password.is_some() {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
         #[allow(unsafe_code)]
         let ordinary = unsafe {
             libc::geteuid() != 0
@@ -887,9 +891,130 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
         {
             return Err(std::io::ErrorKind::PermissionDenied.into());
         }
-        crate::linux_seccomp::apply()?;
+        confine_linux(launch)
+    }
+    #[cfg(not(target_os = "linux"))]
+    Ok(launch)
+}
+
+#[cfg(target_os = "linux")]
+fn confine_linux(mut launch: Launch) -> std::io::Result<Launch> {
+    use std::io;
+    use std::net::{Shutdown, TcpListener};
+    use std::os::unix::net::UnixStream;
+
+    if let Some(password) = launch.http_proxy_password.take() {
+        use std::os::unix::fs::FileTypeExt;
+
+        let Task::Command { environment, .. } = &mut launch.task else {
+            return Err(io::ErrorKind::InvalidData.into());
+        };
+        let broker = launch.private_temp.join("broker.sock");
+        if launch.broker_password.is_some()
+            || !std::fs::symlink_metadata(&broker)?.file_type().is_socket()
+        {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
+        listener.set_nonblocking(true)?;
+        crate::proxy_environment::configure(environment, listener.local_addr()?.port(), &password);
+        // The worker stays in the private namespaces and opens only the
+        // mounted broker socket. The separate filtered launch thread starts
+        // the payload with no broker descriptors.
+        relay_http_proxy(listener, File::open(&launch.private_temp)?)?;
+        crate::linux_seccomp::apply(true)?;
+        return Ok(launch);
+    }
+
+    let relay = if let Some(password) = launch.broker_password.take() {
+        let Task::Command {
+            environment,
+            mode: Mode::Finite,
+            ..
+        } = &mut launch.task
+        else {
+            return Err(io::ErrorKind::InvalidData.into());
+        };
+        let broker = UnixStream::connect(launch.private_temp.join("broker.sock"))?;
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
+        let proxy = format!("socks5h://grida:{password}@{}", listener.local_addr()?);
+        environment.retain(|key, _| !key.to_ascii_lowercase().ends_with("_proxy"));
+        for key in [
+            "all_proxy",
+            "ALL_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+        ] {
+            environment.insert(key.into(), proxy.clone());
+        }
+        Some((listener, broker))
+    } else {
+        None
+    };
+    // Install before creating any child or relay thread. No payload can
+    // use the mounted Unix socket. The one preconnected fd is CLOEXEC.
+    crate::linux_seccomp::apply(relay.is_some())?;
+    if let Some((listener, broker)) = relay {
+        std::thread::Builder::new()
+            .name("broker".into())
+            .spawn(move || -> io::Result<()> {
+                let (stream, _) = listener.accept()?;
+                let mut request = stream.try_clone()?;
+                let mut uplink = broker.try_clone()?;
+                std::thread::Builder::new()
+                    .name("broker-send".into())
+                    .spawn(move || -> io::Result<()> {
+                        io::copy(&mut request, &mut uplink)?;
+                        uplink.shutdown(Shutdown::Write)
+                    })?;
+                let mut response = broker;
+                let mut downlink = stream;
+                io::copy(&mut response, &mut downlink)?;
+                downlink.shutdown(Shutdown::Write)
+            })?;
     }
     Ok(launch)
+}
+
+#[cfg(target_os = "linux")]
+fn relay_http_proxy(listener: std::net::TcpListener, broker_dir: File) -> std::io::Result<()> {
+    use tokio::net::{TcpListener, UnixStream};
+    use tokio::task::JoinSet;
+
+    const MAX_CONNECTIONS: usize = 32;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .build()?;
+    let listener = {
+        let _runtime = runtime.enter();
+        TcpListener::from_std(listener)?
+    };
+    std::thread::Builder::new()
+        .name("http-proxy".into())
+        .spawn(move || {
+            runtime.block_on(async move {
+                // The caller's temporary path may exceed sockaddr_un's limit.
+                // Use the pinned directory's short procfs alias inside the namespace.
+                let broker = PathBuf::from(format!("/proc/self/fd/{}/broker.sock", broker_dir.as_raw_fd()));
+                let mut connections = JoinSet::new();
+                loop {
+                    tokio::select! {
+                        accepted = listener.accept(), if connections.len() < MAX_CONNECTIONS => {
+                            let Ok((mut client, _)) = accepted else { return; };
+                            let broker = broker.clone();
+                            connections.spawn(async move {
+                                if let Ok(mut peer) = UnixStream::connect(broker).await {
+                                    let _ = tokio::io::copy_bidirectional(&mut client, &mut peer).await;
+                                }
+                            });
+                        }
+                        _ = connections.join_next(), if !connections.is_empty() => {}
+                    }
+                }
+            });
+        })?;
+    Ok(())
 }
 
 fn probe(temp: &std::path::Path, enforcement: wire::Enforcement) -> std::io::Result<()> {

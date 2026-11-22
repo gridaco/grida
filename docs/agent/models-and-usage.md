@@ -17,13 +17,13 @@ Desktop can run chat on:
 
 - your connected **ChatGPT subscription**;
 - **Grida Gateway**, under your Grida account;
-- a saved **OpenRouter** or **Vercel AI Gateway** key;
+- a saved **OpenAI API**, **OpenRouter**, or **Vercel AI Gateway** key;
 - an approved compatible endpoint, which can use a key saved under its own ID.
 
 For a new chat with no saved or explicit model choice, Desktop prefers a ready
-ChatGPT subscription, currently with **GPT-6.2 Sol** as its default. Your saved
-or explicit choice takes precedence, including a saved model that has become
-unavailable.
+ChatGPT subscription. It recommends Grida’s preferred model when your account
+offers it, or another available subscription model. Your saved or explicit
+choice takes precedence, including a saved model that has become unavailable.
 
 An endpoint on another device must use HTTPS; plain HTTP works only for
 `localhost` or `127.0.0.1`. A saved HTTP endpoint on another device stays in
@@ -79,12 +79,23 @@ A selected file or nested deck window keeps its fixed model and inherits the
 last chosen effort when starting a new chat. This does not change the saved
 preference for ordinary project chats.
 
-Grida lists its current Gateway models that can use tools. Connecting ChatGPT
-adds its compatible models in a **ChatGPT Subscription** group. Add an
-OpenRouter or Vercel AI Gateway key, or connect a compatible endpoint
-in Desktop settings, to see those models too. A model in the list is not a
-promise that your subscription, key, credits or model access work; send a
-short message to check.
+The list groups models by the connection that runs them. A model offered by
+two connections appears in both groups. Choose the account or key you want
+to use. ChatGPT Subscription lists compatible models offered by your signed-in
+account. **OpenAI API · Project billing** lists compatible models available to
+your OpenAI project key and supports streamed text and agent tool calls.
+OpenRouter and Vercel AI Gateway list compatible models for that provider once
+you add its key. Grida Gateway and your configured endpoints supply their own
+model lists. [Set up an OpenAI project key](./desktop-settings.md#openai-api-project-key)
+
+Desktop checks for new model data in the background. You can open the picker
+using the last verified catalog, or the copy included with Desktop on first
+launch. A compatible model can therefore appear without a Desktop update.
+ChatGPT still needs a recent model list from your signed-in account. If that
+check fails, new subscription choices are unavailable until it succeeds.
+OpenAI project models appear when their availability check finishes. You can
+choose another connection while the check runs.
+Your provider checks access, available credits and quota when you send.
 
 Chats belong to the workspace: every model connection shares its chat list.
 Connecting a provider or refreshing the list leaves your selected connection
@@ -107,14 +118,12 @@ Choose a model in the **ChatGPT Subscription** group to use your plan for a
 new chat or an eligible next turn in an existing chat.
 
 This integration is experimental. Model access depends on your ChatGPT plan,
-workspace and the subscription service. The listed models come from Grida's
-compatibility list; reloading the picker checks connection readiness rather
-than discovering models from your account.
-
-GPT-5.5 and GPT-5.4 have been withdrawn from subscription offerings. A saved
-choice of either remains visible as unavailable. Choose an available model
-explicitly; a refresh or changed default does not replace your saved choice.
-OpenAI API model availability is separate from subscription access.
+workspace and the subscription service. Desktop matches models offered by your
+account with the models Grida can run. OpenAI API model availability is
+separate from subscription access. If a saved choice becomes unavailable, its
+name stays visible and you can choose a replacement. A refreshed listing
+affects future messages. Queued and paused messages still require the provider
+model and connection they had when you sent them.
 
 Subscription chats support text, tools and the model's available reasoning
 settings. **Ultra** can run an independent reviewer on that same subscription
@@ -124,6 +133,24 @@ Work accepted before a Desktop update keeps its earlier captured tools and
 limits; use a new message for the expanded image workflow.
 [Attach an image](./getting-started.md#attach-an-image)
 [Choose how much effort to use](./effort-and-goals.md#choose-how-much-effort-to-use)
+
+### Choose a response speed
+
+On Home or in a workspace chat using **ChatGPT Subscription**, open the model
+picker and click the lightning bolt in the upper-left corner of the effort
+panel. If you’re viewing the model list, select **Back to effort**. New chats use
+**Standard** by default. Select **Fast** or **Ultrafast** when your account
+and the selected model offer them. The lightning bolt is disabled when no
+faster speed is available. Faster speeds use more of your ChatGPT allowance.
+You can set effort separately.
+
+Grida remembers the speed for that chat, including an unsent draft. A message
+already in the queue keeps the speed and model it had when you sent it.
+Choosing a speed on Home applies it to the new chat that opens in the project.
+If Grida can’t check available speeds, choose **Retry availability** below the
+effort controls. If your saved speed is unavailable, select **Standard** from
+the speed menu or choose **Use Standard** if the lightning bolt is disabled.
+If your subscription needs a new sign-in, reconnect it in Settings.
 
 ## Known limits
 
@@ -150,6 +177,10 @@ limits; use a new message for the expanded image workflow.
   subscription again. A new sign-in does not transfer accepted work to the
   new connection. Resolve any retained work before choosing it for a future
   message in the same chat.
+- If the OpenAI model list is temporarily unavailable, choose **Retry** in the
+  picker. If the key was rejected or cannot list models, check its permissions
+  and key in **Settings → LLM Providers → OpenAI API**, then refresh the picker.
+  Accepted messages still require the project key and model that accepted them.
 - If chat asks for an API key, add a key for that provider in Desktop
   settings, then open the model list and pick
   the model again or choose another one.

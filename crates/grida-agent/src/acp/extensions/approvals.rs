@@ -3,15 +3,20 @@
 use super::*;
 use crate::host::{Approvals, TurnControl};
 use crate::permissions::ApprovalDecision;
-use agent_kit_core::WaitId;
+use agent_kit_core::{OperationId, WaitId};
 
 const LIST: &str = "co.grida/session/approvals";
+const RECONSIDER: &str = "co.grida/session/reconsider-denial";
 const ANSWER: &str = "co.grida/session/answer-approval";
 
 pub(super) fn capabilities(reviewer: bool) -> impl Iterator<Item = &'static str> {
-    [Some(LIST), reviewer.then_some(ANSWER)]
-        .into_iter()
-        .flatten()
+    [
+        Some(LIST),
+        reviewer.then_some(ANSWER),
+        reviewer.then_some(RECONSIDER),
+    ]
+    .into_iter()
+    .flatten()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -39,6 +44,20 @@ struct AnswerApproval {
     decision: ApprovalDecision,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/session/reconsider-denial", response = Reconsidered)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReconsiderDenial {
+    session_id: SessionId,
+    turn_id: TurnId,
+    review_id: OperationId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+struct Reconsidered {
+    recorded: bool,
+}
+
 pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
@@ -46,7 +65,27 @@ pub(super) fn handlers(
 ) -> RequestRoutes {
     let list_host = host.clone();
     let list_sessions = sessions.clone();
+    let evidence_host = host.clone();
+    let evidence_sessions = sessions.clone();
     RequestRoutes::default()
+        .on_receive_request(
+            async move |request: ReconsiderDenial, responder, _| {
+                let result = async {
+                    if !reviewer {
+                        return Err(unavailable("approval_reviewer_required"));
+                    }
+                    require(&evidence_sessions, RECONSIDER, Some(&request.session_id))?;
+                    evidence_host
+                        .reconsider_denial(request.session_id, request.turn_id, request.review_id)
+                        .await
+                        .map_err(host_error)?;
+                    Ok(Reconsidered { recorded: true })
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
         .on_receive_request(
             async move |request: ListApprovals, responder, _| {
                 let result = async {

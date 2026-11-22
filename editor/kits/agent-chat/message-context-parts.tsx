@@ -1,5 +1,12 @@
+"use client";
+
+import { useContext } from "react";
 import { cn } from "@app/ui/lib/utils";
 import { ArrowUpRightIcon, PresentationIcon } from "lucide-react";
+import {
+  BrowserOpen,
+  handleBrowserLinkClick,
+} from "@/lib/desktop/browser-open-context";
 import {
   IMAGE_REFERENCE_PART,
   readImageReferencePreviews,
@@ -75,6 +82,7 @@ export function MessageContextParts({
   parts: readonly unknown[];
   className?: string;
 }) {
+  const openLink = useContext(BrowserOpen);
   const chips = parts.flatMap(readChips);
   const first = chips[0];
   if (!first) return null;
@@ -98,6 +106,7 @@ export function MessageContextParts({
               href={chip.href}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(event) => handleBrowserLinkClick(event, openLink)}
               aria-label={
                 chip.group === "workflows"
                   ? `Open workflow reference ${chip.number}, ${chip.title}`

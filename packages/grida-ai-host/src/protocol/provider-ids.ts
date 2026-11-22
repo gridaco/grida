@@ -18,6 +18,7 @@ export {
   BYOK_PROVIDER_IDS,
   byokProvidersFor,
   isByokProviderId,
+  OPENAI_PROJECT_PROVIDER_ID,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
   isGgProviderId,

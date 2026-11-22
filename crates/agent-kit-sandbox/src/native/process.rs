@@ -283,6 +283,8 @@ const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
 
 #[cfg(target_os = "macos")]
 fn confined_command(prepared: &Prepared, status: i32) -> Command {
+    use std::fmt::Write as _;
+
     let mut command = Command::new("/usr/bin/sandbox-exec");
     let mut profile = String::from(
         "(version 1)\n(deny default)\n(allow process-fork)\n\
@@ -297,13 +299,33 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
     // the system's top-level links such as /tmp. None grants file contents or
     // network access.
     profile.push_str(PLATFORM_DEFAULTS);
+    if let Some(port) = prepared.listen_port {
+        profile.push_str(&format!(
+            "(allow network-bind (local tcp \"localhost:{port}\"))\n\
+             (allow network-inbound (local tcp \"localhost:{port}\"))\n\
+             (allow network-outbound (remote tcp \"localhost:{port}\"))\n"
+        ));
+    }
+    if let Some(socket) = &prepared.broker_socket {
+        command
+            .arg("-D")
+            .arg(format!("BROKER={}", socket.display()));
+        profile.push_str(
+            "(allow network-outbound (remote unix-socket (literal (param \"BROKER\"))))\n",
+        );
+    }
+    if let Some(port) = prepared.http_proxy_port {
+        let _ = writeln!(
+            profile,
+            "(allow network-outbound (require-all (remote tcp \"localhost:{port}\") (socket-domain AF_INET)))"
+        );
+    }
     let mut locations: Vec<_> = prepared
         .locations
         .iter()
         .map(|location| (&location.bound, location.access))
         .collect();
     locations.push((&prepared.helper.bound, Access::Runtime));
-    use std::fmt::Write as _;
     // Protected paths are excluded from every grant that contains them.
     let mut unreadable = String::new();
     let mut unwritable = String::new();
@@ -444,6 +466,14 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
                 command.arg("--ro-bind").arg(path).arg(path);
             }
         }
+    }
+    if let Some(socket) = &prepared.broker_socket {
+        // Only trusted setup can open this mount. The payload inherits the
+        // filter denying named Unix sockets and no open broker descriptor.
+        command
+            .arg("--ro-bind")
+            .arg(socket)
+            .arg(prepared.temporary.path().join("broker.sock"));
     }
     // The helper runs from its own path. Under disk read every other path
     // is read-only, so no new mount point could be created for it.

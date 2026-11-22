@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Grida ChatGPT subscription model compatibility",
   "type": "object",
-  "required": ["default_model_id", "model_ids", "retired_model_ids"],
+  "required": ["default_model_id", "retired_model_ids"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
@@ -10,15 +10,6 @@
     "default_model_id": {
       "type": "string",
       "pattern": "^openai/[A-Za-z0-9_.-]+$"
-    },
-    "model_ids": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^openai/[A-Za-z0-9_.-]+$"
-      }
     },
     "retired_model_ids": {
       "type": "array",

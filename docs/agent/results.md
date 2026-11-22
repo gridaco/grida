@@ -17,8 +17,14 @@ While a turn runs, its commentary and actions appear as they happen. When it
 finishes, they fold under a header such as **Worked for 1m 12s**, and the
 answer stays visible below it. Select the header to see the work in order.
 Select a line such as “Read files, ran commands” to list each action and its
-outcome. A turn that only answered, without tools or commentary, shows just
-its answer.
+outcome. Recognized shell commands show the file they read, the search query,
+or the directory they listed. Expand the command to see its original text
+and result. Other commands use the general command label. A turn that only
+answered, without tools or commentary, shows just its answer.
+
+When consecutive turns have different captured models, a divider names both
+models before the newer turn. It also appears in reopened history once both
+turns are visible.
 
 A turn you stopped shows **You stopped** and keeps its partial work in view. A
 failed turn shows **Failed after …**. A turn whose outcome Grida could not
@@ -131,8 +137,10 @@ uses the kept image, including after you reopen the chat.
 
 In a macOS or Linux workspace chat, you can also ask for a PNG through FX.
 The agent can preview the request using your chosen FX route. Live generation
-requires **Full access** and uses your provider budget or subscription. FX
-saves the PNG in the workspace and records the run.
+needs access to that route and uses your provider budget or subscription. In
+**Auto** or **Ask for approval**, a compatible build can request access for
+the individual FX command. FX saves the PNG in the workspace and records the
+run. [Understand agent permissions](./permissions.md#choose-who-reviews-extra-access)
 
 ## See an artifact while work continues
 

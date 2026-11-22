@@ -22,6 +22,12 @@ export type KeynoteAttachOptions = {
    */
   padding?: number;
   /**
+   * Minimum zoom as a fraction of the padded fit scale. Defaults to 1.
+   * Values outside `(0, 1]` use the default. Opening and loading slides
+   * still fits them at the full padded fit scale.
+   */
+  min_fit_scale?: number;
+  /**
    * Screen-pixel scroll slack past the slide edge when zoomed in past fit.
    * Forwarded to the cover constraint's `pan_overshoot`. Default 0 — strict
    * cover behavior (no panning past the slide edge). Applies only when an
@@ -56,10 +62,11 @@ export type KeynoteSurfaceHandle = DomSurfaceHandle & {
 
 /**
  * Attach a keynote-shaped DOM surface:
- * - Mounts via `attach_dom_surface` with `fit: true` (slide is visible on
- *   first frame).
- * - Installs a `'cover'` camera constraint bound to the document root, so
- *   the user can't zoom out past the slide or pan past its edges.
+ * - Fits the first slide with the preset padding on the initial DOM surface
+ *   measurement.
+ * - Suppresses native tooltips from authored SVG titles by default.
+ * - Installs a `'cover'` camera constraint bound to the document root with
+ *   the preset's zoom floor and pan bounds.
  * - Subscribes to `editor.state.load_version` so every `editor.load(svg)`
  *   re-fits the camera to the new document.
  *
@@ -71,18 +78,21 @@ export function attach(
   editor: SvgEditor,
   opts: KeynoteAttachOptions
 ): KeynoteSurfaceHandle {
+  let padding = opts.padding ?? 80;
+  let pan_overshoot = opts.pan_overshoot ?? 0;
+  const { min_fit_scale } = opts;
   const inner = attach_dom_surface(editor, {
     ...opts.surface,
     container: opts.container,
-    fit: true,
+    fit: { margin: padding },
+    native_title_tooltips: opts.surface?.native_title_tooltips ?? false,
   });
-  let padding = opts.padding ?? 80;
-  let pan_overshoot = opts.pan_overshoot ?? 0;
   const apply = () => {
     inner.camera.constraints = {
       type: "cover",
       bounds: "<root>",
       padding,
+      min_fit_scale,
       pan_overshoot,
     };
   };

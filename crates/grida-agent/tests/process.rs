@@ -36,6 +36,12 @@ mod delegation;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/deletion.rs"]
 mod deletion;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_fx_discovery.rs"]
+mod desktop_fx_discovery;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_tools.rs"]
+mod desktop_tools;
 #[cfg(unix)]
 #[path = "process/effort.rs"]
 mod effort;
@@ -71,6 +77,9 @@ mod operating_regime;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/outbound_mcp.rs"]
 mod outbound_mcp;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/prediction.rs"]
+mod prediction;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/processes.rs"]
 mod processes;
@@ -173,6 +182,8 @@ enum Reply {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     ResponsesSigned(&'static str),
     #[cfg(unix)]
+    ResponsesEvents(Vec<Value>),
+    #[cfg(unix)]
     Release(&'static str, tokio::sync::oneshot::Receiver<()>),
     /// Hold a selected fixture response until an independent observation ends.
     #[cfg(unix)]
@@ -271,7 +282,7 @@ impl Endpoint {
                     continue;
                 };
                 connections.spawn(async move {
-                    fixture_request(stream, head, &sent, reply, protocol, credential).await;
+                    fixture_request(stream, head, &sent, reply, protocol, credential, wait).await;
                 });
             }
             drop(listener);
@@ -429,6 +440,7 @@ async fn fixture_request(
     reply: Reply,
     protocol: ProviderProtocol,
     credential: Option<&str>,
+    wait: Duration,
 ) {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     let (reply, credential) = match reply {
@@ -563,7 +575,7 @@ async fn fixture_request(
     if hold {
         let mut remaining = [0; 1];
         assert_eq!(
-            timeout(WAIT, stream.read(&mut remaining))
+            timeout(wait, stream.read(&mut remaining))
                 .await
                 .unwrap()
                 .unwrap(),
@@ -578,6 +590,14 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     let (text, finish) = match reply {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::Credential(_, _) => unreachable!("credential override is handled before the body"),
+        #[cfg(unix)]
+        Reply::ResponsesEvents(events) => {
+            assert_eq!(protocol, ProviderProtocol::Responses);
+            return events
+                .into_iter()
+                .map(|event| format!("data: {event}\n\n"))
+                .collect();
+        }
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
@@ -1494,6 +1514,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
                 text: "Continue work".into()
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -2602,6 +2623,7 @@ async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
                 text: "Continue under the selected route".into(),
             }],
             questions: false,
+            question_batches: false,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),

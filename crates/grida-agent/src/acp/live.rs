@@ -1,8 +1,8 @@
 //! GRIDA-SEC-004 — detached observation for already attached sessions.
 
-use super::projection::{Outcome, activity_update};
+use super::projection::{Outcome, activity_update, question_replies_metadata};
 use super::{ConnectionSessions, Delivery};
-use crate::host::live::{LifecycleFact, LiveUpdate};
+use crate::host::live::{LifecycleFact, LiveTextKind, LiveUpdate};
 use crate::processes::ProcessSessions;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{ContentChunk, SessionNotification, SessionUpdate};
@@ -30,7 +30,18 @@ pub(super) async fn forward(
         loop {
             match updates.recv().await {
                 Ok(LiveUpdate::Text(update)) => {
-                    if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {
+                    if !text_enabled {
+                        continue;
+                    }
+                    let visible = {
+                        let state = sessions.lock().unwrap();
+                        state.can_deliver(&update.session)
+                            && (!matches!(&update.kind, LiveTextKind::QuestionReply(_))
+                                || state
+                                    .negotiated
+                                    .contains(super::extensions::QUESTION_BATCH_LIST))
+                    };
+                    if !visible {
                         continue;
                     }
                     let mut offset = update.offset;
@@ -46,6 +57,22 @@ pub(super) async fn forward(
                             "offsetBytes": offset,
                             "replace": replace,
                         });
+                        let event = match &update.kind {
+                            LiveTextKind::Assistant(citations) => {
+                                if replace && !citations.is_empty() {
+                                    metadata["citations"] =
+                                        super::projection::citation_metadata(citations);
+                                }
+                                SessionUpdate::AgentMessageChunk(chunk)
+                            }
+                            LiveTextKind::QuestionReply(replies) => {
+                                if replace {
+                                    metadata["questionReplies"] =
+                                        question_replies_metadata(replies);
+                                }
+                                SessionUpdate::UserMessageChunk(chunk)
+                            }
+                        };
                         if sessions
                             .lock()
                             .unwrap()
@@ -63,12 +90,12 @@ pub(super) async fn forward(
                                 .clone(),
                             );
                         }
-                        send(
+                        send_update(
                             &connection,
                             &delivery,
                             &sessions,
                             &update.session,
-                            chunk,
+                            event,
                             CAPABILITY,
                             metadata,
                         )
@@ -77,6 +104,50 @@ pub(super) async fn forward(
                         replace = false;
                         text = remaining;
                     }
+                }
+                Ok(LiveUpdate::HostedSearch {
+                    session,
+                    turn,
+                    message,
+                    status,
+                    action,
+                    settled,
+                }) => {
+                    if !text_enabled || !sessions.lock().unwrap().can_deliver(&session) {
+                        continue;
+                    }
+                    let (update, mut metadata) = super::projection::hosted_activity(
+                        &message,
+                        status,
+                        action.as_ref(),
+                        settled,
+                        json!({"turnId":turn}),
+                    );
+                    if sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::projection::ACTIVITY_ORDER)
+                    {
+                        metadata.as_object_mut().unwrap().extend(
+                            crate::host::activity_order::metadata(
+                                ordering.message(&session, &turn, &message),
+                            )
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                        );
+                    }
+                    send_update(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &session,
+                        update,
+                        CAPABILITY,
+                        metadata,
+                    )
+                    .await?;
                 }
                 Ok(LiveUpdate::Activity(update)) => {
                     if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {

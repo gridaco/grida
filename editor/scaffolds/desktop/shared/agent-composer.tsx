@@ -13,6 +13,7 @@ import {
   type AgentComposerInputProps,
 } from "./agent-composer-input";
 import { AgentComposerTools } from "./agent-composer-tools";
+import { ComposerVoice } from "./composer-voice";
 import { NativeModelPicker } from "../workbench/native-chat-controls";
 import type { ComposerMenuAction } from "@/kits/composer";
 
@@ -75,6 +76,7 @@ export function AgentComposer({
       id: "plan",
       icon: <ListChecksIcon />,
       label: "Plan",
+      tooltip: "Plan before making changes",
       disabled: actions.plan.disabled,
       onRemove: () => actions.plan?.onChange(false),
     });
@@ -83,6 +85,7 @@ export function AgentComposer({
       id: "goal",
       icon: <GoalIcon />,
       label: "Goal",
+      tooltip: "Keep working toward a goal",
       // Entry can be unavailable while removing the selected intent stays valid.
       disabled: actions.goal.removeDisabled,
       onRemove: () => actions.goal?.onChange(false),
@@ -91,6 +94,7 @@ export function AgentComposer({
   return (
     <AgentComposerInput
       {...input}
+      voiceDictation={ComposerVoice.desktopHost}
       commandActions={commands.map((command) => ({
         ...command,
         title: command.id,
@@ -155,7 +159,11 @@ export namespace AgentComposer {
   }>;
   export type Props = Omit<
     AgentComposerInputProps,
-    "toolbarStart" | "toolbarEnd" | "commandActions" | "onCommandSelect"
+    | "toolbarStart"
+    | "toolbarEnd"
+    | "commandActions"
+    | "onCommandSelect"
+    | "voiceDictation"
   > & {
     actions: Actions;
     commands?: readonly Command[];

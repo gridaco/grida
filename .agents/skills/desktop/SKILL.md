@@ -282,7 +282,7 @@ current Desktop version already has a GitHub release:
 
 Decide from the shipped boundary, not the directory name:
 
-- A change to `desktop/**`, `skills/**`, or a linked package reported by the
+- A change to `desktop/**`, `skills/**`, `extensions/**`, or a linked package reported by the
   audit changes the native payload. Bump `desktop/package.json` before
   publishing a new native build when its current `v<version>` is already
   published, including as a prerelease. The release assembler deliberately

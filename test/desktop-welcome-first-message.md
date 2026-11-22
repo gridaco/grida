@@ -25,32 +25,43 @@ covered_by:
 
 ## Behavior
 
-A message typed on Welcome opens its workspace and becomes the first turn of a
-new native chat there. The model and effort chosen in the Welcome picker run
+A message typed on Welcome clears from the composer when Send is pressed.
+The composer is immediately ready for the next draft. The first message and
+its attachment appear in the workspace chat while it starts, then become its
+first turn. The model and effort chosen in the Welcome picker run
 that turn; Plan and Goal intents also travel with it. **Default** keeps the
-workspace's default connection. Welcome offers connections available before a
-workspace opens; any workspace-specific choices appear in the workspace's own
-picker once its chat is running.
+workspace's default connection. On an eligible connection, a response speed
+chosen on Home becomes the new chat's speed. Changing the project or model
+clears the speed for the previous connection. If the selected speed becomes
+unavailable before the first send, the workspace keeps the request for review. A regular first message can use automatic web search when the
+destination model and Personalization allow it. Workspace-specific
+connections appear after the workspace opens.
 
 The message is sent at most once. It waits while the workspace's chat starts,
 however long that takes, and survives a reload before it is sent. Once the
 chat sends it, a reload does not send it again. When the chat cannot send it —
 the chosen model cannot open, the send fails, or the workspace needs a model
-choice first — the chat says the Welcome message wasn't sent and puts its text
-in the composer. If startup is temporarily unavailable, the workspace keeps
+choice first — Desktop keeps the ordinary request available for recovery
+alongside any newer draft. If startup is temporarily unavailable, the workspace keeps
 the waiting message for **Retry**. Reopening the workspace while a previous
 visit is still starting must allow the current visit to finish connecting,
 list its existing chats, and send the waiting message once.
 
+New project chats start in **Auto** when the destination supports automatic
+review and **Ask for approval** otherwise. This applies both when sending
+from Home and when creating a chat inside the project. The access picker can
+set **Ask for approval** before the first message. Reopening the chat restores
+the saved mode. Older chats that never saved a mode continue to ask for approval.
+
 When Full access is selected on Home, the same confirmation as a workspace
 chat appears immediately. Confirming keeps the composer on Home and lets the
 person continue drafting. Switching presets for the same project keeps the
-approved access in supporting Desktop builds. Changing projects returns the
-composer to Default. Send opens the exact approved chat with Full access.
-Cancel keeps the draft and Default access. If copying a selected Slides
+approved access in supporting Desktop builds. Changing projects uses the new
+project’s default mode. Send opens the exact approved chat with Full access.
+Cancel keeps the draft and the previous mode. If copying a selected Slides
 template fails, the composer keeps the approval and draft for retry. If the
 handoff fails after the chat is prepared, retrying from the same Home composer
-with the same model and effort reuses the prepared chat and copied deck.
+with the same model, effort and speed reuses the prepared chat and copied deck.
 
 A picked slides template is copied into the selected destination workspace as
 its own deck before the workspace opens. The first message shows the template
@@ -78,8 +89,9 @@ attachment also keeps it with an explanation instead of omitting it.
 ## Steps
 
 1. On Welcome, type “Make a poster for a jazz night” and send.
-   - Expected: the default workspace opens; a new chat appears with that
-     message as its first turn, and the agent answers.
+   - Expected: Welcome clears the composer and shows no message bubble. The
+     message appears once in the new workspace chat while it starts, and the
+     agent answers.
 2. Reload the window (Cmd+R) after the turn starts.
    - Expected: the same chat is shown; the message is not sent again.
 3. Return to Welcome, choose a provider-key model in the picker, type a
@@ -98,7 +110,7 @@ attachment also keeps it with an explanation instead of omitting it.
    - Expected: the workspace explains the connection problem and keeps the
      request while you retry. Restore the original connection and choose
      **Retry** to send it once. Alternatively, choose a working model. The
-     request appears in the composer for you to review and send.
+     outgoing request offers **Edit** so you can review it and send it explicitly.
 6. Send a text-only request from Welcome and reload the workspace window while
    its chat is still starting.
    - Expected: after the reload the chat starts and sends the message once.
@@ -117,12 +129,13 @@ attachment also keeps it with an explanation instead of omitting it.
       workspace rather than switching to the default destination.
 11. On Home, type a request and choose Full access.
     - Expected: the Full access dialog appears immediately on Home. Cancel
-      keeps the message and Default access. Choose Full access again and
+      keeps the message and the previous mode. Choose Full access again and
       confirm. Home remains open. Select Workflows, then go Back and Forward
       to revisit Home and Workflows. The draft and Full access choice persist.
       Send to open the approved new chat and start the message with Full
       access. No second confirmation appears. Return to Home, approve Full
-      access again, and pick a different project. The picker shows Default.
+      access again, and pick a different project. The picker shows the
+      destination project’s default mode.
 12. On Workflows, click three cards. Hover a composer chip and use a card's
     Open button. Remove reference 2, reselect that card, then remove it again.
     Send “Use the approach from 1 and the layout from 2.”
@@ -148,6 +161,37 @@ attachment also keeps it with an explanation instead of omitting it.
     the text field empty.
     - Expected: Home asks for a message and keeps the attachment and picks.
       Adding text lets the draft proceed to the workspace.
+17. With web search on in Personalization, choose an eligible ChatGPT
+    Subscription model and Fast on Home. Ask “Search the web for today’s
+    forecast in Seoul.” Repeat in a new workspace chat.
+    - Both messages can use hosted search. The speed picker shows Fast in
+      the chat started from Home. The **+** menu omits Web search on both
+      surfaces. If the agent searches, the chat shows the reported activity.
+18. Turn off Web search in Personalization and send the same question with
+    the eligible model. Then return to Home and select a model without faster
+    speeds.
+    - The message can be sent, and the agent has no hosted search tool for
+      that request. The new model disables the lightning bolt on Home.
+19. Select a project whose host offers Auto. Send a message from Home without
+    choosing an access mode. Start another new chat from the project's chat
+    pane and send a message there.
+    - Both new chats show **Auto**. Reopening either chat restores Auto.
+      Repeat with a project whose host omits automatic review and verify
+      **Ask for approval**.
+20. Save a plain-text fixture outside the project. From Home for the same
+    supported project, choose **Ask for approval** and ask the agent to read
+    that exact path with its file tool. Decline the request. Reopen this chat,
+    create a separate new chat, and open a chat created on an older build that
+    never saved a mode.
+    - The first turn shows **Allow once** and **Decline** for the exact file.
+      Reopening restores **Ask for approval**. The separate new chat starts in
+      **Auto**. The older chat shows **Ask for approval**.
+21. In a test profile carried over from an earlier build, leave
+    `[features].fast_mode = false` in the config and reopen an eligible chat
+    that had saved Fast. Open a new chat from Home and another from the project.
+    - The saved chat uses **Fast**. Each new draft starts at **Standard** and
+      offers the faster speeds supported by its connection. Personalization
+      shows **Web search** and **Suggested prompts**.
 
 ## Notes
 

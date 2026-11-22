@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -20,15 +21,25 @@ import type {
 import { Button } from "@app/ui/components/button";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
-import { PlayIcon, SquareIcon, GoalIcon, XIcon } from "lucide-react";
+import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
+import {
+  PlayIcon,
+  SquareIcon,
+  GoalIcon,
+  ImagesIcon,
+  XIcon,
+} from "lucide-react";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
 import {
+  AgentPromptCard,
   ChatMessageView,
+  ChatResponseCards,
   CompactionNotice,
+  CompactionProgress,
   PendingTurnIndicator,
   QuestionPrompt,
   workspace_links,
@@ -41,7 +52,10 @@ import {
   type NativeChatInitialComposer,
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
+import { BrowserOpen } from "@/lib/desktop/browser-open-context";
 import { PanelIsPresented } from "./workbench-panel-content";
+import type { LibraryExplorerPageLoader } from "@/kits/library-explorer";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
   ComposerDropArea,
@@ -53,6 +67,7 @@ import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import { AgentComposer } from "../shared/agent-composer";
+import { OutgoingMessage, OutgoingMessageStatus } from "./outgoing-message";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -69,6 +84,7 @@ import { NativeDisplayedReply } from "./native-displayed-reply";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import { ResponseCards } from "@/lib/agent-chat/response-cards";
 import { NativeMessageRevision } from "./native-message-revision";
 import { NativeSubagentActivityPanel } from "./native-agent-activity";
 import { SubagentPlacement } from "./subagent-placement";
@@ -77,19 +93,13 @@ import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-
 import { NativeChatHeader } from "./native-chat-controls";
 import { attachedChatActivity } from "@/lib/agent-chat/native-chat-activity";
 import { ChatActivityIndicators } from "./chat-activity-indicators";
+import layout from "./native-chat-layout.module.css";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
-const readNoSvgSelection = () => false;
-const APPROVAL_ACTION = {
-  read_file: "Read file",
-  list_files: "List folder",
-  search_text: "Search files",
-  write_file: "Replace file",
-  edit_file: "Edit file",
-} as const;
+const readNoEditorSelection = () => undefined;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
   setItem: (key: string, value: string) =>
@@ -108,11 +118,18 @@ export type NativeFirstMessage = Readonly<{
   profileId: string | null;
   composer?: NativeChatInitialComposer;
   waiting: () => boolean;
+  peek?: () => NativeChatFirstInput | null;
+  transferNextDraft?: (destination: {
+    store: ComposerDrafts;
+    key: string;
+  }) => void;
   take: () => NativeChatFirstInput | null;
 }>;
 
 type NativeChatPresentation = {
   subagentPlacement?: SubagentPlacement;
+  /** Working directory already resolved by the owning workspace UI. */
+  workingDirectory?: string;
   /** Registered project folder to open from the access confirmation. */
   projectFolderId?: string;
   /** Lends the selected main chat's existing controller to its workspace. */
@@ -120,6 +137,10 @@ type NativeChatPresentation = {
     processes: NativeBackgroundProcessController | null
   ) => void;
 };
+
+type ComposerPredictionPreferences = Parameters<
+  NativeComposerPrediction["connect"]
+>[0];
 
 type ConnectionRecovery = {
   note: string;
@@ -131,6 +152,7 @@ export function NativeAgentPaneGate({
   bridge,
   selectionKey,
   workspaceId,
+  workingDirectory,
   projectFolderId,
   initialSession,
   editorSurfaces,
@@ -215,9 +237,20 @@ export function NativeAgentPaneGate({
     !!bridge.selectProfile;
   const unavailable =
     !starting && readiness !== "native-ready" && !connectionRequired;
-  if (unavailable)
+  if (unavailable) {
+    const pending = firstMessage?.peek?.();
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
+        {pending && (
+          <OutgoingMessage
+            text={pending.text}
+            displayParts={pending.messageContext?.displayParts}
+            attachmentName={
+              firstMessage?.composer?.attachment?.file.name ??
+              firstMessage?.composer?.missingAttachment?.name
+            }
+          />
+        )}
         <span role="alert" className="text-destructive">
           {readiness === null
             ? "Couldn't check chat availability."
@@ -236,6 +269,7 @@ export function NativeAgentPaneGate({
         </Button>
       </div>
     );
+  }
   return (
     <NativeAgentPane
       key={initialSession}
@@ -263,6 +297,7 @@ export function NativeAgentPaneGate({
       }
       selectionKey={selectionKey}
       workspaceId={workspaceId}
+      workingDirectory={workingDirectory}
       projectFolderId={projectFolderId}
       initialSession={initialSession}
       startupProfileId={
@@ -299,23 +334,34 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
 };
 
+type LibraryRequestSource = {
+  loadPage: LibraryExplorerPageLoader;
+  readPng(id: string, maxBytes: number): Promise<ArrayBuffer>;
+};
+
 export function NativeAgentPane({
   bridge,
+  predictionPreferences,
+  autofocus,
   starting = false,
   recovery,
   recovered,
   selectionKey,
   workspaceId,
+  workingDirectory,
   projectFolderId,
   initialSession,
   startupProfileId,
   editorSurfaces,
+  libraryRequestSource,
   sideChatPlacement,
   firstMessage,
   onProcessesChange,
   subagentPlacement,
 }: {
   bridge: DesktopNativeChat;
+  predictionPreferences?: ComposerPredictionPreferences;
+  autofocus?: boolean;
   /** The agent is still starting; the pane shows but does not connect yet. */
   starting?: boolean;
   /** No connection can run yet; the composer's model picker starts the chat. */
@@ -327,6 +373,7 @@ export function NativeAgentPane({
   /** An untouched chat's recommended connection, selected before startup. */
   startupProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
+  libraryRequestSource?: LibraryRequestSource;
   /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
@@ -339,15 +386,20 @@ export function NativeAgentPane({
       selectionMemory,
       selectionKey && `grida.nativeChat.${selectionKey}`,
       editorSurfaces,
-      !!workspaceId
+      !!workspaceId || !!libraryRequestSource
     );
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone", {
       sessionId:
         initialSession ?? firstMessage?.composer?.preparedSessionId ?? null,
-      fromHome: firstMessage?.waiting() === true,
+      home: firstMessage?.waiting() ? firstMessage.composer : undefined,
     });
     return created;
-  }, [bridge, selectionKey, editorSurfaces, workspaceId]);
+  }, [bridge, selectionKey, editorSurfaces, workspaceId, libraryRequestSource]);
+  useLayoutEffect(() => {
+    const destination = controller.composerDraft();
+    if (destination && firstMessage?.waiting())
+      firstMessage.transferNextDraft?.(destination);
+  }, [controller, firstMessage]);
   useEffect(() => {
     const publish = () =>
       onProcessesChange?.(
@@ -434,18 +486,22 @@ export function NativeAgentPane({
     <NativeChatPane
       controller={controller}
       bridge={bridge}
+      predictionPreferences={predictionPreferences}
+      autofocus={autofocus}
       initialSession={initialSession}
       workspaceId={workspaceId}
       projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
+      libraryRequestSource={libraryRequestSource}
       recovery={recovery}
-      waitingForHome={!!recovery && firstMessage?.waiting()}
+      firstMessage={initialSession ? undefined : firstMessage}
       draftRef={draft}
       subagentsInTabs={!!subagentPlacement}
       header={(state) => (
         <NativeChatHeader
           controller={controller}
           state={state}
+          workingDirectory={workingDirectory}
           disabled={starting || connectionRequired}
           onChatSelected={() => draft.current?.focus()}
         />
@@ -455,7 +511,8 @@ export function NativeAgentPane({
 }
 
 /** The composer handle a chat pane lends its owner. */
-type NativeChatComposer = Pick<ComposerController, "appendText" | "focus">;
+type NativeChatComposer = Pick<ComposerController, "appendText" | "focus"> &
+  Partial<Pick<ComposerController, "restoreDocument">>;
 
 /**
  * A side chat, as a placement presents it: the ordinary chat pane bound to
@@ -483,7 +540,9 @@ export function NativeSideChatPane({
       autofocus
       testId="native-side-chat"
       header={(state) => (
-        <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium">
+        <header
+          className={`flex h-10 shrink-0 items-center gap-2 text-xs font-medium ${layout.contentInset}`}
+        >
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
             {chat.sideChatTitle()}
           </span>
@@ -514,12 +573,14 @@ export function NativeSideChatPane({
 function NativeChatPane({
   controller,
   bridge,
+  predictionPreferences,
   initialSession,
   workspaceId,
   projectFolderId = workspaceId,
   editorSurfaces,
+  libraryRequestSource,
   recovery,
-  waitingForHome,
+  firstMessage,
   draftRef: draft,
   header,
   autofocus = true,
@@ -528,19 +589,22 @@ function NativeChatPane({
 }: {
   controller: NativeChatController;
   bridge: DesktopNativeChat;
+  predictionPreferences?: ComposerPredictionPreferences;
   initialSession?: string | null;
   workspaceId?: string;
   projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
+  libraryRequestSource?: LibraryRequestSource;
   /** No connection can run yet; the composer's model picker starts the chat. */
   recovery?: ConnectionRecovery;
-  waitingForHome?: boolean;
+  firstMessage?: NativeFirstMessage;
   draftRef: RefObject<NativeChatComposer | null>;
   header: (state: NativeChatView) => ReactNode;
   autofocus?: boolean;
   testId?: string;
   subagentsInTabs?: boolean;
 }) {
+  const openWeb = useContext(BrowserOpen);
   // Workspace file links in replies open in the workbench, which validates
   // the path against the workspace before opening a tab.
   const openWorkspaceLink = useMemo(() => {
@@ -558,6 +622,36 @@ function NativeChatPane({
     controller.read,
     controller.read
   );
+  const handoffInput =
+    (!state.selected ||
+      state.selected === firstMessage?.composer?.preparedSessionId) &&
+    firstMessage?.peek?.();
+  const homeInput =
+    handoffInput &&
+    !state.outgoing.some((item) => item.id === handoffInput.requestId)
+      ? handoffInput
+      : null;
+  const homeAttachmentName =
+    firstMessage?.composer?.attachment?.file.name ??
+    firstMessage?.composer?.missingAttachment?.name;
+  const renderOutgoingStatus = (item: NativeChatView["outgoing"][number]) => (
+    <OutgoingMessageStatus
+      status={item.status}
+      error={item.error}
+      onRetry={
+        item.retryable === false
+          ? undefined
+          : () => controller.retryOutgoing(item.id)
+      }
+      onEdit={() =>
+        controller.editOutgoing(
+          item.id,
+          (doc) => draft.current?.restoreDocument?.(doc) ?? false
+        )
+      }
+      onDismiss={() => void controller.dismissOutgoing(item.id)}
+    />
+  );
   const awaitingProfiles =
     !!bridge.profiles && !controller.fixedSession && !state.profilesLoaded;
   const selectionRead = controller.modelSelectionRead;
@@ -565,10 +659,10 @@ function NativeChatPane({
     (awaitingProfiles && state.profileReadError) ||
     (selectionRead === "failed" && state.profileError) ||
     null;
-  const svgTextSelected = useSyncExternalStore(
-    controller.subscribeToComposerSvgText,
-    controller.readComposerSvgText,
-    readNoSvgSelection
+  const editorSelection = useSyncExternalStore(
+    controller.subscribeToComposerEditorSelection,
+    controller.readComposerEditorSelection,
+    readNoEditorSelection
   );
   const subagentActivity = useSyncExternalStore(
     state.subagents?.subscribe ?? subscribeNoActivity,
@@ -604,6 +698,30 @@ function NativeChatPane({
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
+  const desktop = useDesktopBridge();
+  const preferences = predictionPreferences ?? desktop?.composerPredictions;
+  const personalization = desktop?.personalization;
+  useEffect(
+    () => controller.connectPersonalization(personalization),
+    [controller, personalization]
+  );
+  const prediction = controller.composerPrediction;
+  useEffect(() => prediction.connect(preferences), [prediction, preferences]);
+  useLayoutEffect(() => {
+    const report = () =>
+      prediction.setPresented(
+        !controller.fixedSession &&
+          panelPresented &&
+          !activityOpen &&
+          !document.hidden
+      );
+    report();
+    document.addEventListener("visibilitychange", report);
+    return () => {
+      document.removeEventListener("visibilitychange", report);
+      prediction.setPresented(false);
+    };
+  }, [prediction, controller, panelPresented, activityOpen]);
   const conversationPane = useRef<HTMLDivElement>(null);
   const attachmentId = controller.presentedAttachmentId;
   useEffect(() => {
@@ -637,7 +755,10 @@ function NativeChatPane({
     !turn.cancelled &&
     (state.pausing === turn.turnId || turn.paused);
   const approval =
-    turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
+    turn &&
+    (turn.disposition === "suspended" || (running && turn.inputNeeded)) &&
+    !turn.paused &&
+    !turn.cancelled
       ? state.approvals[0]
       : undefined;
   const questions = turn && !turn.cancelled ? state.questions : [];
@@ -655,7 +776,11 @@ function NativeChatPane({
   );
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
-  const error = state.error ?? state.approvalError ?? state.questionError;
+  const error =
+    state.error ??
+    state.approvalError ??
+    state.questionError ??
+    controller.turnOptionsError;
 
   const selectedProfile =
     state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
@@ -678,7 +803,8 @@ function NativeChatPane({
     state.messages,
     state.turnRecords,
     snapshot?.current,
-    snapshot?.latest
+    snapshot?.latest,
+    state.transcriptGapBefore
   );
   const records = new Map<string, (typeof state.turnRecords)[number]>();
   for (const record of state.turnRecords)
@@ -693,6 +819,7 @@ function NativeChatPane({
     else if (
       message.role === "user" &&
       !message.questionReply &&
+      !message.questionReplies &&
       message.turnId &&
       !firstRequest.has(message.turnId)
     )
@@ -727,7 +854,10 @@ function NativeChatPane({
     },
     [replyId, sessionId]
   );
-  const renderMessage = (message: NativeChatMessage) => {
+  const renderMessage = (
+    message: NativeChatMessage,
+    completedAnswer = false
+  ) => {
     if (message.messageId === state.revisionDraft?.messageId)
       return revisionEditor;
     const record = message.turnId ? records.get(message.turnId) : undefined;
@@ -735,18 +865,26 @@ function NativeChatPane({
       record?.goalStart &&
       !!message.turnId &&
       firstRequest.get(message.turnId) === message.messageId;
+    const cards =
+      openWeb && completedAnswer ? ResponseCards.forReply(message) : undefined;
     return (
       <ChatMessageView
         key={message.messageId}
         ref={replyId === message.messageId ? bindReply : undefined}
         loadAttachmentPreview={controller.readAttachmentPreview}
         loadToolImage={controller.readToolImage}
+        responseFooter={
+          openWeb && cards?.length ? (
+            <ChatResponseCards cards={cards} open={openWeb} />
+          ) : undefined
+        }
         actions={
           message.role === "user"
             ? {
                 // Inline revision is for plain-text requests.
                 ...(editHistory &&
                   !message.questionReply &&
+                  !message.questionReplies &&
                   !message.attachments?.length &&
                   !message.displayParts?.length &&
                   !goalStart && {
@@ -782,7 +920,7 @@ function NativeChatPane({
   // editor; the composer consumes its own drops first, so each is handled once.
   // (see test/desktop-agent-chat-pane-drop.md)
   const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
-    if (!activityOpen)
+    if (!activityOpen && !homeInput)
       void controller.pickTransferredAttachment(state.scope, resources);
   };
 
@@ -812,16 +950,21 @@ function NativeChatPane({
         {(state.profileError ||
           state.catalogEntryError ||
           state.permissionModeError) && (
-          <p role="alert" className="px-3 py-1 text-xs text-destructive">
+          <p
+            role="alert"
+            className={`py-1 text-xs text-destructive ${layout.contentInset}`}
+          >
             {state.profileError ??
               state.catalogEntryError ??
               state.permissionModeError}
           </p>
         )}
         {recovery && (
-          <div className="text-muted-foreground px-3 py-1 text-xs">
+          <div
+            className={`py-1 text-xs text-muted-foreground ${layout.contentInset}`}
+          >
             <p role="status">{recovery.note}</p>
-            {waitingForHome && (
+            {firstMessage?.waiting() && (
               <p>Your message from Home is still waiting to send.</p>
             )}
             {state.profiles &&
@@ -845,14 +988,14 @@ function NativeChatPane({
         )}
         <workspace_links.Opener.Provider value={openWorkspaceLink}>
           <Conversation
-            className="min-h-0 flex-1"
+            className={questions.length ? "min-h-8 flex-1" : "min-h-0 flex-1"}
             initial="instant"
             resize={running ? "smooth" : "instant"}
           >
             {/* See test/desktop-agent-chat-scrollbar.md. */}
             <ConversationContent
               scrollbar="custom"
-              className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
+              className={`gap-4 py-4 ${layout.contentInset}`}
               scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
               {sessionId && readState && (
@@ -894,6 +1037,17 @@ function NativeChatPane({
                   <NativeTurnActivity
                     key={block.turnId}
                     block={block}
+                    showModelChanges={!controller.fixedSession}
+                    approvalReviews={records.get(block.turnId)?.approvalReviews}
+                    onReconsider={
+                      controller.canReconsiderDenials
+                        ? (reviewId) =>
+                            void controller.reconsiderDenial(
+                              block.turnId,
+                              reviewId
+                            )
+                        : undefined
+                    }
                     renderMessage={renderMessage}
                     loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(
@@ -913,6 +1067,25 @@ function NativeChatPane({
                   renderMessage(block.message)
                 )
               )}
+              {homeInput && (
+                <OutgoingMessage
+                  text={homeInput.text}
+                  displayParts={homeInput.messageContext?.displayParts}
+                  attachmentName={homeAttachmentName}
+                />
+              )}
+              {state.outgoing
+                .filter((item) => item.placement === "transcript")
+                .map((item) => (
+                  <OutgoingMessage
+                    key={item.id}
+                    text={item.text}
+                    attachmentName={item.attachment?.name}
+                    displayParts={item.displayParts}
+                  >
+                    {renderOutgoingStatus(item)}
+                  </OutgoingMessage>
+                ))}
               {subagentActivity?.activityAvailable &&
                 !subagentActivity.eventsComplete && (
                   <Button
@@ -925,13 +1098,15 @@ function NativeChatPane({
                     More subagent activity is available in Subagents
                   </Button>
                 )}
-              {stillWorking && (
+              {state.commandRunning === "compact" ? (
+                <CompactionProgress />
+              ) : stillWorking ? (
                 <PendingTurnIndicator
                   key={turn?.turnId}
                   progress={state.progressRevision}
                   immediate={!outputStarted}
                 />
-              )}
+              ) : null}
               <div ref={setQuestionTranscript} className="contents" />
               {/* See test/desktop-agent-chat-transcript-history.md. */}
               {!turn &&
@@ -947,13 +1122,15 @@ function NativeChatPane({
                   />
                 )}
             </ConversationContent>
-            <ConversationScrollButton />
+            <ConversationScrollButton
+              working={stillWorking || state.commandRunning === "compact"}
+            />
           </Conversation>
         </workspace_links.Opener.Provider>
         {!state.revisionDraft && state.revisionSubmitting ? (
           <div
             role="status"
-            className="px-3 pt-2 text-xs text-muted-foreground"
+            className={`pt-2 text-xs text-muted-foreground ${layout.contentInset}`}
           >
             Opening edit…
           </div>
@@ -961,7 +1138,7 @@ function NativeChatPane({
         {state.connectionRecovery === "reconnecting" && (
           <div
             role="status"
-            className="px-3 pt-2 text-xs text-muted-foreground"
+            className={`pt-2 text-xs text-muted-foreground ${layout.contentInset}`}
           >
             Reconnecting to this chat…
           </div>
@@ -969,7 +1146,7 @@ function NativeChatPane({
         {state.connectionRecovery === "disconnected" && (
           <div
             role="alert"
-            className="flex items-center gap-2 px-3 pt-2 text-xs"
+            className={`flex items-center gap-2 pt-2 text-xs ${layout.contentInset}`}
           >
             <span className="flex-1">
               {controller.canReconnect
@@ -991,7 +1168,7 @@ function NativeChatPane({
         {interrupted && (
           <div
             role="status"
-            className="flex items-center gap-2 px-3 pt-2 text-xs"
+            className={`flex items-center gap-2 pt-2 text-xs ${layout.contentInset}`}
           >
             <span className="flex-1">
               {turn.cancelled
@@ -1012,7 +1189,7 @@ function NativeChatPane({
         {error && !state.connectionRecovery && (
           <div
             role="alert"
-            className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
+            className={`flex items-center gap-2 pt-2 text-xs text-destructive ${layout.contentInset}`}
           >
             <span className="flex-1">{error}</span>
             <Button
@@ -1025,38 +1202,20 @@ function NativeChatPane({
             </Button>
           </div>
         )}
-        {approval && (
-          <AgentApprovalPrompt
-            description={
-              approval.tool === "write_file" || approval.tool === "edit_file"
-                ? "The agent is asking to change its settings file."
-                : "The agent is asking for additional read access."
-            }
-            detail={
-              <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
-                <div>
-                  {APPROVAL_ACTION[approval.tool]}{" "}
-                  {reviewText(approval.relativePath || ".")}
-                </div>
-                <div>Folder {reviewText(approval.root)}</div>
-                {approval.query !== undefined && (
-                  <div>Search {reviewText(approval.query)}</div>
-                )}
-              </div>
-            }
-            acceptLabel="Allow once"
-            declineLabel="Decline"
-            disabled={state.acting}
-            onDecision={(allowed) =>
-              controller.answerApproval(
-                approval.reviewId,
-                allowed ? "approve_once" : "decline"
-              )
-            }
-          />
-        )}
-        {questions.length > 0 && (
-          <div className="max-h-[50%] shrink-0 space-y-2 overflow-y-auto px-3 py-2 empty:hidden">
+        {(approval || questions.length > 0 || librarySelection) && (
+          // The scroll viewport's padding leaves room for the card shadows.
+          <div
+            className={`relative z-10 -my-1 flex min-h-0 max-h-[75%] flex-col gap-3 overflow-y-auto py-3 empty:hidden [&>[data-question-prompt]:not(:only-child)]:min-h-44 ${layout.contentInset}`}
+          >
+            {approval && (
+              <AgentApprovalPrompt
+                approval={approval}
+                disabled={state.acting}
+                onDecision={(decision) =>
+                  controller.answerApproval(approval.reviewId, decision)
+                }
+              />
+            )}
             {questions.map((question, index) => (
               <QuestionPrompt
                 key={JSON.stringify([state.scope, question.questionId])}
@@ -1069,14 +1228,28 @@ function NativeChatPane({
                     : undefined
                 }
                 input={{
-                  questions: [
-                    {
-                      question: question.question,
-                      options: question.options.map((label) => ({ label })),
-                    },
-                  ],
+                  questions:
+                    "questions" in question
+                      ? question.questions
+                      : [
+                          {
+                            question: question.question,
+                            options: question.options.map((label) => ({
+                              label,
+                            })),
+                          },
+                        ],
                 }}
                 onSubmit={async (survey) => {
+                  if ("questions" in question) {
+                    const answers = survey.batchAnswers();
+                    return answers
+                      ? controller.answerQuestion(question.questionId, {
+                          kind: "batch",
+                          answers,
+                        })
+                      : false;
+                  }
                   const answer = survey.singleAnswer();
                   return answer
                     ? controller.answerQuestion(question.questionId, answer)
@@ -1085,30 +1258,42 @@ function NativeChatPane({
                 submitDisabled={!state.questionReady || state.acting}
               />
             ))}
+            {librarySelection && (
+              <AgentPromptCard
+                role="group"
+                aria-label="Library request"
+                className="shrink-0"
+              >
+                <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
+                  <ImagesIcon aria-hidden="true" className="size-4" />
+                  Library request
+                </div>
+                <p className="px-2">
+                  The agent is asking for a Library reference.
+                </p>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="xs"
+                    className="text-sm font-normal"
+                    disabled={state.acting}
+                    onClick={() =>
+                      setLibraryRequest({
+                        scope: state.scope,
+                        selectionId: librarySelection.selectionId,
+                      })
+                    }
+                  >
+                    {state.librarySelectionRetry
+                      ? "Review answer"
+                      : "Choose reference"}
+                  </Button>
+                </div>
+              </AgentPromptCard>
+            )}
           </div>
         )}
-        {librarySelection && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
-            <p>The agent is asking for a Library reference.</p>
-            <Button
-              type="button"
-              size="xs"
-              variant="outline"
-              disabled={state.acting}
-              onClick={() =>
-                setLibraryRequest({
-                  scope: state.scope,
-                  selectionId: librarySelection.selectionId,
-                })
-              }
-            >
-              {state.librarySelectionRetry
-                ? "Review answer"
-                : "Choose reference"}
-            </Button>
-          </div>
-        )}
-        <div className="shrink-0 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-3">
+        <div className={`shrink-0 pt-3 pb-4 ${layout.contentInset}`}>
           {state.imageInput && (
             <input
               key={`png-${state.scope}`}
@@ -1142,7 +1327,7 @@ function NativeChatPane({
               }}
             />
           )}
-          {state.attachmentReading && (
+          {!homeInput && state.attachmentReading && (
             <p
               role="status"
               className="text-muted-foreground px-1 pb-1 text-xs"
@@ -1150,7 +1335,8 @@ function NativeChatPane({
               Reading attachment…
             </p>
           )}
-          {state.attachmentDraft &&
+          {!homeInput &&
+            state.attachmentDraft &&
             (state.attachmentDraft.error ||
               !(state.attachmentDraft.kind === "image"
                 ? state.selectedImageInput
@@ -1178,14 +1364,12 @@ function NativeChatPane({
               {state.attachmentNotice}
             </p>
           )}
-          {(state.commandRunning || state.commandNotice) && (
+          {(state.commandRunning === "fork" || state.commandNotice) && (
             <div className="flex items-center gap-2 px-1 pb-1 text-xs">
               <span role="status">
-                {state.commandRunning === "compact"
-                  ? "Compacting…"
-                  : state.commandRunning === "fork"
-                    ? "Creating fork…"
-                    : state.commandNotice}
+                {state.commandRunning === "fork"
+                  ? "Creating fork…"
+                  : state.commandNotice}
               </span>
               {state.commandFork && (
                 <Button
@@ -1202,6 +1386,7 @@ function NativeChatPane({
           <NativeComposerTray
             controller={controller}
             view={state}
+            renderOutgoingStatus={renderOutgoingStatus}
             onReturnedText={(text) =>
               void draft.current?.appendText(text, MAX_DRAFT_BYTES)
             }
@@ -1210,7 +1395,7 @@ function NativeChatPane({
             composer mounted so model reattachment preserves its popovers. */}
           <AgentComposer
             access={{
-              mode: state.permissionMode?.mode ?? "restricted",
+              mode: controller.composerPermissionMode,
               loading:
                 state.permissionModeLoading ||
                 (!state.scope &&
@@ -1218,6 +1403,12 @@ function NativeChatPane({
                   !recovery &&
                   controller.supportsPermissionModeRead),
               available: state.permissionModeAvailable,
+              fullAccess:
+                state.permissionMode?.available.includes("full_access"),
+              automaticReview: state.permissionMode
+                ? state.permissionMode.available.includes("approve_for_me")
+                : state.draftAutomaticReviewAvailable &&
+                  state.permissionModeAvailable,
               uncertain: state.permissionModeUncertain,
               onRetry: () => void controller.checkPermissionMode(),
               busy:
@@ -1230,6 +1421,7 @@ function NativeChatPane({
               onChange: (mode) => void controller.selectPermissionMode(mode),
             }}
             draft={controller.composerDraft()}
+            prediction={prediction}
             editing={
               state.queueDraft
                 ? {
@@ -1247,12 +1439,12 @@ function NativeChatPane({
             }
             autofocus={autofocus}
             catalog={catalog}
-            className="@container"
             commands={controller.composerCommands.map((id) => ({
               id,
               run: () => controller.runComposerCommand(id),
             }))}
             attachments={
+              !homeInput &&
               (state.draftMessageContext ||
                 (state.attachmentDraft && !state.attachmentReading)) && (
                 <>
@@ -1301,10 +1493,17 @@ function NativeChatPane({
               (!!state.draftMessageContext.displayParts.length ||
                 !!state.attachmentDraft)
             }
-            selectionContext={svgTextSelected ? "svg-text" : undefined}
+            selectionLabel={editorSelection}
+            onClearSelection={controller.clearComposerEditorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
+            onCapture={(text, document) =>
+              controller.canSubmitOptimistically(text)
+                ? controller.submitOptimistically(text, state.scope, document)
+                : undefined
+            }
             canSubmit={
+              !homeInput &&
               controller.canSubmit &&
               (!state.goalIntent || controller.canStartGoal)
             }
@@ -1323,7 +1522,7 @@ function NativeChatPane({
                   : running && !turn?.paused
                     ? {
                         label: "Pause",
-                        icon: <SquareIcon className="size-3.5" />,
+                        icon: <SquareIcon className="size-3 fill-current" />,
                         onClick: () => void controller.control("pause"),
                         confirmWithEscape: true,
                       }
@@ -1348,6 +1547,7 @@ function NativeChatPane({
                 state.fileInput || state.fileReferenceInput
                   ? {
                       disabled:
+                        !!homeInput ||
                         state.goalIntent ||
                         !(
                           controller.canAttach("file") ||
@@ -1358,14 +1558,17 @@ function NativeChatPane({
                   : undefined,
               image: state.imageInput
                 ? {
-                    disabled: state.goalIntent || !controller.canAttach("png"),
+                    disabled:
+                      !!homeInput ||
+                      state.goalIntent ||
+                      !controller.canAttach("png"),
                     onSelect: () => pngPicker.current?.click(),
                   }
                 : undefined,
               library:
                 workspaceId && state.imageInput
                   ? {
-                      disabled: state.acting || state.goalIntent,
+                      disabled: !!homeInput || state.acting || state.goalIntent,
                       onSelect: () => setLibraryScope(state.scope),
                     }
                   : undefined,
@@ -1408,6 +1611,17 @@ function NativeChatPane({
               },
               refreshError: state.profileReadError,
               effort: state.effort,
+              speed:
+                bridge.turnCapabilities &&
+                !controller.fixedSession &&
+                !state.goalIntent
+                  ? {
+                      value: state.speed,
+                      capabilities: state.turnCapabilities,
+                      onChange: (speed) => controller.selectSpeed(speed),
+                      refresh: () => void controller.refreshTurnCapabilities(),
+                    }
+                  : undefined,
               ultraAvailable: controller.ultraAvailability,
               ultraOffered: controller.offers("delegation"),
               goal: state.goalIntent,
@@ -1440,6 +1654,7 @@ function NativeChatPane({
                 key={librarySelection.selectionId}
                 open
                 single
+                loadPage={libraryRequestSource?.loadPage}
                 onOpenChange={(open) => {
                   if (!open) setLibraryRequest(null);
                 }}
@@ -1449,7 +1664,11 @@ function NativeChatPane({
                       librarySelection.selectionId,
                       {
                         id: pin.id,
-                        readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
+                        readPng: (maxBytes) =>
+                          (libraryRequestSource?.readPng ?? readLibraryPng)(
+                            pin.id,
+                            maxBytes
+                          ),
                       }
                     );
                 }}
@@ -1490,11 +1709,4 @@ async function readLibraryPng(
   const source = await readLibraryAttachment(id);
   if (!source) throw new Error("library_image_unavailable");
   return encodeLibraryPng(source, maxBytes);
-}
-
-function reviewText(value: string): string {
-  return JSON.stringify(value).replace(
-    /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
-  );
 }

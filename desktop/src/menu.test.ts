@@ -15,8 +15,12 @@ const fixture = vi.hoisted(() => {
   const appSession = {};
   class Window {
     static focused: Window | null = null;
+    static windows: Window[] = [];
     static getFocusedWindow() {
       return Window.focused;
+    }
+    static getAllWindows() {
+      return Window.windows;
     }
     webContents: {
       getURL(): string;
@@ -34,6 +38,10 @@ const fixture = vi.hoisted(() => {
       };
     }
     close = vi.fn<() => void>();
+    focus = vi.fn<() => void>();
+    restore = vi.fn<() => void>();
+    loadURL = vi.fn<(url: string) => Promise<void>>().mockResolvedValue();
+    isMinimized = () => false;
     isDestroyed = () => false;
   }
   return {
@@ -94,6 +102,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixture.template = [];
   fixture.Window.focused = null;
+  fixture.Window.windows = [];
   fixture.list.mockResolvedValue([]);
   fixture.sidecarReady = true;
   fixture.focusSettings.mockReturnValue(false);
@@ -145,11 +154,42 @@ it("opens and focuses Settings through the same admitted action as its native me
     fixture.settings.mock.results[0].value
   );
 
-  fixture.focusSettings.mockReturnValue(true);
+  const existing = new fixture.Window(
+    "https://fixture.invalid/desktop/settings#appearance"
+  );
+  fixture.Window.windows.push(existing);
   open_or_focus_settings(app, admission);
-  expect(fixture.focusSettings).toHaveBeenLastCalledWith("/desktop/settings");
+  expect(existing.focus).toHaveBeenCalledOnce();
+  expect(existing.loadURL).not.toHaveBeenCalled();
   expect(fixture.settings).toHaveBeenCalledTimes(1);
   expect(admission.register).toHaveBeenCalledTimes(1);
+});
+
+it("targets LLM Providers in a new or already-open Settings window", async () => {
+  const app = {} as App;
+  const other = new fixture.Window(
+    "https://fixture.invalid/desktop/workspace?route=/desktop/settings"
+  );
+  fixture.Window.windows.push(other);
+  await open_or_focus_settings(app, undefined, "models");
+  expect(other.focus).not.toHaveBeenCalled();
+  expect(other.loadURL).not.toHaveBeenCalled();
+  expect(fixture.settings).toHaveBeenCalledExactlyOnceWith({
+    app,
+    base_url: "https://fixture.invalid",
+    section: "models",
+  });
+
+  const existing = new fixture.Window(
+    "https://fixture.invalid/desktop/settings#appearance"
+  );
+  fixture.Window.windows.push(existing);
+  await open_or_focus_settings(app, undefined, "models");
+  expect(existing.focus).toHaveBeenCalledOnce();
+  expect(existing.loadURL).toHaveBeenCalledExactlyOnceWith(
+    "https://fixture.invalid/desktop/settings#models"
+  );
+  expect(fixture.settings).toHaveBeenCalledTimes(1);
 });
 
 it("withholds Settings until entry admission and retained services are available", () => {
@@ -161,7 +201,6 @@ it("withholds Settings until entry admission and retained services are available
   };
   open_or_focus_settings(app, admission);
   expect(admission.focus_entry).toHaveBeenCalledOnce();
-  expect(fixture.focusSettings).not.toHaveBeenCalled();
   fixture.sidecarReady = false;
   open_or_focus_settings(app, { ...admission, can_open: () => true });
   expect(fixture.settings).not.toHaveBeenCalled();

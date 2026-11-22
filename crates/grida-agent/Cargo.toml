@@ -72,6 +72,10 @@ notify = { version = "8", default-features = false, features = [
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs", "process", "event"] }
 
+[build-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }
 socket2 = "0.6"

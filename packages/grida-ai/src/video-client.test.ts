@@ -2,6 +2,7 @@ import { fixtureGGDiscovery } from "./testing/gg-discovery";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public video authority, whole-operation bounds, safe results.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { bundledModelCatalogue, VisualModels } from "./catalogue";
 import { catalog as models } from "./catalogue/grida";
 import {
   VideoClient,
@@ -81,6 +82,53 @@ function falMock(
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+it("resolves and executes a newly published BYOK video with the same eligibility as listing", async () => {
+  const id = "fixture/runtime-video";
+  const seed = bundledModelCatalogue();
+  const snapshot = {
+    ...seed,
+    visual: {
+      image: {},
+      video: {
+        [id]: {
+          id,
+          label: "Fixture video",
+          deprecated: false,
+          transparentBackground: false,
+          bindings: {
+            fal: {
+              id: "fixture/exact-video-selector",
+              endpoints: [],
+              input: "text",
+              pricingType: "per_second",
+              scalarTokenPricing: false,
+              deprecated: false,
+            },
+          },
+        },
+      },
+    },
+  };
+  const { client, request } = setup({
+    runtime_catalogue: async () => snapshot,
+  });
+  falMock(request);
+  expect(VisualModels.list(snapshot, "video")).toMatchObject([
+    { id, providers: { fal: { text: true } } },
+  ]);
+  await failure(
+    client.resolve({ model_id: id, provider: "fal", image: true }),
+    "input_unsupported"
+  );
+  expect(request).not.toHaveBeenCalled();
+  const operation = await client.resolve({ model_id: id, provider: "fal" });
+  expect(operation.binding_id).toBe("fixture/exact-video-selector");
+  expect((await operation.generate({ prompt: PROMPT })).videos).toHaveLength(1);
+  expect(String(request.mock.calls[0]?.[0])).toBe(
+    "https://queue.fal.run/fixture/exact-video-selector"
+  );
 });
 
 describe("VideoClient bounded image input", () => {

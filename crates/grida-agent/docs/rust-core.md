@@ -111,10 +111,10 @@ must be listed explicitly and never authorize a production dependency.
 | `agent-kit-core`         | R0   | `base64`, `futures-channel`, `futures-core`, `futures-util`, `serde`, `serde_json`, `sha2`, `tokio-util`                                                                          | none                                           |
 | `agent-kit-runtime`      | R1   | `agent-kit-core`, `futures-util`, `serde`, `tokio`                                                                                                                                | none                                           |
 | `agent-kit-sessions`     | R1   | `agent-kit-core`, `serde`                                                                                                                                                         | none                                           |
-| `agent-kit-providers`    | R1   | `agent-kit-core`, `base64`, `futures-core`, `futures-util`, `serde`, `serde_json`                                                                                                 | none                                           |
+| `agent-kit-providers`    | R1   | `agent-kit-core`, `base64`, `futures-core`, `futures-util`, `serde`, `serde_json`, `url`                                                                                          | none                                           |
 | `agent-kit-sandbox`      | R1   | `agent-kit-core`, `libc`, `serde`, `serde_json`, `sha2`, `tempfile`, `tokio`                                                                                                      | none                                           |
 | `agent-kit-store-sqlite` | R1   | `agent-kit-core`, `agent-kit-sessions`, `rusqlite`, `serde`, `serde_json`, `sha2`, `tokio`                                                                                        | none                                           |
-| `grida-agent-master`     | R2   | `agent-kit-core`, `agent-kit-runtime`, `serde`, `serde_json`                                                                                                                      | `agent-kit-sessions`, `agent-kit-store-sqlite` |
+| `grida-agent-master`     | R2   | `agent-kit-core`, `agent-kit-runtime`, `serde`, `serde_json`, `tree-sitter`, `tree-sitter-bash`                                                                                   | `agent-kit-sessions`, `agent-kit-store-sqlite` |
 | `grida-agent`            | R3   | `agent-kit-core`, `agent-kit-providers`, `agent-kit-runtime`, `agent-kit-sandbox`, `agent-kit-sessions`, `agent-kit-store-sqlite`, `grida-agent-master`, `grida-auth`, `external` | none                                           |
 
 <!-- agent-dependency-budgets:end -->
@@ -1420,14 +1420,14 @@ above.
 `Responses` and `Gemini` also take a replay binding that the host retains only
 while provider account and endpoint continuity is verified.
 
-The Grida host's subscription adapter admits only the generated
-[subscription compatibility projection](../data/chatgpt-subscription-models.json).
-This finite model-to-wire mapping is generated from the dedicated
-[subscription definition](../../../data/ai/chatgpt-subscription.json);
-an ordinary OpenAI API binding is not subscription eligibility. Unsupported
-or retired members fail before the host opens session state or sends provider
-work. Catalogue membership updates do not change owner, route or continuation
-bindings, and do not migrate saved choices to another model.
+The Desktop supervisor resolves a canonical model to a provider selector for
+its subscription and built-in BYOK connections. The native host binds that
+selector to the adapter and records it with the accepted input. A refreshed
+catalog can supply new model IDs without a native release. Historical
+subscription inputs and supervisors without explicit selectors use the frozen
+[subscription selector mapping](../data/chatgpt-subscription-models.json).
+Queue dispatch and recovery require the original selector, model and authorized
+connection. A missing or remapped binding cannot redirect accepted work.
 
 A top-level chat can accept inputs on an explicitly selected authorized
 connection while earlier work uses a different one. The host binds the model,

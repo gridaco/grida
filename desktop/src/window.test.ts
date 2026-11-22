@@ -33,6 +33,7 @@ vi.mock("electron", () => ({
       setWindowOpenHandler: vi.fn<(handler: unknown) => void>(),
     };
     loadURL = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+    center = vi.fn<() => void>();
     once =
       vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
 
@@ -65,10 +66,23 @@ import {
   isSafeExternalUrl,
   open_canvas_window,
   open_document_window,
+  open_settings_window,
   set_desktop_window_presentation,
 } from "./window";
 
 const BASE = "https://grida.co";
+
+it("loads the LLM Providers hash when opening a new Settings window", () => {
+  const app = { getVersion: () => "1.0.0" } as App;
+  const window = open_settings_window({
+    app,
+    base_url: BASE,
+    section: "models",
+  });
+  expect(window.loadURL).toHaveBeenCalledExactlyOnceWith(
+    `${BASE}/desktop/settings#models`
+  );
+});
 
 it("offers a separate preload capability for native document chat", () => {
   const selection = vi

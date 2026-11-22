@@ -402,6 +402,7 @@ fn load_driver(
                     Termination::ProcessGroup
                 },
                 disk_read: false,
+                listen_port: None,
             },
             timeout,
         },

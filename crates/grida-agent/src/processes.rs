@@ -9,11 +9,19 @@
 //! A changed permission profile governs later launches only; it does not
 //! stop a running process. The sandbox ends it if this process disappears.
 
+mod network;
+pub use network::CommandNetworkDestination;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) use network::managed::{ApproveDestination, ManagedCommandProxy};
 mod output;
 mod tools;
 
 pub use tools::ProcessTools;
-pub(crate) use tools::{AuthorizedProcess, EXEC_COMMAND, ExecArguments, ProcessScope, WRITE_STDIN};
+pub(crate) use tools::{
+    AuthorizedProcess, CommandFileInput, CommandNetwork, CommandToolMode, EXEC_COMMAND,
+    ExecArguments, FiniteCommand, FiniteLaunch, ProcessScope, ScopedCommandInput,
+    SpawnFiniteCommand, WRITE_STDIN,
+};
 
 use crate::command::{cleanup_verified, summarize};
 use crate::host::live::{LiveProcesses, LiveUpdate};
@@ -89,7 +97,7 @@ struct State {
     chats: BTreeMap<SessionId, BTreeMap<u64, Arc<Entry>>>,
     /// Chats being deleted accept no new process.
     retiring: BTreeSet<SessionId>,
-    /// Admitted launches that have no supervised process yet, by serial.
+    /// Pending launches and finite commands awaiting their final evidence.
     launching: BTreeMap<u64, (SessionId, CancellationToken)>,
     /// Every launched process until its supervision has finished, listed or
     /// not: a process still within its first wait, or one evicted.
@@ -101,6 +109,14 @@ struct State {
     tracked_attempts: BTreeMap<SessionId, BTreeSet<AttemptId>>,
 }
 
+/// Authority at launch controls later interaction with the process.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProcessAccess {
+    Confined,
+    Escalated,
+    FullAccess,
+}
+
 pub(crate) struct Entry {
     serial: u64,
     session: SessionId,
@@ -108,8 +124,7 @@ pub(crate) struct Entry {
     command: String,
     cwd: PathBuf,
     terminal: bool,
-    /// Whether the host launched this process outside the OS sandbox.
-    unconfined: bool,
+    access: ProcessAccess,
     started_at: u64,
     stop: CancellationToken,
     /// Held for one interaction: a read, write or the final collection.
@@ -130,6 +145,25 @@ pub(crate) struct Launch {
     session: SessionId,
     stop: CancellationToken,
     pending: bool,
+    cleanup_unverified: bool,
+}
+
+pub(crate) struct FiniteEvidence {
+    process: ProcessEvidence,
+    transfer_limit_exceeded: bool,
+}
+
+impl FiniteEvidence {
+    fn ending(&self) -> Ending {
+        let mut ending = Ending::from_evidence(&self.process);
+        if self.transfer_limit_exceeded {
+            ending.details["network_error"] = serde_json::json!("command_network_transfer_limit");
+            if ending.status == OutcomeStatus::Succeeded {
+                ending.status = OutcomeStatus::Failed;
+            }
+        }
+        ending
+    }
 }
 
 impl Launch {
@@ -137,12 +171,36 @@ impl Launch {
     pub(crate) fn stop(&self) -> CancellationToken {
         self.stop.clone()
     }
+
+    /// Keep a finite command under host supervision even if its invoking
+    /// turn stops waiting. It never receives an interactive process number.
+    fn supervise_finite(
+        mut self,
+        work: impl Future<Output = Result<FiniteEvidence>> + Send + 'static,
+    ) -> tokio::task::JoinHandle<Result<FiniteEvidence>> {
+        self.cleanup_unverified = true;
+        tokio::spawn(async move {
+            let result = work.await;
+            self.cleanup_unverified = match &result {
+                Ok(evidence) => !cleanup_verified(&evidence.process),
+                Err(error) => error.kind == ErrorKind::Uncertain,
+            };
+            drop(self);
+            result
+        })
+    }
 }
 
 impl Drop for Launch {
     fn drop(&mut self) {
         if self.pending {
-            self.sessions.state().launching.remove(&self.serial);
+            let mut state = self.sessions.state();
+            state.launching.remove(&self.serial);
+            if self.cleanup_unverified {
+                state.unverified = true;
+                state.unverified_chats.insert(self.session.clone());
+            }
+            drop(state);
             self.sessions.changed.notify_waiters();
         }
     }
@@ -292,6 +350,7 @@ impl ProcessSessions {
             session: session.clone(),
             stop,
             pending: true,
+            cleanup_unverified: false,
         })
     }
 
@@ -343,7 +402,7 @@ impl ProcessSessions {
         command: String,
         cwd: PathBuf,
         terminal: bool,
-        unconfined: bool,
+        access: ProcessAccess,
         running: RunningSession,
     ) -> Arc<Entry> {
         let mut state = self.state();
@@ -357,7 +416,7 @@ impl ProcessSessions {
             command,
             cwd,
             terminal,
-            unconfined,
+            access,
             started_at: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map_or(0, |time| {
@@ -729,6 +788,7 @@ impl Entry {
                 Err(_) => Ending::lost(),
             };
             let verified = ending.verified;
+            entry.stop.cancel();
             entry
                 .status
                 .lock()
@@ -848,7 +908,7 @@ mod tests {
             command: "true".into(),
             cwd: PathBuf::from("/"),
             terminal: false,
-            unconfined: false,
+            access: ProcessAccess::Confined,
             started_at: 0,
             stop: CancellationToken::new(),
             io: tokio::sync::Mutex::new(Io {
@@ -966,6 +1026,36 @@ mod tests {
             sessions.admit(&session).err().unwrap().code,
             "process_sessions_closed"
         );
+    }
+
+    #[tokio::test]
+    async fn abandoned_finite_tool_wait_keeps_cleanup_owned_until_native_evidence() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let chat = SessionId::new("finite-cleanup").unwrap();
+        let launch = sessions.admit(&chat).unwrap();
+        let stop = launch.stop();
+        let (finish, evidence) = tokio::sync::oneshot::channel();
+        let waiter = launch.supervise_finite(async move {
+            evidence.await.unwrap();
+            Err(Error::new(ErrorKind::Uncertain, "sandbox_supervisor_lost"))
+        });
+        drop(waiter);
+        assert!(sessions.list(&chat).is_empty());
+        assert_eq!(
+            sessions.shutdown(Instant::now()).await.unwrap_err().code,
+            "process_cleanup_pending"
+        );
+        assert!(stop.is_cancelled());
+        finish.send(()).unwrap();
+        assert_eq!(
+            sessions
+                .shutdown(Instant::now() + Duration::from_secs(2))
+                .await
+                .unwrap_err()
+                .code,
+            "process_cleanup_unverified"
+        );
+        assert!(sessions.cleanup_unverified(&chat));
     }
 
     #[tokio::test]

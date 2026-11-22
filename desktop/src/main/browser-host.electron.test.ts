@@ -13,7 +13,9 @@ const require = createRequire(import.meta.url);
 
 const skipElectron = process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1";
 
-async function runBrowserProof(scenario: "browser" | "download") {
+async function runBrowserProof(
+  scenario: "browser" | "download" | "favicon" | "preview"
+) {
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "grida-browser-proof-")
   );
@@ -28,9 +30,22 @@ async function runBrowserProof(scenario: "browser" | "download") {
         outDir: directory,
         emptyOutDir: false,
         lib: {
-          entry: fileURLToPath(new URL("./browser-host.ts", import.meta.url)),
+          entry: Object.fromEntries(
+            (scenario === "preview"
+              ? [
+                  "browser-host",
+                  "web-preview",
+                  "web-preview-providers",
+                  "browser-favicon-decoder",
+                ]
+              : ["browser-host"]
+            ).map((name) => [
+              name,
+              fileURLToPath(new URL(`./${name}.ts`, import.meta.url)),
+            ])
+          ),
           formats: ["cjs"],
-          fileName: () => "browser-host.cjs",
+          fileName: (_format, name) => `${name}.cjs`,
         },
         rollupOptions: {
           external: [
@@ -74,7 +89,7 @@ async function runBrowserProof(scenario: "browser" | "download") {
       ],
       {
         env: environment,
-        timeout: 20_000,
+        timeout: scenario === "favicon" ? 29_000 : 20_000,
         killSignal: "SIGKILL",
         maxBuffer: 1024 * 1024,
       }
@@ -115,6 +130,37 @@ it.skipIf(skipElectron)(
   async () => {
     expect(await runBrowserProof("download")).toEqual({
       downloadConfirmations: [false, true],
+    });
+  },
+  30_000
+);
+
+it.skipIf(skipElectron)(
+  "renders and updates real favicon pixels without leaking them across guest documents or tabs",
+  async () => {
+    expect(await runBrowserProof("favicon")).toEqual({
+      fixtureCases: 8,
+      mutations: true,
+      isolatedTabs: true,
+      staleResponseDiscarded: true,
+    });
+  },
+  35_000
+);
+
+it.skipIf(skipElectron)(
+  "rasterizes preview images, coalesces local previews, and cancels reads on detach",
+  async () => {
+    expect(await runBrowserProof("preview")).toEqual({
+      sharedRequests: 1,
+      title: "Preview fixture",
+      description: "Server-rendered & local",
+      productLabel: "FX Viewer",
+      rasterSize: { width: 32, height: 32 },
+      bannerSize: { width: 640, height: 336 },
+      scriptRequests: 0,
+      completedMiss: true,
+      detachedReadCanceled: true,
     });
   },
   30_000

@@ -93,7 +93,11 @@ pub(super) struct PriorContext {
 #[derive(Default)]
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
+    pub(crate) models: BTreeMap<TurnId, ModelId>,
+    pub(crate) authored_inputs: BTreeMap<MessageId, (TurnId, ChangeId)>,
+    pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
+    pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
 }
 
@@ -175,33 +179,100 @@ impl Host {
     ) -> Result<TranscriptInputFacts> {
         let mut facts = TranscriptInputFacts::default();
         for turn in turns {
-            for input in self
+            let mut automatic_review = false;
+            let inputs = self
                 .store
                 .turn_submissions(session.clone(), turn.clone())
-                .await?
-            {
+                .await?;
+            let single_input = inputs.len() == 1;
+            for input in inputs {
                 if !is_stored_input(&input.payload) {
                     continue;
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
+                let message = prompt_message_id(&input.id)?;
+                if stored.subagent.is_none() {
+                    facts
+                        .authored_inputs
+                        .insert(message.clone(), (turn.clone(), input.id));
+                }
+                if single_input && let Some(model) = stored.model {
+                    facts.models.insert(turn.clone(), model);
+                }
+                automatic_review |= stored.permission_capture.as_ref().is_some_and(|capture| {
+                    capture.mode() == crate::permissions::PermissionMode::ApproveForMe
+                });
                 if matches!(stored.goal, Some(goals::GoalInput::Start(_))) {
                     facts.goal_starts.insert(turn.clone());
                 }
                 if stored.editor_svg_target.is_some() {
-                    facts
-                        .svg_text_selections
-                        .insert(prompt_message_id(&input.id)?);
+                    facts.svg_text_selections.insert(message.clone());
+                }
+                if stored.editor_tool_context_id.is_some() {
+                    facts.editor_tool_contexts.insert(message.clone());
                 }
                 if let Some(context) = message_context::context(&stored.parts)
                     && !context.display_parts.is_empty()
                 {
                     facts
                         .display_parts
-                        .insert(prompt_message_id(&input.id)?, context.display_parts.clone());
+                        .insert(message, context.display_parts.clone());
+                }
+            }
+            if automatic_review {
+                let mut reviews = self
+                    .store
+                    .inspect_turn_with(
+                        session.clone(),
+                        turn.clone(),
+                        super::permissions::approval_review_facts,
+                    )
+                    .await?;
+                let with_ids = reviews
+                    .iter_mut()
+                    .filter_map(|review| {
+                        let id =
+                            super::reconsideration::annotation_id(turn, review.review_id.as_ref()?);
+                        Some(id.map(|id| (review, id)))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                if !with_ids.is_empty() {
+                    let receipts = self
+                        .store
+                        .context_annotation_receipts(
+                            session.clone(),
+                            with_ids.iter().map(|(_, id)| id.clone()).collect(),
+                        )
+                        .await?;
+                    for (review, id) in with_ids {
+                        review.reconsidered = receipts.contains_key(&id);
+                    }
+                }
+                if !reviews.is_empty() {
+                    facts.approval_reviews.insert(turn.clone(), reviews);
                 }
             }
         }
         Ok(facts)
+    }
+
+    /// The foreground model captured with the prompt selected into this turn.
+    /// A main chat turns exactly one selected submission into foreground work.
+    pub(crate) async fn captured_turn_model(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<Option<ModelId>> {
+        let Some(input) = self
+            .store
+            .sole_turn_submission(session.clone(), turn.clone())
+            .await?
+            .filter(|input| is_stored_input(&input.payload))
+        else {
+            return Ok(None);
+        };
+        let stored: StoredPrompt = decode_input(&input)?;
+        Ok(stored.model)
     }
 
     pub(crate) async fn fork_latest(
@@ -530,7 +601,8 @@ impl Host {
             {
                 continue;
             }
-            let messages = prompt_input(&input.id, &stored.parts)?;
+            let messages =
+                prompt_input_with_predecessor(&input.id, &stored.parts, stored.preceding_turn)?;
             if !matches!(messages.as_slice(), [message] if &message.id == original && message.content == visible.content)
             {
                 continue;
@@ -706,8 +778,16 @@ impl Host {
                     host.check_ready_capacity(&session).await?;
                 }
                 let policy = host.submission_policy(&replacement, false)?;
-                host.capture_input(&view, replacement.id, replacement.parts, policy)
-                    .await?
+                // The edit replaces history through the anchor. The old tip cannot
+                // identify what preceded the replacement in the revised conversation.
+                host.capture_input_with_predecessor(
+                    &view,
+                    replacement.id,
+                    replacement.parts,
+                    policy,
+                    None,
+                )
+                .await?
             };
             let revised = host
                 .store
@@ -768,53 +848,8 @@ fn model_context_for_route(
     }
     records
         .into_iter()
-        .filter_map(|HistoryRecord::Message(mut message)| {
-            if !matches!(message.role, Role::Assistant | Role::Tool) {
-                return Some(HistoryRecord::Message(message));
-            }
-            message.content = message
-                .content
-                .into_iter()
-                .filter_map(|part| match part {
-                    Content::Text(text) => Some(Content::Text(text)),
-                    Content::ToolCall(call) => Some(Content::Text(format!(
-                        "Earlier tool call (history only): {}",
-                        serde_json::json!({
-                            "call": call.id,
-                            "tool": call.tool,
-                            "arguments": call.arguments,
-                        })
-                    ))),
-                    Content::ToolResult(result) => Some(Content::Text(format!(
-                        "Earlier tool result (history only): {}",
-                        serde_json::json!({
-                            "call": result.call,
-                            "status": result.status,
-                            "content": result.content.into_iter().map(|part| match part {
-                                ResultContent::Text(text) => serde_json::json!({"text": text}),
-                                ResultContent::Media(media) => serde_json::json!({
-                                    "mediaType": media.media_type,
-                                    "omitted": "Media bytes are not portable between model routes.",
-                                }),
-                            }).collect::<Vec<_>>(),
-                            "structured": result.structured,
-                            "truncated": result.truncated,
-                        })
-                    ))),
-                    Content::Media(media) => Some(Content::Media(media)),
-                    Content::Reasoning(_) | Content::ProviderState(_) => None,
-                })
-                .collect();
-            if message.content.is_empty() {
-                return None;
-            }
-            message.role = Role::Assistant;
-            message.provenance = Provenance {
-                source: "retained_model_context".into(),
-                kind: ProvenanceKind::Transformed,
-                fingerprint: None,
-            };
-            Some(HistoryRecord::Message(message))
+        .filter_map(|HistoryRecord::Message(message)| {
+            grida_agent_master::history::portable_message(message).map(HistoryRecord::Message)
         })
         .collect()
 }
@@ -926,15 +961,14 @@ fn history_message(
     {
         return None;
     }
-    if let Some(reply) = grida_agent_master::questions::visible_reply(message) {
-        let end = reply
-            .answer
-            .floor_char_boundary(HISTORY_PREVIEW_BYTES.min(reply.answer.len()));
+    if let Some(replies) = grida_agent_master::questions::visible_replies(message) {
+        let text = super::question_reply_text(&replies);
+        let end = text.floor_char_boundary(HISTORY_PREVIEW_BYTES.min(text.len()));
         return Some(HistoryMessage {
             anchor,
             role: message.role,
             editable: false,
-            preview: reply.answer[..end].to_owned(),
+            preview: text[..end].to_owned(),
         });
     }
     if super::editor_observation::is_observation(message) {

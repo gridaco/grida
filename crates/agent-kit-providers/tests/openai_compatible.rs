@@ -37,6 +37,7 @@ fn binding() -> ProviderBinding {
 
 fn profile() -> ModelProfile {
     ModelProfile {
+        wire_model: None,
         capabilities: ModelCapabilities {
             revision: BindingId::new("capabilities").unwrap(),
             input_modalities: [Modality::Text].into(),

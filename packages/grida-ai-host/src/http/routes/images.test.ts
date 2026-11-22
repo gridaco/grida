@@ -6,9 +6,11 @@ import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { ggContractFixture } from "../../../../grida-ai/src/testing/gg-contract";
 import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
+import { bundledModelCatalogue } from "@grida/ai/catalogue";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
-import { registerImagesRoutes } from "./images";
+import { registerImagesRoutes, type ImagesRoutesDeps } from "./images";
+import { OPENAI_PROJECT_PROVIDER_ID } from "../../protocol/provider-ids";
 import { TRANSPARENT_PNG_BASE64 } from "../../testing/transparent-png";
 
 const PNG =
@@ -33,6 +35,7 @@ function appWith(
     media?: MediaPersistence | null;
     gg?: GridaGatewaySessionStore;
     request?: typeof globalThis.fetch;
+    runtime_catalogue?: ImagesRoutesDeps["runtime_catalogue"];
   } = {}
 ) {
   const request = vi.fn<typeof globalThis.fetch>(
@@ -54,6 +57,7 @@ function appWith(
     media: options.media,
     gg: options.gg,
     gg_base_url: options.gg ? "https://grida.test" : undefined,
+    runtime_catalogue: options.runtime_catalogue,
     provider_http: new ProviderHttp({
       request: async (url, init) =>
         metadata.response(url) ?? request(url, init),
@@ -72,6 +76,74 @@ function post(app: Hono, payload: unknown, accept?: string) {
 }
 
 describe("POST /images/generate", () => {
+  it("uses the selected project key for direct OpenAI generation without falling back", async () => {
+    const projectKey = "sk-proj-synthetic-image";
+    const keys: Record<string, string> = {
+      openai: "legacy-openai-key",
+      openrouter: "other-provider-key",
+    };
+    const { app, request, download } = appWith({
+      keys,
+      runtime_catalogue: async () => bundledModelCatalogue(),
+    });
+    const payload = {
+      model_id: "openai/gpt-image-2.6-sunburst",
+      provider: OPENAI_PROJECT_PROVIDER_ID,
+      prompt: "A red apple",
+      n: 1,
+    };
+    const unavailable = await post(app, payload);
+    expect(unavailable.status).toBe(400);
+    expect(await unavailable.json()).toMatchObject({
+      code: "image_model_unavailable",
+    });
+
+    keys[OPENAI_PROJECT_PROVIDER_ID] = projectKey;
+    expect(
+      (
+        await post(app, {
+          ...payload,
+          model_id: "google/gemini-nano-banana-2.1",
+        })
+      ).status
+    ).toBe(400);
+    expect((await post(app, payload, RETAINED_IMAGE_TYPE)).status).toBe(400);
+    expect(request).not.toHaveBeenCalled();
+
+    const generated = await post(app, payload);
+    expect(generated.status).toBe(200);
+    expect(await generated.json()).toEqual({
+      model_id: payload.model_id,
+      provider_id: OPENAI_PROJECT_PROVIDER_ID,
+      images: [{ base64: PNG, media_type: "image/png" }],
+    });
+    expect(request).toHaveBeenCalledOnce();
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe("https://api.openai.com/v1/images/generations");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("authorization")).toBe(
+      `Bearer ${projectKey}`
+    );
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      model: "gpt-image-2.6-sunburst",
+      prompt: payload.prompt,
+      n: 1,
+    });
+    request.mockResolvedValueOnce(
+      new Response("synthetic-private-upstream-detail", { status: 401 })
+    );
+    const denied = await post(app, payload);
+    expect(denied.status).toBe(502);
+    expect(await denied.json()).toEqual({
+      error: "image generation failed",
+      model_id: payload.model_id,
+      provider_id: OPENAI_PROJECT_PROVIDER_ID,
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(String(request.mock.lastCall?.[0])).toBe(String(url));
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it("keeps a bounded retained-image response separate from the normal bytes response", async () => {
     const stored: MediaItem = {
       id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",

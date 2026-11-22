@@ -10,6 +10,8 @@ date: 2026-07-23
 updated: 2026-11-13
 automatable: false
 covered_by:
+  - crates/grida-agent/tests/process/desktop_tools.rs
+  - desktop/src/main/native-editor-surfaces.test.ts
   - editor/scaffolds/desktop/workbench/workspace-surface-host.test.ts
 ---
 
@@ -44,19 +46,20 @@ must not reveal a permanently pending presentation call.
    - Expected: the user's navigation wins. The agent does not pull focus back
      unless it makes a new intentional presentation request.
 4. Ask the agent to create a `.canvas` bundle.
-   - Expected: after the valid manifest references its first meaningful
-     document, the bundle directory opens as one artifact and the agent
-     continues refining it. Its internal `.canvas.json` file is not opened as a
-     separate surface.
+   - Give the agent either the full filesystem path printed by a command or
+     the path relative to the workspace. Repeat in a file-only workbench
+     and a workbench with Browser available.
+   - Expected: after the valid manifest references the first meaningful
+     document, the bundle opens as one tab and the agent continues refining
+     it. The bundle directory is the target.
 5. Start another artifact-creation request and close the window while the agent
    is still working. Wait for the run to finish, then reopen the workspace and
    conversation.
    - Expected: the artifact work and conversation continue normally. No
-     unresolved `surface_open` call blocks the run or the queued turn after it.
+     unresolved `workbench_show` call blocks the run or the queued turn after it.
 
 ## Notes
 
-- `surface_open` is a best-effort presentation request, not confirmation that a
-  renderer completed a transition.
-- `surface_list_open` describes the host snapshot captured at turn start; it is
-  not a filesystem listing.
+- The file reveal receipt confirms dispatch. The tab becomes visible when
+  the workbench applies the request.
+- The tab inventory reads the current view of the captured workbench.

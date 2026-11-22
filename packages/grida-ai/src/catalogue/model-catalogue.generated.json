@@ -1,0 +1,4135 @@
+{
+  "version": "2.20261121.1",
+  "text": {
+    "anthropic/claude-fable-5": {
+      "id": "anthropic/claude-fable-5",
+      "label": "Claude Fable 5",
+      "shortLabel": "Fable 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-fable-5.1": {
+      "id": "anthropic/claude-fable-5.1",
+      "label": "Claude Fable 5.1",
+      "shortLabel": "Fable 5.1",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5-1",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-fable-5.2": {
+      "id": "anthropic/claude-fable-5.2",
+      "label": "Claude Fable 5.2",
+      "shortLabel": "Fable 5.2",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5-2",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-haiku-5.5": {
+      "id": "anthropic/claude-haiku-5.5",
+      "label": "Claude Haiku 5.5",
+      "shortLabel": "Haiku 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-haiku-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-4.8": {
+      "id": "anthropic/claude-opus-4.8",
+      "label": "Claude Opus 4.8",
+      "shortLabel": "Opus 4.8",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-4-8",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-5": {
+      "id": "anthropic/claude-opus-5",
+      "label": "Claude Opus 5",
+      "shortLabel": "Opus 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-5.5": {
+      "id": "anthropic/claude-opus-5.5",
+      "label": "Claude Opus 5.5",
+      "shortLabel": "Opus 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-sonnet-5": {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "shortLabel": "Sonnet 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-sonnet-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-sonnet-5.5": {
+      "id": "anthropic/claude-sonnet-5.5",
+      "label": "Claude Sonnet 5.5",
+      "shortLabel": "Sonnet 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-sonnet-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "google/gemini-3.1-pro-preview": {
+      "id": "google/gemini-3.1-pro-preview",
+      "label": "Gemini 3.1 Pro Preview",
+      "shortLabel": "Gemini 3.1 Pro",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 64000
+        },
+        "google": {
+          "wireModel": "gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 64000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-3.7-flash": {
+      "id": "google/gemini-3.7-flash",
+      "label": "Gemini 3.7 Flash",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        },
+        "google": {
+          "wireModel": "gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-3.8-flash": {
+      "id": "google/gemini-3.8-flash",
+      "label": "Gemini 3.8 Flash",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        },
+        "google": {
+          "wireModel": "gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-argon": {
+      "id": "google/gemini-4-argon",
+      "label": "Gemini 4 Argon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-carbon": {
+      "id": "google/gemini-4-carbon",
+      "label": "Gemini 4 Carbon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 32768
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-hydrogen": {
+      "id": "google/gemini-4-hydrogen",
+      "label": "Gemini 4 Hydrogen",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-neon": {
+      "id": "google/gemini-4-neon",
+      "label": "Gemini 4 Neon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "openai/gpt-5.5": {
+      "id": "openai/gpt-5.5",
+      "label": "GPT-5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.5-pro": {
+      "id": "openai/gpt-5.5-pro",
+      "label": "GPT-5.5 Pro",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-luna": {
+      "id": "openai/gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-sol": {
+      "id": "openai/gpt-5.6-sol",
+      "label": "GPT-5.6 Sol",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-terra": {
+      "id": "openai/gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-astra": {
+      "id": "openai/gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-luna": {
+      "id": "openai/gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-sol": {
+      "id": "openai/gpt-6-sol",
+      "label": "GPT-6 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.1-sol": {
+      "id": "openai/gpt-6.1-sol",
+      "label": "GPT-6.1 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.1-terra": {
+      "id": "openai/gpt-6.1-terra",
+      "label": "GPT-6.1 Terra",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.2-astra": {
+      "id": "openai/gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.2-sol": {
+      "id": "openai/gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    }
+  },
+  "visual": {
+    "image": {
+      "alibaba/qwen-image-3.0": {
+        "id": "alibaba/qwen-image-3.0",
+        "label": "Qwen Image 3.0",
+        "vendor": "alibaba",
+        "shortDescription": "Image generation and editing with multilingual text rendering.",
+        "options": {},
+        "releaseDate": "2026-08-04",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "alibaba": {
+            "id": "qwen-image-3.0",
+            "endpoints": [],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "alibaba/qwen-image-3/text-to-image",
+            "endpoints": [
+              {
+                "id": "alibaba/qwen-image-3/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "alibaba/qwen-image-3/edit",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "alibaba/qwen-image-3/edit",
+              "max": 3
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "alibaba/qwen-image-3.0",
+            "endpoints": [
+              {
+                "id": "image.alibaba.qwen-image-3.0.text",
+                "input": "text"
+              },
+              {
+                "id": "image.alibaba.qwen-image-3.0.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-2-max": {
+        "id": "bfl/flux-2-max",
+        "label": "Flux 2 Max",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Black Forest Labs' highest-fidelity Flux 2 — maximum prompt adherence and detail.",
+        "options": {},
+        "releaseDate": "2025-12-16",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bfl/flux-2-max",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "black-forest-labs/flux.2-max",
+            "endpoints": [],
+            "references": {
+              "id": "black-forest-labs/flux.2-max",
+              "max": 8
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/flux-2-max",
+            "endpoints": [
+              {
+                "id": "fal-ai/flux-2-max",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/flux-2-max/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "bfl": {
+            "id": "flux-2-max",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bfl/flux-2-max",
+            "endpoints": [
+              {
+                "id": "image.bfl.flux-2-max.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.bfl.flux-2-max.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-2-pro": {
+        "id": "bfl/flux-2-pro",
+        "label": "Flux 2 Pro",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Latest Flux model with best-in-class image quality and prompt adherence",
+        "options": {
+          "constraints": {
+            "max_edge": 1440
+          }
+        },
+        "releaseDate": "2025-11-25",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bfl/flux-2-pro",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "black-forest-labs/flux.2-pro",
+            "endpoints": [],
+            "references": {
+              "id": "black-forest-labs/flux.2-pro",
+              "max": 8
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/flux-2-pro",
+            "endpoints": [
+              {
+                "id": "fal-ai/flux-2-pro",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/flux-2-pro/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "bfl": {
+            "id": "flux-2-pro",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bfl/flux-2-pro",
+            "endpoints": [
+              {
+                "id": "image.bfl.flux-2-pro.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.bfl.flux-2-pro.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-3-image": {
+        "id": "bfl/flux-3-image",
+        "label": "FLUX 3 Image",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Image generation and editing with up to ten reference images.",
+        "options": {
+          "pricing": {
+            "type": "per_image_tiered"
+          }
+        },
+        "releaseDate": "2026-10-05",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "bfl": {
+            "id": "flux-3-image",
+            "endpoints": [],
+            "references": {
+              "id": "flux-3-image",
+              "max": 10
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "bfl/flux-3-image",
+            "endpoints": [],
+            "references": {
+              "id": "bfl/flux-3-image",
+              "max": 10
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "black-forest-labs/flux-3-image",
+            "endpoints": [],
+            "references": {
+              "id": "black-forest-labs/flux-3-image",
+              "max": 10
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "blackforestlabs/flux-3/text-to-image",
+            "endpoints": [
+              {
+                "id": "blackforestlabs/flux-3/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "blackforestlabs/flux-3/edit-image",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "blackforestlabs/flux-3/edit-image",
+              "max": 10
+            },
+            "pricingType": "per_megapixel",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bfl/flux-3-image",
+            "endpoints": [
+              {
+                "id": "image.bfl.flux-3-image.text",
+                "input": "text"
+              },
+              {
+                "id": "image.bfl.flux-3-image.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-kontext-max": {
+        "id": "bfl/flux-kontext-max",
+        "label": "Flux Kontext Max",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Highest quality Flux model for context-aware image generation and editing",
+        "options": {
+          "constraints": {
+            "max_edge": 1820
+          }
+        },
+        "releaseDate": "2025-05-29",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bfl/flux-kontext-max",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/flux-pro/kontext/max",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "bfl": {
+            "id": "flux-kontext-max",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-kontext-pro": {
+        "id": "bfl/flux-kontext-pro",
+        "label": "Flux Kontext Pro",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Fast context-aware image generation and editing",
+        "options": {
+          "constraints": {
+            "max_edge": 1820
+          }
+        },
+        "releaseDate": "2025-05-29",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bfl/flux-kontext-pro",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/flux-pro/kontext",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "bfl": {
+            "id": "flux-kontext-pro",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-pro-1.1": {
+        "id": "bfl/flux-pro-1.1",
+        "label": "Flux Pro 1.1",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
+        "options": {
+          "constraints": {
+            "max_edge": 1440
+          }
+        },
+        "releaseDate": "2024-10-02",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bfl/flux-pro-1.1",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "bfl": {
+            "id": "flux-pro-1.1",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/flux-pro/v1.1",
+            "endpoints": [],
+            "pricingType": "per_megapixel",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bytedance/seedream-4.5": {
+        "id": "bytedance/seedream-4.5",
+        "label": "Seedream 4.5",
+        "vendor": "bytedance",
+        "shortDescription": "ByteDance's unified image generation and editing model.",
+        "options": {
+          "constraints": {
+            "max_edge": 4096
+          }
+        },
+        "releaseDate": "2025-12-03",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bytedance/seedream-4.5",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "bytedance-seed/seedream-4.5",
+            "endpoints": [],
+            "references": {
+              "id": "bytedance-seed/seedream-4.5",
+              "max": 14
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/bytedance/seedream/v4.5/text-to-image",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "byteplus": {
+            "id": "seedream-4-5-251128",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bytedance/seedream-5.0-lite": {
+        "id": "bytedance/seedream-5.0-lite",
+        "label": "Seedream 5.0 Lite",
+        "vendor": "bytedance",
+        "shortDescription": "ByteDance's fast 2K–4K image model — Seedream 5.0 quality at the 4.5 price point.",
+        "options": {},
+        "releaseDate": "2026-02-13",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bytedance/seedream-5.0-lite",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "bytedance-seed/seedream-5-0-lite",
+            "endpoints": [],
+            "references": {
+              "id": "bytedance-seed/seedream-5-0-lite",
+              "max": 14
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "bytedance/seedream/v5/lite/text-to-image",
+            "endpoints": [
+              {
+                "id": "bytedance/seedream/v5/lite/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/bytedance/seedream/v5/lite/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "byteplus": {
+            "id": "seedream-5-0-lite-260128",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bytedance/seedream-5.0-lite",
+            "endpoints": [
+              {
+                "id": "image.bytedance.seedream-5.0-lite.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.bytedance.seedream-5.0-lite.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bytedance/seedream-5.0-pro": {
+        "id": "bytedance/seedream-5.0-pro",
+        "label": "Seedream 5.0 Pro",
+        "vendor": "bytedance",
+        "shortDescription": "ByteDance's flagship image model — dense layouts, infographics and text-heavy compositions at 1K–2K.",
+        "options": {},
+        "releaseDate": "2026-07-08",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "bytedance/seedream-5.0-pro",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "bytedance-seed/seedream-5-0-pro",
+            "endpoints": [],
+            "references": {
+              "id": "bytedance-seed/seedream-5-0-pro",
+              "max": 14
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "bytedance/seedream/v5/pro/text-to-image",
+            "endpoints": [
+              {
+                "id": "bytedance/seedream/v5/pro/edit",
+                "input": "image"
+              },
+              {
+                "id": "bytedance/seedream/v5/pro/text-to-image",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "byteplus": {
+            "id": "dola-seedream-5-0-pro-260628",
+            "endpoints": [],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bytedance/seedream-5.0-pro",
+            "endpoints": [
+              {
+                "id": "image.bytedance.seedream-5.0-pro.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.bytedance.seedream-5.0-pro.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-3-pro-image": {
+        "id": "google/gemini-3-pro-image",
+        "label": "Gemini 3 Pro Image",
+        "vendor": "google",
+        "shortDescription": "High-quality multimodal model with native image generation",
+        "options": {},
+        "releaseDate": "2025-11-20",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/gemini-3-pro-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/gemini-3-pro-image-preview",
+            "endpoints": [],
+            "references": {
+              "id": "google/gemini-3-pro-image-preview",
+              "max": 14
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/nano-banana-pro",
+            "endpoints": [
+              {
+                "id": "fal-ai/nano-banana-pro",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/nano-banana-pro/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "google": {
+            "id": "gemini-3-pro-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/gemini-3-pro-image",
+            "endpoints": [
+              {
+                "id": "image.google.gemini-3-pro-image.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.google.gemini-3-pro-image.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-3.1-flash-image-preview": {
+        "id": "google/gemini-3.1-flash-image-preview",
+        "label": "Gemini 3.1 Flash Image",
+        "vendor": "google",
+        "shortDescription": "Fast, efficient multimodal model with native image generation",
+        "options": {
+          "constraints": {
+            "max_edge": 1536
+          }
+        },
+        "releaseDate": "2026-02-26",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/gemini-3.1-flash-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/gemini-3.1-flash-image",
+            "endpoints": [],
+            "references": {
+              "id": "google/gemini-3.1-flash-image",
+              "max": 14
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/nano-banana-2",
+            "endpoints": [
+              {
+                "id": "fal-ai/nano-banana-2",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/nano-banana-2/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "google": {
+            "id": "gemini-3.1-flash-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/gemini-3.1-flash-image-preview",
+            "endpoints": [
+              {
+                "id": "image.google.gemini-3.1-flash-image-preview.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.google.gemini-3.1-flash-image-preview.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-3.1-flash-lite-image": {
+        "id": "google/gemini-3.1-flash-lite-image",
+        "label": "Gemini 3.1 Flash Lite Image",
+        "vendor": "google",
+        "shortDescription": "Fastest, most cost-efficient Gemini image model; 1K output only.",
+        "options": {
+          "constraints": {
+            "max_edge": 1024
+          }
+        },
+        "releaseDate": "2026-06-30",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/gemini-3.1-flash-lite-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/gemini-3.1-flash-lite-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "google": {
+            "id": "gemini-3.1-flash-lite-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "google/nano-banana-2-lite",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-nano-banana-2.1": {
+        "id": "google/gemini-nano-banana-2.1",
+        "label": "Gemini Nano Banana 2.1",
+        "vendor": "google",
+        "shortDescription": "Image generation and conversational editing at 1K, 2K and 4K.",
+        "options": {},
+        "releaseDate": "2026-10-06",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "google": {
+            "id": "gemini-nano-banana-2.1",
+            "endpoints": [
+              {
+                "id": "gemini-nano-banana-2.1",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/gemini-nano-banana-2.1",
+            "endpoints": [
+              {
+                "id": "google/gemini-nano-banana-2.1",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "google/gemini-nano-banana-2.1",
+            "endpoints": [
+              {
+                "id": "google/gemini-nano-banana-2.1",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "google/nano-banana-2.1",
+            "endpoints": [
+              {
+                "id": "google/nano-banana-2.1",
+                "input": "text"
+              },
+              {
+                "id": "google/nano-banana-2.1/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/gemini-nano-banana-2.1",
+            "endpoints": [
+              {
+                "id": "image.google.gemini-nano-banana-2.1.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.google.gemini-nano-banana-2.1.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "ideogram/ideogram-4.5": {
+        "id": "ideogram/ideogram-4.5",
+        "label": "Ideogram 4.5",
+        "vendor": "ideogram",
+        "shortDescription": "Image generation and precise editing with typography and reference-image control.",
+        "options": {},
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "ideogram": {
+            "id": "ideogram-4-5",
+            "endpoints": [
+              {
+                "id": "/v2/image/generate/ideogram-4-5",
+                "input": "text"
+              },
+              {
+                "id": "/v2/image/precise-edit/ideogram-4-5",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "ideogram/v4.5",
+            "endpoints": [
+              {
+                "id": "ideogram/v4.5",
+                "input": "text"
+              },
+              {
+                "id": "ideogram/v4.5/edit",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "ideogram/v4.5/edit",
+              "max": 5
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "ideogram/ideogram-4.5",
+            "endpoints": [
+              {
+                "id": "image.ideogram.ideogram-4.5.text",
+                "input": "text"
+              },
+              {
+                "id": "image.ideogram.ideogram-4.5.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "meta/muse-image-1.0": {
+        "id": "meta/muse-image-1.0",
+        "label": "Muse Image 1.0",
+        "vendor": "meta",
+        "shortDescription": "Meta's agentic image model — reasons before it renders; generates and edits from text and references.",
+        "options": {},
+        "releaseDate": "2026-07-07",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "meta/muse-image-1.0",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "meta/muse-image/text-to-image",
+            "endpoints": [
+              {
+                "id": "meta/muse-image/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "meta/muse-image/edit",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "meta/muse-image/edit",
+              "max": 10
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "meta": {
+            "id": "muse-image-1.0",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "meta/muse-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "meta/muse-image-1.0",
+            "endpoints": [
+              {
+                "id": "image.meta.muse-image-1.0.text",
+                "input": "text"
+              },
+              {
+                "id": "image.meta.muse-image-1.0.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "microsoft/mai-image-2.7": {
+        "id": "microsoft/mai-image-2.7",
+        "label": "MAI Image 2.7",
+        "vendor": "microsoft",
+        "shortDescription": "Text-to-image generation and precise image editing.",
+        "options": {},
+        "releaseDate": "2026-11-17",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "azure": {
+            "id": "MAI-Image-2.7",
+            "endpoints": [
+              {
+                "id": "/mai/v1/images/generations",
+                "input": "text"
+              },
+              {
+                "id": "/mai/v1/images/edits",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "/mai/v1/images/edits",
+              "max": 5
+            },
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "microsoft/mai-image-2.7",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "microsoft/mai-image-2.7",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "microsoft/mai-image-2.7/text-to-image",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "microsoft/mai-image-2.7/edit",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7/edit",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "microsoft/mai-image-2.7",
+            "endpoints": [
+              {
+                "id": "image.microsoft.mai-image-2.7.text",
+                "input": "text"
+              },
+              {
+                "id": "image.microsoft.mai-image-2.7.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "microsoft/mai-image-2.7-flash": {
+        "id": "microsoft/mai-image-2.7-flash",
+        "label": "MAI Image 2.7 Flash",
+        "vendor": "microsoft",
+        "shortDescription": "Lower-latency image generation and editing.",
+        "options": {},
+        "releaseDate": "2026-11-17",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "azure": {
+            "id": "MAI-Image-2.7-Flash",
+            "endpoints": [
+              {
+                "id": "/mai/v1/images/generations",
+                "input": "text"
+              },
+              {
+                "id": "/mai/v1/images/edits",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "/mai/v1/images/edits",
+              "max": 5
+            },
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "microsoft/mai-image-2.7-flash",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7-flash",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7-flash",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "microsoft/mai-image-2.7-flash",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7-flash",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7-flash",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "microsoft/mai-image-2.7/flash/text-to-image",
+            "endpoints": [
+              {
+                "id": "microsoft/mai-image-2.7/flash/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "microsoft/mai-image-2.7/flash/edit",
+                "input": "multi_image"
+              }
+            ],
+            "references": {
+              "id": "microsoft/mai-image-2.7/flash/edit",
+              "max": 5
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "microsoft/mai-image-2.7-flash",
+            "endpoints": [
+              {
+                "id": "image.microsoft.mai-image-2.7-flash.text",
+                "input": "text"
+              },
+              {
+                "id": "image.microsoft.mai-image-2.7-flash.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-1-mini": {
+        "id": "openai/gpt-image-1-mini",
+        "label": "GPT Image Mini",
+        "vendor": "openai",
+        "shortDescription": "Cost-efficient image generation model",
+        "options": {
+          "pricing": {
+            "type": "per_image_tiered"
+          }
+        },
+        "releaseDate": "2025-10-06",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-1-mini",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-1-mini",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/gpt-image-1-mini",
+            "input": "text",
+            "endpoints": [],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-1-mini",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-1-mini",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-1-mini",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": true,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-1.5": {
+        "id": "openai/gpt-image-1.5",
+        "label": "GPT Image 1.5",
+        "vendor": "openai",
+        "shortDescription": "Previous-generation image model. Superseded by GPT Image 2.",
+        "options": {
+          "pricing": {
+            "type": "per_image_tiered"
+          }
+        },
+        "releaseDate": "2025-12-16",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-1.5",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-1.5",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/gpt-image-1.5",
+            "input": "text",
+            "endpoints": [],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-2": {
+        "id": "openai/gpt-image-2",
+        "label": "GPT Image 2",
+        "vendor": "openai",
+        "shortDescription": "Previous-generation image model. Superseded by GPT Image 2.5.",
+        "options": {
+          "constraints": {
+            "max_edge": 3840
+          },
+          "pricing": {
+            "type": "per_image_tiered"
+          }
+        },
+        "releaseDate": "2026-04-21",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-2",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "openai/gpt-image-2",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2",
+                "input": "text"
+              },
+              {
+                "id": "openai/gpt-image-2/edit",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-2",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-2",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "openai/gpt-image-2",
+            "endpoints": [
+              {
+                "id": "image.openai.gpt-image-2.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.openai.gpt-image-2.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-2.5-flare": {
+        "id": "openai/gpt-image-2.5-flare",
+        "label": "GPT Image 2.5 Flare",
+        "vendor": "openai",
+        "shortDescription": "Fast image generation and reference-guided editing.",
+        "options": {
+          "constraints": {
+            "max_edge": 3840
+          },
+          "quality": {
+            "options": ["auto", "low", "medium", "high", "xhigh", "max"],
+            "default": "high"
+          }
+        },
+        "releaseDate": "2026-09-08",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-2.5-flare",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "openai/gpt-image-2.5/flare/text-to-image",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.5/flare/edit",
+                "input": "image"
+              },
+              {
+                "id": "openai/gpt-image-2.5/flare/text-to-image",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.5/flare/edit",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-2.5-flare",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-2.5-flare",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.5-flare",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.5-flare",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "openai/gpt-image-2.5-flare",
+            "endpoints": [
+              {
+                "id": "image.openai.gpt-image-2.5-flare.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.openai.gpt-image-2.5-flare.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-2.5-sunburst": {
+        "id": "openai/gpt-image-2.5-sunburst",
+        "label": "GPT Image 2.5 Sunburst",
+        "vendor": "openai",
+        "shortDescription": "Detailed image generation and precise editing with longer generation times.",
+        "options": {
+          "constraints": {
+            "max_edge": 3840
+          },
+          "quality": {
+            "options": ["auto", "low", "medium", "high", "xhigh", "max"],
+            "default": "high"
+          }
+        },
+        "releaseDate": "2026-09-08",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-2.5-sunburst",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "openai/gpt-image-2.5/sunburst/text-to-image",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.5/sunburst/edit",
+                "input": "image"
+              },
+              {
+                "id": "openai/gpt-image-2.5/sunburst/text-to-image",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.5/sunburst/edit",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-2.5-sunburst",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-2.5-sunburst",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.5-sunburst",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.5-sunburst",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "openai/gpt-image-2.5-sunburst",
+            "endpoints": [
+              {
+                "id": "image.openai.gpt-image-2.5-sunburst.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.openai.gpt-image-2.5-sunburst.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-2.6-flare": {
+        "id": "openai/gpt-image-2.6-flare",
+        "label": "GPT Image 2.6 Flare",
+        "vendor": "openai",
+        "shortDescription": "Image generation and editing for fast iteration.",
+        "options": {
+          "constraints": {
+            "max_edge": 3840
+          },
+          "quality": {
+            "options": ["auto", "low", "medium", "high", "xhigh", "max"]
+          }
+        },
+        "releaseDate": "2026-11-04",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-2.6-flare",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "openai/gpt-image-2.6/flare/text-to-image",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.6/flare/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "openai/gpt-image-2.6/flare/edit",
+                "input": "image"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.6/flare/edit",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-2.6-flare",
+            "endpoints": [
+              {
+                "id": "v1/images/generations",
+                "input": "text"
+              },
+              {
+                "id": "v1/images/edits",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-2.6-flare",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.6-flare",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.6-flare",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "openai/gpt-image-2.6-flare",
+            "endpoints": [
+              {
+                "id": "image.openai.gpt-image-2.6-flare.text",
+                "input": "text"
+              },
+              {
+                "id": "image.openai.gpt-image-2.6-flare.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "openai/gpt-image-2.6-sunburst": {
+        "id": "openai/gpt-image-2.6-sunburst",
+        "label": "GPT Image 2.6 Sunburst",
+        "vendor": "openai",
+        "shortDescription": "Image generation and editing for detailed visual work.",
+        "options": {
+          "constraints": {
+            "max_edge": 3840
+          },
+          "quality": {
+            "options": ["auto", "low", "medium", "high", "xhigh", "max"]
+          }
+        },
+        "releaseDate": "2026-11-04",
+        "deprecated": false,
+        "transparentBackground": true,
+        "bindings": {
+          "vercel": {
+            "id": "openai/gpt-image-2.6-sunburst",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "openai/gpt-image-2.6/sunburst/text-to-image",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.6/sunburst/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "openai/gpt-image-2.6/sunburst/edit",
+                "input": "image"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.6/sunburst/edit",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openai": {
+            "id": "gpt-image-2.6-sunburst",
+            "endpoints": [
+              {
+                "id": "v1/images/generations",
+                "input": "text"
+              },
+              {
+                "id": "v1/images/edits",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "openai/gpt-image-2.6-sunburst",
+            "endpoints": [
+              {
+                "id": "openai/gpt-image-2.6-sunburst",
+                "input": "text"
+              }
+            ],
+            "references": {
+              "id": "openai/gpt-image-2.6-sunburst",
+              "max": 16
+            },
+            "pricingType": "per_token",
+            "scalarTokenPricing": true,
+            "transparentBackground": true,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "openai/gpt-image-2.6-sunburst",
+            "endpoints": [
+              {
+                "id": "image.openai.gpt-image-2.6-sunburst.text",
+                "input": "text"
+              },
+              {
+                "id": "image.openai.gpt-image-2.6-sunburst.references",
+                "input": "multi_image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "recraft/recraft-v3": {
+        "id": "recraft/recraft-v3",
+        "label": "Recraft V3",
+        "vendor": "recraft-ai",
+        "shortDescription": "Design-grade image model with strong text rendering and vector styles.",
+        "options": {
+          "constraints": {
+            "max_edge": 2048
+          }
+        },
+        "releaseDate": "2024-10-30",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "recraft/recraft-v3",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "recraft/recraft-v3",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/recraft/v3/text-to-image",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "recraft": {
+            "id": "recraftv3",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "recraft/recraft-v4.1": {
+        "id": "recraft/recraft-v4.1",
+        "label": "Recraft V4.1",
+        "vendor": "recraft-ai",
+        "shortDescription": "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
+        "options": {
+          "constraints": {
+            "max_edge": 2048
+          }
+        },
+        "releaseDate": "2026-05-14",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "recraft/recraft-v4.1",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "recraft/recraft-v4.1",
+            "endpoints": [],
+            "references": {
+              "id": "recraft/recraft-v4.1",
+              "max": 1
+            },
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/recraft/v4.1/text-to-image",
+            "endpoints": [
+              {
+                "id": "fal-ai/recraft/v4.1/text-to-image",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "recraft": {
+            "id": "recraftv4_1",
+            "endpoints": [],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "recraft/recraft-v4.1",
+            "endpoints": [
+              {
+                "id": "image.recraft.recraft-v4.1.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "reve/reve-2.1": {
+        "id": "reve/reve-2.1",
+        "label": "Reve 2.1",
+        "vendor": "reve",
+        "shortDescription": "Native 4K generation and editing with layout and typography understanding.",
+        "options": {},
+        "releaseDate": "2026-07-09",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "fal": {
+            "id": "reve/2.1/text-to-image",
+            "endpoints": [
+              {
+                "id": "reve/2.1/text-to-image",
+                "input": "text"
+              },
+              {
+                "id": "reve/2.1/edit",
+                "input": "image"
+              },
+              {
+                "id": "reve/2.1/remix",
+                "input": "multi_image"
+              }
+            ],
+            "pricingType": "per_image_flat",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "xai/grok-imagine-image-2.0": {
+        "id": "xai/grok-imagine-image-2.0",
+        "label": "Grok Imagine Image 2.0",
+        "vendor": "xai",
+        "shortDescription": "SpaceXAI's image model — fast 1K/2K generation with a low-cost quality tier.",
+        "options": {
+          "constraints": {
+            "max_edge": 2048
+          },
+          "pricing": {
+            "type": "per_image_tiered"
+          }
+        },
+        "releaseDate": "2026-08-07",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "spacexai/grok-imagine-image-2.0",
+            "endpoints": [],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "x-ai/grok-imagine-image-2.0",
+            "endpoints": [],
+            "references": {
+              "id": "x-ai/grok-imagine-image-2.0",
+              "max": 3
+            },
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "xai/grok-imagine-image/v2.0/text-to-image",
+            "endpoints": [
+              {
+                "id": "xai/grok-imagine-image/v2.0/edit",
+                "input": "image"
+              },
+              {
+                "id": "xai/grok-imagine-image/v2.0/text-to-image",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "xai": {
+            "id": "grok-imagine-image-2.0",
+            "endpoints": [],
+            "pricingType": "per_image_tiered",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "xai/grok-imagine-image-2.0",
+            "endpoints": [
+              {
+                "id": "image.xai.grok-imagine-image-2.0.references",
+                "input": "multi_image"
+              },
+              {
+                "id": "image.xai.grok-imagine-image-2.0.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      }
+    },
+    "video": {
+      "alibaba/wan-3.0": {
+        "id": "alibaba/wan-3.0",
+        "label": "Wan 3.0",
+        "vendor": "alibaba",
+        "shortDescription": "Alibaba's flagship video model — long clips (up to 30s) with bundled audio at the lowest per-second rates in the catalogue.",
+        "options": {
+          "aspect_ratios": ["16:9", "4:3", "1:1", "3:4", "9:16"],
+          "min_duration": 2,
+          "max_duration": 30
+        },
+        "releaseDate": "2026-08-06",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "alibaba/wan-v3.0-video",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "alibaba/wan-3.0/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "alibaba/wan-3.0/image-to-video",
+                "input": "image"
+              },
+              {
+                "id": "alibaba/wan-3.0/text-to-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "alibaba": {
+            "id": "wan3.0-video",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "alibaba/wan-3.0",
+            "endpoints": [
+              {
+                "id": "alibaba/wan-3.0",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "alibaba/wan-3.0",
+            "endpoints": [
+              {
+                "id": "video.alibaba.wan-3.0.image",
+                "input": "image"
+              },
+              {
+                "id": "video.alibaba.wan-3.0.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bfl/flux-3-video": {
+        "id": "bfl/flux-3-video",
+        "label": "FLUX 3 Video",
+        "vendor": "black-forest-labs",
+        "shortDescription": "Video generation from text or images with synchronized audio and clips up to 20 seconds.",
+        "options": {
+          "min_duration": 5,
+          "max_duration": 20
+        },
+        "releaseDate": "2026-08-04",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "bfl": {
+            "id": "flux-3-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "flux-3-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second_by_mode",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "blackforestlabs/flux-3/text-to-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "blackforestlabs/flux-3/text-to-video",
+                "input": "text"
+              },
+              {
+                "id": "blackforestlabs/flux-3/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "black-forest-labs/flux-3-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "black-forest-labs/flux-3-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "bfl/flux-3-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "bfl/flux-3-video",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bfl/flux-3-video",
+            "endpoints": [
+              {
+                "id": "video.bfl.flux-3-video.text",
+                "input": "text"
+              },
+              {
+                "id": "video.bfl.flux-3-video.image",
+                "input": "image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bytedance/seedance-2.0": {
+        "id": "bytedance/seedance-2.0",
+        "label": "Seedance 2.0",
+        "vendor": "bytedance",
+        "shortDescription": "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
+        "options": {
+          "aspect_ratios": ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          "min_duration": 4,
+          "max_duration": 15
+        },
+        "releaseDate": "2026-02-12",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "fal": {
+            "id": "bytedance/seedance-2.0/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "bytedance/seedance-2.0/image-to-video",
+                "input": "image"
+              },
+              {
+                "id": "bytedance/seedance-2.0/text-to-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "bytedance/seedance-2.0",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "video_token_tiers",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "byteplus": {
+            "id": "dreamina-seedance-2-0-260128",
+            "endpoints": [],
+            "pricingType": "video_token_tiers",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "bytedance/seedance-2.0",
+            "endpoints": [
+              {
+                "id": "bytedance/seedance-2.0",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bytedance/seedance-2.0",
+            "endpoints": [
+              {
+                "id": "video.bytedance.seedance-2.0.image",
+                "input": "image"
+              },
+              {
+                "id": "video.bytedance.seedance-2.0.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "bytedance/seedance-2.5": {
+        "id": "bytedance/seedance-2.5",
+        "label": "Seedance 2.5",
+        "vendor": "bytedance",
+        "shortDescription": "ByteDance's latest video model — up to 30-second clips with native audio, reference and editing modes.",
+        "options": {
+          "aspect_ratios": ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"],
+          "min_duration": 4,
+          "max_duration": 30
+        },
+        "releaseDate": "2026-07-31",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "fal": {
+            "id": "bytedance/seedance-2.5/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "bytedance/seedance-2.5/image-to-video",
+                "input": "image"
+              },
+              {
+                "id": "bytedance/seedance-2.5/text-to-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "bytedance/seedance-2.5",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "video_token_tiers",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "byteplus": {
+            "id": "dreamina-seedance-2-5-260628",
+            "endpoints": [],
+            "pricingType": "video_token_tiers",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "bytedance/seedance-2.5",
+            "endpoints": [
+              {
+                "id": "bytedance/seedance-2.5",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "bytedance/seedance-2.5",
+            "endpoints": [
+              {
+                "id": "video.bytedance.seedance-2.5.image",
+                "input": "image"
+              },
+              {
+                "id": "video.bytedance.seedance-2.5.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "fal/h3-max": {
+        "id": "fal/h3-max",
+        "label": "H3 Max",
+        "vendor": "fal",
+        "shortDescription": "fal-developed post-trained MiniMax H3 variant with faster video generation and native audio.",
+        "options": {
+          "max_duration": 15
+        },
+        "releaseDate": "2026-08-27",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "fal": {
+            "id": "minimax/h3-max/text-to-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "minimax/h3-max/text-to-video",
+                "input": "text"
+              },
+              {
+                "id": "minimax/h3-max/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "minimax": {
+            "id": "MiniMax-H3-Max",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "MiniMax-H3-Max",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "minimax/minimax-h3-max",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "minimax/minimax-h3-max",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-omni-1.1-flash": {
+        "id": "google/gemini-omni-1.1-flash",
+        "label": "Gemini Omni 1.1 Flash",
+        "vendor": "google",
+        "shortDescription": "Production Gemini video generation with native audio and first/last-frame control.",
+        "options": {
+          "min_duration": 3,
+          "max_duration": 10
+        },
+        "releaseDate": "2026-08-27",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "google": {
+            "id": "gemini-omni-1.1-flash",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "google/gemini-omni-flash/v1.1/text-to-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "google/gemini-omni-flash/v1.1/text-to-video",
+                "input": "text"
+              },
+              {
+                "id": "google/gemini-omni-flash/v1.1/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/gemini-omni-1.1-flash",
+            "endpoints": [
+              {
+                "id": "video.google.gemini-omni-1.1-flash.text",
+                "input": "text"
+              },
+              {
+                "id": "video.google.gemini-omni-1.1-flash.image",
+                "input": "image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/gemini-omni-1.2-flash": {
+        "id": "google/gemini-omni-1.2-flash",
+        "label": "Gemini Omni 1.2 Flash",
+        "vendor": "google",
+        "shortDescription": "Video generation with native audio, clips up to 15 seconds, and first/last-frame interpolation.",
+        "options": {
+          "min_duration": 3,
+          "max_duration": 15
+        },
+        "releaseDate": "2026-11-05",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "google": {
+            "id": "gemini-omni-1.2-flash",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_token",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "google/gemini-omni-flash/v1.2/text-to-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "google/gemini-omni-flash/v1.2/text-to-video",
+                "input": "text"
+              },
+              {
+                "id": "google/gemini-omni-flash/v1.2/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/gemini-omni-1.2-flash",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "google/gemini-omni-1.2-flash",
+            "input": "text-or-image",
+            "endpoints": [],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/gemini-omni-1.2-flash",
+            "endpoints": [
+              {
+                "id": "video.google.gemini-omni-1.2-flash.text",
+                "input": "text"
+              },
+              {
+                "id": "video.google.gemini-omni-1.2-flash.image",
+                "input": "image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/veo-3.1": {
+        "id": "google/veo-3.1",
+        "label": "Veo 3.1",
+        "vendor": "google",
+        "shortDescription": "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
+        "options": {
+          "aspect_ratios": ["16:9", "9:16"],
+          "min_duration": 4,
+          "max_duration": 8
+        },
+        "releaseDate": "2025-10-15",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/veo-3.1-generate-001",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/veo3.1/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "fal-ai/veo3.1",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/veo3.1/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/veo-3.1",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "google": {
+            "id": "veo-3.1-generate-preview",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/veo-3.1",
+            "endpoints": [
+              {
+                "id": "video.google.veo-3.1.image",
+                "input": "image"
+              },
+              {
+                "id": "video.google.veo-3.1.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/veo-3.1-fast": {
+        "id": "google/veo-3.1-fast",
+        "label": "Veo 3.1 Fast",
+        "vendor": "google",
+        "shortDescription": "Faster, cheaper Veo 3.1 — the same envelope and native audio at a fraction of the price.",
+        "options": {
+          "aspect_ratios": ["16:9", "9:16"],
+          "min_duration": 4,
+          "max_duration": 8
+        },
+        "releaseDate": "2025-10-15",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/veo-3.1-fast-generate-001",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/veo3.1/fast/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "fal-ai/veo3.1/fast",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/veo3.1/fast/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "google": {
+            "id": "veo-3.1-fast-generate-preview",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/veo-3.1-fast",
+            "endpoints": [
+              {
+                "id": "google/veo-3.1-fast",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/veo-3.1-fast",
+            "endpoints": [
+              {
+                "id": "video.google.veo-3.1-fast.image",
+                "input": "image"
+              },
+              {
+                "id": "video.google.veo-3.1-fast.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "google/veo-3.1-lite": {
+        "id": "google/veo-3.1-lite",
+        "label": "Veo 3.1 Lite",
+        "vendor": "google",
+        "shortDescription": "Budget Veo 3.1 — 720p/1080p clips with native audio for a few cents a second.",
+        "options": {
+          "aspect_ratios": ["16:9", "9:16"],
+          "min_duration": 4,
+          "max_duration": 8
+        },
+        "releaseDate": "2026-03-31",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "google/veo-3.1-lite-generate-001",
+            "input": "text-or-image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "fal-ai/veo3.1/lite/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "fal-ai/veo3.1/lite",
+                "input": "text"
+              },
+              {
+                "id": "fal-ai/veo3.1/lite/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "google": {
+            "id": "veo-3.1-lite-generate-preview",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "google/veo-3.1-lite",
+            "endpoints": [
+              {
+                "id": "google/veo-3.1-lite",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "google/veo-3.1-lite",
+            "endpoints": [
+              {
+                "id": "video.google.veo-3.1-lite.image",
+                "input": "image"
+              },
+              {
+                "id": "video.google.veo-3.1-lite.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "minimax/h3": {
+        "id": "minimax/h3",
+        "label": "MiniMax H3",
+        "vendor": "minimax",
+        "shortDescription": "Multimodal video generation with native stereo audio and first/last-frame conditioning.",
+        "options": {
+          "min_duration": 4,
+          "max_duration": 15
+        },
+        "releaseDate": "2026-07-31",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "minimax": {
+            "id": "MiniMax-H3",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "MiniMax-H3",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "minimax/h3/text-to-video",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "minimax/h3/text-to-video",
+                "input": "text"
+              },
+              {
+                "id": "minimax/h3/image-to-video",
+                "input": "image"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "vercel": {
+            "id": "minimax/minimax-h3",
+            "input": "text-or-image",
+            "endpoints": [
+              {
+                "id": "minimax/minimax-h3",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "minimax/h3",
+            "endpoints": [
+              {
+                "id": "video.minimax.h3.text",
+                "input": "text"
+              },
+              {
+                "id": "video.minimax.h3.image",
+                "input": "image"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      },
+      "xai/grok-imagine-video-1.5": {
+        "id": "xai/grok-imagine-video-1.5",
+        "label": "Grok Imagine Video 1.5",
+        "vendor": "xai",
+        "shortDescription": "SpaceXAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
+        "options": {
+          "aspect_ratios": ["16:9", "9:16"],
+          "min_duration": 1,
+          "max_duration": 15
+        },
+        "releaseDate": "2026-06-03",
+        "deprecated": false,
+        "transparentBackground": false,
+        "bindings": {
+          "vercel": {
+            "id": "spacexai/grok-imagine-video-1.5",
+            "input": "image",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "fal": {
+            "id": "xai/grok-imagine-video/v1.5/image-to-video",
+            "input": "image",
+            "endpoints": [
+              {
+                "id": "xai/grok-imagine-video/v1.5/image-to-video",
+                "input": "image"
+              },
+              {
+                "id": "xai/grok-imagine-video/v1.5/text-to-video",
+                "input": "text"
+              }
+            ],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "xai": {
+            "id": "grok-imagine-video-1.5",
+            "endpoints": [],
+            "pricingType": "per_second",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "openrouter": {
+            "id": "x-ai/grok-imagine-video-1.5",
+            "endpoints": [
+              {
+                "id": "x-ai/grok-imagine-video-1.5",
+                "input": "text"
+              }
+            ],
+            "pricingType": "provider_skus",
+            "scalarTokenPricing": false,
+            "deprecated": false
+          },
+          "grida": {
+            "id": "xai/grok-imagine-video-1.5",
+            "endpoints": [
+              {
+                "id": "video.xai.grok-imagine-video-1.5.image",
+                "input": "image"
+              },
+              {
+                "id": "video.xai.grok-imagine-video-1.5.text",
+                "input": "text"
+              }
+            ],
+            "scalarTokenPricing": false,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  },
+  "agents": {
+    "anthropic-claude-code": {
+      "claude-fable-5": {
+        "canonicalModelId": "anthropic/claude-fable-5",
+        "serviceTiers": {}
+      },
+      "claude-fable-5-1": {
+        "canonicalModelId": "anthropic/claude-fable-5.1",
+        "serviceTiers": {}
+      },
+      "claude-fable-5-2": {
+        "canonicalModelId": "anthropic/claude-fable-5.2",
+        "serviceTiers": {}
+      },
+      "claude-haiku-5-5": {
+        "canonicalModelId": "anthropic/claude-haiku-5.5",
+        "serviceTiers": {}
+      },
+      "claude-opus-4-8": {
+        "canonicalModelId": "anthropic/claude-opus-4.8",
+        "serviceTiers": {}
+      },
+      "claude-opus-5": {
+        "canonicalModelId": "anthropic/claude-opus-5",
+        "serviceTiers": {}
+      },
+      "claude-opus-5-5": {
+        "canonicalModelId": "anthropic/claude-opus-5.5",
+        "serviceTiers": {}
+      },
+      "claude-sonnet-5": {
+        "canonicalModelId": "anthropic/claude-sonnet-5",
+        "serviceTiers": {}
+      },
+      "claude-sonnet-5-5": {
+        "canonicalModelId": "anthropic/claude-sonnet-5.5",
+        "serviceTiers": {}
+      }
+    },
+    "openai-codex": {
+      "gpt-5.6-luna": {
+        "canonicalModelId": "openai/gpt-5.6-luna",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-5.6-sol": {
+        "canonicalModelId": "openai/gpt-5.6-sol",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-5.6-terra": {
+        "canonicalModelId": "openai/gpt-5.6-terra",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6-astra": {
+        "canonicalModelId": "openai/gpt-6-astra",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6-luna": {
+        "canonicalModelId": "openai/gpt-6-luna",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6-sol": {
+        "canonicalModelId": "openai/gpt-6-sol",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6.1-sol": {
+        "canonicalModelId": "openai/gpt-6.1-sol",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6.1-terra": {
+        "canonicalModelId": "openai/gpt-6.1-terra",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6.2-astra": {
+        "canonicalModelId": "openai/gpt-6.2-astra",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6.2-sol": {
+        "canonicalModelId": "openai/gpt-6.2-sol",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      }
+    }
+  }
+}

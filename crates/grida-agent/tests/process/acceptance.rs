@@ -148,9 +148,11 @@ async fn failed_submission_commit_leaves_no_receipt_and_the_same_input_can_succe
     drop(socket);
     terminate_shared_server(host).await;
 
-    // The trigger inserts a deferred constraint violation in the fixture
-    // database. The ordinary store stages the input and claim, then SQLite
-    // rejects COMMIT and rolls back. The fixture edits only a closed database.
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = initialized_shared_socket(&url).await;
+    // Inject the deferred commit failure after the host validates the schema.
+    // The ordinary store stages the input and claim, then SQLite rejects COMMIT
+    // and rolls back.
     let database = state.join(grida_agent::host::DATABASE_FILE);
     rusqlite::Connection::open(&database)
         .unwrap()
@@ -166,8 +168,6 @@ async fn failed_submission_commit_leaves_no_receipt_and_the_same_input_can_succe
         )
         .unwrap();
 
-    let (host, url) = shared_server(&state, &endpoint.url).await;
-    let mut socket = initialized_shared_socket(&url).await;
     assert_eq!(
         load_transcript(&mut socket, &session, workspace.path()).await,
         [FIRST_PROMPT, FIRST_ANSWER]
