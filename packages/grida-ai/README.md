@@ -1,5 +1,6 @@
 The pinned public `@grida/ai-models` release seeds the catalogue. Desktop
-refreshes its foreground chat catalogue from the latest compatible V2 release.
+refreshes foreground chat and BYOK image and video facts from the latest
+compatible V2 release.
 `@grida/ai/catalogue` owns only the client compatibility projection and Grida
 product presets; it is not the live GG offering list. See
 [`data/ai`](../../data/ai/README.md) for ownership and generation.
@@ -155,9 +156,9 @@ callers dispatch to the existing typed clients, including the exact 3D model uni
 ## Public Models V2
 
 Use `@grida/ai/model-catalogue` to parse exact-release Models V2 documents.
-`parseModelCatalogue(version, models, agents)` returns an immutable view of text
+`parseModelCatalogue(version, models, agents)` returns an immutable view of text, image, and video
 model facts, provider bindings and agent selectors. See the
-[catalogue reference](./src/catalogue/README.md#models-v2-foreground-chat)
+[catalogue reference](./src/catalogue/README.md#models-v2-in-desktop)
 for the host store and Grida chat integration.
 
 ## Current GG discovery and execution

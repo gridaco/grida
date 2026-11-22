@@ -85,4 +85,7 @@ export {
   type EndpointProviderConfig,
   type ProbedEndpointModel,
 } from "./protocol/endpoints";
-export type { GGModelsView } from "./protocol/gg-models";
+export type {
+  GGModelsView,
+  VisualModelCatalogueView,
+} from "./protocol/gg-models";

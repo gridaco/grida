@@ -13,6 +13,7 @@ import type {
   ProviderId,
   EndpointProviderConfig,
   GGModelsView,
+  VisualModelCatalogueView,
   ProbedEndpointModel,
   ImageGenerateRequest,
   ImageGenerateResult,
@@ -575,6 +576,7 @@ export type DesktopBridge = {
   providers?: {
     /** Anonymous metadata is read by the native host; absent on older builds. */
     gg_models?: () => Promise<GGModelsView>;
+    visual_models?: () => Promise<VisualModelCatalogueView>;
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
     /** Explicit Connect/Save consents to this exact saved destination. New
      * hosts retain that consent across restarts without another dialog. */

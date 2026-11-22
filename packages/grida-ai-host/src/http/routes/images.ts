@@ -69,6 +69,7 @@ export type ImagesRoutesDeps = {
   media?: MediaPersistence | null;
   /** Image catalogue for resolution; absent ⇒ the bundled one. */
   catalog?: ModelCatalogStore;
+  runtime_catalogue?: ImageClient.Options["runtime_catalogue"];
   gg_catalog?: GGDiscoveryStore;
   // GRIDA-GG: provider — the optional hosted image arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
@@ -78,7 +79,15 @@ export type ImagesRoutesDeps = {
 };
 
 export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
-  const { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog } = deps;
+  const {
+    secrets,
+    gg,
+    gg_base_url,
+    provider_http,
+    catalog,
+    runtime_catalogue,
+    gg_catalog,
+  } = deps;
 
   app.post("/images/generate", async (c) => {
     const r = await body(c, {
@@ -158,6 +167,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
           gg_base_url,
           provider_http,
           catalog,
+          runtime_catalogue,
           gg_catalog,
         },
         model_id,

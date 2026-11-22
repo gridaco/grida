@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — explicit provider authority, separate downloads, safe operation failures.
 // GRIDA-SEC-006 — scoped GG credential is re-read at use; no mint or persistent custody.
 // GRIDA-GG: token — explicit GG selection never falls back to BYOK.
-import { models } from "./catalogue";
+import { models, VisualModels } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -30,6 +30,7 @@ export class ImageClient {
   readonly #getKey: ImageClient.Keys["get"];
   readonly #http: ProviderHttp;
   readonly #catalog?: ModelCatalogStore;
+  readonly #runtimeCatalogue?: VisualModels.Read;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
   readonly #ggCatalog: GGDiscoveryStore;
@@ -44,6 +45,7 @@ export class ImageClient {
       this.#getKey = get.bind(keys);
       this.#http = http;
       this.#catalog = catalog;
+      this.#runtimeCatalogue = options.runtime_catalogue;
       this.#ggCatalog =
         options.gg_catalog ?? new GGDiscoveryStore({ fetch: http.request });
       if (gg !== undefined) {
@@ -64,12 +66,19 @@ export class ImageClient {
       const selected = selection(input);
       if (selected.provider === "gg")
         return await this.#resolveHosted(selected);
-      const view = await catalogViewOnMiss(
-        this.#catalog,
-        (v) => !v.image.cardById(selected.model_id)
-      );
-      const card = view.image.cardById(selected.model_id);
-      if (!MediaRoutes.imageModel(card)) {
+      const runtime = await this.#runtimeCatalogue?.();
+      const legacy = runtime
+        ? null
+        : await catalogViewOnMiss(
+            this.#catalog,
+            (view) => !view.image.cardById(selected.model_id)
+          );
+      const card = legacy?.image.cardById(selected.model_id);
+      if (
+        runtime
+          ? !Object.hasOwn(runtime.visual?.image ?? {}, selected.model_id)
+          : !MediaRoutes.imageModel(card)
+      ) {
         if (
           selected.provider === "auto" &&
           liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
@@ -85,12 +94,21 @@ export class ImageClient {
           : [selected.provider];
       let referenceCapable = false;
       for (const provider of order) {
-        const route = MediaRoutes.image(
-          card,
-          provider,
-          selected.references ?? false,
-          selected.background
-        );
+        const route = runtime
+          ? VisualModels.image(
+              runtime,
+              selected.model_id,
+              provider,
+              selected.references,
+              selected.background
+            )
+          : card &&
+            MediaRoutes.image(
+              card,
+              provider,
+              selected.references ?? false,
+              selected.background
+            );
         if (!route) continue;
         referenceCapable = true;
         if (!(await this.#key(provider))) continue;
@@ -297,6 +315,7 @@ export namespace ImageClient {
     /** Explicit host choice. ImageClient never constructs an ambient transport. */
     http: ProviderHttp;
     catalog?: ModelCatalogStore;
+    runtime_catalogue?: VisualModels.Read;
     gg?: GgTokenSource;
     gg_base_url?: string;
     gg_catalog?: GGDiscoveryStore;

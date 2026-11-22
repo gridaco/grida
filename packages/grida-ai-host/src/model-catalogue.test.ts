@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ModelCatalogueStore } from "./model-catalogue";
+import { createMediaDaemon } from "./media-server";
+import { DaemonTransport } from "@grida/daemon/transport";
 import { bundledModelCatalogue } from "@grida/ai/catalogue";
 
 let directory: string;
@@ -23,10 +25,32 @@ const resolver =
 function release(
   version: string,
   canonical = "lab/new-chat",
-  agentCanonical = canonical
+  agentCanonical = canonical,
+  imageBinding?: string
 ) {
   const models = JSON.stringify({
     $schema: "https://grida.co/schemas/ai-model-facts-v2.json",
+    ...(imageBinding && {
+      "image.models": {
+        "fixture/new-image": {
+          id: "fixture/new-image",
+          label: "New image",
+          release: { date: "2026-11-23" },
+          providers: {
+            openrouter: {
+              id: imageBinding,
+              provider: "openrouter",
+              pricing: { type: "per_image_flat" },
+            },
+            fal: {
+              id: "fixture/unsupported",
+              provider: "fal",
+              pricing: { type: "unsupported" },
+            },
+          },
+        },
+      },
+    }),
     "text.catalog": {
       [canonical]: {
         id: canonical,
@@ -250,5 +274,105 @@ it("restores the last validated release with all catalogue requests disabled", a
     expect(fetch).not.toHaveBeenCalled();
   } finally {
     offline.dispose();
+  }
+});
+
+it("uses one verified runtime snapshot for media listing and a real sidecar image request", async () => {
+  const catalogue = join(directory, "catalogue");
+  const main = new ModelCatalogueStore({
+    directory: catalogue,
+    fetch: transport(
+      release(nextVersion, undefined, undefined, "fixture/exact-selector")
+    ),
+  });
+  const request = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      data: [{ b64_json: "iVBORw0KGgo=" }],
+    })
+  );
+  const password = "synthetic-private-host-password";
+  const origin = "https://desktop.invalid";
+  const daemon = createMediaDaemon({
+    password,
+    user_data_path: join(directory, "state"),
+    model_catalogue: catalogue,
+    http_access: {
+      allowed_origins: [origin],
+      allowed_referer_paths: ["/desktop"],
+    },
+    provider_http: {
+      request,
+      download: async () => {
+        throw Error("unexpected download");
+      },
+    },
+  });
+  const call = async (route: string, input?: unknown) =>
+    daemon.fetch(
+      new Request(new URL(route, origin), {
+        method: input === undefined ? "GET" : "POST",
+        headers: {
+          authorization: DaemonTransport.buildBasicAuthHeader(password),
+          origin,
+          referer: origin + "/desktop/settings",
+          "content-type": "application/json",
+        },
+        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+      })
+    );
+  try {
+    await daemon.start({ listen: false });
+    const before = await (await call("/providers/visual/models")).json();
+    expect(
+      before.image.some(({ id }: { id: string }) => id === "fixture/new-image")
+    ).toBe(false);
+    expect(await main.refresh()).toBe(true);
+    const current = await (await call("/providers/visual/models")).json();
+    expect(current).toMatchObject({
+      version: nextVersion,
+      image: [
+        {
+          id: "fixture/new-image",
+          providers: { openrouter: { text: true } },
+          release_date: "2026-11-23",
+        },
+      ],
+    });
+    expect(current.image[0].providers).not.toHaveProperty("fal");
+    expect(JSON.stringify(current)).not.toContain("fixture/exact-selector");
+
+    const selection = {
+      model_id: "fixture/new-image",
+      prompt: "Synthetic image",
+    };
+    expect(
+      (await call("/images/generate", { ...selection, provider: "openrouter" }))
+        .status
+    ).toBe(400);
+    expect(request).not.toHaveBeenCalled();
+    expect(
+      (
+        await call("/secrets/set", {
+          provider_id: "openrouter",
+          key: "synthetic-openrouter-test-key",
+        })
+      ).ok
+    ).toBe(true);
+    expect(
+      (await call("/images/generate", { ...selection, provider: "fal" })).status
+    ).toBe(400);
+    expect(request).not.toHaveBeenCalled();
+    const result = await call("/images/generate", {
+      ...selection,
+      provider: "openrouter",
+    });
+    expect(result.status).toBe(200);
+    expect(request).toHaveBeenCalledOnce();
+    const [target, init] = request.mock.calls[0];
+    expect(String(target)).toBe("https://openrouter.ai/api/v1/images");
+    expect(JSON.parse(String(init?.body)).model).toBe("fixture/exact-selector");
+  } finally {
+    main.dispose();
+    await daemon.stop();
   }
 });

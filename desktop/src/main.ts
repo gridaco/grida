@@ -734,6 +734,17 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  const catalogueDirectory = path.join(
+    (nativeProfile && NativeDesktopProfile.agentData()) ||
+      app.getPath("userData"),
+    "model-catalogue"
+  );
+  const modelCatalogue = new ModelCatalogueStore({
+    directory: catalogueDirectory,
+    fetch: net.fetch,
+    offline: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
+  });
+  app.once("will-quit", () => modelCatalogue.dispose());
   if (!IS_DEV && !IS_INSIDERS && !nativeProfile) {
     const version = app.getVersion();
     desktopUpdates = new DesktopUpdates({
@@ -876,6 +887,7 @@ app.on("ready", async () => {
               });
             },
           chatTitles: true,
+          modelCatalogue,
         };
         nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
           accountSession,
@@ -954,11 +966,7 @@ app.on("ready", async () => {
             onLifecycle: onNativeLifecycle,
             openExternal: (url) => shell.openExternal(url),
             chatTitles: true,
-            modelCatalogue: new ModelCatalogueStore({
-              directory: path.join(app.getPath("userData"), "model-catalogue"),
-              fetch: net.fetch,
-              offline: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
-            }),
+            modelCatalogue,
           }
         );
         nativeDocuments = ordinarySelectedSvgFiles(
@@ -975,6 +983,7 @@ app.on("ready", async () => {
       }
     }
   }
+  await modelCatalogue.start();
   let desktopPreferences: DesktopPreferences;
   let chatSelections: NativeChatSelections | undefined;
   try {
@@ -1179,7 +1188,8 @@ app.on("ready", async () => {
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
       servicesSidecarInfo = await startServicesSidecar(
-        workspaceCatalog?.directory
+        workspaceCatalog?.directory,
+        catalogueDirectory
       );
       console.log(
         `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`

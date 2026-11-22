@@ -5,6 +5,7 @@ import {
   type EndpointProviderConfig,
 } from "@grida/ai-host";
 import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -48,6 +49,7 @@ export namespace NativeProviderSelection {
     hasKey: (id: string) => Promise<boolean>;
     network: () => Promise<NativeProviderNetwork>;
     imageRequest?: (init: RequestInit) => Promise<Response>;
+    modelCatalogue?: ModelCatalogueSnapshot;
   }>;
 
   const builtInEndpoints = {
@@ -107,7 +109,8 @@ export namespace NativeProviderSelection {
       ? NativeImageGeneration.forByok(
           providerId,
           endpoint,
-          settings.imageRequest
+          settings.imageRequest,
+          settings.modelCatalogue
         )
       : undefined;
     return {

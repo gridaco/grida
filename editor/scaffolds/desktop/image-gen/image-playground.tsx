@@ -1,7 +1,7 @@
 "use client";
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
-import { useGGModels } from "@/lib/desktop/gg-models";
+import { useGGModels, useVisualModels } from "@/lib/desktop/gg-models";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -85,14 +85,17 @@ const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
  *  when empty. Extra slots beyond the images are blank placeholders. */
 const MIN_CELLS = 20;
 
+type ImageSettings = Readonly<{
+  constraints?: { max_edge?: number | null } | null;
+  quality?: { options: readonly string[]; default?: string };
+  pricing?: { type: string };
+}>;
 type SizeOption = { label: string; width?: number; height?: number };
 const AUTO_SIZE: SizeOption = { label: "Auto" };
 const QUALITY_OPTIONS = ["auto", "high", "medium", "low"] as const;
 
 /** Size options for a model — 2K/4K only when its constraints allow. */
-function sizeOptionsFor(
-  card: models.image.ImageModelCard | undefined
-): SizeOption[] {
+function sizeOptionsFor(card: ImageSettings | undefined): SizeOption[] {
   const maxEdge = card?.constraints?.max_edge;
   const opts: SizeOption[] = [
     AUTO_SIZE,
@@ -108,12 +111,10 @@ function sizeOptionsFor(
 }
 
 /** Explicit quality options can also belong to token-billed image models. */
-function qualityOptionsFor(
-  card: models.image.ImageModelCard | undefined
-): readonly string[] {
+function qualityOptionsFor(card: ImageSettings | undefined): readonly string[] {
   return (
     card?.quality?.options ??
-    (card?.pricing.type === "per_image_tiered" ? QUALITY_OPTIONS : [])
+    (card?.pricing?.type === "per_image_tiered" ? QUALITY_OPTIONS : [])
   );
 }
 
@@ -175,7 +176,12 @@ export function DesktopImagePlayground({
     providerStore.getSnapshot
   );
   const ggModels = useGGModels();
-  const providers = { ...providerState, gg_models: ggModels };
+  const visual = useVisualModels();
+  const providers = {
+    ...providerState,
+    gg_models: ggModels,
+    visual_models: visual?.image,
+  };
   useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
     () =>
@@ -191,6 +197,9 @@ export function DesktopImagePlayground({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
   const card = models.image.models[modelId];
+  const settings = visual
+    ? visual.image.find(({ id }) => id === modelId)?.options
+    : card;
   const [transparent, setTransparent] = useState(false);
   const access = MediaModelAvailability.image(
     card,
@@ -205,7 +214,7 @@ export function DesktopImagePlayground({
     modelId
   );
   const [quality, setQuality] = useState<string>(
-    () => card?.quality?.default ?? "auto"
+    () => settings?.quality?.default ?? "auto"
   );
   const active = tiles.find((t) => t.id === activeId && t.status === "done");
 
@@ -225,7 +234,8 @@ export function DesktopImagePlayground({
       card,
       transparent,
       ggModels,
-      modelId
+      modelId,
+      visual?.image
     );
     if (
       !MediaModelAvailability.image(
@@ -250,7 +260,7 @@ export function DesktopImagePlayground({
         ...(size.width && size.height
           ? { width: size.width, height: size.height }
           : {}),
-        ...(card?.quality || quality !== "auto" ? { quality } : {}),
+        ...(settings?.quality || quality !== "auto" ? { quality } : {}),
         ...(transparent ? { background: "transparent" as const } : {}),
       });
       for (let index = res.images.length - 1; index >= 0; index -= 1) {
@@ -342,7 +352,7 @@ export function DesktopImagePlayground({
               <PromptInputTools>
                 <TemplateMenu />
                 <SettingsMenu
-                  card={card}
+                  card={settings}
                   size={size}
                   onSize={setSize}
                   quality={quality}
@@ -361,7 +371,10 @@ export function DesktopImagePlayground({
                     setSize(AUTO_SIZE);
                     setTransparent(false);
                     setQuality(
-                      models.image.models[next]?.quality?.default ?? "auto"
+                      (visual
+                        ? visual.image.find(({ id }) => id === next)?.options
+                        : models.image.models[next]
+                      )?.quality?.default ?? "auto"
                     );
                   }}
                 />
@@ -427,7 +440,7 @@ function SettingsMenu({
   onTransparent,
   transparencyAvailable,
 }: {
-  card: models.image.ImageModelCard | undefined;
+  card: ImageSettings | undefined;
   size: SizeOption;
   onSize: (s: SizeOption) => void;
   quality: string;

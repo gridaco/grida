@@ -3,7 +3,8 @@
 Model facts are maintained in the public [`gridaco/models`](https://github.com/gridaco/models)
 catalogue. The exact `@grida/ai-models` dependency in `packages/grida-ai/package.json`
 supplies the bundled seed. Desktop checks for newer V2 releases at runtime for its
-ChatGPT subscription, OpenRouter and Vercel foreground chat choices. Effective GG offerings, prices and operation
+ChatGPT subscription, OpenRouter and Vercel foreground chat choices and for BYOK
+image and video. Effective GG offerings, prices and operation
 contracts come from [GG discovery](https://gateway.grida.ai/v1/models).
 
 This directory contains only Grida-owned choices and executable native contracts:
@@ -37,9 +38,10 @@ node scripts/ai-catalogue/generate.mjs --bundle
 node scripts/ai-catalogue/generate.mjs --bundle --check
 ```
 
-Generated TypeScript retains literal IDs and installed-client interfaces. Media
-adapters use this bundled release. Desktop foreground chat can use newer public
-facts through the [V2 catalogue store](../../packages/grida-ai/src/catalogue/README.md). The Rust `operations.json` asset contains only
+Generated TypeScript retains literal IDs and the installed-client compatibility
+interfaces. Desktop chat and BYOK image and video read newer public facts through the [V2 catalogue store](../../packages/grida-ai/src/catalogue/README.md). The old media membership projection serves the legacy catalogue and callers on
+its installed contract. Desktop visual choices use adapter eligibility over V2.
+The Rust `operations.json` asset contains only
 implemented native operation descriptors. GG runtime discovery is separate. These outputs are checked, not independent
 facts authoring homes. Updating the public dependency requires reviewing the
 model facts diff, regenerating and testing its consumers. Ordinary GG catalogue

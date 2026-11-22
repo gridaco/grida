@@ -7,6 +7,10 @@ description: Plan, prepare, or verify releases of the Grida CLI and Grida Deskto
 
 Keep the npm `grida` CLI and Grida Desktop on the same version by default. An urgent release for one product may advance its patch version independently. Keep the same major and minor versions. When the two next ship together, use a common version higher than both published versions. Check the published npm version and Desktop GitHub tag when choosing a version. FX has its own version. Use [externals](../externals/SKILL.md) for shared dependency pins.
 
+For Models seed or discovery bridge changes, follow the catalogue check in the
+[Desktop release runbook](../../../docs/contributing/desktop-release.md#verify-compatibility).
+Compatible Models V2 data updates reach installed Desktop in the background.
+
 ## Release order
 
 1. **Start from published FX.** If a new FX version is needed, release it before changing Grida's pin. The FX repository owns its version checks, dry run, and approved tag release. Its workflow publishes the platform engines before the npm SDK, then publishes the PyPI wheels. Verify that the exact npm SDK and platform packages are available before adopting them in Grida. The FX tag also supplies the template source archive. Follow the [FX release runbook](https://github.com/gridaco/fx/blob/main/RELEASING.md).

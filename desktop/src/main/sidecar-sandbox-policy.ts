@@ -14,6 +14,7 @@ export namespace SidecarSandboxPolicy {
     mediaRoot: string;
     desktopStateRoot?: string;
     workspaceCatalogRoot?: string;
+    catalogueDirectory?: string;
     protectedStateRoots?: readonly string[];
     home: string;
   }) {
@@ -33,7 +34,12 @@ export namespace SidecarSandboxPolicy {
     const providerRoot = path.resolve(
       input.providerRoot ?? path.join(input.userData, "providers")
     );
-    if (input.protectedStateRoots?.some((root) => /[*?[\]]/u.test(root)))
+    if (
+      [
+        ...(input.protectedStateRoots ?? []),
+        ...(input.catalogueDirectory ? [input.catalogueDirectory] : []),
+      ].some((root) => /[*?[\]]/u.test(root))
+    )
       throw new Error("native_desktop_protected_state_path_not_literal");
     const mainOnly = [
       ...(input.desktopStateRoot ? [input.desktopStateRoot] : []),
@@ -50,6 +56,7 @@ export namespace SidecarSandboxPolicy {
           ...policy.filesystem.deny_write,
           ...mainOnly,
           ...(input.workspaceCatalogRoot ? [input.workspaceCatalogRoot] : []),
+          ...(input.catalogueDirectory ? [input.catalogueDirectory] : []),
         ]),
         // The long-lived sidecar owns durable media writes. The root remains
         // outside the agent secret directory and is denied again in every

@@ -9,7 +9,10 @@
  */
 
 import { DaemonTransport } from "@grida/daemon/transport";
-import type { GGModelsView } from "./protocol/gg-models";
+import type {
+  GGModelsView,
+  VisualModelCatalogueView,
+} from "./protocol/gg-models";
 import type {
   ImageGenerateRequest,
   ImageGenerateResult,
@@ -85,6 +88,8 @@ export namespace MediaTransport {
     } as const;
 
     readonly providers = {
+      visual_models: () =>
+        this.getJson<VisualModelCatalogueView>("/providers/visual/models"),
       gg_models: async (): Promise<GGModelsView> =>
         await this.getJson<GGModelsView>("/providers/gg/models"),
       /** Endpoint provider configs — readable plain config, unlike

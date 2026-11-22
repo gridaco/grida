@@ -449,6 +449,16 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    returns, or logs credentials or bodies; credential ownership and injection
    remain in the sidecar's provider layer.
 
+   Desktop Main publishes the public Models V2 cache with verified release
+   hashes and atomic replacement. The [retained service policy](desktop/src/main/sidecar-sandbox-policy.ts)
+   gives the sidecar read access to that cache and denies writes on confined
+   platforms. File APIs keep the catalogue root outside workspace admission.
+   [Visual model resolution](packages/grida-ai/src/catalogue/visual-models.ts)
+   validates provider selectors before building adapter requests. The
+   Settings and picker view contains compatible model facts and operations.
+   Credential presence and the exact launch binding are still checked at
+   generation time.
+
    Anonymous GG discovery has a separate, narrow permission: credential-free
    `GET` requests to exactly `https://gateway.grida.ai/v1/models`,
    `/v1/endpoints` and `/schemas/operations.json`, with no query or body and only

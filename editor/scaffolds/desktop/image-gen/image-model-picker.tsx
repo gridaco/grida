@@ -1,6 +1,10 @@
 "use client";
 
-import { mediaModelChoices } from "@/lib/desktop/gg-models";
+import {
+  mediaModelChoices,
+  newestMediaModels,
+  promptModels,
+} from "@/lib/desktop/gg-models";
 import { catalog as models } from "@grida/ai/catalogue";
 import {
   Select,
@@ -27,10 +31,14 @@ export function ImageModelPicker({
   disabled?: boolean;
   providers: MediaModelAvailability.ImageProviderState;
 }) {
-  const listed = mediaModelChoices(
-    models.image.listed_models(),
-    providers.gg_models ?? [],
-    "image"
+  const listed = newestMediaModels(
+    mediaModelChoices(
+      providers.visual_models
+        ? promptModels(providers.visual_models)
+        : models.image.listed_models(),
+      providers.gg_models ?? [],
+      "image"
+    )
   );
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

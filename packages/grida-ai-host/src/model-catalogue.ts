@@ -76,6 +76,8 @@ export class ModelCatalogueStore {
   private readonly path: string;
   private readonly request: CatalogueFetch;
   private loaded?: Promise<void>;
+  private reading?: Promise<void>;
+  private cacheIdentity?: string;
   private pending?: Promise<boolean>;
   private timer?: ReturnType<typeof setInterval>;
   private readonly lifetime = new AbortController();
@@ -92,6 +94,16 @@ export class ModelCatalogueStore {
   }
 
   view(): ModelCatalogueSnapshot {
+    return this.current;
+  }
+
+  /** Read the app-owned cache from a process without network or write authority. */
+  async read(): Promise<ModelCatalogueSnapshot> {
+    await (this.reading ??= this.restore()
+      .catch(() => {})
+      .finally(() => {
+        this.reading = undefined;
+      }));
     return this.current;
   }
 
@@ -130,9 +142,15 @@ export class ModelCatalogueStore {
       constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW
     );
     try {
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.size > MAX_CACHE_BYTES) return;
-      const raw = Buffer.alloc(stat.size);
+      const stat = await file.stat({ bigint: true });
+      const identity = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}`;
+      if (
+        !stat.isFile() ||
+        stat.size > MAX_CACHE_BYTES ||
+        identity === this.cacheIdentity
+      )
+        return;
+      const raw = Buffer.alloc(Number(stat.size));
       let offset = 0;
       while (offset < raw.length) {
         const { bytesRead } = await file.read(
@@ -150,6 +168,7 @@ export class ModelCatalogueStore {
         newer(release.version, this.current.version)
       )
         this.current = verified(release);
+      this.cacheIdentity = identity;
     } finally {
       await file.close();
     }
@@ -164,7 +183,9 @@ export class ModelCatalogueStore {
       AbortSignal.timeout(15_000),
     ]);
     try {
-      const { version } = JSON.parse(await this.read(RESOLVER, 4096, signal));
+      const { version } = JSON.parse(
+        await this.download(RESOLVER, 4096, signal)
+      );
       if (
         !isModelCatalogueVersion(version) ||
         !newer(version, this.current.version)
@@ -172,9 +193,9 @@ export class ModelCatalogueStore {
         return false;
       const base = CDN + version + "/";
       const [manifest, models, agents] = await Promise.all([
-        this.read(base + "manifest.json", LIMITS.manifest, signal),
-        this.read(base + "models.json", LIMITS.models, signal),
-        this.read(base + "agents.json", LIMITS.agents, signal),
+        this.download(base + "manifest.json", LIMITS.manifest, signal),
+        this.download(base + "models.json", LIMITS.models, signal),
+        this.download(base + "agents.json", LIMITS.agents, signal),
       ]);
       const release = { version, manifest, models, agents };
       const next = verified(release);
@@ -198,7 +219,7 @@ export class ModelCatalogueStore {
     }
   }
 
-  private async read(
+  private async download(
     url: string,
     maximum: number,
     signal: AbortSignal

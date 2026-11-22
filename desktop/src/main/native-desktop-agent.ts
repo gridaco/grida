@@ -100,7 +100,7 @@ type LaunchOptions = Readonly<{
   ) => ImageReferenceReview;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
-  modelCatalogue?: Pick<ModelCatalogueStore, "view" | "start" | "dispose">;
+  modelCatalogue?: Pick<ModelCatalogueStore, "view">;
   /**
    * Title untitled chats from their first request. The app always does; the
    * option keeps scripted test providers free of the extra request.
@@ -261,7 +261,6 @@ export class NativeDesktopAgent {
       });
       subscription = { host, oauth };
     }
-    await options?.modelCatalogue?.start();
     return new NativeDesktopAgent(
       store,
       account,
@@ -1146,7 +1145,12 @@ export class NativeDesktopAgent {
       ? ChatModels.resume(snapshot, { provider }, model, retained)
       : ChatModels.resolve(snapshot, { provider }, model);
     if (!binding) throw new Error("native_chat_profile_unavailable");
-    return servicesSidecarClient.nativeBuiltInByok(provider, model, binding);
+    return servicesSidecarClient.nativeBuiltInByok(
+      provider,
+      model,
+      binding,
+      snapshot
+    );
   }
 
   private async subscriptionLaunch(
@@ -1306,7 +1310,6 @@ export class NativeDesktopAgent {
   close(): Promise<void> {
     if (this.closed) return this.accountDrain ?? Promise.resolve();
     this.closed = true;
-    this.modelCatalogue?.dispose();
     const previous = this.accountDrain;
     return this.transition(async () => {
       try {

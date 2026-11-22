@@ -2,7 +2,7 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import { useVideoProviders } from "@/lib/desktop/video-providers";
-import { useGGModels } from "@/lib/desktop/gg-models";
+import { useGGModels, useVisualModels } from "@/lib/desktop/gg-models";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 
 import { useRef, useState } from "react";
@@ -73,16 +73,23 @@ const MIN_CELLS = 12;
 
 const AUTO = "Auto";
 
+type VideoSettings = Readonly<{
+  min_duration?: number;
+  max_duration?: number;
+  aspect_ratios?: readonly string[];
+  default?: { duration?: number };
+}>;
+
 /** Duration options bounded by the model's min/max (seconds). */
 function durationOptionsFor(
-  card: models.video.VideoModelCard | undefined
+  card: VideoSettings | undefined
 ): { label: string; value?: number }[] {
   const opts: { label: string; value?: number }[] = [{ label: AUTO }];
   if (!card) return opts;
   const seen = new Set<number>();
   for (const v of [
     card.min_duration,
-    card.default.duration,
+    card.default?.duration,
     card.max_duration,
   ]) {
     if (v != null && !seen.has(v)) {
@@ -136,6 +143,7 @@ export function DesktopVideoPlayground({
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const current = useGGModels();
+  const visual = useVisualModels();
   const { state: providerState, refresh: refreshProviders } =
     useVideoProviders();
   const [selectedModelId, setModelId] = useState(initialModelId ?? "");
@@ -151,7 +159,12 @@ export function DesktopVideoPlayground({
         )?.id ??
           "")
       : selectedModelId;
-  const access = MediaModelAvailability.video(modelId, current, providerState);
+  const visualProviders = { ...providerState, visual_models: visual?.video };
+  const access = MediaModelAvailability.video(
+    modelId,
+    current,
+    visualProviders
+  );
   const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +175,9 @@ export function DesktopVideoPlayground({
     label: AUTO,
   });
 
-  const card = models.video.models[modelId];
+  const card = visual
+    ? visual.video.find(({ id }) => id === modelId)?.options
+    : models.video.models[modelId];
   const active = tiles.find((t) => t.id === activeId && t.status === "done");
 
   const remove = (id: string) =>
@@ -185,11 +200,10 @@ export function DesktopVideoPlayground({
     try {
       onGenerationBusyChange?.(true);
       const refreshed = await refreshProviders(modelId);
-      const refreshedAccess = MediaModelAvailability.video(
-        modelId,
-        current,
-        refreshed
-      );
+      const refreshedAccess = MediaModelAvailability.video(modelId, current, {
+        ...refreshed,
+        visual_models: visual?.video,
+      });
       if (!refreshedAccess.available)
         throw new Error(
           refreshedAccess.reason ?? "This video model is unavailable."
@@ -314,7 +328,7 @@ export function DesktopVideoPlayground({
                 <VideoModelPicker
                   value={modelId}
                   current={current}
-                  providers={providerState}
+                  providers={visualProviders}
                   disabled={busy}
                   onValueChange={(next) => {
                     // Model-scoped options don't carry over — a stale aspect
@@ -403,7 +417,7 @@ function SettingsMenu({
   disabled,
 }: {
   disabled?: boolean;
-  card: models.video.VideoModelCard | undefined;
+  card: VideoSettings | undefined;
   aspect: string;
   onAspect: (a: string) => void;
   duration: { label: string; value?: number };

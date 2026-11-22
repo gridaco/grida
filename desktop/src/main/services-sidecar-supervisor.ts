@@ -8,6 +8,7 @@
  * channels. The retained process has no model command or direct network owner.
  * Windows keeps its explicitly unconfined non-agent services.
  */
+import { mkdir } from "node:fs/promises";
 import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
@@ -72,6 +73,7 @@ export class ServicesSidecarSupervisor {
   private nativeSandbox?: RetainedServiceSandbox;
   private sandboxReady = false;
   private workspaceCatalog?: string;
+  private catalogueDirectory?: string;
   private protectedStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
   private endpointConsent?: ProviderEndpointConsent;
@@ -126,15 +128,21 @@ export class ServicesSidecarSupervisor {
     });
   }
 
-  async start(workspaceCatalog?: string): Promise<ServicesSidecarInfo> {
+  async start(
+    workspaceCatalog?: string,
+    catalogueDirectory?: string
+  ): Promise<ServicesSidecarInfo> {
     if (this.isShuttingDown) throw new Error("services_sidecar_shutting_down");
     if (
       (workspaceCatalog &&
         (!this.nativeChat || !RetainedServiceSandbox.isSupportedPlatform())) ||
-      (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
+      (this.sandboxReady &&
+        (workspaceCatalog !== this.workspaceCatalog ||
+          catalogueDirectory !== this.catalogueDirectory))
     )
       throw new Error("workspace_catalog_scope_invalid");
     this.workspaceCatalog = workspaceCatalog;
+    this.catalogueDirectory = catalogueDirectory;
     this.servicesStarted = true;
     if (this.info) return this.info.connection;
     if (this.restartTimer) {
@@ -142,6 +150,8 @@ export class ServicesSidecarSupervisor {
       this.restartTimer = null;
     }
     if (!this.sandboxReady) {
+      if (catalogueDirectory)
+        await mkdir(catalogueDirectory, { recursive: true, mode: 0o700 });
       await this.initSandbox();
     }
     return await this.spawn();
@@ -306,6 +316,7 @@ export class ServicesSidecarSupervisor {
     if (!RetainedServiceSandbox.isSupportedPlatform()) {
       if (chat) throw new Error("native_retained_sidecar_sandbox_unavailable");
       this.protectedFileRoots = [
+        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
         ProviderEndpointConsent.directory(app.getPath("userData")),
         path.join(
           app.getPath("userData"),
@@ -350,6 +361,7 @@ export class ServicesSidecarSupervisor {
     this.protectedFileRoots = [
       ...new Set([
         ...this.protectedStateRoots,
+        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
         nativeStateRoot,
         ProviderEndpointConsent.directory(app.getPath("userData")),
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
@@ -364,6 +376,7 @@ export class ServicesSidecarSupervisor {
         ...protectedPolicyRoots,
         ProviderEndpointConsent.directory(app.getPath("userData")),
       ],
+      catalogueDirectory: this.catalogueDirectory,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
@@ -430,6 +443,9 @@ export class ServicesSidecarSupervisor {
       `--user-data=${this.user_data_path}`,
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
+      ...(this.catalogueDirectory
+        ? [`--model-catalogue=${this.catalogueDirectory}`]
+        : []),
       `--agent=${mode}`,
       ...(this.ordinaryNativeChat ? ["--ordinary-native-chat-services=1"] : []),
       ...(this.workspaceCatalog
@@ -732,9 +748,10 @@ function sidecar(): ServicesSidecarSupervisor {
 }
 
 export function startServicesSidecar(
-  workspaceCatalog?: string
+  workspaceCatalog?: string,
+  catalogueDirectory?: string
 ): Promise<ServicesSidecarInfo> {
-  return sidecar().start(workspaceCatalog);
+  return sidecar().start(workspaceCatalog, catalogueDirectory);
 }
 
 export function selectNativeChat(ordinary = false): NativeChatPaths {

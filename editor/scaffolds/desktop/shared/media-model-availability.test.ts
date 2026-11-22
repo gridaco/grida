@@ -28,6 +28,66 @@ const catalogue = Object.freeze([
   { id: "beta", label: "Beta" },
 ]);
 
+describe("runtime visual model readiness", () => {
+  const choice = {
+    id: "fixture/published",
+    label: "Published model",
+    providers: {
+      fal: { text: true as const },
+      openrouter: { image: true as const },
+    },
+  };
+
+  it("uses the installed host's resolved image operations and connected keys", () => {
+    const state = {
+      loaded: true,
+      images: true,
+      configured: ["fal"] as const,
+      hosted: false,
+      gg_models: [],
+      visual_models: [choice],
+    };
+    expect(
+      MediaModelAvailability.image(undefined, state, false, choice.id).available
+    ).toBe(true);
+    expect(
+      MediaModelAvailability.image(undefined, state, true, choice.id).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.image(
+        undefined,
+        { ...state, configured: ["openrouter"] },
+        false,
+        choice.id
+      ).available
+    ).toBe(false);
+  });
+
+  it("treats an empty runtime catalogue as authoritative instead of restoring legacy BYOK cards", () => {
+    const state = {
+      loaded: true,
+      hosted: false,
+      configured: ["vercel"] as const,
+      visual_models: [],
+    };
+    const card = models.image.models["openai/gpt-image-2"]!;
+    expect(
+      MediaModelAvailability.image(card, { ...state, images: true }, false)
+        .available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.video("google/veo-3.1", [], state).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.video(choice.id, [], {
+        ...state,
+        configured: ["fal"],
+        visual_models: [choice],
+      }).available
+    ).toBe(true);
+  });
+});
+
 describe("MediaModelAvailability.select", () => {
   const legacy = { id: "legacy", deprecated: true };
   const active = { id: "active" };

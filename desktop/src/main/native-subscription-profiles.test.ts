@@ -1422,8 +1422,6 @@ async function subscriptionDesktop() {
   let catalogue = bundledModelCatalogue();
   const modelCatalogue = {
     view: () => catalogue,
-    async start() {},
-    dispose() {},
   };
   const launch = async () => {
     const { NativeDesktopAgent } = await import("./native-desktop-agent");

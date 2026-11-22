@@ -46,7 +46,9 @@ Product presets and native compatibility data come from `@grida/ai/catalogue`, w
 legacy status, tiers, request presets and optional recommendations to the neutral
 `@grida/ai-models` facts. Desktop foreground chat can refresh the public V2
 catalogue at runtime. Its subscription picker also requires the signed-in
-account to offer the selector. Media BYOK routes use the installed seed.
+account to offer the selector. Desktop BYOK image and video read the same
+verified V2 cache through a read-only mount. Their model list and submission
+use the same adapter policy.
 Media routes share the host's separate bounded GG discovery store; hosted
 music also uses current GG operation contracts.
 Sound effects, speech and typed native 3D adapters retain their bundled inputs. The optional image default

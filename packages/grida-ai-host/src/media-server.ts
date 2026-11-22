@@ -42,6 +42,8 @@ export type MediaTenantOptions = {
   gg_base_url?: string;
   /** Allow an authorized host to manage saved custom provider endpoints. */
   endpoint_settings?: boolean;
+  /** App-owned V2 cache directory, mounted read-only in the retained sidecar. */
+  model_catalogue?: string;
 };
 
 /** Mount shared media and optional provider settings without chat state. */
@@ -115,6 +117,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
         provider_http: opts.provider_http,
         gg_base_url: opts.gg_base_url,
         endpoint_settings: opts.endpoint_settings,
+        model_catalogue: opts.model_catalogue,
       }),
     ],
   });

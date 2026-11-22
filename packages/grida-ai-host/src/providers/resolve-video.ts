@@ -10,6 +10,7 @@ export type ResolvedVideoModel = VideoClient.Resolved;
 export type ResolveVideoDeps = {
   secrets: SecretsStore;
   catalog?: ModelCatalogStore;
+  runtime_catalogue?: VideoClient.Options["runtime_catalogue"];
   gg_catalog?: GGDiscoveryStore;
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
@@ -48,6 +49,7 @@ export async function resolveVideoModel(
     // remote downloads still require a supplied host transport.
     http: deps.provider_http ?? new ProviderHttp(),
     catalog: deps.catalog,
+    runtime_catalogue: deps.runtime_catalogue,
     gg_catalog: deps.gg_catalog,
     gg: deps.gg,
     gg_base_url: deps.gg_base_url,

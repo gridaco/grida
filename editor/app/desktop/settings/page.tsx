@@ -82,7 +82,14 @@ import {
   type EndpointModelEntry,
 } from "@/lib/desktop/bridge";
 import * as gridaGateway from "@/lib/desktop/gg-session";
-import { useGGModels } from "@/lib/desktop/gg-models";
+import {
+  mediaModelChoices,
+  newestMediaModels,
+  promptModels,
+  useVisualModels,
+  useGGModels,
+  type MediaModelChoice,
+} from "@/lib/desktop/gg-models";
 import { musicModelChoices } from "@/scaffolds/desktop/audio-gen/music-generation-controls";
 import Link from "next/link";
 import { DesktopPageShell } from "@/scaffolds/desktop/chrome/page-shell";
@@ -975,8 +982,22 @@ function MediaModelsSection({
   const musicSupported = audio.music.isSupported();
   const soundEffectSupported = audio.soundEffects.isSupported();
   const voiceSupported = audio.textToSpeech.isSupported();
-  const imageModels = imageSupported ? models.image.listed_models() : [];
-  const videoModels = videoSupported ? models.video.listed_models() : [];
+  const currentGG = useGGModels();
+  const visual = useVisualModels();
+  const imageModels = imageSupported
+    ? mediaModelChoices(
+        visual ? promptModels(visual.image) : models.image.listed_models(),
+        currentGG,
+        "image"
+      )
+    : [];
+  const videoModels = videoSupported
+    ? mediaModelChoices(
+        visual ? promptModels(visual.video) : models.video.listed_models(),
+        currentGG,
+        "video"
+      )
+    : [];
   const threeDModels = threeDSupported ? models.three_d.ordered_models() : [];
   const tripoModels = tripoSupported
     ? models.three_d.model_generation.ordered_models()
@@ -984,7 +1005,6 @@ function MediaModelsSection({
   const riggingModels = riggingSupported
     ? models.three_d.rigging.listed_models()
     : [];
-  const currentGG = useGGModels();
   const musicModels = musicSupported
     ? musicModelChoices(currentGG).map((model) => ({
         ...model,
@@ -1104,10 +1124,11 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                MediaModelReadiness.hosted(card.id, "image", currentGG)
+                MediaModelReadiness.hosted(card.id, "image", currentGG) ??
+                  (visual ? false : undefined)
               )
             }
-            hrefForModel={mediaToolHref}
+            hrefForModel={(id) => DesktopMediaTool.href("image-generator", id)}
             actionLabel="Open in image generator"
           />
         )}
@@ -1120,10 +1141,11 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                MediaModelReadiness.hosted(card.id, "video", currentGG)
+                MediaModelReadiness.hosted(card.id, "video", currentGG) ??
+                  (visual ? false : undefined)
               )
             }
-            hrefForModel={mediaToolHref}
+            hrefForModel={(id) => DesktopMediaTool.href("video-generator", id)}
             actionLabel="Open in video generator"
           />
         )}
@@ -1198,16 +1220,6 @@ function MediaModelsSection({
   );
 }
 
-type MediaModelCard = {
-  id: string;
-  label: string;
-  short_description: string;
-  vendor: string;
-  provider?: string;
-  providers?: object;
-  deprecated?: boolean;
-};
-
 function MediaModelGroup({
   title,
   models,
@@ -1216,8 +1228,8 @@ function MediaModelGroup({
   actionLabel,
 }: {
   title: string;
-  models: readonly MediaModelCard[];
-  readyForModel: (card: MediaModelCard) => boolean | null;
+  models: readonly MediaModelChoice[];
+  readyForModel: (card: MediaModelChoice) => boolean | null;
   hrefForModel: (id: string) => string;
   actionLabel: string;
 }) {
@@ -1227,7 +1239,7 @@ function MediaModelGroup({
         <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
       </header>
       <div className="divide-y">
-        {models.map((card) => (
+        {newestMediaModels(models).map((card) => (
           <MediaModelRow
             key={card.id}
             card={card}
@@ -1247,14 +1259,14 @@ function MediaModelRow({
   href,
   actionLabel,
 }: {
-  card: MediaModelCard;
+  card: MediaModelChoice;
   ready: boolean | null;
   href: string;
   actionLabel: string;
 }) {
   return (
     <div className="flex gap-3 px-6 py-4 text-sm">
-      <MediaVendorLogo vendor={card.vendor} />
+      {card.vendor && <MediaVendorLogo vendor={card.vendor} />}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">{card.label}</span>
@@ -1272,9 +1284,11 @@ function MediaModelRow({
             {ready === null ? "Checking" : ready ? "Ready" : "Setup required"}
           </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {card.short_description}
-        </span>
+        {card.short_description && (
+          <span className="text-xs text-muted-foreground">
+            {card.short_description}
+          </span>
+        )}
         <Button
           asChild
           variant="link"
@@ -1313,7 +1327,7 @@ function MediaVendorLogo({ vendor }: { vendor: string }) {
   );
 }
 
-function MediaProviderLogos({ card }: { card: MediaModelCard }) {
+function MediaProviderLogos({ card }: { card: MediaModelChoice }) {
   const providerIds = MEDIA_PROVIDER_IDS.filter((id) =>
     card.providers
       ? Object.prototype.hasOwnProperty.call(card.providers, id)

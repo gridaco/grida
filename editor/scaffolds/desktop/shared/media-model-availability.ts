@@ -1,4 +1,4 @@
-import { catalog as models } from "@grida/ai/catalogue";
+import { catalog as models, type VisualModels } from "@grida/ai/catalogue";
 import { byokProvidersFor } from "@grida/ai-host";
 import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
@@ -29,6 +29,7 @@ export namespace MediaModelAvailability {
     hosted: boolean;
     /** null only for released binaries without the discovery bridge. */
     gg_models?: readonly CurrentGGModel[] | null;
+    visual_models?: readonly VisualModels.Choice[];
   }>;
 
   export type ImageAccess = Readonly<{
@@ -86,6 +87,23 @@ export namespace MediaModelAvailability {
           ) === true))
     )
       return { available: true };
+    if (state.visual_models) {
+      const choice = state.visual_models.find(({ id }) => id === modelId);
+      if (!state.loaded)
+        return { available: false, reason: "Checking connected providers…" };
+      if (
+        state.images &&
+        state.configured.some((id) => {
+          const route = choice?.providers[id];
+          return route?.text && (!transparent || route.transparent);
+        })
+      )
+        return { available: true };
+      return {
+        available: false,
+        reason: "Connect a supported provider key or choose another model.",
+      };
+    }
     if (!card?.listed)
       return { available: false, reason: "Choose an image model" };
     if (
@@ -139,6 +157,7 @@ export namespace MediaModelAvailability {
   export type VideoProviderState = Readonly<{
     loaded: boolean;
     configured: readonly models.video.VideoProvider[];
+    visual_models?: readonly VisualModels.Choice[];
     hosted: boolean;
   }>;
 
@@ -161,6 +180,15 @@ export namespace MediaModelAvailability {
       )
     )
       return { available: true };
+    if (state.visual_models) {
+      const choice = state.visual_models.find(({ id }) => id === modelId);
+      return state.configured.some((id) => choice?.providers[id]?.text)
+        ? { available: true }
+        : {
+            available: false,
+            reason: "Connect a supported provider key or choose another model.",
+          };
+    }
     const card = models.video.models[modelId];
     const textRoute = (provider: models.video.VideoProvider) => {
       if (!card?.listed || !models.video.binding(card, provider)) return false;
@@ -213,7 +241,8 @@ export namespace MediaModelAvailability {
       card?: models.image.ImageModelCard,
       transparent = false,
       ggModels?: readonly CurrentGGModel[] | null,
-      modelId = card?.id
+      modelId = card?.id,
+      visualModels?: readonly VisualModels.Choice[]
     ): Promise<ImageProviderState> {
       const generation = ++this.generation;
       const bridge = this.bridge;
@@ -241,6 +270,7 @@ export namespace MediaModelAvailability {
           .map((provider) => provider.id),
         hosted: false,
         gg_models: ggModels !== undefined ? ggModels : this.current.gg_models,
+        visual_models: visualModels,
       };
       const publish = (state: ImageProviderState): ImageProviderState => {
         // A newer refresh or unmount invalidates this submit-time result too,

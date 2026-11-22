@@ -43,6 +43,18 @@ describe("SidecarSandboxPolicy", () => {
     expect(policy.filesystem.allow_write).not.toContain(desktopStateRoot);
   });
 
+  it("lets the sidecar read the app catalogue while forbidding writes", () => {
+    const catalogueDirectory = "/isolated-grida/agent/model-catalogue";
+    const policy = SidecarSandboxPolicy.build({
+      userData: "/isolated-grida/agent",
+      mediaRoot: "/isolated-grida/media",
+      catalogueDirectory,
+      home: "/Users/test",
+    });
+    expect(policy.filesystem.deny_read).not.toContain(catalogueDirectory);
+    expect(policy.filesystem.deny_write).toContain(catalogueDirectory);
+  });
+
   it("adds literal protected-state read and write denials only when supplied", () => {
     const launch = {
       userData: "/isolated/agent",
@@ -80,6 +92,8 @@ describe("SidecarSandboxPolicy", () => {
       const mediaRoot = path.join(browser, "Media");
       const native = path.join(browser, "chats");
       const agent = path.join(root, "agent");
+      const catalogueDirectory = path.join(browser, "model-catalogue");
+      const catalogue = path.join(catalogueDirectory, "catalogue-v2.json");
       const installed = path.join(
         root,
         "Application Support",
@@ -89,8 +103,8 @@ describe("SidecarSandboxPolicy", () => {
         await import("./retained-service-sandbox");
       try {
         await Promise.all(
-          [mediaRoot, native, agent, installed].map((directory) =>
-            fs.mkdir(directory, { recursive: true })
+          [mediaRoot, native, agent, installed, catalogueDirectory].map(
+            (directory) => fs.mkdir(directory, { recursive: true })
           )
         );
         const protectedFiles = [
@@ -100,6 +114,7 @@ describe("SidecarSandboxPolicy", () => {
         await Promise.all(
           protectedFiles.map((file) => fs.writeFile(file, "retained"))
         );
+        await fs.writeFile(catalogue, "verified catalogue");
         const output = path.join(mediaRoot, "new.bin");
         const script = path.join(root, "probe.cjs");
         await fs.writeFile(
@@ -109,6 +124,8 @@ describe("SidecarSandboxPolicy", () => {
           const fs = require('node:fs');
           fs.writeFileSync(${JSON.stringify(output)}, 'new media');
           assert.equal(fs.readFileSync(${JSON.stringify(output)}, 'utf8'), 'new media');
+          assert.equal(fs.readFileSync(${JSON.stringify(catalogue)}, "utf8"), "verified catalogue");
+          assert.throws(() => fs.writeFileSync(${JSON.stringify(catalogue)}, "changed"), {code: "EPERM"});
           for (const file of ${JSON.stringify(protectedFiles)}) {
             assert.throws(() => fs.readFileSync(file), { code: 'EPERM' });
             assert.throws(() => fs.writeFileSync(file, 'changed'), { code: 'EPERM' });
@@ -120,6 +137,7 @@ describe("SidecarSandboxPolicy", () => {
           userData: agent,
           mediaRoot,
           desktopStateRoot: native,
+          catalogueDirectory,
           protectedStateRoots: [installed],
         });
         const sandbox = new RetainedServiceSandbox({

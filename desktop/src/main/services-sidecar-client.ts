@@ -1,4 +1,5 @@
 import type { ChatModels } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 /**
  * GRIDA-SEC-004 — main-process client for the services sidecar.
  *
@@ -267,7 +268,8 @@ export namespace servicesSidecarClient {
   export function nativeBuiltInByok(
     providerId: string,
     modelId: string,
-    binding?: ChatModels.Binding
+    binding?: ChatModels.Binding,
+    modelCatalogue?: ModelCatalogueSnapshot
   ) {
     const transport = client();
     return NativeProviderSelection.builtInByok(
@@ -277,6 +279,7 @@ export namespace servicesSidecarClient {
         ...nativeAgentByokSettings(),
         hasKey: transport.secrets.has,
         imageRequest: (init) => transport.fetch("/images/generate", init),
+        modelCatalogue,
       },
       binding
     );

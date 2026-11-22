@@ -10,6 +10,7 @@ export type ResolvedImageModel = ImageClient.Resolved;
 export type ResolveImageDeps = {
   secrets: Pick<SecretsStore, "_getKey">;
   catalog?: ModelCatalogStore;
+  runtime_catalogue?: ImageClient.Options["runtime_catalogue"];
   gg_catalog?: GGDiscoveryStore;
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
@@ -56,6 +57,7 @@ export async function resolveImageModel(
     // remote downloads still require a supplied host transport.
     http: deps.provider_http ?? new ProviderHttp(),
     catalog: deps.catalog,
+    runtime_catalogue: deps.runtime_catalogue,
     gg_catalog: deps.gg_catalog,
     gg: deps.gg,
     gg_base_url: deps.gg_base_url,
