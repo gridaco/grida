@@ -562,15 +562,55 @@ every main-process IPC handler validates `event.senderFrame.url`.
 requests and the per-chat automatic reviewer. The host records each requested
 effect, captured authority and exact operation. It validates the retained answer,
 file identity or prepared command, current controls and authority before dispatch.
-Settings writes stay with the person. Failure, timeout or incomplete evidence
-leaves an eligible wait open for a manual decision. A scoped external read uses
-a verified descriptor and checks the file version before disclosing its bytes.
-A network command uses a finite confined process with a supervisor-owned broker
-for its approved destination. Interactive input cannot extend that grant.
+The [review evidence projection](crates/grida-agent/src/host/approval_review/evidence.rs)
+uses the preceding assistant message for context. It checks publication order
+and the conversation known at submission. Structured questions keep assistant
+text separate from the person's answer. A manual approval requires a decision
+bound to its pending request. [Reconsideration](crates/grida-agent/src/host/reconsideration.rs)
+requires an exact denial the client can display without masking or truncation.
+Settings writes stay with the person. A scoped assessment that denies, times out
+or exhausts its technical retries blocks the action. A separate, actionable
+human request handles evidence that the reviewer cannot represent. For command
+assessments with an existing shell read grant, the host can run a bounded,
+offline command under the turn’s filesystem read ceiling. This can include
+ordinary files outside the workspace. Protected and revoked locations remain
+inaccessible. Private scratch is its only write scope. The reviewer has no
+foreground terminal handles or escalation route. An eligible file-only profile
+uses the protected, descriptor-relative primary-workspace reader instead.
+
+The captured model provider receives bounded observations. Compatible later
+reviews in that chat receive retained observations as quoted, untrusted text.
+A checkpoint cannot inject a tool call or grant authority. Raw results stay
+out of public projections and foreground model context. Replacing the
+active history view or changing the reviewer’s effective settings retires the
+reusable context. The host checks the current action, controls and grants
+before resolving its wait. A scoped external read uses a verified descriptor
+and checks the file version before disclosing its bytes.
+Ordinary Act commands in a managed profile receive a host-owned, authenticated
+CONNECT proxy. Launching the command grants no destination.
+The sandbox permits only the bound IPv4 loopback proxy endpoint on macOS
+and a private loopback ingress backed by a protected Unix socket on Linux.
+The host records and checks each exact DNS host and port before resolving or
+dialing a verified public address. A decision applies to one command process,
+including all connections it makes to that destination. Cancelling or ending
+the process revokes the credential and closes the tunnels. Pending decisions
+from a previous execution owner are withdrawn on resumption. Sensitive
+transfers require authority for the data and destination.
 Electron Main retains scoped approval objects and issues opaque frame-local tokens.
 
-**Explicit Full access.** The ordinary restricted profile retains all command
-and filesystem exclusions below. A trusted launch can separately opt into
+**Reviewed command retry.** A trusted launcher can opt in with
+`allowCommandEscalation` or `--allow-reviewed-command-retry`. The native host
+captures the prepared shell, working directory, filesystem and network scope.
+The sandbox enforces the filesystem read ceiling, mandatory host exclusions
+and agent metadata restrictions. On macOS, one reviewed TCP listener can use
+its captured port. The command chooses its bind address. Outbound TCP is limited to loopback on
+the same port so the process can check readiness. The automatic reviewer checks
+a local preview's loopback bind. Desktop binds the exact reported effect to its
+one-use approval token. The originating chat owns the closed-stdin process and
+the supervisor can stop it. Later commands use their own captured authority.
+Plan and worker restrictions still apply.
+
+**Explicit Full access.** A trusted launch can separately opt into
 Full access, and Desktop Main requires an in-app confirmation for the exact
 chat before selecting it. In a workspace the review is tied to the current
 attachment. On Home, Main validates the registered destination and binds a
@@ -583,19 +623,19 @@ without an attachment or a send capability. The private,
 negotiated permission-mode operation is not a model tool. The host records the
 per-chat selection at a serialized admission boundary. Running turns, queued
 inputs and worker assignments keep their captured posture. New chats start
-restricted. Only a turn with captured Full access can interact with a process
-launched unconfined. The supervisor can still list and stop the chat's processes.
+restricted. Only a turn with captured Full access can drive a process launched in that
+mode. The supervisor can still list and stop the chat's processes.
 
 Full access deliberately removes model-command filesystem, network and IPC
 confinement. Same-user code can read or modify local credentials, Grida state,
 installed files and other same-user processes wherever OS permissions allow.
 Private file modes and cleared environments do not isolate these resources
 from that code. The command-level exclusions in GRIDA-SEC-004 and
-GRIDA-SEC-014 therefore apply to restricted execution, not this explicit
-posture. The renderer bridge, retained-sidecar sandbox and purpose-bound
-provider transport remain in force; none is widened to provide the escape
-hatch. Full access adds no OS privilege elevation or automatic credential
-injection and does not require automatic approval review.
+GRIDA-SEC-014 protect confined executions, including approved escalation.
+The renderer bridge, retained-sidecar sandbox and purpose-bound provider
+transport keep their own boundaries. Full access adds no OS privilege
+elevation or automatic credential injection and does not require automatic
+approval review.
 
 The native helper provides process ownership, input/output bounds, terminal
 interaction, deadlines and best-effort cleanup for unconfined launches. Its
@@ -624,7 +664,7 @@ its chat is deleted, or the host shuts down. Kept processes run under a
 Processes keep their launch posture. Within a compatible turn, the launch
 approval covers terminal input. A policy that must review every command
 should refuse interactive terminals. The host reports unverified cleanup at
-shutdown and lets the queue proceed. Filesystem grants, network denial, private
+shutdown and lets the queue proceed. Filesystem grants, network scope, private
 temporary storage, and the termination guarantee come from the host and
 native sandbox.
 A host profile can let programs read and execute anywhere except its protected
@@ -633,7 +673,8 @@ paths (disk read) and start from the host's environment minus Grida's own
 with. The host's state, the profile file, the credential home,
 `GRIDA_HOME` and `~/.grida` stay read-and-write protected, so disk read never
 reaches them; the sandbox expresses each as an exclusion of every grant rather
-than relying on rule order. Version-control and agent metadata (`.git`,
+than relying on rule order. Under the default file scope, version-control
+and agent metadata (`.git`,
 `.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
 read-only once it exists when the command starts; agent configuration
 (`.grida`, `.codex`) is protected even before it exists. On Linux the sandbox
@@ -750,9 +791,9 @@ login PTY — arbitrary code execution by design, accepted under the same
 trust model as VSCode's integrated terminal: the human runs commands as
 themselves, on their own machine, with their own privileges (no
 escalation). It is deliberately NOT wrapped in an agent sandbox and
-deliberately NOT part of the agent's tool surface — the agent's Default command tool
-stays confined by the native command sandbox, explicit Full access uses its
-separate owned unconfined process path, and no code path hands the
+deliberately NOT part of the agent's tool surface. The agent's restricted
+commands, including approved escalation, use the native sandbox. Explicit
+Full access uses the supervised unconfined backend. No code path hands the
 agent a handle to a human terminal. What makes the surface acceptable is that
 only the legitimate desktop renderer can reach it: the four terminal IPC
 channels are registered through the same sender-frame `guarded()` wrapper
@@ -949,7 +990,8 @@ pixels through this reader, with no additional filesystem or model grant.
   [helper posture protocol](crates/agent-kit-sandbox/src/wire.rs). These add an
   explicitly confirmed unconfined path without relaxing restricted execution
   or retained-service containment. Headless evidence lives in the
-  [permission-mode process tests](crates/grida-agent/tests/process/full_access.rs).
+  [permission-mode process tests](crates/grida-agent/tests/process/full_access.rs) and
+  [one-command approval cases](crates/grida-agent/tests/process/approvals/escalation.rs).
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
   builds the locked Rust host and helper, strips only staged copies and verifies
@@ -2123,6 +2165,7 @@ Today:
 - The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
 - The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while a reviewed hook check's command cleanup is pending; unverified hook cleanup stops automatic queue advancement. Model command processes belong to their chat and do not hold the slot; deletion and host shutdown clean them up. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
 - Trusted launch configuration can select [automatic review](crates/grida-agent/src/host/approval_review.rs) for one exact file read already governed by `ask`. The [review policy](crates/grida-agent-master/src/approval_review.rs) bounds the evidence and gives the selected provider no tools, absolute root, or file content. Only a valid retained result on the same action, scope, control, and history basis can answer the ordinary pending approval. Manual decisions and current file grants still govern. The host filters reviewer output before the public stream. [Built tests](crates/grida-agent/tests/process/approvals/reviewer.rs) cover exact scope, manual precedence, restart, and interruption.
+- In per-chat Auto mode the [review coordinator](crates/grida-agent/src/host/approval_review.rs) binds a private provider dispatch to the exact action. The [investigation](crates/grida-agent/src/host/approval_review/investigation.rs) offers the [confined shell](crates/grida-agent/src/permissions/review_shell.rs) when the turn captured the necessary grant, or the [bounded file reader](crates/grida-agent/src/permissions/review_files.rs) when only a file read is available. The [review session](crates/grida-agent/src/host/approval_review/session.rs) and [private checkpoint store](crates/agent-kit-store-sqlite/src/checkpoint.rs) bind retained evidence to one chat, history view and compatible permissions and model settings. Only a durably answered trunk review can publish its next checkpoint. [Store cases](crates/agent-kit-store-sqlite/tests/store/checkpoint.rs) and [host cases](crates/grida-agent/tests/process/approvals/reviewer.rs) cover recovery, ownership and retired context.
 - The [native ACP confinement fixtures](crates/grida-agent/tests/process/approvals/confinement.rs) retarget a folder alias into a protected root during approval and verify both direct and aliased reads and writes are refused under Seatbelt or bubblewrap. The Linux cases probe socket denial inside the command namespace and verify detached work stops, retaining explicit uncertainty when native cleanup cannot be confirmed.
 - Each [shared ACP listener](crates/grida-agent/src/acp/websocket.rs) has one bearer and one trusted Host. Deploy independent authorities as separate processes with separate private state, listener tokens, provider grants and workspace profiles. The [built deployment fixtures](crates/grida-agent/tests/process/approvals/deployments.rs) exercise cross-token and cross-session refusal, duplicate state ownership, separate provider routing, and concurrent native command scopes. Whole-host containment depends on the deployment's own filesystem and network isolation.
 - The native [workspace bindings](crates/grida-agent/src/workspace.rs) and [retained input store](crates/grida-agent/src/scratch.rs) separate captured locations from current grants and enforce supplied protected roots. Working-copy receipts retain their source identity. [Workspace tests](crates/grida-agent/tests/workspace.rs) and [scratch tests](crates/grida-agent/tests/scratch.rs) exercise replacement, traversal, private publication and restart.
@@ -4146,8 +4189,10 @@ grant custody and cleanup.
 ### `GRIDA-SEC-014` — Shared native provider credential boundary
 
 Scoped command review receives the names of environment variables and the
-prepared filesystem grants. Environment values, proxy credentials and the
-private protected-path inventory are excluded from the review payload. A
+prepared filesystem grants. An escalated command includes its effective
+confined scope, command, resolved shell and working directory, environment
+variable names and justification. The review excludes environment values,
+proxy credentials and the private protected-path inventory. A
 one-file approval rechecks the host’s protected paths, including the adopted
 credential home, before returning bytes.
 
@@ -4272,9 +4317,10 @@ durable or discard unrelated OAuth records.
    long-lived credential host retains custody access. Native read-only
    adapters require a current directory grant and recheck supplied protected
    roots before opening a target and delivering results. The native permission
-   profile carries the same protected paths into finite command confinement.
-   An approve-once decision remains bounded by those denials. No renderer can
-   configure or remove these protections.
+   profile carries the same protected paths into command confinement. An
+   approval of a confined operation remains bounded by those denials,
+   including an approved command that updates version-control metadata. No
+   renderer can configure or remove these protections.
    The [native launch profile](crates/grida-agent/src/launch_permissions.rs)
    is selected by the supervisor and read from a private canonical file. It
    adds fixed denials for host state, the profile file, and credential homes.
@@ -4282,10 +4328,10 @@ durable or discard unrelated OAuth records.
    write them. A session working directory only selects an exact matching
    profile. Chat input and workspace content confer no grants. The protected
    agent settings file (GRIDA-SEC-004) stays outside every restricted
-   command scope and accepts only reviewed defaults. Explicit Full
-   access relinquishes these command and file-tool exclusions; ordinary-user
-   unconfined code may reach readable credential files and mutate application
-   state. It does not receive keys automatically through the provider bridge.
+   command scope and accepts only reviewed defaults. Full access relinquishes
+   command and file-tool exclusions. Ordinary-user unconfined code can reach
+   readable credential files and mutate application state. The provider
+   bridge keeps custody of its keys.
    The [Desktop launch adapter](desktop/src/main/native-agent-permissions.ts)
    publishes owner-only profiles from canonical main-selected roots and
    protects the native state and additional custody paths. The profile path

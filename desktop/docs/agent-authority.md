@@ -279,9 +279,9 @@ are never adopted as removable user data by a later launch.
 
 ## Raw execution and extensions
 
-Desktop workspace chats start in Default. A compatible launcher also offers
-Approve for me and explicitly confirmed Full access. Main stages `allowFullAccess` as a launch capability, not an
-initial selection. Its guarded permission-mode bridge uses an in-app
+New Desktop workspace chats start with sandboxed execution and automatic
+review when supported. A person can select manual review or explicitly
+confirm Full access. Main stages `allowFullAccess` as a launch capability. Its guarded permission-mode bridge uses an in-app
 confirmation bound to the attached chat before enabling Full access. The Rust
 host retains that chat's choice and captures it with accepted work and worker
 assignments. New chats begin restricted. On Welcome, Main reserves a new chat
@@ -310,19 +310,37 @@ negotiated operation keep Default.
 Approve for me delegates individual decisions to the chat’s captured model and
 connection. Main checks the installed binary before offering scoped approvals
 for a new project chat. An attached chat reports its own available modes.
-The original workspace sandbox, protected paths and manual settings approvals
-remain in force. The file tool can ask for a descriptor-checked outside file.
-A finite command can request one brokered public destination. The broker and
-native sandbox enforce that grant on macOS and Linux. When private review
-cannot decide, Main exposes the original native wait to the frame and accepts
-a one-time answer. The [permission guide](../../docs/agent/permissions.md#choose-who-reviews-extra-access)
-describes the user-facing behavior.
+The workspace sandbox and protected paths apply to ordinary commands. The
+person reviews settings changes. The file tool can ask for a descriptor-checked outside file.
+A finite command can request one brokered public destination. The reviewer
+can infer the need for the exact destination from the authorized action.
+Sensitive transfers require authorization for the data and destination.
+The broker and native sandbox enforce the grant on macOS and Linux.
+Main shows a running review as activity. It offers **Allow once** and **Decline**
+when the host hands the decision to the person. For a connection requested by a
+running command, the broker opens a separate wait for that answer. The host
+blocks the action if the review times out or exhausts its retries. See the
+[automatic review contract](../../docs/wg/ai/agent/permissions.md#automatic-review)
+and the [permission guide](../../docs/agent/permissions.md#choose-who-reviews-extra-access).
+
+Main probes the installed command host for `--allow-reviewed-command-retry`
+before offering reviewed retries in workspace Act turns. The approval identifies
+the command, shell, working folder, filesystem access, network scope,
+environment variable names and the agent's justification. Main retains
+that evidence behind the attachment-bound one-use review token. Renderers
+that request the command-retry format get the complete scope. Earlier
+renderers can decline the request through the same attachment. A changed
+effect for a wait invalidates earlier review tokens for that wait.
+A macOS request can include one TCP listener and connections to the same port
+on loopback. The command controls the bind address. Host filesystem exclusions
+and other outbound network restrictions still apply. The closed-stdin pipe session can outlive the turn. The chat
+retains its selected permission mode.
 
 Default model commands run through the Rust host and native sandbox helper. The host
 captures explicit directory permissions, protected paths, trusted executable
-identity, deadlines and bounded output. Plan withholds command execution. A
-profile denies the shared provider credential root (GRIDA-SEC-014) alongside
-host state and other protected paths; additional access cannot override it. A
+identity, deadlines and bounded output. Plan offers finite read-only,
+offline inspection. Confined commands exclude the shared provider credential
+root (GRIDA-SEC-014), host state and other protected paths. A
 failed or unavailable boundary refuses the command rather than selecting an
 unconfined executor. Native macOS/Linux confinement, cancellation and trusted
 checks have built-process coverage.
@@ -339,13 +357,13 @@ unqualified platform into a supported execution environment.
 
 Raw networking follows these postures:
 
-| Workload                                   | Default                                                                                   | Host-route requirement                                                                                                                             |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell or script under Default              | Network denied                                                                            | A designed, granted HTTP capability may use the native service; arbitrary TCP remains unavailable without a conforming enforcer.                   |
-| Shell or script under explicit Full access | Unconfined ordinary-user networking                                                       | The launched software owns routing and proxy support; no managed network isolation is claimed.                                                     |
-| External ACP agent                         | Withheld in Desktop until its fixed endpoints and client route/trust can both be enforced | A static environment proxy is not advertised as system-PAC compatibility.                                                                          |
-| Local MCP / extension                      | Confined filesystem/process with no egress grant                                          | Exact egress grants are enforced per worker. The user may separately choose a visible, revocable unmanaged-network grant for that extension alone. |
-| Install-time resolver or lifecycle script  | Inert acquisition only                                                                    | Any executable install step is a separate confined workload with its own egress grant.                                                             |
+| Workload                                  | Default                                                                                   | Host-route requirement                                                                                                                             |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell or script under Default             | Network denied                                                                            | A designed, granted HTTP capability may use the native service; arbitrary TCP remains unavailable without a conforming enforcer.                   |
+| Shell or script under Full access         | Unconfined ordinary-user networking                                                       | The launched software owns routing and proxy support; no managed network isolation is claimed.                                                     |
+| External ACP agent                        | Withheld in Desktop until its fixed endpoints and client route/trust can both be enforced | A static environment proxy is not advertised as system-PAC compatibility.                                                                          |
+| Local MCP / extension                     | Confined filesystem/process with no egress grant                                          | Exact egress grants are enforced per worker. The user may separately choose a visible, revocable unmanaged-network grant for that extension alone. |
+| Install-time resolver or lifecycle script | Inert acquisition only                                                                    | Any executable install step is a separate confined workload with its own egress grant.                                                             |
 
 An unmanaged-network extension grant is not called sandboxed networking. It
 means Grida does not intercept that extension's network stack; the extension is

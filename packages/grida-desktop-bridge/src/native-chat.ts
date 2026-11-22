@@ -728,6 +728,13 @@ export type NativeChatTurnRecord = Readonly<{
   approvalReviews?: readonly Readonly<{
     decision: "reviewing" | "approved" | "declined" | "needs_human";
     action: string;
+    /** Present only on a policy denial eligible for user-requested reconsideration. */
+    reviewId?: string;
+    reconsidered?: true;
+    userAuthorization?: "unknown" | "low" | "medium" | "high";
+    failure?: NativeApprovalReviewFailure;
+    riskLevel?: "low" | "medium" | "high" | "critical";
+    rationale?: string;
   }>[];
   /** The turn's input started a goal. */
   goalStart?: true;
@@ -943,7 +950,7 @@ export type NativeChatControlReceipt = Readonly<{
   journalPosition: number;
 }>;
 
-/** Captured filesystem and environment reach of a single finite command. */
+/** Captured filesystem and environment reach of one command. */
 export type NativeChatCommandScope = Readonly<{
   diskRead: boolean;
   resolvedExecutable: string;
@@ -971,10 +978,30 @@ export type NativeChatApprovalAction =
       command: string;
       executable: string;
       cwd: string;
+      sandboxPermissions?: "use_default";
+      process?: "session" | "terminal";
+      managedNetwork?: true;
       access: "read" | "read_write";
       network?: Readonly<{ host: string; port: number }>;
       scope?: NativeChatCommandScope;
+    }>
+  | Readonly<{
+      tool: "exec_command";
+      command: string;
+      executable: string;
+      cwd: string;
+      sandboxPermissions: "require_escalated";
+      justification: string;
+      environmentNames: readonly string[];
+      scope?: NativeChatCommandScope;
+      access?: "read" | "read_write";
+      network?: NativeChatEscalatedCommandNetwork;
     }>;
+
+export type NativeChatEscalatedCommandNetwork =
+  | Readonly<{ kind: "denied" }>
+  | Readonly<{ kind: "managed" }>
+  | Readonly<{ kind: "listen"; port: number }>;
 
 export type NativeApprovalReviewFailure =
   | "timed_out"
@@ -1466,10 +1493,19 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     change: NativeChatGoalControl
   ): Promise<NativeChatGoalReceipt>;
+  /** A renderer that can show the complete command retry scope may allow it once. */
   approvals?(
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    acceptsCommandRetries?: true,
+    acceptsManagedOutbound?: true,
+    acceptsCommandSessions?: true
   ): Promise<readonly NativeChatApproval[]>;
+  reconsiderDenial?(
+    attachmentId: string,
+    turnId: string,
+    reviewId: string
+  ): Promise<void>;
   answerApproval?(
     attachmentId: string,
     reviewId: string,

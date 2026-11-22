@@ -66,3 +66,38 @@ pub async fn commit(claim: &ClaimedTurn, id: &str, actions: Vec<JournalAction>) 
     .unwrap();
     claim.lease.journal().commit(change).await.unwrap()
 }
+
+#[allow(dead_code)]
+pub async fn open_wait(claim: &ClaimedTurn, id: &str) -> agent_kit_core::WaitId {
+    use agent_kit_core::turn::{ResponseContract, WaitRecord};
+    let wait = agent_kit_core::WaitId::new(id).unwrap();
+    commit(
+        claim,
+        &format!("open-{id}"),
+        vec![JournalAction::OpenWait(WaitRecord {
+            id: wait.clone(),
+            request: payload("scope"),
+            response: ResponseContract {
+                schema: SchemaId::new("test.text").unwrap(),
+                version: 1,
+            },
+            answer: None,
+            withdrawn: false,
+        })],
+    )
+    .await;
+    wait
+}
+
+#[allow(dead_code)]
+pub async fn answer(claim: &ClaimedTurn, wait: &agent_kit_core::WaitId) {
+    commit(
+        claim,
+        &format!("answer-{}", wait.as_str()),
+        vec![JournalAction::ResolveWait {
+            wait: wait.clone(),
+            answer: payload("decision"),
+        }],
+    )
+    .await;
+}

@@ -92,6 +92,19 @@ async fn removes_only_owned_rows_and_replays_exact_receipt_after_reopen() {
     let input = submission("input", "original input");
     store.submit(session(), input.clone()).await.unwrap();
     let owner = claim(&store, "claim", vec![input.id.clone()]).await;
+    let wait = support::open_wait(&owner, "check").await;
+    let scope = Fingerprint::of(&"scope").unwrap();
+    let private = store
+        .private_context(owner.lease.binding().clone(), scope, wait.clone(), scope)
+        .await
+        .unwrap();
+    support::answer(&owner, &wait).await;
+    assert!(
+        private
+            .publish(payload("private history"), |_| Ok(true))
+            .await
+            .unwrap()
+    );
     let message = user_message();
     commit(
         &owner,
@@ -165,6 +178,8 @@ async fn removes_only_owned_rows_and_replays_exact_receipt_after_reopen() {
     // Removing the session row removes every row it owns; only its
     // retirement remains.
     for sql in [
+        "SELECT count(*) FROM private_checkpoints WHERE session=?1",
+        "SELECT count(*) FROM private_branches WHERE session=?1",
         "SELECT count(*) FROM context_replacements WHERE session=?1",
         "SELECT count(*) FROM history_views WHERE session=?1",
         "SELECT count(*) FROM submissions WHERE session=?1",

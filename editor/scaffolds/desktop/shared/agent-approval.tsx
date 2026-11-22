@@ -32,9 +32,18 @@ export function AgentApprovalPrompt({
   disabled?: boolean;
   onDecision: (decision: NativeChatApprovalDecision) => void | Promise<void>;
 }) {
-  const description =
-    approval.tool === "exec_command"
-      ? approval.network
+  const command = approval.tool === "exec_command" ? approval : undefined;
+  const escalated =
+    command?.sandboxPermissions === "require_escalated" ? command : undefined;
+  const confined =
+    command?.sandboxPermissions !== "require_escalated" ? command : undefined;
+  const scope = command?.scope;
+  const verified =
+    scope && (!escalated || (escalated.access && escalated.network));
+  const description = escalated
+    ? "Allow this command to run with additional access?"
+    : confined
+      ? confined.network
         ? "Allow this command to connect to the requested destination?"
         : "Allow this command to run in the sandbox?"
       : approval.tool === "write_file" || approval.tool === "edit_file"
@@ -61,66 +70,92 @@ export function AgentApprovalPrompt({
           {approval.tool === "exec_command" ? (
             <>
               <div>
-                {approval.network ? (
+                {confined?.network ? (
                   <>
-                    Destination {reviewText(approval.network.host)} port{" "}
-                    {approval.network.port}
+                    Destination {reviewText(confined.network.host)} port{" "}
+                    {confined.network.port}
                   </>
-                ) : (
+                ) : verified && escalated?.network?.kind === "listen" ? (
+                  <>
+                    Incoming TCP on port {escalated.network.port}. The command
+                    chooses the listen address. It can connect to loopback on
+                    that port for readiness checks.
+                  </>
+                ) : verified &&
+                  (escalated?.network?.kind === "managed" ||
+                    confined?.managedNetwork) ? (
+                  "Outbound destinations are approved separately as the command connects."
+                ) : verified ? (
                   "Network access denied"
+                ) : null}
+                {escalated?.access === "read_write" &&
+                  verified &&
+                  escalated.network?.kind === "denied" && (
+                    <p className="font-sans">
+                      This command can change version-control metadata in the
+                      project.
+                    </p>
+                  )}
+                {confined?.process && verified && (
+                  <p className="font-sans">
+                    {confined.process === "terminal"
+                      ? "The command can accept terminal input and may keep running after this turn."
+                      : "The command may keep running after this turn."}
+                  </p>
+                )}
+                {escalated && verified && (
+                  <p className="font-sans">
+                    Protected locations stay restricted. It may keep running
+                    after this turn.
+                  </p>
                 )}
               </div>
+              {escalated && (
+                <div>Reason {reviewText(escalated.justification)}</div>
+              )}
               <div>Command {reviewText(approval.command)}</div>
               <div>
                 Shell{" "}
-                {reviewText(
-                  approval.scope?.resolvedExecutable ?? approval.executable
-                )}
+                {reviewText(scope?.resolvedExecutable ?? approval.executable)}
               </div>
               <div>
-                Working folder{" "}
-                {reviewText(approval.scope?.resolvedCwd ?? approval.cwd)}
+                Working folder {reviewText(scope?.resolvedCwd ?? approval.cwd)}
               </div>
-              {approval.scope ? (
+              {verified ? (
                 <>
                   <div>
-                    {approval.scope.diskRead
+                    {scope.diskRead
                       ? "Can read files outside the project, except protected locations."
                       : "File reads are limited to the listed folders and runtime paths."}
                   </div>
-                  {approval.scope.readRoots.length > 0 && (
+                  {scope.readRoots.length > 0 && (
                     <div>
-                      Read folders{" "}
-                      {approval.scope.readRoots.map(reviewText).join(", ")}
+                      Read folders {scope.readRoots.map(reviewText).join(", ")}
                     </div>
                   )}
                   <div>
-                    {approval.scope.writeRoots.length
+                    {scope.writeRoots.length
                       ? "Writable folders " +
-                        approval.scope.writeRoots.map(reviewText).join(", ")
+                        scope.writeRoots.map(reviewText).join(", ")
                       : "No writable project folders"}
                   </div>
-                  {approval.scope.privateTempWrite && (
+                  {scope.privateTempWrite && (
                     <div>Can write private temporary files.</div>
                   )}
-                  {(approval.scope.runtimeRoots.length > 0 ||
-                    approval.scope.environmentNames.length > 0) && (
+                  {(scope.runtimeRoots.length > 0 ||
+                    scope.environmentNames.length > 0) && (
                     <details>
                       <summary>Runtime paths and environment</summary>
-                      {approval.scope.runtimeRoots.length > 0 && (
+                      {scope.runtimeRoots.length > 0 && (
                         <div>
                           Runtime paths{" "}
-                          {approval.scope.runtimeRoots
-                            .map(reviewText)
-                            .join(", ")}
+                          {scope.runtimeRoots.map(reviewText).join(", ")}
                         </div>
                       )}
-                      {approval.scope.environmentNames.length > 0 && (
+                      {scope.environmentNames.length > 0 && (
                         <div>
                           Environment variables{" "}
-                          {approval.scope.environmentNames
-                            .map(reviewText)
-                            .join(", ")}
+                          {scope.environmentNames.map(reviewText).join(", ")}
                         </div>
                       )}
                     </details>
@@ -128,8 +163,8 @@ export function AgentApprovalPrompt({
                 </>
               ) : (
                 <p>
-                  The host could not verify this command’s filesystem scope.
-                  Decline this request to continue.
+                  The host could not verify this command’s permissions. Decline
+                  this request to continue.
                 </p>
               )}
             </>
@@ -168,9 +203,7 @@ export function AgentApprovalPrompt({
           type="button"
           size="xs"
           className="text-sm font-normal"
-          disabled={
-            disabled || (approval.tool === "exec_command" && !approval.scope)
-          }
+          disabled={disabled || (command !== undefined && !verified)}
           onClick={() => void onDecision("approve_once")}
         >
           Allow once

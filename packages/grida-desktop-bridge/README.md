@@ -351,11 +351,12 @@ the **Ask for approval** presentation without a selection action.
 
 An attached chat can offer **Auto** when its available modes contain
 `approve_for_me`. Selecting it delegates eligible individual decisions and
-preserves command confinement. A private review can leave the original wait
-open for an exact manual answer. Pending approvals may carry `reviewFailure`.
-A finite command includes its filesystem reach and environment names. If that scope is missing, Desktop offers only Decline.
+preserves command confinement. Main issues a review token when the host
+requests a human decision. A live network handoff has its own wait ID.
+Pending approvals may carry `reviewFailure`.
+A command includes its filesystem reach and environment names. A persistent process or interactive terminal carries its process type, and managed network access is disclosed at launch. An older renderer that cannot present the captured scope offers only Decline.
 The transcript's optional `approvalReviews` records the review decisions and
-their bounded action descriptions.
+their bounded action descriptions, optional risk level, user authorization, rationale and failure. A supporting host exposes a `reviewId` on an eligible denial. The optional `reconsiderDenial(attachmentId, turnId, reviewId)` records the user’s request to review that exact action again. The transcript reports `reconsidered: true` after acknowledgment. This call starts no work and grants no permission.
 
 New hosts optionally expose `selection(target)`, `updateSelection(...)`, and
 `createFromDraft(draftId)`. A target names exactly one saved `sessionId` or

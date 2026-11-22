@@ -81,21 +81,7 @@ pub const RESUMED_GUIDANCE: &str = "The user paused the previous response and th
 /// The transcript keeps showing the interrupted text.
 pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     let records = project(state);
-    let mut interrupted = BTreeSet::new();
-    for operation in state.operations().values() {
-        if let Some(OperationOutcome::Inference(outcome)) = operation.outcome()
-            && outcome.status == InferenceStatus::Interrupted
-            && outcome.failure.as_ref().is_some_and(person_interruption)
-        {
-            interrupted.extend(
-                outcome
-                    .messages
-                    .iter()
-                    .filter(|item| item.role == Role::Assistant)
-                    .map(|item| item.id.clone()),
-            );
-        }
-    }
+    let interrupted = interrupted_responses(state);
     let mut output = Vec::with_capacity(records.len() + 1);
     let mut previous_dropped = false;
     for record in records {
@@ -134,6 +120,26 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
         }
     }
     output
+}
+
+/// Assistant messages cut off when the person stopped or paused a response.
+pub fn interrupted_responses(state: &TurnState) -> BTreeSet<MessageId> {
+    let mut interrupted = BTreeSet::new();
+    for operation in state.operations().values() {
+        if let Some(OperationOutcome::Inference(outcome)) = operation.outcome()
+            && outcome.status == InferenceStatus::Interrupted
+            && outcome.failure.as_ref().is_some_and(person_interruption)
+        {
+            interrupted.extend(
+                outcome
+                    .messages
+                    .iter()
+                    .filter(|item| item.role == Role::Assistant)
+                    .map(|item| item.id.clone()),
+            );
+        }
+    }
+    interrupted
 }
 
 /// A pause or stop from the person. Other cancellations, such as an

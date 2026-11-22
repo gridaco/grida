@@ -758,7 +758,10 @@ function NativeChatPane({
     !turn.cancelled &&
     (state.pausing === turn.turnId || turn.paused);
   const approval =
-    turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
+    turn &&
+    (turn.disposition === "suspended" || (running && turn.inputNeeded)) &&
+    !turn.paused &&
+    !turn.cancelled
       ? state.approvals[0]
       : undefined;
   const questions = turn && !turn.cancelled ? state.questions : [];
@@ -1039,6 +1042,15 @@ function NativeChatPane({
                     block={block}
                     showModelChanges={!controller.fixedSession}
                     approvalReviews={records.get(block.turnId)?.approvalReviews}
+                    onReconsider={
+                      controller.canReconsiderDenials
+                        ? (reviewId) =>
+                            void controller.reconsiderDenial(
+                              block.turnId,
+                              reviewId
+                            )
+                        : undefined
+                    }
                     renderMessage={renderMessage}
                     loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(

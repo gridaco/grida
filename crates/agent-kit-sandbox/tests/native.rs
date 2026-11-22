@@ -97,6 +97,7 @@ impl Fixture {
             temporary_parent: self.temporary.clone(),
             termination: Termination::ProcessGroup,
             disk_read: false,
+            listen_port: None,
         }
     }
 
@@ -2011,6 +2012,132 @@ async fn finite_proxy_grant_reaches_only_the_protected_socket() {
     );
     assert!(
         tokio::time::timeout(Duration::from_millis(25), local.accept())
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+#[cfg_attr(target_os = "linux", ignore = "requires bubblewrap")]
+async fn managed_http_proxy_is_the_only_route_for_parallel_session_connections() {
+    use tokio::net::{TcpListener, UnixListener};
+
+    let fixture = Fixture::new();
+    let secret = "0123456789abcdef0123456789abcdef";
+    #[cfg(target_os = "macos")]
+    let (proxy, listener) = {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = HttpProxy::Loopback {
+            port: listener.local_addr().unwrap().port(),
+            password: secret.into(),
+        };
+        (proxy, listener)
+    };
+    #[cfg(target_os = "linux")]
+    let (proxy, listener) = {
+        let socket = fixture.outside.join("proxy.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let proxy = HttpProxy::Unix {
+            socket,
+            password: secret.into(),
+        };
+        (proxy, listener)
+    };
+    let local = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let sibling_socket = fixture.workspace.join("unrelated.sock");
+    let sibling = UnixListener::bind(&sibling_socket).unwrap();
+    let protected = fixture.outside.join("secret");
+    fs::write(&protected, "protected fixture").unwrap();
+    #[cfg(target_os = "macos")]
+    let sibling_family = TcpListener::bind(("::1", listener.local_addr().unwrap().port()))
+        .await
+        .unwrap();
+    #[cfg(target_os = "macos")]
+    let other_family_check = format!(
+        "if /usr/bin/curl --noproxy '*' --max-time 1 -sf 'http://{}/'; then exit 24; fi",
+        sibling_family.local_addr().unwrap()
+    );
+    #[cfg(target_os = "linux")]
+    let other_family_check = "";
+    let script = format!(
+        "if /bin/cat '{}' 2>/dev/null; then exit 21; fi
+         if /usr/bin/curl --noproxy '*' --max-time 1 -sf http://{}/; then exit 22; fi
+         if /usr/bin/curl --noproxy '*' --unix-socket '{}' --max-time 1 -sf http://localhost/; then exit 23; fi
+         {other_family_check}
+         /usr/bin/curl --max-time 5 -fsS http://feed.example/metadata & first=$!
+         /usr/bin/curl --max-time 5 -fsS http://feed.example/artifact & second=$!
+         wait \"$first\" && wait \"$second\"",
+        protected.display(),
+        local.local_addr().unwrap(),
+        sibling_socket.display()
+    );
+    let mut scope = fixture.scope();
+    scope.disk_read = true;
+    let session = fixture
+        .sandbox()
+        .prepare(fixture.command(&script), scope)
+        .unwrap()
+        .spawn_session_with_http_proxy(session_options(false), &proxy, CancellationToken::new())
+        .unwrap();
+    let peer = tokio::spawn(async move {
+        // Hold the first stream until the second arrives to prove parallelism.
+        let (first, _) = listener.accept().await.unwrap();
+        let (second, _) = listener.accept().await.unwrap();
+        let mut targets = Vec::new();
+        for mut client in [first, second] {
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                request.push(client.read_u8().await.unwrap());
+                assert!(request.len() < 4096);
+            }
+            let request = String::from_utf8(request).unwrap();
+            assert!(request.lines().any(|line| {
+                line.eq_ignore_ascii_case("Proxy-Authorization: Basic Z3JpZGE6MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+            }));
+            targets.push(request.lines().next().unwrap().to_owned());
+            client
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nfixture",
+                )
+                .await
+                .unwrap();
+        }
+        targets.sort();
+        assert_eq!(
+            targets,
+            [
+                "GET http://feed.example/artifact HTTP/1.1",
+                "GET http://feed.example/metadata HTTP/1.1"
+            ]
+        );
+    });
+    let (output, ended) = read_until(&session, Duration::from_secs(8), |_| false).await;
+    assert!(ended, "proxy command did not finish: {output:?}");
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Exited(0),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
+    assert_eq!(output, b"fixturefixture");
+    tokio::time::timeout(Duration::from_secs(1), peer)
+        .await
+        .expect("managed proxy did not relay both connections")
+        .unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), local.accept())
+            .await
+            .is_err()
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), sibling.accept())
+            .await
+            .is_err()
+    );
+    #[cfg(target_os = "macos")]
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), sibling_family.accept())
             .await
             .is_err()
     );

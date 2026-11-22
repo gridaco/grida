@@ -185,9 +185,9 @@ export class NativeAgentTerminationPending extends Error {
 }
 
 export class NativeAgentProcess {
-  private static readonly scopedApprovalProbes = new Map<
+  private static readonly approvalProbes = new Map<
     string,
-    { identity: string; supported: Promise<boolean> }
+    { identity: string; supported: Promise<ReadonlySet<string>> }
   >();
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
@@ -227,6 +227,7 @@ export class NativeAgentProcess {
   private activityOrder = false;
   private optionalQuestions = false;
   private questionBatches = false;
+  private reconsiderDenials = false;
   private readonly questionBatchPreference = new AsyncLocalStorage<boolean>();
   private catalogQuery = false;
   private modelChange = false;
@@ -369,6 +370,10 @@ export class NativeAgentProcess {
 
   get acceptsOptionalQuestions(): boolean {
     return this.connected && this.optionalQuestions;
+  }
+
+  get acceptsReconsideration(): boolean {
+    return this.connected && this.reconsiderDenials;
   }
 
   get acceptsQuestionBatches(): boolean {
@@ -545,23 +550,24 @@ export class NativeAgentProcess {
     if (process.platform !== "darwin" && process.platform !== "linux")
       return false;
     try {
-      return await this.supportsScopedApprovalLaunch(
+      const options = await this.approvalLaunchOptions(
         this.executable(resourcesPath)
       );
+      return options.has("--allow-scoped-approvals");
     } catch {
       return false;
     }
   }
 
   /** The switch is parsed before ACP can advertise the host's permission modes. */
-  private static async supportsScopedApprovalLaunch(
+  private static async approvalLaunchOptions(
     executable: string
-  ): Promise<boolean> {
+  ): Promise<ReadonlySet<string>> {
     const [installed, file] = await Promise.all([
       fs.promises.realpath(executable).catch(() => undefined),
       fs.promises.lstat(executable, { bigint: true }).catch(() => undefined),
     ]);
-    if (!installed || !file?.isFile()) return false;
+    if (!installed || !file?.isFile()) return new Set();
     const identity = [
       file.dev,
       file.ino,
@@ -569,9 +575,9 @@ export class NativeAgentProcess {
       file.mtimeNs,
       file.ctimeNs,
     ].join("/");
-    const cached = this.scopedApprovalProbes.get(installed);
+    const cached = this.approvalProbes.get(installed);
     if (cached?.identity === identity) return cached.supported;
-    const supported: Promise<boolean> = readAgentHelp(
+    const supported: Promise<ReadonlySet<string>> = readAgentHelp(
       executable,
       ["serve", "--help"],
       {
@@ -583,17 +589,23 @@ export class NativeAgentProcess {
         windowsHide: true,
       }
     )
-      .then(({ stdout }) =>
-        /^[ \t]*--allow-scoped-approvals[ \t]*\r?$/m.test(stdout)
+      .then(
+        ({ stdout }) =>
+          new Set(
+            Array.from(
+              stdout.matchAll(/^[ \t]*(--allow-[\w-]+)[ \t]*\r?$/gm),
+              (match) => match[1]
+            )
+          )
       )
       .catch(() => {
         // A timeout or process error can clear on a later launch.
-        if (this.scopedApprovalProbes.get(installed)?.supported === supported) {
-          this.scopedApprovalProbes.delete(installed);
+        if (this.approvalProbes.get(installed)?.supported === supported) {
+          this.approvalProbes.delete(installed);
         }
-        return false;
+        return new Set<string>();
       });
-    this.scopedApprovalProbes.set(installed, { identity, supported });
+    this.approvalProbes.set(installed, { identity, supported });
     return supported;
   }
 
@@ -782,12 +794,22 @@ export class NativeAgentProcess {
       args.push("--permission-profile", permissionProfile.profile);
     // Keep the content-derived profile path stable for work accepted by an
     // earlier binary. The launcher selects additional per-action capabilities.
+    const approvalOptions = permissionProfile?.scopedAccess
+      ? await this.approvalLaunchOptions(executable)
+      : undefined;
     const scopedAccess =
       permissionProfile?.scopedAccess &&
-      (await this.supportsScopedApprovalLaunch(executable))
-        ? permissionProfile.scopedAccess
+      approvalOptions?.has("--allow-scoped-approvals")
+        ? {
+            ...permissionProfile.scopedAccess,
+            commandEscalation: approvalOptions.has(
+              "--allow-reviewed-command-retry"
+            ),
+          }
         : undefined;
     if (scopedAccess) args.push("--allow-scoped-approvals");
+    if (scopedAccess?.commandEscalation)
+      args.push("--allow-reviewed-command-retry");
     const environment = nativeEnvironment();
     if (options.mcp) {
       if (!options.workspace || !options.gatewayScope)
@@ -835,6 +857,9 @@ export class NativeAgentProcess {
             clientCapabilities: {
               _meta: {
                 ...capabilities,
+                ...(permissionProfile && {
+                  [NativeAgentPermissions.reconsideration]: 1,
+                }),
                 ...(routeImages && { [NativeImageGeneration.capability]: 1 }),
                 ...((imageGeneration?.supportsReference || routeImages) && {
                   [NativeImageGeneration.referenceCapability]: 1,
@@ -932,6 +957,9 @@ export class NativeAgentProcess {
       }
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
+      processOwner.reconsiderDenials =
+        !!permissionProfile &&
+        advertised?.[NativeAgentPermissions.reconsideration] === 1;
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
       processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
       processOwner.optionalQuestions =

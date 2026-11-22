@@ -10,11 +10,24 @@ use tokio::process::{ChildStdin, ChildStdout};
 mod confinement;
 #[path = "approvals/deployments.rs"]
 mod deployments;
+#[path = "approvals/escalation.rs"]
+mod escalation;
 #[path = "approvals/reviewer.rs"]
 mod reviewer;
 
 const LIST: &str = "co.grida/session/approvals";
 const ANSWER: &str = "co.grida/session/answer-approval";
+
+/// Current authorization evidence follows any replayed private reviewer conversation.
+fn current_review_message(wire: &Value) -> &Value {
+    wire["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|message| message["role"] == "user")
+        .unwrap()
+}
 
 pub(super) struct Fixture {
     _base: TempDir,
@@ -150,7 +163,7 @@ fn initialize() -> Value {
     let meta = request["clientCapabilities"]["_meta"]
         .as_object_mut()
         .unwrap();
-    for key in [LIST, ANSWER] {
+    for key in [LIST, ANSWER, "co.grida/session/reconsider-denial"] {
         meta.insert(key.into(), 1.into());
     }
     request
@@ -380,6 +393,10 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     let ready = ws_rpc(&mut observer, 1, "initialize", initialize()).await;
     assert_eq!(ready["result"]["agentCapabilities"]["_meta"][LIST], 1);
     assert!(ready["result"]["agentCapabilities"]["_meta"][ANSWER].is_null());
+    assert!(
+        ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/reconsider-denial"]
+            .is_null()
+    );
     let loaded = ws_rpc(
         &mut observer,
         2,
@@ -390,6 +407,17 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     )
     .await;
     assert!(loaded.get("error").is_none(), "{loaded}");
+    let unauthorized = ws_rpc(
+        &mut observer,
+        30,
+        "_co.grida/session/reconsider-denial",
+        json!({"sessionId":session,"turnId":turn,"reviewId":"untrusted-control"}),
+    )
+    .await;
+    assert_eq!(
+        unauthorized["error"]["data"], "approval_reviewer_required",
+        "{unauthorized}"
+    );
     let listed = ws_rpc(
         &mut observer,
         3,

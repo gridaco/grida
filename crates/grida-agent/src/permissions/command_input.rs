@@ -67,6 +67,7 @@ impl TurnPermissions {
         Ok((
             Ready {
                 request: ApprovalRequest {
+                    launch_scope: None,
                     session: self.selection.0.clone(),
                     turn: self.selection.1.clone(),
                     operation: admission.operation.clone(),

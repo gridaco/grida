@@ -25,9 +25,9 @@ ask “Run the tests and fix what fails.” The composer shows the current mode.
   your computer, except protected locations such as Grida's own data and
   saved credentials. Act commands can write to the project and temporary
   storage. Ordinary commands have no direct internet access.
-- Existing version-control and agent settings folders, such as `.git`, stay
-  read-only. The agent can start a new repository but cannot commit to an
-  existing one, so run commits yourself.
+- Sandboxed commands can start a new repository. Ordinary commands and
+  listener retries keep existing version-control metadata read-only. An
+  approved offline write can update that metadata. Agent settings stay protected.
 - With the **Plan** badge on, the agent can investigate with confined
   commands and ask questions. Each command finishes within its call, runs
   offline, and can write only to private temporary storage.
@@ -38,12 +38,19 @@ ask “Run the tests and fix what fails.” The composer shows the current mode.
 ## Choose who reviews extra access
 
 New project chats begin in **Auto** when the native host supports it. The
-chat’s model reviews eligible requests for extra access and asks you when it
-needs a decision. Where Auto is unavailable, the chat begins in
+chat’s model reviews eligible actions. Routine steps such as fetching a public
+dependency can proceed automatically. Where Auto is unavailable, the chat begins in
 **Ask for approval**. Older chats without a saved choice continue to ask you.
 
 Open the access picker on Home or in a project chat and choose
 **Ask for approval** to review every request for extra access yourself.
+With **Auto**, you see approval buttons when a request needs your decision.
+For example, a request can reach you if the reviewer cannot fit the instructions
+it needs into its context. When the reviewer denies a request, the activity
+shows why it was blocked. A timeout or service failure also stops the action.
+Successful reviews can happen while a command waits to connect, including
+when an installer contacts several different hosts in a row.
+
 A choice is saved for that chat and applies to messages accepted after the
 change. If Auto becomes unavailable for a chat, the chat switches to
 **Ask for approval**. Select **Auto** again when it becomes available.
@@ -54,21 +61,48 @@ outside file. That approval covers the exact file and verified version.
 Replacing or changing the file requires a fresh decision. The one-file
 route excludes protected locations, symbolic links, and hard-linked files.
 
-On supported macOS and Linux builds a finite command may also request a connection to
-one public hostname and port. For example, name the HTTPS URL when asking
-the agent to check a resource. The command needs a client that supports
-the supplied SOCKS proxy. Review includes the whole command and the files it can read or write. Desktop commands may read outside the project, so approving a destination can allow a command to send data there. Interactive terminals and background sessions
-cannot keep this network permission.
+On supported macOS and Linux builds, a workspace **Act** command starts with a
+managed proxy for outbound HTTPS.
+The first connection to each public hostname and port receives a separate
+decision. If approved, the command can reuse that destination until it ends.
+A request to send sensitive data needs authorization for the data and its
+destination. A command that needs a new destination after its turn closes
+must request access in a new command. Use a cache within the workspace or the
+command's temporary directory if the installer cannot write to its usual cache.
 
-The reviewer considers the proposed action and instructions from your chat,
-including earlier limits such as “keep this project offline.” Each new action
-needs its own decision. If a confined command fails and the agent requests
-network access to retry it, you can see both reviews in the turn’s activity
-when both attempts required review.
-When it needs your decision, the composer shows the target with **Allow once**
-and **Decline**. The turn's activity records automatic decisions. Pause or
-stop a turn to interrupt review. Older Desktop builds show their available
-access choices.
+An **Act** turn can request a reviewed retry when the sandbox blocks needed
+access. For example, if you ask to preview a site on macOS, **Auto** can review
+the command and the TCP port it needs to listen on. Local previews should bind
+to loopback. In **Ask for approval**, you see the command, scope and reason.
+**Allow once** applies to the process. It keeps its filesystem protections.
+The command chooses the address on which it listens. Its outgoing connections
+are limited to the approved port on loopback. Later commands use the chat's
+normal access. Linux supports reviewed workspace writes and
+managed outbound connections.
+
+The reviewer considers the proposed action, your instructions and answers, and
+workspace guidance. To check what a command would do, it can run short,
+read-only commands. For example, it can inspect which script starts a preview.
+It inherits the turn’s read permissions, which in a default Desktop chat can
+include files outside the project. Protected locations stay off limits.
+
+The chat’s selected model provider receives bounded output from these checks.
+The reviewer can reuse earlier findings in the same chat after you reopen it.
+Raw findings stay out of the visible conversation. Each action still needs its
+own decision. A command and a connection it opens can require separate decisions.
+Later instructions such as “keep this project offline” apply even if a review
+was already running.
+
+When a request needs your decision, the composer shows its target with
+**Allow once** and **Decline**. Activity shows the reason for a blocked action.
+An eligible denial offers **Request reconsideration**. Choosing it records your
+instruction for the exact action. If the agent tries it again, Auto reviews it
+under the current permissions. You can pause or stop a turn during review.
+
+The agent may also ask in chat, for example, “Delete `old-export.zip`?
+This will remove the local copy.” If you reply “Yes,” Auto can consider your
+answer when the agent asks to delete that file again. Use the buttons to
+answer an open approval card.
 
 ## Choose Full access
 
@@ -115,8 +149,8 @@ Builds without the picker ask you to review requests for extra access.
 
 ## What the agent cannot reach
 
-With **Auto** or **Ask for approval**, changes outside the project require an
-existing write grant. A one-file read grants no access to neighboring files.
+Sandboxed changes outside the project require an existing write grant.
+A one-file read grants access to that file alone.
 Confined commands need a separate grant for each network destination. You can
 also attach a file to a message.
 [Attach an image or a file](./getting-started.md#attach-an-image)
@@ -140,7 +174,7 @@ turn. If the model cannot decide or its review is interrupted, the request
 waits for you. Pause and Stop still apply during the review.
 [Configure automatic read review](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#review-one-configured-read)
 
-A trusted native launcher can separately opt into Full access. That authority
-comes from the launcher, not a workspace file or model request. See the
+A trusted native launcher can offer one-command escalation and Full access
+independently. It chooses which are available in a workspace. See the
 [native permission profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services)
 for its opt-in fields and the private per-chat selection contract.

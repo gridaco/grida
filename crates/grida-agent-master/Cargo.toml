@@ -11,6 +11,8 @@ agent-kit-core = { path = "../agent-kit-core" }
 agent-kit-runtime = { path = "../agent-kit-runtime" }
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
+tree-sitter = "0.25.10"
+tree-sitter-bash = "0.25.1"
 
 [dev-dependencies]
 agent-kit-sessions = { path = "../agent-kit-sessions" }

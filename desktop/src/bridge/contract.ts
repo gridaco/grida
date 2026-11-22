@@ -224,6 +224,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_START_GOAL: "grida:native-chat:start-goal",
   NATIVE_CHAT_CONTROL_GOAL: "grida:native-chat:control-goal",
   NATIVE_CHAT_APPROVALS: "grida:native-chat:approvals",
+  NATIVE_CHAT_RECONSIDER_DENIAL: "grida:native-chat:reconsider-denial",
   NATIVE_CHAT_ANSWER_APPROVAL: "grida:native-chat:answer-approval",
   NATIVE_CHAT_QUESTIONS: "grida:native-chat:questions",
   NATIVE_CHAT_ANSWER_QUESTION: "grida:native-chat:answer-question",

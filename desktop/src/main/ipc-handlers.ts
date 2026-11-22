@@ -1110,8 +1110,27 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
-    (event, id: string, observation: string) =>
-      nativeChat.approvals(event, id, observation)
+    (
+      event,
+      id: string,
+      observation: string,
+      acceptsCommandRetries?: unknown,
+      acceptsManagedOutbound?: unknown,
+      acceptsCommandSessions?: unknown
+    ) =>
+      nativeChat.approvals(
+        event,
+        id,
+        observation,
+        acceptsCommandRetries,
+        acceptsManagedOutbound,
+        acceptsCommandSessions
+      )
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_RECONSIDER_DENIAL,
+    (event, id: string, turn: string, review: string) =>
+      nativeChat.reconsiderDenial(event, id, turn, review)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,

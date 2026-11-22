@@ -36,6 +36,7 @@ pub(crate) mod prediction;
 pub mod prompt_preview;
 mod questions;
 mod queued_text;
+mod reconsideration;
 mod retained_file;
 mod retained_inputs;
 mod selected_file;
@@ -497,6 +498,9 @@ impl DurableSubmission {
 
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
+    /// The last settled turn known when the host accepted this user input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    preceding_turn: Option<Fingerprint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     initial_instructions: Option<String>,
     /// Older inputs keep the file and process tools admitted before shell exploration.
@@ -778,6 +782,7 @@ struct PreparedInput {
     desktop_tool_sources: Option<discovery::Sources>,
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
+    project_instructions: Option<String>,
     skills: Option<crate::skills::SkillListing>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -2422,6 +2427,9 @@ impl Host {
             )
             .await?;
         let operations = opened.turn.operations();
+        if !closing {
+            approval_review::withdraw_orphaned_network_waits(&operations).await?;
+        }
         if let Some(image) = image {
             image.insert(&mut inventory, &mut authority.tools)?;
         }
@@ -2502,7 +2510,7 @@ impl Host {
         if let Some(file) = file {
             master = master.with_retained_file_check(move || file.check());
         }
-        if !cancellation_only
+        let reviewer = if !cancellation_only
             && prepared.goal.is_none()
             && !prepared.subagent
             && permission_scope.is_some()
@@ -2521,11 +2529,47 @@ impl Host {
                     .and_then(|profile| profile.automatic_read_review().cloned())
                     .map(approval_review::ReviewPolicy::ConfiguredRead),
             };
-            if let Some(policy) = policy {
-                master = master.with_approval_reviewer(Arc::new(
-                    approval_review::AutomaticReview::new(self, policy, execution, provider),
-                ));
-            }
+            policy.map(|policy| {
+                Arc::new(approval_review::AutomaticReview::new(
+                    self,
+                    policy,
+                    execution,
+                    provider,
+                    prepared.project_instructions,
+                    permission_scope
+                        .as_ref()
+                        .map(Arc::downgrade)
+                        .unwrap_or_default(),
+                ))
+            })
+        } else {
+            None
+        };
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if let Some(permissions) = &permission_scope {
+            let operations = operations.downgrade();
+            let reviewer = reviewer.clone();
+            let updates = self.live_updates.clone();
+            permissions.bind_network_review(move |request, stop| {
+                let operations = operations.upgrade();
+                let reviewer = reviewer.clone();
+                let updates = updates.clone();
+                Box::pin(async move {
+                    let Some(operations) = operations else {
+                        return false;
+                    };
+                    // The pending wait belongs to this command. Its cleanup
+                    // must run even if the broker closes its client streams.
+                    tokio::spawn(approval_review::authorize_network(
+                        operations, updates, reviewer, request, stop,
+                    ))
+                    .await
+                    .unwrap_or(false)
+                })
+            });
+        }
+        if let Some(reviewer) = reviewer {
+            master = master.with_approval_reviewer(reviewer);
         }
         if let Some(effort) = prepared.effort {
             master = master
@@ -2717,6 +2761,24 @@ impl Host {
         id: ChangeId,
         parts: Vec<PromptPart>,
         policy: SubmissionPolicy,
+    ) -> Result<Submission> {
+        self.capture_input_with_predecessor(
+            session,
+            id,
+            parts,
+            policy,
+            settled_predecessor(session)?,
+        )
+        .await
+    }
+
+    async fn capture_input_with_predecessor(
+        &self,
+        session: &SessionView,
+        id: ChangeId,
+        parts: Vec<PromptPart>,
+        policy: SubmissionPolicy,
+        preceding_turn: Option<Fingerprint>,
     ) -> Result<Submission> {
         let SubmissionPolicy {
             request_options,
@@ -2953,6 +3015,7 @@ impl Host {
         Ok(Submission {
             id,
             payload: StoredPrompt {
+                preceding_turn: preceding_turn.filter(|_| !child_work),
                 initial_instructions: Some(grida_agent_master::CORE_INSTRUCTIONS.to_owned()),
                 shell_exploration: !child_work,
                 editor_instructions: None,
@@ -3058,6 +3121,7 @@ impl Host {
         let worker;
         let mut retained_file = None;
         let skills;
+        let project_instructions;
         let (
             messages,
             operating_regime,
@@ -3458,6 +3522,11 @@ impl Host {
                         .instructions
                         .push_str(grida_agent_master::effort::PRIMARY_READ_REVIEW_INSTRUCTIONS);
                 }
+                project_instructions = stored
+                    .guidance
+                    .as_ref()
+                    .and_then(|g| g.project_instructions())
+                    .map(str::to_owned);
                 let guidance = stored
                     .guidance
                     .as_ref()
@@ -3500,7 +3569,11 @@ impl Host {
                     }
                     Vec::new()
                 } else {
-                    prompt_input(&input.id, &stored.parts)?
+                    // A child assignment can inherit the parent's captured settings,
+                    // but its instructions were written by the parent agent.
+                    let preceding_turn =
+                        stored.preceding_turn.filter(|_| stored.subagent.is_none());
+                    prompt_input_with_predecessor(&input.id, &stored.parts, preceding_turn)?
                 };
                 (
                     messages,
@@ -3600,6 +3673,7 @@ impl Host {
             desktop_tool_sources,
             image_generation,
             guidance,
+            project_instructions,
             skills,
             goal,
             completion_checks,
@@ -4670,19 +4744,13 @@ async fn drive(
         activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
     let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
     drop(initial);
-    let operations = turn.operations();
-    let mut private_reviews = BTreeSet::from([
-        operations.operation_id(&grida_agent_master::approval_review::operation_key())?
-    ]);
-    for slot in 0..grida_agent_master::approval_review::MAX_SCOPED_REVIEWS {
-        private_reviews.insert(operations.operation_id(
-            &grida_agent_master::approval_review::scoped_operation_key(slot)?,
-        )?);
-    }
-    drop(operations);
-    let mut publish = |update| {
-        if matches!(&update, TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. }
-            if private_reviews.contains(operation))
+    let mut publish = |update, observer: &agent_kit_runtime::TurnObserver| {
+        if let TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. } = &update
+            && !observer.inspect_operation(operation, |record| {
+                !matches!(&record.record.input, agent_kit_core::turn::OperationInput::Inference(request)
+                    if request.request().messages.first().is_some_and(|message|
+                        message.role == Role::System && message.provenance.source == "approval-review"))
+            })
         {
             return;
         }
@@ -4701,7 +4769,7 @@ async fn drive(
             tokio::select! {
                 outcome = &mut run => break outcome,
                 update = observer.next(), if observer_open => match update {
-                    Some(update) => publish(update),
+                    Some(update) => publish(update, &observer),
                     None => observer_open = false,
                 }
             }
@@ -4713,7 +4781,7 @@ async fn drive(
     // buffered updates before publishing the terminal result to the client.
     if observer_open {
         while let Some(update) = observer.next().await {
-            publish(update);
+            publish(update, &observer);
         }
     }
     match outcome? {
@@ -4739,7 +4807,11 @@ async fn drive(
             let state = observer.snapshot().state;
             if state.controls().admits_work() {
                 let questions = questions::pending(&state)?;
-                let approvals = permissions::pending_approvals(&state)?.approvals;
+                let approvals: Vec<_> = permissions::pending_approvals(&state)?
+                    .approvals
+                    .into_iter()
+                    .filter(|approval| !approval.reviewing)
+                    .collect();
                 let library_selections = library::pending(&state)?.selections;
                 if !questions.questions.is_empty()
                     || !approvals.is_empty()
@@ -4939,6 +5011,32 @@ fn prompt_message_id(id: &ChangeId) -> Result<MessageId> {
 }
 
 fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
+    prompt_input_with_predecessor(id, parts, None)
+}
+
+pub(super) fn preceding_turn_fingerprint(
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<Fingerprint> {
+    Fingerprint::of(&("preceding-settled-turn", session, turn))
+}
+
+fn settled_predecessor(view: &SessionView) -> Result<Option<Fingerprint>> {
+    if view.current.is_some() || !view.queued.is_empty() {
+        return Ok(None);
+    }
+    view.latest
+        .as_ref()
+        .filter(|turn| turn.disposition == TurnDisposition::Settled)
+        .map(|turn| preceding_turn_fingerprint(&view.session, &turn.binding.turn))
+        .transpose()
+}
+
+fn prompt_input_with_predecessor(
+    id: &ChangeId,
+    parts: &[PromptPart],
+    preceding_turn: Option<Fingerprint>,
+) -> Result<Vec<Message>> {
     validate_prompt_record(parts)?;
     let content = parts
         .iter()
@@ -4995,7 +5093,7 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
                 .map_or("native-client", |_| message_context::SUPPLIED_SOURCE)
                 .into(),
             kind: ProvenanceKind::Supplied,
-            fingerprint: None,
+            fingerprint: preceding_turn,
         },
     }];
     if let Some(context) = supplied_context {

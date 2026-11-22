@@ -114,7 +114,7 @@ must be listed explicitly and never authorize a production dependency.
 | `agent-kit-providers`    | R1   | `agent-kit-core`, `base64`, `futures-core`, `futures-util`, `serde`, `serde_json`, `url`                                                                                          | none                                           |
 | `agent-kit-sandbox`      | R1   | `agent-kit-core`, `libc`, `serde`, `serde_json`, `sha2`, `tempfile`, `tokio`                                                                                                      | none                                           |
 | `agent-kit-store-sqlite` | R1   | `agent-kit-core`, `agent-kit-sessions`, `rusqlite`, `serde`, `serde_json`, `sha2`, `tokio`                                                                                        | none                                           |
-| `grida-agent-master`     | R2   | `agent-kit-core`, `agent-kit-runtime`, `serde`, `serde_json`                                                                                                                      | `agent-kit-sessions`, `agent-kit-store-sqlite` |
+| `grida-agent-master`     | R2   | `agent-kit-core`, `agent-kit-runtime`, `serde`, `serde_json`, `tree-sitter`, `tree-sitter-bash`                                                                                   | `agent-kit-sessions`, `agent-kit-store-sqlite` |
 | `grida-agent`            | R3   | `agent-kit-core`, `agent-kit-providers`, `agent-kit-runtime`, `agent-kit-sandbox`, `agent-kit-sessions`, `agent-kit-store-sqlite`, `grida-agent-master`, `grida-auth`, `external` | none                                           |
 
 <!-- agent-dependency-budgets:end -->

@@ -186,6 +186,7 @@ impl Fixture {
                         temporary_parent: self.temporary.clone(),
                         termination: Termination::ProcessGroup,
                         disk_read: false,
+                        listen_port: None,
                     },
                     timeout: Duration::from_secs(8),
                 },

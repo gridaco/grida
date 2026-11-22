@@ -99,6 +99,7 @@ jobs:
             src/main/browser-automation.electron.test.ts \
             src/main/live-chat-catalog.test.ts \
             src/main/native-agent-command-profile.test.ts \
+            src/main/native-agent-permissions.test.ts \
             src/main/native-chat-ipc.test.ts \
             src/main/native-agent-chat.test.ts \
             src/main/native-agent-process.test.ts \

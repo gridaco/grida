@@ -943,16 +943,61 @@ results, and wake-up delivery.
 
 ## Permission profiles and automatic review
 
-Approval eligibility, reviewer routing, and enforced access are separate
-contracts. Manual and automatic review can select the same workspace profile
-while changing only the reviewer, so automatic review is a separate decision
-route for eligible approval requests.
+Qualify [automatic review](../../../docs/wg/ai/agent/permissions.md#automatic-review)
+and manual review against the same workspace profile. Verify which requests
+need a decision, who can answer, and what access the executor enforces.
+
+A command reviewer with a captured shell grant can inspect a project script
+or a permitted file outside the project. Exercise both a workspace-only and a
+disk-read profile, additional and revoked roots, protected paths, attempted
+writes and network access. Stopping an inspection or revoking a read must
+drain the process and withhold its output. The file-only grant on an older
+turn stays file-only. The private model request can carry bounded output.
+The foreground request, public activity and transcript must omit it.
+[Shell confinement cases](../src/permissions/review_shell.rs),
+[review lifecycle regressions](../tests/process/approvals/reviewer.rs).
+
+A compatible later review may reuse a committed exchange in the same chat
+after restart. A different chat starts empty. Replacing the active history
+view or changing the reviewer’s effective settings retires the old checkpoint.
+Concurrent actions take independent snapshots. Recover a still-pending
+parallel action after the shared conversation advances and verify it retains
+its original snapshot and cannot publish over the shared one. A stale owner
+cannot restore discarded context. Remove the file after inspection and verify
+that only the next private provider request receives the retained observation.
+Historical observations are quoted as untrusted text. They cannot inject a
+tool call or authorize the current action. After an input-limit error, one
+retry can drop whole prior exchanges while preserving the current action
+and observations.
+[Private checkpoint cases](../../agent-kit-store-sqlite/tests/store/checkpoint.rs),
+[provider and restart cases](../tests/process/approvals/reviewer.rs).
 
 The native host keeps an executor with immutable scope, independently validated
 roots, and OS sandbox creation, and its supervised approval flow preserves the
 exact request and consuming run. An automatic reviewer adds a separate decision
 route. [Command confinement](./rust-sandbox.md),
 [Approval confinement tests](../tests/process/approvals/confinement.rs).
+
+A restricted Act turn can request a reviewed retry in a workspace with no
+version-control metadata. The [command retry process
+cases](../tests/process/approvals/escalation.rs) require an exact fresh decision
+and one launch after approval replay. They exercise a denied read of protected
+host state, an ordinary workspace write, and replacement of the working
+directory while approval is pending. On macOS, they also verify that a reviewed
+listener serves HTTP on the approved loopback port. The process still cannot
+bind a different port or connect outside the approved loopback endpoint. Stopping it ends the
+listener, and a later ordinary command cannot use its grant.
+For outbound access, the reviewer can consider a destination implied by an
+authorized command. The broker still enforces the exact approved connection.
+If a command yields a process handle and the foreground model finishes, the
+turn must account for a destination review already in progress before publishing
+its terminal receipt. The model need not poll the command to complete that review.
+If the command itself exits before a decision, withdraw its wait and cancel the
+private inference while retaining its outcome. A later decision for that
+connection cannot cause a new prompt or reconnect the command.
+When the decision requires human input, the same running command must receive
+that answer even if the foreground model has already finished. An affirmative
+answer must reach the upstream connection stage.
 
 Full access is a separate explicit execution choice, independent of automatic
 review. Restricted work must retain its original capture after a host gains
@@ -975,30 +1020,55 @@ separately verify finite, pipe and terminal supervision, cancellation,
 owner-loss, denied default access and explicit unconfined evidence. Native
 platform qualification must identify which OS was actually exercised.
 
-| Pressure case                                                      | Required result                                                  |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| Automatic reviewer approves an action beyond mandatory host limits | Admission is denied and no broader capability is created         |
-| The action or authority changes while review runs                  | Revalidate and obtain a decision covering the current action     |
-| Review times out or the reviewer is unavailable                    | Preserve that failure and use the declared human/stop fallback   |
-| The requested sandbox profile cannot be enforced                   | Refuse or wait for an explicitly supported route                 |
-| A review decision is committed just before restart                 | Restore its action binding and consumption state before dispatch |
-| An allowed network destination is used for a sensitive operation   | Product policy can still require semantic review of the action   |
+| Pressure case                                                      | Required result                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Automatic reviewer approves an action beyond mandatory host limits | Admission is denied and no broader capability is created                        |
+| The action or authority changes while review runs                  | Revalidate and obtain a decision covering the current action                    |
+| A scoped Auto review times out or its evidence store fails         | Block the action and keep the technical failure out of the human approval queue |
+| The requested sandbox profile cannot be enforced                   | Refuse or wait for an explicitly supported route                                |
+| A review decision is committed just before restart                 | Restore its action binding and consumption state before dispatch                |
+| An allowed network destination is used for a sensitive operation   | Product policy can still require semantic review of the action                  |
 
 A user can select **Auto**, request an exact external file, and see
 the file read once or the request return for manual review. Changing the file
 while a decision is pending invalidates it. Earlier instructions in the same
 chat remain relevant to later actions. A confined command retried with a
-network destination requires review of the new authority. Tests must account
-for the execution attempts and the evidence supplied to each reviewer.
+network destination requires review of the new authority. A command may need
+a public hostname the user never typed. Tests cover both reviewer decisions,
+including an earlier instruction to stay offline, and verify that a selected
+reference link supplies context without granting access. An approved command
+can reach only the reviewed destination. Tests count execution attempts and
+check the evidence supplied to each reviewer.
 Answering a clarifying question preserves the user's earlier restrictions.
+After a denial, exercise a retry following a visible risk explanation and a
+short reply in chat. Check that the reviewer can distinguish the assistant's
+explanation from the user's answer. Cover consent to the same target, a refusal,
+and a change of target. A reply queued before the question, or a steer that
+preceded publication, supplies no informed consent to that question. A chat
+reply cannot resolve a pending human approval.
 If one action needs human input, another eligible action in the same response
-can still receive its own review within the turn's allowance. A connected
-Desktop chat shows a pending review and its verdict while the turn is running.
+can still receive its own review. The number of successful decisions does not
+trigger a manual request. Repeated policy denials interrupt the turn.
+Independent destination reviews can overlap. Completing one preserves other
+pending reviews. A command that yields a process handle during review retains
+its assessment when the current evidence still matches. New user instructions
+require a fresh assessment. Exercise both orderings with a held provider reply.
+The broker must consume the committed decision for its exact destination even
+if the observer has yet to receive the update. A handoff must register the
+human-owned request before the turn can finish.
+Desktop chat shows review activity while the turn is running. Headless
+regressions hold a managed destination in Auto review and verify the card
+appears only after manual handoff. When Auto decides a command and its
+destination, the native lifecycle emits no manual approval request.
 Manual decisions remain available across the host's command-size range.
 Withdrawing the launcher's reviewer opt-in returns new work to
-**Ask for approval** and preserves earlier selection receipts. Finite command
-cleanup remains owned through shutdown, and a transfer beyond the broker's byte
-limit reports an incomplete result.
+**Ask for approval** and preserves earlier selection receipts. For managed
+outbound retries, headless tests exercise the first destination decision under
+the actual host and prove that repeated connections reuse it. The [package client
+fixtures](../src/processes/network/package_clients.rs) install an npm artifact
+larger than 8 MiB and fetch a uv wheel from a second HTTPS host, including the
+case where the artifact host is denied. Both clients use local fixture origins.
+The process owner revokes the proxy on exit and cancellation.
 The [built-host review cases](../tests/process/approvals/reviewer.rs) exercise
 both scopes and count real command starts. The Linux qualification also
 serves a response from the approved hostname inside an isolated network
@@ -1209,13 +1279,13 @@ enforcement evidence.
 
 The [native sandbox binding](./rust-sandbox.md) uses one crate with Seatbelt on
 macOS and bubblewrap plus a trusted seccomp helper on Linux. The raw-command
-profile denies direct networking. A qualified finite invocation may separately obtain a single mediated destination. Native Windows raw execution is deferred behind
+profile denies direct networking. Ordinary Act commands on a managed profile receive the proxy at launch. A connection needs a destination decision. Native Windows raw execution is deferred behind
 capability checks.
 
 | Pressure case                                              | Required result                                                                                                                                                                                             |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                                                                                                 |
-| A command requests networking                              | Admission refuses an unsupported profile before execution. A qualified finite command uses its exact reviewed destination and keeps direct network access denied.                                           |
+| A command requests networking                              | Admission refuses an unsupported profile before execution. A qualified command reuses its process-scoped destination decisions and keeps direct network access denied.                                      |
 | A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation.                                                                      |
 | A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                                                                                          |
 | Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                                                                                            |

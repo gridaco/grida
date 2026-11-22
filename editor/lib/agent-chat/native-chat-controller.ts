@@ -423,6 +423,8 @@ type Scope = {
     childAfter?: NativeChatGatewayChildRef;
   };
   approvalBasis?: string;
+  /** Successful receipts may be newer than a retained transcript page. */
+  reconsiderations?: { view: number; byTurn: Map<string, Set<string>> };
   questionBasis?: string;
   librarySelectionAvailable?: boolean;
   librarySelectionBasis?: string;
@@ -7448,6 +7450,52 @@ export class NativeChatController {
     }
   }
 
+  get canReconsiderDenials(): boolean {
+    return typeof this.bridge.reconsiderDenial === "function";
+  }
+
+  async reconsiderDenial(turnId: string, reviewId: string): Promise<void> {
+    const scope = this.scope;
+    const send = this.bridge.reconsiderDenial?.bind(this.bridge);
+    const eligible = this.view.turnRecords
+      .find((turn) => turn.turnId === turnId)
+      ?.approvalReviews?.some(
+        (review) =>
+          review.reviewId === reviewId &&
+          review.decision === "declined" &&
+          !review.reconsidered
+      );
+    const view = scope?.recentWindow?.view;
+    if (
+      !scope?.attachment ||
+      view === undefined ||
+      !send ||
+      this.view.acting ||
+      !eligible
+    )
+      return;
+    this.update({ acting: true, error: null });
+    try {
+      await send(scope.attachment.attachmentId, turnId, reviewId);
+      if (!this.owns(scope) || scope.recentWindow?.view !== view) return;
+      if (scope.reconsiderations?.view !== view)
+        scope.reconsiderations = { view, byTurn: new Map() };
+      const byTurn = scope.reconsiderations.byTurn;
+      const reviews = byTurn.get(turnId) ?? new Set();
+      reviews.add(reviewId);
+      byTurn.set(turnId, reviews);
+      this.publishMessages(scope);
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn’t record the reconsideration request. Open the chat again and check the review.",
+        });
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
   async answerApproval(
     reviewId: string,
     decision: NativeChatApprovalDecision
@@ -8322,6 +8370,7 @@ export class NativeChatController {
     if (page && scope.recentWindow?.view !== page.view) {
       scope.earlierPages = [];
       scope.earlierBoundary = undefined;
+      scope.reconsiderations = undefined;
     }
     scope.recentWindow = page && {
       view: page.view,
@@ -8425,7 +8474,13 @@ export class NativeChatController {
   ): Promise<void> {
     if (!this.bridge.approvals || !this.bridge.answerApproval) return;
     const turn = observation.snapshot.current;
-    if (turn?.disposition !== "suspended" || turn.paused || turn.cancelled) {
+    if (
+      !turn ||
+      (turn.disposition !== "suspended" &&
+        (turn.disposition !== "running" || !turn.inputNeeded)) ||
+      turn.paused ||
+      turn.cancelled
+    ) {
       scope.approvalBasis = undefined;
       if (this.view.approvals.length || this.view.approvalError)
         this.update({ approvals: [], approvalError: null });
@@ -8436,11 +8491,24 @@ export class NativeChatController {
     try {
       const approvals = await this.bridge.approvals(
         attachment.attachmentId,
-        observation.observationId
+        observation.observationId,
+        true,
+        true,
+        true
       );
       if (!this.owns(scope)) return;
-      scope.approvalBasis = observation.observationId;
-      this.update({ approvals, approvalError: null });
+      // Auto can hand off a destination without changing the turn revision.
+      // Keep checking an active wait until an actionable request appears.
+      scope.approvalBasis =
+        turn.disposition === "running" && approvals.length === 0
+          ? undefined
+          : observation.observationId;
+      if (
+        approvals.length ||
+        this.view.approvals.length ||
+        this.view.approvalError
+      )
+        this.update({ approvals, approvalError: null });
     } catch {
       if (this.owns(scope))
         this.update({ approvalError: "Couldn't load the permission request." });
@@ -8838,8 +8906,25 @@ export class NativeChatController {
       return true;
     });
     const turns = new Map<string, NativeChatTurnRecord>();
-    for (const page of [...pages, scope.recentWindow])
-      for (const turn of page?.turns ?? []) turns.set(turn.turnId, turn);
+    const reconsiderations = scope.reconsiderations?.byTurn;
+    for (const page of [...pages, scope.recentWindow]) {
+      for (const turn of page?.turns ?? []) {
+        const acknowledged = reconsiderations?.get(turn.turnId);
+        turns.set(
+          turn.turnId,
+          acknowledged
+            ? {
+                ...turn,
+                approvalReviews: turn.approvalReviews?.map((review) =>
+                  review.reviewId && acknowledged.has(review.reviewId)
+                    ? { ...review, reconsidered: true }
+                    : review
+                ),
+              }
+            : turn
+        );
+      }
+    }
     this.update({
       messages,
       progressRevision: scope.progressRevision,

@@ -1,5 +1,8 @@
 mod support;
 
+#[path = "store/checkpoint.rs"]
+mod checkpoint;
+
 #[path = "store/operation_claim.rs"]
 mod operation_claim;
 
@@ -1227,6 +1230,150 @@ async fn finish_history_turn(
     )
     .await;
     id
+}
+
+#[tokio::test]
+async fn verified_annotations_follow_active_and_idle_chronology_and_history_view() {
+    let (directory, store) = store().await;
+    let first = history_message("first", "first message");
+    let source = finish_history_turn(&store, session(), "source", vec![first.clone()]).await;
+    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
+    let initial = store
+        .context_history_with(session(), None, project)
+        .await
+        .unwrap();
+    let idle = history_message("note-idle", "added while idle");
+    let idle_note = idle.clone();
+    store
+        .annotate_context(
+            session(),
+            source.clone(),
+            change("idle-note"),
+            move |state| {
+                assert!(state.outcome().is_some());
+                Ok(idle_note)
+            },
+        )
+        .await
+        .unwrap();
+    let view = store.inspect(session()).await.unwrap();
+    assert!(view.current.is_none() && view.queued.is_empty());
+    let context = store
+        .context_history_with(session(), None, project)
+        .await
+        .unwrap();
+    assert_ne!(context.basis, initial.basis);
+    assert_eq!(context.into_records(), vec![first.clone(), idle.clone()]);
+    assert_eq!(
+        store.history(session(), None).await.unwrap(),
+        vec![first.clone()]
+    );
+    drop(store);
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    store
+        .annotate_context(session(), source.clone(), change("idle-note"), |_| {
+            panic!("duplicate")
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        store.inspect(session()).await.unwrap().revision,
+        view.revision
+    );
+
+    let input = submission("active-input", "unrelated prompt");
+    store.submit(session(), input.clone()).await.unwrap();
+    let owner = claim(&store, "active-claim", vec![input.id]).await;
+    let later = history_message("later", "next message");
+    commit(
+        &owner,
+        "later-message",
+        vec![JournalAction::AppendHistory(vec![later.clone()])],
+    )
+    .await;
+    let active = history_message("note-active", "added while running");
+    let active_note = active.clone();
+    store
+        .annotate_context(
+            session(),
+            source.clone(),
+            change("active-note"),
+            move |_| Ok(active_note),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        owner
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records(),
+        &[later.clone(), active.clone()]
+    );
+    commit(
+        &owner,
+        "finish",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    drop(owner);
+    let context = store
+        .context_history_with(session(), None, project)
+        .await
+        .unwrap();
+    assert_eq!(context.into_records(), vec![first, idle, later, active]);
+    let ids = vec![change("idle-note"), change("active-note")];
+    assert_eq!(
+        store
+            .context_annotation_receipts(session(), ids.clone())
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    store
+        .revise_history(
+            HistoryRevision {
+                session: session(),
+                request: change("revise"),
+                expected_revision: store.inspect(session()).await.unwrap().revision,
+                expected_history: current_history(&store, session()).await.basis,
+                intent: Fingerprint::of(&"before denial").unwrap(),
+                replacement: submission("replacement", "other work"),
+            },
+            project,
+            |_| {
+                Ok(HistorySeed {
+                    records: vec![],
+                    provenance: payload("cut"),
+                })
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        store
+            .context_annotation_receipts(session(), ids)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_error(
+        store
+            .annotate_context(session(), source, change("idle-note"), |_| {
+                panic!("stale source")
+            })
+            .await,
+        ErrorKind::Conflict,
+        "context_annotation_source_superseded",
+    );
 }
 
 #[tokio::test]
@@ -2700,6 +2847,92 @@ async fn unprompted_maintenance_admits_only_before_the_exact_queue_head() {
         ErrorKind::Conflict,
         "request_identity_reused",
     );
+}
+
+#[tokio::test]
+async fn full_context_replacement_preserves_annotations_received_during_and_after_compaction() {
+    use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
+    let (_directory, store) = store().await;
+    let source = finish_history_turn(
+        &store,
+        session(),
+        "original",
+        vec![history_message("first", "older input")],
+    )
+    .await;
+    let history = store
+        .context_history_with(session(), None, |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    let maintenance = TurnId::new("maintenance").unwrap();
+    let claim = UnpromptedClaim {
+        session: session(),
+        turn: maintenance.clone(),
+        request: change("summary"),
+        expected_revision: history.session_revision,
+        expected_context: history.basis.clone(),
+        checkpoint: payload("summary request"),
+    };
+    let ClaimOutcome::Acquired(owner) = store.claim_unprompted(claim).await.unwrap() else {
+        panic!("expected maintenance")
+    };
+    let during = history_message("during", "arrived during compaction");
+    let note = during.clone();
+    store
+        .annotate_context(session(), source.clone(), change("during"), move |_| {
+            Ok(note)
+        })
+        .await
+        .unwrap();
+    assert!(
+        owner
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records()
+            .is_empty()
+    );
+    let outcome = TurnOutcome {
+        status: OutcomeStatus::Succeeded,
+        account: None,
+        evidence: vec![],
+    };
+    commit(
+        &owner,
+        "finish-summary",
+        vec![JournalAction::Settle(outcome.clone())],
+    )
+    .await;
+    drop(owner);
+    let summary = history_message("summary", "summarized history");
+    store
+        .install_context(ContextInstall {
+            session: session(),
+            turn: maintenance,
+            expected_context: history.basis,
+            expected_outcome: Fingerprint::of(&outcome).unwrap(),
+            replacement: HistorySeed {
+                records: vec![summary.clone()],
+                provenance: payload("summary"),
+            },
+            covered_through: None,
+        })
+        .await
+        .unwrap();
+    let after = history_message("after", "arrived after compaction");
+    let note = after.clone();
+    store
+        .annotate_context(session(), source, change("after"), move |_| Ok(note))
+        .await
+        .unwrap();
+    let context = store
+        .context_history_with(session(), None, |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    assert_eq!(context.into_records(), vec![summary, during, after]);
 }
 
 #[tokio::test]

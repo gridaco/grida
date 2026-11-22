@@ -142,11 +142,20 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         allowScopedAccess: true,
       },
     };
-    async function check(supported: boolean, probes: number) {
+    async function check(
+      supported: boolean,
+      probes: number,
+      escalation = false
+    ) {
       const agent = await NativeAgentProcess.start(options);
       try {
         const args = (await agent.request("fixture/argv", {})) as string[];
         expect(args.includes("--allow-scoped-approvals")).toBe(supported);
+        expect(args).not.toContain("--allow-command-escalation");
+        expect(args).not.toContain("--allow-protected-command-escalation");
+        expect(args.includes("--allow-reviewed-command-retry")).toBe(
+          escalation
+        );
         expect(
           fs.readFileSync(path.join(resources, "probes"), "utf8")
         ).toHaveLength(probes);
@@ -177,7 +186,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       ).resolves.toBe(false);
       expect(await check(false, 2)).toBe(profile);
       expect(await check(false, 2)).toBe(profile);
-      fs.writeFileSync(help, "      --allow-scoped-approvals\n");
+      fs.writeFileSync(
+        help,
+        "      --allow-scoped-approvals\n      --allow-command-escalation\n      --allow-protected-command-escalation\n"
+      );
       fs.copyFileSync(executable, executable + ".update");
       fs.renameSync(executable + ".update", executable);
       await expect(
@@ -185,6 +197,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       ).resolves.toBe(true);
       expect(await check(true, 3)).toBe(profile);
       expect(await check(true, 3)).toBe(profile);
+      fs.appendFileSync(help, "      --allow-reviewed-command-retry\n");
+      fs.copyFileSync(executable, executable + ".update");
+      fs.renameSync(executable + ".update", executable);
+      expect(await check(true, 4, true)).toBe(profile);
     } finally {
       command.mockRestore();
       test.close();

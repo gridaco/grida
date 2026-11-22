@@ -1270,11 +1270,27 @@ const bridge: DesktopBridge = {
         attachmentId,
         change
       ),
-    approvals: (attachmentId, observationId) =>
+    approvals: (
+      attachmentId,
+      observationId,
+      acceptsCommandRetries,
+      acceptsManagedOutbound,
+      acceptsCommandSessions
+    ) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
         attachmentId,
-        observationId
+        observationId,
+        acceptsCommandRetries,
+        acceptsManagedOutbound,
+        acceptsCommandSessions
+      ),
+    reconsiderDenial: (attachmentId, turnId, reviewId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_RECONSIDER_DENIAL,
+        attachmentId,
+        turnId,
+        reviewId
       ),
     answerApproval: (attachmentId, reviewId, decision) =>
       nativeChatInvoke(

@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
 /// The SQLite application identity of this store's databases.
 pub(crate) const APPLICATION_ID: i64 = 0x4752_4147;
-pub(crate) const VERSION: i64 = 3;
+pub(crate) const VERSION: i64 = 5;
 
 /// Encoded values are JSON. Digests and identities the store compares in SQL
 /// are raw 32-byte blobs. No CHECK enumerates an open vocabulary such as
@@ -189,6 +189,47 @@ ALTER TABLE sessions ADD COLUMN read_revision INTEGER NOT NULL DEFAULT 0 CHECK (
 ALTER TABLE sessions ADD COLUMN unread INTEGER NOT NULL DEFAULT 0 CHECK (unread IN (0,1));
 ";
 
+// Idle context additions follow the latest turn without reopening its journal.
+// Active turns use the journal itself. Both use the same durable idempotency key.
+const ANNOTATION_SCHEMA: &str = "
+CREATE TABLE context_annotations (
+    ordinal INTEGER PRIMARY KEY,
+    session TEXT NOT NULL,
+    view INTEGER NOT NULL,
+    after_turn INTEGER NOT NULL REFERENCES turns(ordinal) ON DELETE CASCADE,
+    record BLOB NOT NULL,
+    FOREIGN KEY (session,view) REFERENCES history_views(session,view) ON DELETE CASCADE
+);
+CREATE INDEX context_annotations_at ON context_annotations(session,view,after_turn,ordinal);
+";
+
+// A private branch can see only the checkpoint from its exact history view
+// and compatibility scope. It has no catalog membership or transcript rows.
+const PRIVATE_CHECKPOINT_SCHEMA: &str = "
+CREATE TABLE private_checkpoints (
+    session TEXT PRIMARY KEY,
+    view INTEGER NOT NULL,
+    compatibility BLOB NOT NULL CHECK (length(compatibility) = 32),
+    generation BLOB NOT NULL CHECK (length(generation) = 32),
+    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    snapshot BLOB,
+    FOREIGN KEY (session,view) REFERENCES history_views(session,view) ON DELETE CASCADE
+) WITHOUT ROWID;
+CREATE TABLE private_branches (
+    session TEXT NOT NULL REFERENCES private_checkpoints(session) ON DELETE CASCADE,
+    turn TEXT NOT NULL,
+    wait TEXT NOT NULL,
+    basis BLOB NOT NULL CHECK (length(basis) = 32),
+    revision INTEGER NOT NULL,
+    trunk INTEGER NOT NULL CHECK (trunk IN (0,1)),
+    snapshot BLOB,
+    PRIMARY KEY (session,turn,wait,basis)
+) WITHOUT ROWID;
+CREATE TRIGGER release_private_turn AFTER UPDATE OF active_turn ON sessions
+WHEN OLD.active_turn IS NOT NULL AND OLD.active_turn IS NOT NEW.active_turn
+BEGIN DELETE FROM private_branches WHERE session=OLD.id AND turn=OLD.active_turn; END;
+";
+
 /// The owner projections a store opens with. A database keeps the profile it
 /// was created with.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -210,7 +251,7 @@ pub(crate) fn prepare(
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(database_error)?;
     match (application_id, version) {
-        (APPLICATION_ID, VERSION | 2) => {
+        (APPLICATION_ID, VERSION | 4 | 3 | 2) => {
             require_profile(connection, profile)?;
             let enabled: bool = connection
                 .query_row(
@@ -222,25 +263,26 @@ pub(crate) fn prepare(
             if enabled != conversations.is_some() {
                 return Err(error(ErrorKind::Unsupported, "store_profile_mismatch"));
             }
+            if version == VERSION {
+                return verify_definitions(connection, version);
+            }
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            verify_definitions(&tx, version)?;
             if version == 2 {
-                let tx = connection
-                    .transaction_with_behavior(TransactionBehavior::Immediate)
-                    .map_err(database_error)?;
-                let reference = Connection::open_in_memory().map_err(database_error)?;
-                reference.execute_batch(SCHEMA_V1).map_err(database_error)?;
-                reference
-                    .execute_batch(CONVERSATION_SCHEMA)
-                    .map_err(database_error)?;
-                if definitions(&tx)? != definitions(&reference)? {
-                    return Err(unsupported());
-                }
                 tx.execute_batch(READ_STATE_SCHEMA)
                     .map_err(database_error)?;
-                tx.pragma_update(None, "user_version", VERSION)
-                    .map_err(database_error)?;
-                tx.commit().map_err(commit_error)?;
             }
-            Ok(())
+            if version < 4 {
+                tx.execute_batch(ANNOTATION_SCHEMA)
+                    .map_err(database_error)?;
+            }
+            tx.execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+                .map_err(database_error)?;
+            tx.pragma_update(None, "user_version", VERSION)
+                .map_err(database_error)?;
+            tx.commit().map_err(commit_error)
         }
         (APPLICATION_ID, 1) => upgrade(connection, profile, conversations),
         (0, 0) => install(connection, profile, conversations.is_some()),
@@ -270,6 +312,12 @@ fn install(connection: &mut Connection, profile: Profile, conversations: bool) -
         .map_err(database_error)?;
     transaction
         .execute_batch(READ_STATE_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(ANNOTATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
         .map_err(database_error)?;
     transaction
         .execute(
@@ -308,6 +356,12 @@ fn upgrade(
     transaction
         .execute_batch(READ_STATE_SCHEMA)
         .map_err(database_error)?;
+    transaction
+        .execute_batch(ANNOTATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+        .map_err(database_error)?;
     if let Some(project) = conversations {
         // Version 1 retained immutable session configuration but no message
         // timestamps. Recover membership without opening a single transcript.
@@ -343,6 +397,26 @@ fn upgrade(
         .pragma_update(None, "user_version", VERSION)
         .map_err(database_error)?;
     transaction.commit().map_err(commit_error)
+}
+
+fn verify_definitions(connection: &Connection, version: i64) -> Result<()> {
+    let reference = Connection::open_in_memory().map_err(database_error)?;
+    for sql in [
+        Some(SCHEMA_V1),
+        Some(CONVERSATION_SCHEMA),
+        (version >= 3).then_some(READ_STATE_SCHEMA),
+        (version >= 4).then_some(ANNOTATION_SCHEMA),
+        (version >= 5).then_some(PRIVATE_CHECKPOINT_SCHEMA),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        reference.execute_batch(sql).map_err(database_error)?;
+    }
+    if definitions(connection)? != definitions(&reference)? {
+        return Err(unsupported());
+    }
+    Ok(())
 }
 
 fn definitions(connection: &Connection) -> Result<Vec<String>> {
@@ -399,6 +473,90 @@ mod tests {
     use crate::{SqliteStore, encode, turn_links::TurnLinkDecision};
     use agent_kit_core::{ChangeId, Envelope, Fingerprint, SchemaId, SessionId};
     use agent_kit_sessions::{SessionStore, Submission};
+
+    #[test]
+    fn current_schema_requires_private_checkpoint_cleanup() {
+        let mut db = Connection::open_in_memory().unwrap();
+        let profile = Profile {
+            catalog: false,
+            turn_links: false,
+        };
+        install(&mut db, profile, false).unwrap();
+        prepare(&mut db, profile, None).unwrap();
+        db.execute_batch("DROP TRIGGER release_private_turn")
+            .unwrap();
+        assert_eq!(prepare(&mut db, profile, None), Err(unsupported()));
+    }
+
+    #[test]
+    fn version_four_adds_private_checkpoints_without_touching_other_state() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA_V1).unwrap();
+        db.execute_batch(CONVERSATION_SCHEMA).unwrap();
+        db.execute_batch(READ_STATE_SCHEMA).unwrap();
+        db.execute_batch(ANNOTATION_SCHEMA).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 4).unwrap();
+        db.execute(
+            "INSERT INTO store_profile(singleton,catalog,turn_links) VALUES(1,0,0)",
+            [],
+        )
+        .unwrap();
+        let profile = Profile {
+            catalog: false,
+            turn_links: false,
+        };
+        db.execute_batch("CREATE TABLE unexpected(value INTEGER);")
+            .unwrap();
+        assert_eq!(prepare(&mut db, profile, None), Err(unsupported()));
+        db.execute_batch("DROP TABLE unexpected;").unwrap();
+        prepare(&mut db, profile, None).unwrap();
+        let count: i64 = db
+            .query_row("SELECT COUNT(*) FROM private_checkpoints", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(
+            db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            VERSION
+        );
+    }
+
+    #[test]
+    fn version_three_adds_empty_context_annotations_and_refuses_unknown_objects() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA_V1).unwrap();
+        db.execute_batch(CONVERSATION_SCHEMA).unwrap();
+        db.execute_batch(READ_STATE_SCHEMA).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 3).unwrap();
+        db.execute(
+            "INSERT INTO store_profile(singleton,catalog,turn_links) VALUES(1,0,0)",
+            [],
+        )
+        .unwrap();
+        let profile = Profile {
+            catalog: false,
+            turn_links: false,
+        };
+        db.execute_batch("CREATE TABLE unexpected(value INTEGER);")
+            .unwrap();
+        assert_eq!(prepare(&mut db, profile, None), Err(unsupported()));
+        let version: i64 = db
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 3);
+        db.execute_batch("DROP TABLE unexpected;").unwrap();
+        prepare(&mut db, profile, None).unwrap();
+        let annotations: i64 = db
+            .query_row("SELECT COUNT(*) FROM context_annotations", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(annotations, 0);
+    }
 
     #[test]
     fn version_two_upgrades_read_positions_without_changing_existing_recency() {

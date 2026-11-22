@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   NativeAgentPermissions,
   type NativeApprovalReview,
@@ -82,11 +82,38 @@ function completion(text: string | null, action: FixtureAction) {
   );
 }
 
+/** Give the native host a narrow read profile so separate file grants take effect. */
+function useScopedFileReads() {
+  const stage = NativeAgentPermissions.stage.bind(NativeAgentPermissions);
+  const spy = vi
+    .spyOn(NativeAgentPermissions, "stage")
+    .mockImplementation(async (...args) => {
+      const staged = await stage(...args);
+      const profile = JSON.parse(fs.readFileSync(staged.profile, "utf8"));
+      profile.command.diskRead = false;
+      // macOS /bin/sh reads its selected shell from this system directory.
+      if (process.platform === "darwin")
+        profile.command.runtimePaths.push("/private/var/select");
+      const file = path.join(staged.stateDirectory, "scoped-file-reads.json");
+      fs.writeFileSync(file, JSON.stringify(profile), { mode: 0o600 });
+      return { ...staged, profile: file };
+    });
+  onTestFinished(() => spy.mockRestore());
+}
+
+function readScopedFile(directory: string, file: string): FixtureAction {
+  return {
+    name: "exec_command",
+    args: {
+      cmd: "/bin/cat",
+      access: "read",
+      input_file: { directory, path: file },
+    },
+  };
+}
+
 async function fixtureProvider(
-  action: FixtureAction = {
-    name: "read_file",
-    args: { directory: "additional", path: "note.txt" },
-  },
+  action: FixtureAction,
   beforeReply?: (index: number) => Promise<void>
 ) {
   const replies = [
@@ -241,6 +268,70 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
+  it("offers a manual decision only after automatic review hands it off", async () => {
+    const row = {
+      waitId: "approval/network/destination",
+      request: {
+        session: "session",
+        turn: "turn",
+        directory: "project",
+        root: "/project",
+        effect: {
+          kind: "command",
+          command: "curl https://registry.example.test/",
+          executable: "/bin/sh",
+          cwd: "/project",
+          access: "read",
+          terminal: false,
+          finite: true,
+          network: { host: "registry.example.test", port: 443 },
+        },
+      },
+    };
+    let pending: object = { ...row, reviewing: true };
+    const request = vi.fn<
+      (method: string, params: unknown) => Promise<unknown>
+    >(async (method) =>
+      method.endsWith("/snapshot")
+        ? {
+            sessionId: "session",
+            sessionRevision: 5,
+            current: { turnId: "turn", controlRevision: 1 },
+          }
+        : {
+            sessionId: "session",
+            turnId: "turn",
+            controlRevision: 1,
+            approvals: [pending],
+          }
+    );
+    const permissions = new NativeAgentPermissions(
+      request,
+      new Map(),
+      undefined,
+      {
+        project: { id: "project", path: "/project" },
+        protectedPaths: [],
+        workspaceId: "workspace",
+      }
+    );
+
+    await expect(permissions.list("session", "turn")).resolves.toEqual([]);
+    pending = { ...row, reviewing: "true" };
+    await expect(permissions.list("session", "turn")).rejects.toThrow(
+      "native_agent_approval_invalid"
+    );
+    pending = { ...row, reviewFailure: "needs_human" };
+    await expect(permissions.list("session", "turn")).resolves.toMatchObject([
+      {
+        waitId: row.waitId,
+        tool: "exec_command",
+        network: row.request.effect.network,
+        reviewFailure: "needs_human",
+      },
+    ]);
+  });
+
   it("binds external reads and network commands to a workspace launch and the issuing workspace", async () => {
     const command = {
       kind: "command",
@@ -342,12 +433,145 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
         },
       },
     ]);
+    const [unknownNetworkScope] = await list("project", "/project", {
+      ...command,
+      network: { ...command.network, additionalScope: true },
+    });
+    expect(unknownNetworkScope).not.toHaveProperty("scope");
+    const [sessionCommand] = await list("project", "/project", {
+      ...command,
+      finite: undefined,
+      terminal: true,
+      network: undefined,
+      managed_network: true,
+    });
+    expect(sessionCommand).toMatchObject({
+      process: "terminal",
+      managedNetwork: true,
+      scope: expect.any(Object),
+    });
+    const [connection] = await list("project", "/project", {
+      ...command,
+      finite: undefined,
+      managed_network: true,
+    });
+    expect(connection).toMatchObject({
+      process: "session",
+      network: { host: "example.org", port: 443 },
+    });
     await expect(
       list("project", "/project", { ...command, terminal: true })
     ).rejects.toThrow("invalid");
     await expect(
       list("project", "/project", { ...command, cwd: "/other" })
     ).rejects.toThrow("invalid");
+    const escalated = {
+      kind: "escalated_command",
+      command: "next start --hostname 127.0.0.1 --port 43123",
+      justification: "Start the requested local preview",
+      executable: "/bin/sh",
+      cwd: "/project",
+      filesystem: { ...command.filesystem, write_roots: ["/project"] },
+      environment_names: ["PATH"],
+      access: "read_write",
+      network: "listen",
+      listen_port: 43123,
+    };
+    await expect(list("project", "/project", escalated)).rejects.toThrow(
+      "invalid"
+    );
+    const responder = req("project", "/project", escalated);
+    const owner = new NativeAgentPermissions(
+      responder,
+      new Map(),
+      "/settings",
+      {
+        ...scope,
+        commandEscalation: true,
+      }
+    );
+    const [launch] = await owner.list("s", "t");
+    expect(launch).toMatchObject({
+      tool: "exec_command",
+      sandboxPermissions: "require_escalated",
+      command: escalated.command,
+      justification: escalated.justification,
+      cwd: escalated.cwd,
+      executable: escalated.executable,
+      access: "read_write",
+      network: { kind: "listen", port: 43123 },
+      scope: {
+        diskRead: true,
+        writeRoots: ["/project"],
+        environmentNames: ["PATH"],
+      },
+    });
+    responder.mockImplementationOnce(async (_method, params) => ({
+      sessionId: "s",
+      turnId: "t",
+      requestId: (params as { requestId: string }).requestId,
+      sessionRevision: 2,
+      journalPosition: 1,
+    }));
+    await expect(owner.answer(launch, "approve_once")).resolves.toMatchObject({
+      sessionId: "s",
+    });
+    const { listen_port: _, ...offline } = escalated;
+    const [offlineReview] = await new NativeAgentPermissions(
+      req("project", "/project", { ...offline, network: "denied" }),
+      new Map(),
+      "/settings",
+      { ...scope, commandEscalation: true }
+    ).list("s", "t");
+    expect(offlineReview).toMatchObject({
+      network: { kind: "denied" },
+      scope: { diskRead: true },
+    });
+    const [managed] = await new NativeAgentPermissions(
+      req("project", "/project", { ...offline, network: "managed" }),
+      new Map(),
+      "/settings",
+      { ...scope, commandEscalation: true }
+    ).list("s", "t");
+    expect(managed).toMatchObject({
+      network: { kind: "managed" },
+      scope: { diskRead: true },
+    });
+    for (const unverified of [
+      { ...escalated, filesystem: undefined },
+      { ...offline, network: undefined },
+      { ...escalated, access: undefined },
+      { ...escalated, access: "full" },
+      { ...escalated, access: "read" },
+      { ...escalated, network: { host: "example.org", port: 443 } },
+      { ...escalated, network: "denied" },
+      { ...escalated, network: "managed" },
+      { ...offline, network: "listen" },
+      { ...escalated, listen_port: 0 },
+      { ...escalated, listen_port: 1.5 },
+      { ...escalated, listen_port: 65536 },
+      {
+        ...escalated,
+        filesystem: { ...escalated.filesystem, full_disk_write: true },
+      },
+      {
+        ...escalated,
+        filesystem: { ...escalated.filesystem, resolved_cwd: "/other" },
+      },
+    ]) {
+      const host = new NativeAgentPermissions(
+        req("project", "/project", unverified),
+        new Map(),
+        "/settings",
+        { ...scope, commandEscalation: true }
+      );
+      const [review] = await host.list("s", "t");
+      expect(review).not.toHaveProperty("scope");
+      expect(review).not.toHaveProperty("network");
+      await expect(host.answer(review, "approve_once")).rejects.toThrow(
+        "invalid"
+      );
+    }
     const other = new NativeAgentPermissions(
       req("external-file", "/", read),
       new Map(),
@@ -467,7 +691,10 @@ it.runIf(Boolean(packaged) && supported)(
   "uses private Desktop stdio to approve an exact Rust read and retry its receipt after restart",
   async () => {
     const test = workspaceFixture();
-    const provider = await fixtureProvider();
+    useScopedFileReads();
+    const provider = await fixtureProvider(
+      readScopedFile("additional", "note.txt")
+    );
     fs.writeFileSync(
       path.join(test.additional.path, "note.txt"),
       "approved native fixture text"
@@ -516,8 +743,7 @@ it.runIf(Boolean(packaged) && supported)(
       expect(provider.received[0]).not.toContain(
         "approved native fixture text"
       );
-      // Desktop runs agents under the Default preset, which includes
-      // sandboxed commands in the project.
+      expect(provider.received[0]).toContain('"input_file"');
       expect(provider.received[0]).toContain("exec_command");
       expect(provider.received[0]).toContain("write_stdin");
       await expect(
@@ -568,7 +794,10 @@ it.runIf(Boolean(packaged) && supported)(
   "reviews an additional-root read through the guarded Desktop bridge and replays only the exact decision",
   async () => {
     const test = workspaceFixture();
-    const provider = await fixtureProvider();
+    useScopedFileReads();
+    const provider = await fixtureProvider(
+      readScopedFile("additional", "note.txt")
+    );
     const notices: NativeChatLifecycle[] = [];
     const origin = "https://editor.fixture.invalid";
     const frame = {
@@ -700,6 +929,7 @@ it.runIf(Boolean(packaged) && supported)(
   "uses the selected native reviewer for an external read and reopens its decision",
   async () => {
     const test = workspaceFixture();
+    useScopedFileReads();
     const reference = path.join(
       path.dirname(test.stateDirectory),
       "schedule.txt"
@@ -709,9 +939,8 @@ it.runIf(Boolean(packaged) && supported)(
     const finalReply = Promise.withResolvers<void>();
     const provider = await fixtureProvider(
       {
-        name: "read_file",
-        args: { directory: "external-file", path: reference.slice(1) },
-        review: "allow",
+        ...readScopedFile("external-file", reference.slice(1)),
+        review: JSON.stringify({ outcome: "allow" }),
       },
       async (index) => {
         if (index === 1) await reviewReply.promise;
@@ -750,7 +979,7 @@ it.runIf(Boolean(packaged) && supported)(
       const pending = (await chat.observe(session)).current;
       expect(pending).toMatchObject({
         disposition: "running",
-        inputNeeded: true,
+        inputNeeded: false,
       });
       const reviews = async () =>
         (await chat!.transcriptPage(session)).turns?.find(
@@ -811,16 +1040,115 @@ it.runIf(Boolean(packaged) && supported)(
 );
 
 it.runIf(Boolean(packaged) && supported)(
-  "presents the full long command and filesystem scope for manual fallback",
+  "retains a reconsidered policy denial across restart without submitting work",
   async () => {
     const test = workspaceFixture();
-    const command = `curl https://example.org # ${"x".repeat(40 * 1024)}`;
+    const rationale = "The requested action exceeds the approved scope.";
+    const provider = await fixtureProvider({
+      name: "exec_command",
+      args: {
+        cmd: "printf reviewed",
+        access: "read",
+        sandbox_permissions: "require_escalated",
+        justification: "Inspect the project.",
+      },
+      review: JSON.stringify({
+        outcome: "deny",
+        risk_level: "high",
+        user_authorization: "low",
+        rationale,
+      }),
+    });
+    const launch = {
+      resourcesPath: packaged!,
+      cwd: test.workspace.primary.path,
+      stateDirectory: test.stateDirectory,
+      provider: "openai-compatible" as const,
+      model: "fixture",
+      endpoint: provider.endpoint,
+      workspace: { ...test.workspace, allowScopedAccess: true as const },
+    };
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start(launch);
+      const session = await chat.create();
+      const mode = await chat.permissionMode(session);
+      await chat.setPermissionMode(
+        session,
+        mode.revision,
+        "select-review",
+        "approve_for_me"
+      );
+      const turn = await chat.submit(
+        session,
+        "inspect",
+        "Inspect the project."
+      );
+      await vi.waitFor(
+        async () =>
+          expect((await chat!.observe(session)).latest?.status).toBe(
+            "succeeded"
+          ),
+        { timeout: 12000 }
+      );
+      const denial = (await chat.transcriptPage(session)).turns?.find(
+        (t) => t.turnId === turn.turnId
+      )?.approvalReviews?.[0];
+      expect(denial).toMatchObject({
+        decision: "declined",
+        reviewId: expect.any(String),
+        riskLevel: "high",
+        userAuthorization: "low",
+        rationale,
+      });
+      if (!turn.turnId || !denial?.reviewId)
+        throw new Error("missing verified denial");
+      await chat.reconsiderDenial(session, turn.turnId, denial.reviewId);
+      await chat.close();
+      chat = await NativeAgentChat.start(launch);
+      const reopened = await chat.load(session.id);
+      await chat.reconsiderDenial(reopened, turn.turnId, denial.reviewId);
+      const retained = await chat.transcriptPage(reopened);
+      expect(
+        retained.turns?.find((t) => t.turnId === turn.turnId)
+          ?.approvalReviews?.[0]
+      ).toMatchObject({ ...denial, reconsidered: true });
+      expect(await chat.observe(reopened)).toMatchObject({
+        queuedInputs: 0,
+        current: null,
+      });
+      expect(provider.received).toHaveLength(3);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await provider.close();
+        test.close();
+      }
+    }
+  },
+  25000
+);
+
+it
+  .runIf(Boolean(packaged) && supported)
+  .each(["managed connection", "escalation"] as const)(
+  "presents the full long command and its actual authority for manual fallback (%s)",
+  async (authority) => {
+    const test = workspaceFixture();
+    const destination = { host: "fixture.invalid", port: 443 };
+    const justification = "Write the requested build output.";
+    const escalated = authority === "escalation";
+    const environmentNames = expect.any(Array);
+    const command = `${escalated ? "npm run build" : "/usr/bin/curl --max-time 20 https://fixture.invalid"} # ${"x".repeat(40 * 1024)}`;
     const provider = await fixtureProvider({
       name: "exec_command",
       args: {
         cmd: command,
-        access: "read",
-        network: { host: "example.org", port: 443 },
+        access: escalated ? "read_write" : "read",
+        ...(escalated
+          ? { sandbox_permissions: "require_escalated", justification }
+          : { yield_time_ms: 20000 }),
       },
     });
     let chat: NativeAgentChat | undefined;
@@ -839,27 +1167,48 @@ it.runIf(Boolean(packaged) && supported)(
       await chat.setPermissionMode(
         session,
         initial.revision,
-        "enable-review",
+        "select-review",
         "approve_for_me"
       );
       await chat.submit(
         session,
         "check-resource",
-        "Check https://example.org with a read-only command."
+        escalated
+          ? "Write the production build for this project."
+          : "Check https://fixture.invalid with a read-only command."
       );
       const review = await vi.waitFor(
         async () => {
           const snapshot = await chat!.observe(session);
           const [pending] = await chat!.approvals(session, snapshot);
+          expect(pending).toBeDefined();
           expect(pending).toMatchObject({
             tool: "exec_command",
-            access: "read",
             command,
-            network: { host: "example.org", port: 443 },
+            ...(escalated
+              ? {
+                  sandboxPermissions: "require_escalated",
+                  justification,
+                  cwd: test.workspace.primary.path,
+                  environmentNames,
+                  access: "read_write",
+                  network: { kind: "denied" },
+                }
+              : {
+                  access: "read",
+                  network: destination,
+                  scope: {
+                    diskRead: true,
+                    resolvedCwd: test.workspace.primary.path,
+                    environmentNames,
+                  },
+                }),
+          });
+          expect(pending).toMatchObject({
             scope: {
               diskRead: true,
               resolvedCwd: test.workspace.primary.path,
-              environmentNames: expect.any(Array),
+              environmentNames,
             },
           });
           return pending;

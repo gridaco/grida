@@ -493,10 +493,11 @@ change to the target or material action requires a decision covering that change
 After a refusal, the agent can use the remaining authority to pursue the request,
 or explain the dependency that prevents completion.
 
-An automatic denial or unavailable reviewer has a visible reason and a clear
-next action. The product follows its declared fallback, which may ask the person
-or stop the affected work. An unanswered or failed review cannot silently permit
-the action.
+While Auto reviews an action, the chat can show progress. Approval buttons
+appear when the host asks the person to decide. A denial or timed-out review
+shows why the action was blocked. Choosing **Request reconsideration** on an
+eligible denial records the person’s instruction for a future attempt.
+See [Automatic review](./permissions.md#automatic-review).
 
 Questions explain what decision the answer will affect. Suggested answers are
 short and the person can supply their own. An unanswered question stays visible

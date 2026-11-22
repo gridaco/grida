@@ -982,7 +982,10 @@ fn catalog_response(
         if include_activity {
             let is_running = record.current_turn_disposition
                 == Some(agent_kit_sessions::TurnDisposition::Running);
-            let needs_input = crate::host::needs_user_input(&record.pending_request_schemas);
+            let needs_input = crate::host::needs_user_input(
+                &record.pending_request_schemas,
+                record.current_turn_disposition,
+            );
             meta.insert("co.grida/running".into(), is_running.into());
             meta.insert("co.grida/inputNeeded".into(), needs_input.into());
             if is_running {

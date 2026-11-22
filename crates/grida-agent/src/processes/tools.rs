@@ -1,7 +1,7 @@
 //! `exec_command` and `write_stdin`: the model's command tools.
 
 use super::output::{self, Standing};
-use super::{Entry, Io, ProcessSessions, RETAINED_OUTPUT_BYTES};
+use super::{Entry, Io, ProcessAccess, ProcessSessions, RETAINED_OUTPUT_BYTES};
 use crate::command::{CommandAccess, CommandLimits, valid_path};
 use crate::file_tools::{SETTINGS_DIRECTORY, SETTINGS_PATH};
 use agent_kit_core::inference::InputFormat;
@@ -41,6 +41,7 @@ const DEADLINE_MARGIN: Duration = Duration::from_secs(2);
 const SPECIFICATION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_RECORDED: usize = 16;
 const INTERRUPT: &str = "\u{3}";
+const MAX_JUSTIFICATION_BYTES: usize = 1024;
 
 pub(crate) type SpawnSession = dyn Fn(PreparedProcess, SessionOptions, CancellationToken) -> Result<RunningSession>
     + Send
@@ -99,14 +100,62 @@ impl ProcessScope {
 
 type ResolveProcess = dyn Fn(&Invocation) -> Result<AuthorizedProcess> + Send + Sync;
 
+/// Accepted command networking. Earlier offers keep their original tool schema.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CommandNetwork {
+    Offline,
+    ExactDestination,
+    ManagedRetry,
+    Managed,
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum CommandToolMode {
     Fixed,
     Act {
         unconfined: bool,
-        allow_network: bool,
+        network: CommandNetwork,
+        allow_escalation: bool,
     },
     Plan,
+}
+
+impl CommandToolMode {
+    fn full_access(self) -> bool {
+        matches!(
+            self,
+            Self::Act {
+                unconfined: true,
+                ..
+            }
+        )
+    }
+
+    fn allows_escalation(self) -> bool {
+        matches!(
+            self,
+            Self::Act {
+                unconfined: false,
+                allow_escalation: true,
+                ..
+            }
+        )
+    }
+
+    fn network(self) -> CommandNetwork {
+        match self {
+            Self::Act {
+                unconfined: false,
+                network,
+                ..
+            } => network,
+            _ => CommandNetwork::Offline,
+        }
+    }
+
+    fn allows_local_listener(self) -> bool {
+        self.allows_escalation() && cfg!(target_os = "macos")
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -225,16 +274,8 @@ impl ProcessTools {
                 "invalid_command_limits",
             ));
         }
-        let scoped = matches!(authority, Authority::Authorized(_));
         if file_input != CommandFileInput::None
-            && (!scoped
-                || matches!(
-                    mode,
-                    CommandToolMode::Act {
-                        unconfined: true,
-                        ..
-                    }
-                ))
+            && (matches!(authority, Authority::Fixed { .. }) || mode.full_access())
         {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -252,7 +293,7 @@ impl ProcessTools {
         });
         Ok(Self {
             exec: Arc::new(ExecCommand {
-                definition: exec_definition(scoped, mode, file_input, limits)?,
+                definition: exec_definition(mode, file_input, limits)?,
                 shared: shared.clone(),
             }),
             write: Arc::new(WriteStdin {
@@ -269,25 +310,11 @@ impl ProcessTools {
 }
 
 fn exec_definition(
-    scoped: bool,
     mode: CommandToolMode,
     file_input: CommandFileInput,
     limits: CommandLimits,
 ) -> Result<ToolDefinition> {
-    let unconfined = matches!(
-        mode,
-        CommandToolMode::Act {
-            unconfined: true,
-            ..
-        }
-    );
-    let allow_command_network = matches!(
-        mode,
-        CommandToolMode::Act {
-            allow_network: true,
-            ..
-        }
-    );
+    let unconfined = mode.full_access();
     let mut schema = json!({
         "type": "object",
         "properties": {
@@ -301,22 +328,49 @@ fn exec_definition(
         "additionalProperties": false
     });
     let mut description = "Runs a command in a PTY or pipes, returning output or a session ID for ongoing interaction. The command runs with `sh -c` semantics in the user's shell (sh, bash, zsh or dash) inside a sandbox: network access is denied and writes stay inside granted locations. A command still running when the wait ends keeps running; continue with write_stdin and its session ID.".to_owned();
+    if mode.network() == CommandNetwork::Managed {
+        description = "Runs a command in a PTY or pipes under the workspace sandbox. Outbound HTTPS uses the managed proxy and each destination is reviewed on first connection. Use ordinary exec_command for downloads and package installs. Use a workspace or temporary cache if needed. Poll a running command with write_stdin and its session ID.".into();
+    }
     if unconfined {
         description = "Runs a command in a PTY or pipes with sh -c semantics in the user's shell (sh, bash, zsh or dash). Full access was explicitly selected: OS filesystem/network sandboxing is disabled, and commands can use the current OS user's files and network without further approval. This does not grant elevated OS privileges. A command still running when the wait ends keeps running; continue with write_stdin and its session ID.".into();
     }
-    if scoped {
+    if !matches!(mode, CommandToolMode::Fixed) {
         schema["properties"]["access"] = json!({"enum": ["read", "read_write"], "description": if unconfined { "Declare the intended operation. Full access does not confine filesystem or network effects, including when read is selected." } else { "read lets the command read the directory; read_write also lets it write there." }});
         schema["properties"]["directory"] = json!({"type": "string", "description": "ID of a configured directory grant. Omit for the primary directory, including when workdir points to one of its subfolders."});
         schema["required"] = json!(["cmd", "access"]);
         description.push_str(" Select read or read_write access explicitly. The working directory must be inside the selected directory.");
     }
-    if allow_command_network {
+    if mode.network() == CommandNetwork::ExactDestination {
         schema["properties"]["network"] = json!({
             "type":"object", "properties":{"host":{"type":"string"},"port":{"type":"integer","minimum":1,"maximum":65535}},
             "required":["host","port"], "additionalProperties":false,
             "description":"Request one TCP connection to an exact public DNS host and port for this command. Use curl or another client that honors the supplied SOCKS5 proxy URL. Omit tty and yield_time_ms. The command ends within 30 seconds."
         });
         description.push_str(" On request, a one-action approval permits a single proxied connection. Raw sockets stay denied.");
+    }
+    if mode.allows_escalation() {
+        schema["properties"]["sandbox_permissions"] = json!({
+            "type": "string", "enum": ["use_default", "require_escalated"],
+            "description": "Defaults to use_default. Use require_escalated and a justification to request one reviewed command when the default sandbox blocks necessary access. Use pipes with stdin closed."
+        });
+        schema["properties"]["justification"] = json!({
+            "type": "string", "minLength": 1, "maxLength": MAX_JUSTIFICATION_BYTES,
+            "description": format!("For require_escalated only. Explain in one line (up to {MAX_JUSTIFICATION_BYTES} UTF-8 bytes) what this command will do and which additional access it needs.")
+        });
+        description.push_str(" Use the default sandbox where possible. A reviewed command retains protected paths and the selected directory's access rules. Poll output or interrupt the process with write_stdin.");
+    }
+    if mode.network() == CommandNetwork::ManagedRetry {
+        description.push_str(" For managed outbound commands, use a cache in the workspace or $TMPDIR if the usual cache is not writable. Poll a running command to completion when its result is needed.");
+        schema["properties"]["network_access"] = json!({
+            "type": "boolean",
+            "description": "With require_escalated, request outbound HTTPS through the managed proxy. Each destination is reviewed when the command first connects."
+        });
+    }
+    if mode.allows_local_listener() {
+        schema["properties"]["listen_port"] = json!({
+            "type": "integer", "minimum": 1, "maximum": 65535,
+            "description": "With require_escalated, allow a TCP listener and loopback connections on this port for one command. For a local preview, use a loopback-only server or bind explicitly to 127.0.0.1 or ::1 on this port."
+        });
     }
     let plan = matches!(mode, CommandToolMode::Plan);
     if plan {
@@ -378,7 +432,7 @@ fn exec_definition(
     };
     Ok(ToolDefinition {
         id: ToolId::new(EXEC_COMMAND)?,
-        version,
+        version: if mode.allows_escalation() { 7 } else { version },
         description,
         input: InputFormat::Json(schema),
         max_input_bytes: limits.max_input_bytes,
@@ -416,11 +470,25 @@ pub(crate) struct ScopedCommandInput {
     pub(crate) path: PathBuf,
 }
 
+#[derive(Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum SandboxPermissions {
+    #[default]
+    UseDefault,
+    RequireEscalated,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ExecArguments {
     pub(crate) cmd: String,
+    #[serde(default)]
+    sandbox_permissions: SandboxPermissions,
+    justification: Option<String>,
     pub(crate) network: Option<super::CommandNetworkDestination>,
+    #[serde(default)]
+    pub(crate) network_access: bool,
+    pub(crate) listen_port: Option<std::num::NonZeroU16>,
     pub(crate) workdir: Option<PathBuf>,
     #[serde(default)]
     pub(crate) tty: bool,
@@ -434,35 +502,65 @@ pub(crate) struct ExecArguments {
 }
 
 impl ExecArguments {
-    pub(crate) fn parse(arguments: &ToolArguments, maximum: usize, scoped: bool) -> Result<Self> {
-        Self::parse_with_scope(arguments, maximum, scoped, false, CommandFileInput::None)
-    }
-
-    pub(crate) fn parse_plan(arguments: &ToolArguments, maximum: usize) -> Result<Self> {
-        Self::parse_workspace(arguments, maximum, true, CommandFileInput::None)
-    }
-
-    pub(crate) fn parse_workspace(
+    pub(crate) fn parse_for_mode(
         arguments: &ToolArguments,
         maximum: usize,
-        plan: bool,
+        mode: CommandToolMode,
         file_input: CommandFileInput,
     ) -> Result<Self> {
-        Self::parse_with_scope(arguments, maximum, true, plan, file_input)
-    }
-
-    fn parse_with_scope(
-        arguments: &ToolArguments,
-        maximum: usize,
-        scoped: bool,
-        plan: bool,
-        file_input: CommandFileInput,
-    ) -> Result<Self> {
+        let scoped = !matches!(mode, CommandToolMode::Fixed);
+        let plan = matches!(mode, CommandToolMode::Plan);
         let value = json_arguments(arguments, maximum)?;
         if value.get("input_file").is_some() && file_input == CommandFileInput::None {
             return Err(invalid());
         }
         let mut command: Self = serde_json::from_value(value.clone()).map_err(|_| invalid())?;
+        match command.sandbox_permissions {
+            SandboxPermissions::RequireEscalated => {
+                if value.get("listen_port").is_some() && command.listen_port.is_none() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "command_listener_port_invalid",
+                    ));
+                }
+                if command.network_access && command.listen_port.is_some() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "command_network_scope_conflict",
+                    ));
+                }
+                if command.tty
+                    || value.get("network").is_some()
+                    || value.get("input_file").is_some()
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "command_escalation_requires_plain_pipes",
+                    ));
+                }
+                if !command.justification.as_deref().is_some_and(|reason| {
+                    !reason.trim().is_empty()
+                        && reason.len() <= MAX_JUSTIFICATION_BYTES
+                        && !reason.chars().any(char::is_control)
+                }) {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "command_escalation_justification_invalid",
+                    ));
+                }
+            }
+            SandboxPermissions::UseDefault
+                if value.get("justification").is_some()
+                    || value.get("listen_port").is_some()
+                    || value.get("network_access").is_some() =>
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "command_escalation_justification_unexpected",
+                ));
+            }
+            SandboxPermissions::UseDefault => {}
+        }
         if plan {
             if command.access == Some(CommandAccess::ReadWrite)
                 || value.get("access").is_some_and(|access| access.is_null())
@@ -548,7 +646,37 @@ impl ExecArguments {
     }
 
     pub(crate) fn supports_finite(&self) -> bool {
-        !self.tty && self.yield_time_ms.is_none()
+        !self.tty && self.yield_time_ms.is_none() && self.escalation_justification().is_none()
+    }
+
+    /// A valid request can be declined by the current permissions after the
+    /// runtime has claimed the tool call and can return a regular result.
+    pub(crate) fn check_retry_scope(&self, mode: CommandToolMode) -> Result<()> {
+        if self.sandbox_permissions == SandboxPermissions::RequireEscalated
+            && !mode.allows_escalation()
+        {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "command_escalation_unavailable",
+            ));
+        }
+        if self.network_access && mode.network() != CommandNetwork::ManagedRetry {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "command_network_unavailable",
+            ));
+        }
+        if self.listen_port.is_some() && !mode.allows_local_listener() {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "command_listener_unavailable",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn escalation_justification(&self) -> Option<&str> {
+        self.justification.as_deref()
     }
 
     /// Run in the named or default directory, starting from the host's
@@ -674,22 +802,6 @@ fn output_budget(requested: Option<f64>, maximum: usize) -> usize {
 }
 
 impl Shared {
-    fn parse_exec(&self, input: &ToolArguments, maximum: usize) -> Result<ExecArguments> {
-        if self.file_input != CommandFileInput::None {
-            return ExecArguments::parse_workspace(
-                input,
-                maximum,
-                matches!(self.mode, CommandToolMode::Plan),
-                self.file_input,
-            );
-        }
-        match self.mode {
-            CommandToolMode::Plan => ExecArguments::parse_plan(input, maximum),
-            CommandToolMode::Act { .. } => ExecArguments::parse(input, maximum, true),
-            CommandToolMode::Fixed => ExecArguments::parse(input, maximum, false),
-        }
-    }
-
     fn record(&self, invocation: &Invocation, attempt: &AttemptId, outcome: &ToolOutcome) {
         let mut recorded = self
             .recorded
@@ -722,14 +834,25 @@ impl Shared {
 }
 
 impl ExecCommand {
+    fn parse_arguments(&self, arguments: &ToolArguments) -> Result<ExecArguments> {
+        ExecArguments::parse_for_mode(
+            arguments,
+            self.definition.max_input_bytes,
+            self.shared.mode,
+            self.shared.file_input,
+        )
+    }
+
     async fn run(&self, invocation: &Invocation, context: &InvocationContext) -> ToolOutcome {
         let started = Instant::now();
         let shared = &self.shared;
-        let arguments =
-            match shared.parse_exec(invocation.arguments(), self.definition.max_input_bytes) {
-                Ok(arguments) => arguments,
-                Err(error) => return ToolOutcome::failed(&error.code),
-            };
+        let arguments = match self.parse_arguments(invocation.arguments()) {
+            Ok(arguments) => arguments,
+            Err(error) => return ToolOutcome::failed(&error.code),
+        };
+        if let Err(error) = arguments.check_retry_scope(shared.mode) {
+            return ToolOutcome::failed(&error.code);
+        }
         let maximum = context
             .max_output_bytes
             .min(self.definition.max_output_bytes);
@@ -747,6 +870,9 @@ impl ExecCommand {
             ),
             Authority::Authorized(resolve) => match resolve(invocation) {
                 Ok(authority) if authority.spawn_finite.is_some() => {
+                    if !arguments.supports_finite() {
+                        return ToolOutcome::failed("command_finite_required");
+                    }
                     return self
                         .run_finite(authority, arguments, context, maximum)
                         .await;
@@ -766,7 +892,14 @@ impl ExecCommand {
                 Err(error) => return ToolOutcome::failed(&error.code),
             },
         };
-        let unconfined = matches!(scope, ProcessScope::Unconfined(_));
+        let process_access = match (&scope, arguments.escalation_justification()) {
+            (ProcessScope::Confined(_), None) => ProcessAccess::Confined,
+            (ProcessScope::Confined(_), Some(_)) => ProcessAccess::Escalated,
+            (ProcessScope::Unconfined(_), None) if shared.mode.full_access() => {
+                ProcessAccess::FullAccess
+            }
+            _ => return ToolOutcome::failed("command_scope_changed"),
+        };
         let spec = arguments.spec(&root, &environment, false);
         let cwd = spec.cwd.clone();
         let launch = match shared
@@ -829,7 +962,7 @@ impl ExecCommand {
             arguments.cmd.clone(),
             cwd,
             arguments.tty,
-            unconfined,
+            process_access,
             running,
         );
         let mut unlisted = Unlisted {
@@ -1019,16 +1152,16 @@ impl WriteStdin {
                 "unknown session id {id} (it may have ended or been stopped)"
             ));
         };
-        if entry.unconfined
-            && !matches!(
-                shared.mode,
-                CommandToolMode::Act {
-                    unconfined: true,
-                    ..
-                }
-            )
-        {
+        if entry.access == ProcessAccess::FullAccess && !shared.mode.full_access() {
             return ToolOutcome::failed("process_requires_full_access");
+        }
+        if entry.access == ProcessAccess::Escalated
+            && !arguments.chars.is_empty()
+            && arguments.chars != INTERRUPT
+        {
+            return ToolOutcome::failed(
+                "stdin is closed for the approved command. Poll or interrupt the process.",
+            );
         }
         let mut io = tokio::select! {
             io = entry.io.lock() => io,
@@ -1172,9 +1305,7 @@ impl Tool for ExecCommand {
     }
 
     fn validate(&self, arguments: &ToolArguments) -> Result<()> {
-        self.shared
-            .parse_exec(arguments, self.definition.max_input_bytes)
-            .map(|_| ())
+        self.parse_arguments(arguments).map(|_| ())
     }
 
     fn invoke(
@@ -1262,8 +1393,30 @@ impl Tool for WriteStdin {
 mod tests {
     use super::*;
 
+    const WORKSPACE: CommandToolMode = CommandToolMode::Act {
+        unconfined: false,
+        network: CommandNetwork::ExactDestination,
+        allow_escalation: false,
+    };
+
+    fn parse(
+        value: serde_json::Value,
+        mode: CommandToolMode,
+        file_input: CommandFileInput,
+    ) -> Result<ExecArguments> {
+        ExecArguments::parse_for_mode(&ToolArguments::Json(value), 4096, mode, file_input)
+    }
+
     fn exec(value: serde_json::Value, scoped: bool) -> Result<ExecArguments> {
-        ExecArguments::parse(&ToolArguments::Json(value), 4096, scoped)
+        parse(
+            value,
+            if scoped {
+                WORKSPACE
+            } else {
+                CommandToolMode::Fixed
+            },
+            CommandFileInput::None,
+        )
     }
 
     #[test]
@@ -1307,17 +1460,22 @@ mod tests {
             assert!(exec(invalid.clone(), scoped).is_err(), "{invalid}");
         }
         assert_eq!(
-            ExecArguments::parse(&ToolArguments::Json(json!({"cmd": "ls"})), 4, false)
-                .err()
-                .unwrap()
-                .code,
+            ExecArguments::parse_for_mode(
+                &ToolArguments::Json(json!({"cmd": "ls"})),
+                4,
+                CommandToolMode::Fixed,
+                CommandFileInput::None
+            )
+            .err()
+            .unwrap()
+            .code,
             "command_input_limit"
         );
     }
 
     #[test]
     fn plan_arguments_are_always_read_only_and_finite() {
-        let parse = |value| ExecArguments::parse_plan(&ToolArguments::Json(value), 4096);
+        let parse = |value| parse(value, CommandToolMode::Plan, CommandFileInput::None);
         for input in [json!({"cmd":"ls"}), json!({"cmd":"ls", "access":"read"})] {
             let arguments = parse(input).unwrap();
             assert_eq!(arguments.access, Some(CommandAccess::Read));
@@ -1335,11 +1493,125 @@ mod tests {
     }
 
     #[test]
+    fn escalation_is_one_justified_pipe_command_on_an_enabled_workspace() {
+        let enabled = CommandToolMode::Act {
+            unconfined: false,
+            network: CommandNetwork::ExactDestination,
+            allow_escalation: true,
+        };
+        let limits = CommandLimits {
+            timeout: Duration::from_secs(1),
+            max_input_bytes: 4096,
+            max_output_bytes: 4096,
+        };
+        let properties = |mode| {
+            let definition = exec_definition(mode, CommandFileInput::None, limits).unwrap();
+            let InputFormat::Json(schema) = definition.input else {
+                panic!("expected JSON schema")
+            };
+            schema["properties"].clone()
+        };
+        let request = json!({
+            "cmd":"pwd", "access":"read",
+            "sandbox_permissions":"require_escalated", "justification":"Check the selected directory."
+        });
+        for mode in [
+            CommandToolMode::Fixed,
+            CommandToolMode::Plan,
+            WORKSPACE,
+            CommandToolMode::Act {
+                unconfined: true,
+                network: CommandNetwork::Offline,
+                allow_escalation: true,
+            },
+        ] {
+            assert!(properties(mode).get("sandbox_permissions").is_none());
+            let mut request = request.clone();
+            if matches!(mode, CommandToolMode::Fixed) {
+                request.as_object_mut().unwrap().remove("access");
+            }
+            let request = parse(request, mode, CommandFileInput::None).unwrap();
+            assert_eq!(
+                request.check_retry_scope(mode).unwrap_err().code,
+                "command_escalation_unavailable"
+            );
+        }
+        assert_eq!(
+            properties(enabled)["sandbox_permissions"]["enum"],
+            json!(["use_default", "require_escalated"])
+        );
+        let parse = |input| parse(input, enabled, CommandFileInput::ScopedFiles);
+        let auth = parse(request.clone()).unwrap();
+        assert_eq!(
+            auth.escalation_justification(),
+            Some("Check the selected directory.")
+        );
+        assert!(!auth.supports_finite());
+        let mut yielding = request.clone();
+        yielding["yield_time_ms"] = json!(250);
+        assert!(parse(yielding).is_ok());
+        let mut listener = request.clone();
+        listener["access"] = json!("read");
+        listener["listen_port"] = json!(43000);
+        assert!(parse(listener).is_ok());
+        assert_eq!(
+            properties(enabled).get("listen_port").is_some(),
+            cfg!(target_os = "macos")
+        );
+
+        let defaults = json!({"cmd":"ls","access":"read", "sandbox_permissions":"use_default"});
+        assert!(
+            parse(defaults)
+                .unwrap()
+                .escalation_justification()
+                .is_none()
+        );
+        let mut missing = request.clone();
+        missing.as_object_mut().unwrap().remove("justification");
+        assert!(parse(missing).is_err());
+        let mut at_limit = request.clone();
+        at_limit["justification"] = json!("é".repeat(MAX_JUSTIFICATION_BYTES / 2));
+        assert!(parse(at_limit).is_ok());
+        for (field, invalid) in [
+            ("listen_port", json!(0)),
+            ("listen_port", json!(null)),
+            ("listen_port", json!(65536)),
+            ("justification", json!(null)),
+            ("justification", json!("   ")),
+            (
+                "justification",
+                json!("é".repeat(MAX_JUSTIFICATION_BYTES / 2 + 1)),
+            ),
+            ("justification", json!("reason\nsecond line")),
+            ("sandbox_permissions", json!("use_default")),
+            ("sandbox_permissions", json!("other")),
+            ("tty", json!(true)),
+            (
+                "input_file",
+                json!({"directory":"selected","path":"index.html"}),
+            ),
+            ("network", json!({"host":"example.com","port":443})),
+        ] {
+            let mut input = request.clone();
+            input[field] = invalid;
+            assert!(parse(input).is_err(), "{field}");
+        }
+    }
+
+    #[test]
     fn scoped_input_is_one_relative_file_and_only_for_finite_read_pipes() {
         let input_file = json!({"directory": "chosen", "path": "report.txt"});
         let input = json!({"cmd": "cat", "access": "read", "input_file": input_file});
         let parse = |value, plan, file_input| {
-            ExecArguments::parse_workspace(&ToolArguments::Json(value), 4096, plan, file_input)
+            parse(
+                value,
+                if plan {
+                    CommandToolMode::Plan
+                } else {
+                    WORKSPACE
+                },
+                file_input,
+            )
         };
         let command = parse(input.clone(), false, CommandFileInput::Scoped).unwrap();
         assert!(command.supports_finite());
@@ -1393,7 +1665,7 @@ mod tests {
             max_output_bytes: 4096,
         };
         let definition =
-            |file_input| exec_definition(true, CommandToolMode::Plan, file_input, limits).unwrap();
+            |file_input| exec_definition(CommandToolMode::Plan, file_input, limits).unwrap();
         assert_eq!(definition(CommandFileInput::None).version, 2);
         let legacy_scoped = definition(CommandFileInput::Scoped);
         assert_eq!(legacy_scoped.version, 3);
@@ -1420,12 +1692,15 @@ mod tests {
         assert_eq!(input["path"]["enum"], json!(["config.toml"]));
 
         let parse = |directory, path, plan, file_input| {
-            ExecArguments::parse_workspace(
-                &ToolArguments::Json(json!({
+            parse(
+                json!({
                     "cmd":"cat","access":"read","input_file":{"directory":directory,"path":path}
-                })),
-                4096,
-                plan,
+                }),
+                if plan {
+                    CommandToolMode::Plan
+                } else {
+                    WORKSPACE
+                },
                 file_input,
             )
         };
@@ -1490,18 +1765,18 @@ mod tests {
         std::fs::set_permissions(&plain, std::fs::Permissions::from_mode(0o700)).unwrap();
         let custom_shell = environment(plain.to_str().unwrap());
         assert_eq!(shell(&custom_shell), plain);
-        let plan = ExecArguments::parse_plan(&ToolArguments::Json(json!({"cmd": "ls"})), 4096)
-            .unwrap()
-            .spec(Path::new("/project"), &custom_shell, true);
-        assert_eq!(plan.executable, Path::new(DEFAULT_SHELL));
-
-        let spec = ExecArguments::parse(
-            &ToolArguments::Json(json!({"cmd": "echo hi", "tty": true})),
-            4096,
-            false,
+        let plan = parse(
+            json!({"cmd": "ls"}),
+            CommandToolMode::Plan,
+            CommandFileInput::None,
         )
         .unwrap()
-        .spec(Path::new("/project"), &environment("/bin/sh"), false);
+        .spec(Path::new("/project"), &custom_shell, true);
+        assert_eq!(plan.executable, Path::new(DEFAULT_SHELL));
+
+        let spec = exec(json!({"cmd": "echo hi", "tty": true}), false)
+            .unwrap()
+            .spec(Path::new("/project"), &environment("/bin/sh"), false);
         assert_eq!(spec.arguments, ["-c", "echo hi"]);
         assert_eq!(spec.cwd, PathBuf::from("/project"));
         assert!(spec.stdin.is_empty());

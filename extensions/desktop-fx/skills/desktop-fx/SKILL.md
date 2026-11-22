@@ -32,10 +32,12 @@ use. Use `grida-fx doctor` to check provider setup.
 
 When a viewer is useful, use `grida-fx plan <workflow> --check --register --json`
 or `grida-fx inspect <run> --register --json`. Registration returns the entry's
-relative `route`. Resolve it against the running service URL returned by
-`grida-fx status --project-root <project-dir> --json` for that same project.
+relative `route`. Resolve it against the same project's service URL from
+`grida-fx start --json` or `grida-fx status --project-root <project-dir> --json`.
 When the user wants the viewer started, run `grida-fx start --json` in the
 project and keep its foreground process running while the viewer is in use.
+To choose a fixed loopback port, run `grida-fx start --port <port> --json`.
+Without `--port`, FX uses the project's remembered port or starts on 8787.
 
 A registered route identifies a plan or saved run on that project's current
 service. Verify the viewer's subject and selection before using its presentation

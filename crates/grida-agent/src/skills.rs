@@ -151,11 +151,23 @@ pub(crate) struct CapturedGuidance {
 }
 
 impl CapturedGuidance {
+    const SOURCE: &'static str = "selected-task-guidance";
+
+    pub(crate) fn is_message(message: &Message) -> bool {
+        message.role == Role::User
+            && message.provenance.source == Self::SOURCE
+            && message.provenance.kind == ProvenanceKind::Supplied
+    }
+
     pub(crate) fn selected(&self) -> Vec<SkillDescription> {
         self.skills
             .iter()
             .map(|skill| skill.descriptor.clone())
             .collect()
+    }
+
+    pub(crate) fn project_instructions(&self) -> Option<&str> {
+        self.project.as_ref().map(|project| project.body.as_str())
     }
 
     pub(crate) fn project_revision(&self) -> Option<&str> {
@@ -165,7 +177,7 @@ impl CapturedGuidance {
     }
 
     pub(crate) fn message(&self, input: &ChangeId) -> Result<Message> {
-        let source = "selected-task-guidance";
+        let source = Self::SOURCE;
         let identity = Fingerprint::of(&(source, input))?.to_hex();
         let text = serde_json::to_string(self)
             .map_err(|_| problem(ErrorKind::InvalidState, "skill_context_encoding_failed"))?;

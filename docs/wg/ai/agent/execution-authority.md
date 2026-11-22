@@ -17,9 +17,15 @@ Every raw agent-controlled runtime receives its own captured authority.
 Restricted execution confines that authority. A user may instead explicitly
 choose the Full access posture defined by [Permission policy](./permissions.md#sandbox-levels),
 relinquishing filesystem and network isolation for that chat's execution.
+A host may offer additional scope for one reviewed command within its
+permission ceiling. The chat keeps its captured preset.
 Mediated or cooperatively configured connections use the user's effective host
 network, within the principal's destination grant. An incompatible opaque
-client remains unavailable.
+client remains unavailable. A managed command profile supplies a proxy that requests destination decisions
+from the host as connections occur. Each approved
+hostname and port belongs to that running process. The runtime's approval
+interaction records the destination, and the sandbox limits connections to
+the host-supplied proxy ingress.
 
 The model distinguishes two boundaries. Host containment is a separately
 declared deployment guarantee for trusted code that implements structured
@@ -189,7 +195,9 @@ MUST cover at least:
 - lifetime, cancellation, and output bounds; and
 - the credentials, if any, deliberately delegated to that principal.
 
-An explicitly user-selected Full access process runs without that confinement.
+A reviewed confined command retains the host's mandatory filesystem denials
+and any network limits outside its approved scope. An explicit Full access
+preset authorizes execution outside that confinement.
 Its authority record MUST identify the unconfined posture before launch; it
 MUST NOT claim protected-path, destination or descendant-isolation guarantees.
 Its network stack follows the launched software's own OS and proxy support,
@@ -313,8 +321,8 @@ MUST withhold the capabilities covered by that requirement. Structured local
 capabilities otherwise follow their declared host profile. Ambient raw execution
 MUST NOT be labeled sandboxed.
 
-An explicit user-selected Full access grant or human-operated development
-escape hatch MAY provide ambient raw execution. It is a distinct, visibly
+An explicit Full access grant or human-operated development escape hatch MAY
+provide ambient raw execution. It is a distinct, visibly
 unsandboxed posture and is never the default consequence of an unavailable
 enforcer. Same-user code in this posture may reach readable host state and
 credentials; clearing inherited credentials does not establish isolation from
@@ -438,8 +446,9 @@ An implementation conforms only if it can demonstrate all of these:
    in a separate compartment.
 5. **Restricted raw shell is confined.** A model-selected restricted command cannot read protected
    host data, write outside writable roots, spawn beyond its process rules, or
-   reach an ungranted destination. An explicitly selected Full access command
-   instead reports its unconfined posture and retains lifecycle ownership.
+   reach an ungranted destination. Approved additions keep the host's mandatory
+   denies effective. A command authorized for unconfined execution reports
+   that posture and retains lifecycle ownership.
 6. **Allowed confined egress preserves routing.** An allowed destination uses
    the configured host route; a disallowed destination is rejected before any
    upstream request.
@@ -501,9 +510,9 @@ credential custody.
 
 ### Offer a “disable sandbox” switch as the solution
 
-Skipping confinement may be an explicit Full access or development posture, but it drops
-filesystem, process, and network protection together. It does not solve host
-routing while keeping agent authority confined.
+Explicit Full access and human-operated development postures relinquish
+filesystem, process and network isolation together. Routed access inside
+confinement requires a distinct, enforceable grant.
 
 ## Consequences
 

@@ -2312,7 +2312,7 @@ export class NativeAgentChat {
       return {
         view: revision(page.view),
         messages: [...capture.messages.values()],
-        turns: turnRecords(page.turns),
+        turns: turnRecords(page.turns, this.process.acceptsReconsideration),
         older,
       };
     } finally {
@@ -2329,7 +2329,9 @@ export class NativeAgentChat {
     const permissions = this.process.permissions;
     if (
       !permissions ||
-      current?.disposition !== "suspended" ||
+      !current ||
+      (current.disposition !== "suspended" &&
+        (current.disposition !== "running" || !current.inputNeeded)) ||
       current.paused ||
       current.cancelled
     )
@@ -2344,7 +2346,28 @@ export class NativeAgentChat {
       )
     )
       throw new Error("native_chat_approval_changed");
-    return reviews;
+    // Destination approvals can ask the user while the process is running.
+    // Pre-launch approvals wait for the turn to suspend.
+    return current.disposition === "running"
+      ? reviews.filter((review) =>
+          review.waitId.startsWith("approval/network/")
+        )
+      : reviews;
+  }
+
+  async reconsiderDenial(
+    session: NativeChatSession,
+    turnId: string,
+    reviewId: string
+  ): Promise<void> {
+    const sessionId = this.requireAttached(session);
+    if (!this.process.permissions || !this.process.acceptsReconsideration)
+      throw new Error("native_chat_reconsideration_unavailable");
+    await this.process.permissions.reconsiderDenial(
+      sessionId,
+      turnId,
+      reviewId
+    );
   }
 
   async answerApproval(
@@ -3540,7 +3563,10 @@ function messagePhase(
   return value;
 }
 
-function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
+function turnRecords(
+  value: unknown,
+  acceptsReconsideration: boolean
+): NativeChatTurnRecord[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > MAX_TRANSCRIPT_MESSAGES)
     throw invalidResponse();
@@ -3559,7 +3585,10 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
     const compaction = compactionFact(record.compaction);
-    const approvalReviews = approvalReviewFacts(record.approvalReviews);
+    const approvalReviews = approvalReviewFacts(
+      record.approvalReviews,
+      acceptsReconsideration
+    );
     const modelId = optionalIdentity(record.modelId);
     return Object.freeze({
       turnId: identity(record.turnId),
@@ -3576,12 +3605,22 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
 }
 
 function approvalReviewFacts(
-  value: unknown
+  value: unknown,
+  acceptsReconsideration: boolean
 ): NativeChatTurnRecord["approvalReviews"] {
   if (value == null) return undefined;
-  if (!Array.isArray(value) || value.length > 64) throw invalidResponse();
+  if (!Array.isArray(value) || value.length > 1024) throw invalidResponse();
   return value.map((item) => {
-    const { decision, action } = object(item);
+    const {
+      decision,
+      action,
+      failure,
+      riskLevel,
+      rationale,
+      reviewId,
+      reconsidered,
+      userAuthorization,
+    } = object(item);
     if (
       (decision !== "reviewing" &&
         decision !== "approved" &&
@@ -3589,10 +3628,45 @@ function approvalReviewFacts(
         decision !== "needs_human") ||
       typeof action !== "string" ||
       !action ||
-      Buffer.byteLength(action) > 4096
+      Buffer.byteLength(action) > 4096 ||
+      (rationale !== undefined &&
+        (typeof rationale !== "string" || Buffer.byteLength(rationale) > 512))
     )
       throw invalidResponse();
-    return { decision, action };
+    return {
+      decision,
+      action,
+      ...(acceptsReconsideration &&
+        reviewId !== undefined &&
+        decision === "declined" && { reviewId: identity(reviewId) }),
+      ...(reconsidered === true && { reconsidered: true as const }),
+      ...(userAuthorization !== undefined && {
+        userAuthorization: choice(userAuthorization, [
+          "unknown",
+          "low",
+          "medium",
+          "high",
+        ] as const),
+      }),
+      ...(failure !== undefined && {
+        failure: choice(failure, [
+          "timed_out",
+          "interrupted",
+          "invalid_reply",
+          "unavailable",
+          "needs_human",
+        ] as const),
+      }),
+      ...(riskLevel !== undefined && {
+        riskLevel: choice(riskLevel, [
+          "low",
+          "medium",
+          "high",
+          "critical",
+        ] as const),
+      }),
+      ...(rationale && { rationale }),
+    };
   });
 }
 

@@ -29,12 +29,14 @@ export function NativeTurnActivity({
   showModelChanges = false,
   subagentEvents = [],
   approvalReviews,
+  onReconsider,
   onOpenSubagent,
   loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
   showModelChanges?: boolean;
   approvalReviews?: NativeChatTurnRecord["approvalReviews"];
+  onReconsider?: (reviewId: string) => void;
   renderMessage: (
     message: NativeChatMessage,
     completedAnswer?: boolean
@@ -53,10 +55,19 @@ export function NativeTurnActivity({
     subagentEvents,
     block.turnId
   );
+  const visibleReviews = approvalReviews?.filter(
+    (review) =>
+      review.decision !== "approved" && review.failure !== "interrupted"
+  );
+  const pending =
+    visibleReviews?.filter((review) => review.decision === "reviewing") ?? [];
+  const decisions = visibleReviews?.filter(
+    (review) => review.decision !== "reviewing"
+  );
   const hasWork =
     (timeline.work.length > 0 ||
       timeline.unplaced.length > 0 ||
-      !!approvalReviews?.length) &&
+      !!visibleReviews?.length) &&
     !stopped;
   return (
     <div
@@ -76,7 +87,7 @@ export function NativeTurnActivity({
       {block.requests.map((message) => renderMessage(message))}
       {(turn_activity.showsHeader(block) ||
         (block.finished &&
-          (subagentEvents.length > 0 || !!approvalReviews?.length))) && (
+          (subagentEvents.length > 0 || !!visibleReviews?.length))) && (
         <div className="border-b pb-1">
           {hasWork ? (
             <button
@@ -99,13 +110,59 @@ export function NativeTurnActivity({
           )}
         </div>
       )}
-      {open &&
-        approvalReviews?.map((approvalReview, index) => (
-          <p key={index} className="text-xs text-muted-foreground break-words">
-            {REVIEW_LABEL[approvalReview.decision]}{" "}
-            <bdi>{reviewText(approvalReview.action)}</bdi>
-          </p>
-        ))}
+      {open && pending.length > 0 && (
+        <div
+          className="text-xs text-muted-foreground break-words"
+          role="status"
+        >
+          {pending.length === 1 ? (
+            <>
+              Reviewing access for <bdi>{reviewText(pending[0].action)}</bdi>
+            </>
+          ) : (
+            <>
+              Reviewing {pending.length} approval requests
+              {pending.slice(0, 3).map((review, index) => (
+                <bdi key={index} className="block truncate">
+                  {reviewText(review.action)}
+                </bdi>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+      {decisions?.map((approvalReview, index) => (
+        <p key={index} className="text-xs text-muted-foreground break-words">
+          {approvalReview.decision === "needs_human"
+            ? "Automatic review deferred to you for"
+            : approvalReview.failure
+              ? REVIEW_FAILURE[approvalReview.failure]
+              : "Automatically declined"}{" "}
+          <bdi>{reviewText(approvalReview.action)}</bdi>
+          {approvalReview.decision === "declined" &&
+            approvalReview.riskLevel &&
+            ` (${approvalReview.riskLevel} risk)`}
+          {approvalReview.decision === "declined" &&
+            approvalReview.rationale && (
+              <span className="block">
+                <bdi>{approvalReview.rationale}</bdi>
+              </span>
+            )}
+          {approvalReview.reviewId &&
+            onReconsider &&
+            (approvalReview.reconsidered ? (
+              <span className="block">Reconsideration requested.</span>
+            ) : (
+              <button
+                type="button"
+                className="block cursor-pointer underline underline-offset-2"
+                onClick={() => onReconsider(approvalReview.reviewId!)}
+              >
+                Request reconsideration
+              </button>
+            ))}
+        </p>
+      ))}
       {open &&
         timeline.work.map((item) =>
           item.kind === "commentary" ? (
@@ -245,9 +302,10 @@ function SubagentEventRow({
   );
 }
 
-const REVIEW_LABEL = {
-  reviewing: "Reviewing access for",
-  approved: "Automatically approved",
-  declined: "Automatically declined",
+const REVIEW_FAILURE = {
+  timed_out: "Automatic review timed out for",
+  interrupted: "Automatic review interrupted for",
+  unavailable: "Automatic review unavailable for",
+  invalid_reply: "Automatic review failed for",
   needs_human: "Automatic review deferred to you for",
 } as const;

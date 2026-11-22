@@ -423,6 +423,13 @@ fn launch(command: Command) -> Command {
                 .help("Offer one-action file approvals, supported command networking and the automatic reviewer for newly accepted work"),
         )
         .arg(
+            Arg::new("allow-reviewed-command-retry")
+                .long("allow-reviewed-command-retry")
+                .action(ArgAction::SetTrue)
+                .requires("permission-profile")
+                .help("Allow Act commands to request a reviewed retry with additional sandbox permissions"),
+        )
+        .arg(
             Arg::new("headless-surface")
                 .long("headless-surface")
                 .action(ArgAction::SetTrue)
@@ -779,7 +786,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             "revision": view.revision,
             "admission_paused": view.admission_paused,
             "input_needed": view.current.as_ref().is_some_and(|turn| !turn.controls.cancelled
-                && grida_agent::host::needs_user_input(&turn.pending_request_schemas)),
+                && grida_agent::host::needs_user_input(&turn.pending_request_schemas, Some(turn.disposition))),
             "current": view.current,
             "latest": view.latest,
         }))
@@ -853,6 +860,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 provider.credential_home.as_deref(),
                 &launch_secrets,
                 args.get_flag("allow-scoped-approvals"),
+                args.get_flag("allow-reviewed-command-retry"),
             )
         })
         .transpose()?;

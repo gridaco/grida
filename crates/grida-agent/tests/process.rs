@@ -282,7 +282,7 @@ impl Endpoint {
                     continue;
                 };
                 connections.spawn(async move {
-                    fixture_request(stream, head, &sent, reply, protocol, credential).await;
+                    fixture_request(stream, head, &sent, reply, protocol, credential, wait).await;
                 });
             }
             drop(listener);
@@ -440,6 +440,7 @@ async fn fixture_request(
     reply: Reply,
     protocol: ProviderProtocol,
     credential: Option<&str>,
+    wait: Duration,
 ) {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     let (reply, credential) = match reply {
@@ -574,7 +575,7 @@ async fn fixture_request(
     if hold {
         let mut remaining = [0; 1];
         assert_eq!(
-            timeout(WAIT, stream.read(&mut remaining))
+            timeout(wait, stream.read(&mut remaining))
                 .await
                 .unwrap()
                 .unwrap(),

@@ -210,7 +210,7 @@ impl FileTools {
     ) -> Result<Vec<u8>> {
         let mut file = self.open(directory, path, Kind::File, budget)?;
         let before = unix::fstat(&file).map_err(open_error)?;
-        let (bytes, limited) = read(&mut file, maximum, budget)?;
+        let (bytes, limited) = read(&mut file, maximum, || budget.check())?;
         if limited {
             return Err(problem(ErrorKind::LimitExceeded, "image_size_limit"));
         }
@@ -292,7 +292,7 @@ impl FileTools {
         .map_err(open_error)?
         .into();
         same_inode(&before, &unix::fstat(&file).map_err(open_error)?)?;
-        let (bytes, limited) = read(&mut file, MAX_FILE_BYTES, budget)?;
+        let (bytes, limited) = read(&mut file, MAX_FILE_BYTES, || budget.check())?;
         if limited {
             return Err(problem(ErrorKind::LimitExceeded, "file_too_large"));
         }
@@ -610,7 +610,7 @@ impl Search {
         self.files += 1;
         let remaining = MAX_SEARCH_BYTES - self.bytes;
         let maximum = MAX_FILE_BYTES.min(remaining.saturating_sub(1));
-        let (bytes, limited) = read(file, maximum, budget)?;
+        let (bytes, limited) = read(file, maximum, || budget.check())?;
         self.bytes += bytes.len();
         if limited {
             self.truncated = true;
@@ -639,14 +639,18 @@ impl Search {
     }
 }
 
-fn read(file: &mut File, maximum: usize, budget: &Budget) -> Result<(Vec<u8>, bool)> {
+fn read(
+    file: &mut File,
+    maximum: usize,
+    check: impl Fn() -> Result<()>,
+) -> Result<(Vec<u8>, bool)> {
     if file.metadata().map_err(|_| unavailable())?.len() > maximum as u64 {
         return Ok((Vec::new(), true));
     }
     let mut bytes = Vec::new();
     let mut buffer = [0; 8192];
     while bytes.len() <= maximum {
-        budget.check()?;
+        check()?;
         let want = (maximum + 1 - bytes.len()).min(buffer.len());
         match file.read(&mut buffer[..want]) {
             Ok(0) => return Ok((bytes, false)),
@@ -667,11 +671,20 @@ fn decode(bytes: Vec<u8>) -> Result<String> {
 }
 
 fn read_text(file: &mut File, budget: &Budget) -> Result<ToolOutcome> {
-    let (bytes, limited) = read(file, budget.output.min(MAX_FILE_BYTES), budget)?;
+    let text = read_bounded_text(file, budget.output.min(MAX_FILE_BYTES), || budget.check())?;
+    text_outcome(text, false, budget.output)
+}
+
+pub(crate) fn read_bounded_text(
+    file: &mut File,
+    maximum: usize,
+    check: impl Fn() -> Result<()>,
+) -> Result<String> {
+    let (bytes, limited) = read(file, maximum, check)?;
     if limited {
         return Err(problem(ErrorKind::LimitExceeded, "file_read_limit"));
     }
-    text_outcome(decode(bytes)?, false, budget.output)
+    decode(bytes)
 }
 
 fn child(parent: &File, raw_name: &[u8]) -> Result<Option<Entry>> {
@@ -928,6 +941,16 @@ fn open_beneath(
 
 pub(crate) fn verify_open_path(file: &File, root: &Path) -> Result<()> {
     if !observed_path(file)?.starts_with(root) {
+        return Err(problem(ErrorKind::Conflict, "file_path_changed"));
+    }
+    Ok(())
+}
+
+/// Revalidate the exact file named by the request before releasing its contents.
+pub(crate) fn verify_named_file(file: &File, path: &Path) -> Result<()> {
+    if file.metadata().map_err(|_| unavailable())?.nlink() != 1
+        || observed_path(file)?.as_os_str() != path.as_os_str()
+    {
         return Err(problem(ErrorKind::Conflict, "file_path_changed"));
     }
     Ok(())

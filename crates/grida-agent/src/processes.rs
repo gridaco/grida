@@ -11,13 +11,16 @@
 
 mod network;
 pub use network::CommandNetworkDestination;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) use network::managed::{ApproveDestination, ManagedCommandProxy};
 mod output;
 mod tools;
 
 pub use tools::ProcessTools;
 pub(crate) use tools::{
-    AuthorizedProcess, CommandFileInput, CommandToolMode, EXEC_COMMAND, ExecArguments,
-    FiniteCommand, FiniteLaunch, ProcessScope, ScopedCommandInput, SpawnFiniteCommand, WRITE_STDIN,
+    AuthorizedProcess, CommandFileInput, CommandNetwork, CommandToolMode, EXEC_COMMAND,
+    ExecArguments, FiniteCommand, FiniteLaunch, ProcessScope, ScopedCommandInput,
+    SpawnFiniteCommand, WRITE_STDIN,
 };
 
 use crate::command::{cleanup_verified, summarize};
@@ -106,6 +109,14 @@ struct State {
     tracked_attempts: BTreeMap<SessionId, BTreeSet<AttemptId>>,
 }
 
+/// Authority at launch controls later interaction with the process.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProcessAccess {
+    Confined,
+    Escalated,
+    FullAccess,
+}
+
 pub(crate) struct Entry {
     serial: u64,
     session: SessionId,
@@ -113,8 +124,7 @@ pub(crate) struct Entry {
     command: String,
     cwd: PathBuf,
     terminal: bool,
-    /// Whether the host launched this process outside the OS sandbox.
-    unconfined: bool,
+    access: ProcessAccess,
     started_at: u64,
     stop: CancellationToken,
     /// Held for one interaction: a read, write or the final collection.
@@ -392,7 +402,7 @@ impl ProcessSessions {
         command: String,
         cwd: PathBuf,
         terminal: bool,
-        unconfined: bool,
+        access: ProcessAccess,
         running: RunningSession,
     ) -> Arc<Entry> {
         let mut state = self.state();
@@ -406,7 +416,7 @@ impl ProcessSessions {
             command,
             cwd,
             terminal,
-            unconfined,
+            access,
             started_at: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map_or(0, |time| {
@@ -778,6 +788,7 @@ impl Entry {
                 Err(_) => Ending::lost(),
             };
             let verified = ending.verified;
+            entry.stop.cancel();
             entry
                 .status
                 .lock()
@@ -897,7 +908,7 @@ mod tests {
             command: "true".into(),
             cwd: PathBuf::from("/"),
             terminal: false,
-            unconfined: false,
+            access: ProcessAccess::Confined,
             started_at: 0,
             stop: CancellationToken::new(),
             io: tokio::sync::Mutex::new(Io {

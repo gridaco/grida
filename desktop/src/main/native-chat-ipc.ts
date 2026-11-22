@@ -181,6 +181,7 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "reconsiderDenial"
         | "withQuestionBatchPreference"
         | "predictPrompt"
         | "messageActivityCatalog"
@@ -258,7 +259,10 @@ type Attachment = {
   session: NativeChatSession;
   latestObservation?: NativeChatSnapshot;
   observations: Map<string, NativeChatSnapshot>;
-  approvals: Map<string, NativeApprovalReview>;
+  approvals: Map<
+    string,
+    { review: NativeApprovalReview; declineOnly: boolean }
+  >;
   questions: Map<string, NativeQuestionReview>;
   librarySelections: Map<string, NativeLibrarySelectionReview>;
   goals: Map<string, NativeGoalInspection>;
@@ -3960,7 +3964,10 @@ export class NativeChatIpc {
   async approvals(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    acceptsCommandRetries?: unknown,
+    acceptsManagedOutbound?: unknown,
+    acceptsCommandSessions?: unknown
   ): Promise<readonly NativeChatApproval[]> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = requireObservation(attachment, observationId);
@@ -3970,9 +3977,25 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return reviews.slice(0, MAX_REVIEWS).map((review) => {
+      const declineOnly =
+        review.tool === "exec_command" &&
+        (review.sandboxPermissions === "require_escalated"
+          ? acceptsCommandRetries !== true ||
+            (review.network?.kind === "managed" &&
+              acceptsManagedOutbound !== true)
+          : (review.process !== undefined || review.managedNetwork === true) &&
+            acceptsCommandSessions !== true);
+      // A wait whose displayed action changed needs a new decision.
+      for (const [id, previous] of attachment.approvals)
+        if (
+          previous.review.turnId === review.turnId &&
+          previous.review.waitId === review.waitId &&
+          !isDeepStrictEqual(previous.review, review)
+        )
+          attachment.approvals.delete(id);
       const reviewId = retainReview(
         attachment.approvals,
-        review,
+        { review, declineOnly },
         isDeepStrictEqual
       );
       const basis = {
@@ -3981,17 +4004,30 @@ export class NativeChatIpc {
         ...(review.reviewFailure && { reviewFailure: review.reviewFailure }),
       };
       if (review.tool === "exec_command") {
-        const { tool, command, cwd, executable, access, network, scope } =
-          review;
+        const { tool, command, cwd, executable, scope } = review;
+        const common = { ...basis, tool, command, cwd, executable };
+        if (review.sandboxPermissions === "require_escalated") {
+          // An older card assumes any network object has an outbound host
+          // and enables Allow once whenever it sees a filesystem scope.
+          return {
+            ...common,
+            sandboxPermissions: review.sandboxPermissions,
+            justification: review.justification,
+            environmentNames: review.environmentNames,
+            ...(declineOnly
+              ? {}
+              : { access: review.access, network: review.network, scope }),
+          };
+        }
         return {
-          ...basis,
-          tool,
-          command,
-          cwd,
-          executable,
-          access,
-          network,
-          scope,
+          ...common,
+          access: review.access,
+          network: review.network,
+          ...(review.process && { process: review.process }),
+          ...(review.managedNetwork && {
+            managedNetwork: review.managedNetwork,
+          }),
+          scope: declineOnly ? undefined : scope,
         };
       }
       const { tool, relativePath, query } = review;
@@ -4105,6 +4141,20 @@ export class NativeChatIpc {
     return receipt;
   }
 
+  async reconsiderDenial(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    turnId: string,
+    reviewId: string
+  ): Promise<void> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (!chat.reconsiderDenial)
+      throw new Error("native_chat_reconsideration_unavailable");
+    await chat.reconsiderDenial(attachment.session, turnId, reviewId);
+    this.revalidate(owner, attachment);
+  }
+
   async answerApproval(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -4114,13 +4164,14 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     if (decision !== "approve_once" && decision !== "decline")
       throw new Error("native_chat_approval_decision_invalid");
-    const review = token(reviewId)
+    const retained = token(reviewId)
       ? attachment.approvals.get(reviewId)
       : undefined;
-    if (!review) throw new Error("native_chat_approval_unavailable");
+    if (!retained || (retained.declineOnly && decision !== "decline"))
+      throw new Error("native_chat_approval_unavailable");
     const receipt = await owner.active.chat.answerApproval(
       attachment.session,
-      review,
+      retained.review,
       decision
     );
     this.revalidate(owner, attachment);

@@ -9,13 +9,15 @@ use crate::file_tools::{
 };
 use crate::goal_verification::ReadVerification;
 use crate::processes::{
-    AuthorizedProcess, CommandFileInput, CommandToolMode, EXEC_COMMAND, ExecArguments,
-    ProcessScope, ProcessSessions, ProcessTools, SESSION_LIFETIME, ScopedCommandInput, WRITE_STDIN,
+    AuthorizedProcess, CommandFileInput, CommandNetwork, CommandToolMode, EXEC_COMMAND,
+    ExecArguments, ProcessScope, ProcessSessions, ProcessTools, SESSION_LIFETIME,
+    ScopedCommandInput, WRITE_STDIN,
 };
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, Denial, GrantSelection,
 };
+use agent_kit_core::inference::InputFormat;
 use agent_kit_core::tools::{Inventory, Invocation};
 use agent_kit_core::turn::{
     OperationInput, OperationState, ResponseContract, TurnBinding, WaitRecord,
@@ -41,13 +43,25 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 mod command_input;
+mod review_files;
+mod review_shell;
 
 pub(crate) const REQUEST: &str = "grida.agent.approval";
+pub(crate) const SCOPED_REVIEW: &str = "grida.agent.scoped-review";
+pub(crate) const NETWORK_REVIEW: &str = "grida.agent.network-review";
+/// A live connection for which the broker has explicitly requested a human decision.
+pub(crate) const NETWORK_HANDOFF: &str = "grida.agent.network-approval";
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
 const MAX_GOAL_READ_VERIFICATIONS: usize = 16;
 const PRIMARY_REVIEW_CONTEXT: &str = "\nYou may inspect the primary workspace with read_file, list_files, and search_text. Use relative paths and omit the directory field.";
+
+enum ConfinedCommandAuthority {
+    Default,
+    ReviewedOffline,
+    Listener(std::num::NonZeroU16),
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,6 +87,19 @@ pub struct DirectoryAccess {
     /// captured before file writes existed keep their identity.
     #[serde(skip_serializing_if = "AccessRule::is_deny")]
     pub write: AccessRule,
+}
+
+impl DirectoryAccess {
+    fn command_rule(self, access: CommandAccess, needs_review: bool) -> Result<AccessRule> {
+        let rule = match access {
+            CommandAccess::Read => self.command_read,
+            CommandAccess::ReadWrite => self.command_read_write,
+        };
+        if rule == AccessRule::Deny {
+            return Err(denied());
+        }
+        Ok(if needs_review { AccessRule::Ask } else { rule })
+    }
 }
 
 /// Native installation and fixed command constraints chosen by the host.
@@ -129,6 +156,7 @@ pub struct PermissionProfile {
     identity: Fingerprint,
     context: String,
     allow_full_access: bool,
+    allow_command_escalation: bool,
     command_network_home: Option<PathBuf>,
     allow_approve_for_me: bool,
     allow_external_file_read: bool,
@@ -166,6 +194,16 @@ pub struct PermissionCapture {
     external_file_read: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     command_network: bool,
+    /// Accepted work retains its original command offer on resume.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    managed_command_network: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    review_command_effects: bool,
+    /// Captured separately because private shell evidence can leave the primary workspace.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    review_shell: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    command_escalation: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     plan: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -337,6 +375,7 @@ impl PermissionProfile {
             identity,
             context,
             allow_full_access: false,
+            allow_command_escalation: false,
             command_network_home: None,
             allow_approve_for_me: false,
             allow_external_file_read: false,
@@ -376,6 +415,17 @@ impl PermissionProfile {
             self.command_network_home = Some(state.to_owned());
         }
         self
+    }
+
+    pub(crate) fn with_command_escalation(mut self, allowed: bool) -> Result<Self> {
+        if allowed && (self.command.is_none() || self.hooks_only) {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "command_escalation_launch_invalid",
+            ));
+        }
+        self.allow_command_escalation = allowed;
+        Ok(self)
     }
 
     pub(crate) fn with_approve_for_me(mut self, allowed: bool) -> Self {
@@ -704,19 +754,7 @@ impl PermissionProfile {
     }
 
     pub fn capture(&self, scope: ScopeId) -> PermissionCapture {
-        PermissionCapture {
-            scope,
-            profile: self.identity,
-            context: self.mode_context(PermissionMode::Restricted, self.allow_external_file_read),
-            mode: PermissionMode::Restricted,
-            external_file_read: self.allow_external_file_read,
-            command_network: self.command_network_home.is_some(),
-            plan: false,
-            shell_text_reads: false,
-            command_file_input: false,
-            broad_command_reads: false,
-            client_managed_settings: false,
-        }
+        self.capture_supported_mode(scope, PermissionMode::Restricted)
     }
 
     pub(crate) fn capture_mode(
@@ -730,20 +768,33 @@ impl PermissionProfile {
                 "permission_mode_unavailable",
             ));
         }
-        Ok(PermissionCapture {
+        Ok(self.capture_supported_mode(scope, mode))
+    }
+
+    fn capture_supported_mode(&self, scope: ScopeId, mode: PermissionMode) -> PermissionCapture {
+        let managed = self.allow_command_escalation
+            && self.command_network_home.is_some()
+            && mode != PermissionMode::FullAccess;
+        let mut capture = PermissionCapture {
             scope,
             profile: self.identity,
-            context: self.mode_context(mode, self.allow_external_file_read),
+            context: String::new(),
             mode,
             external_file_read: self.allow_external_file_read && mode != PermissionMode::FullAccess,
+            command_escalation: self.allow_command_escalation && mode != PermissionMode::FullAccess,
             command_network: self.command_network_home.is_some()
                 && mode != PermissionMode::FullAccess,
+            managed_command_network: managed,
+            review_command_effects: mode != PermissionMode::FullAccess && !self.hooks_only,
+            review_shell: mode == PermissionMode::ApproveForMe && self.supports_review_shell(),
             plan: false,
             shell_text_reads: false,
             command_file_input: false,
             broad_command_reads: false,
             client_managed_settings: false,
-        })
+        };
+        capture.context = self.captured_context(&capture);
+        capture
     }
 
     pub(crate) fn capture_plan(
@@ -754,7 +805,10 @@ impl PermissionProfile {
         let mut capture = self.capture_mode(scope, mode)?;
         capture.plan = true;
         capture.command_network = false;
-        capture.context = self.mode_context(PermissionMode::Restricted, capture.external_file_read);
+        capture.managed_command_network = false;
+        capture.review_command_effects = false;
+        capture.command_escalation = false;
+        capture.context = self.captured_context(&capture);
         Ok(capture)
     }
 
@@ -817,6 +871,15 @@ impl PermissionProfile {
         if capture.broad_command_reads {
             context.push_str("\nThe command's read scope includes ordinary files outside the project. Use plain exec_command for reads it already has permission to perform. Protected paths keep their restrictions.");
         }
+        if capture.review_command_effects && capture.managed_command_network {
+            context.push_str("\nOrdinary workspace commands can reach approved HTTPS destinations through the managed proxy.");
+        }
+        if capture.command_escalation {
+            context.push_str("\nWhen the sandbox blocks access required for the task, request a reviewed command with require_escalated and explain the needed access. Protected paths stay restricted.");
+            if cfg!(target_os = "macos") {
+                context.push_str(" Use listen_port when starting a requested local server. Use a loopback-only server or set its bind address to 127.0.0.1 or ::1.");
+            }
+        }
         context
     }
 
@@ -837,6 +900,16 @@ impl PermissionProfile {
             return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
         }
         if !self.supports_mode(capture.mode)
+            || (capture.review_shell
+                && (capture.mode != PermissionMode::ApproveForMe || !self.supports_review_shell()))
+            || (capture.command_escalation
+                && (!self.allow_command_escalation
+                    || capture.mode == PermissionMode::FullAccess
+                    || capture.plan))
+            || (capture.review_command_effects
+                && (capture.plan || capture.mode == PermissionMode::FullAccess || self.hooks_only))
+            || (capture.managed_command_network
+                && !(capture.command_escalation && capture.command_network))
             || (capture.command_network
                 && (self.command_network_home.is_none()
                     || capture.mode == PermissionMode::FullAccess
@@ -876,6 +949,10 @@ impl PermissionProfile {
             mode: PermissionMode::Restricted,
             external_file_read: false,
             command_network: false,
+            managed_command_network: false,
+            review_command_effects: false,
+            review_shell: false,
+            command_escalation: false,
             plan: false,
             shell_text_reads: false,
             command_file_input: false,
@@ -893,6 +970,10 @@ impl PermissionProfile {
             || capture.mode != PermissionMode::Restricted
             || capture.external_file_read
             || capture.command_network
+            || capture.managed_command_network
+            || capture.review_command_effects
+            || capture.review_shell
+            || capture.command_escalation
             || capture.plan
             || capture.shell_text_reads
             || capture.command_file_input
@@ -980,49 +1061,67 @@ impl PermissionProfile {
         } else {
             self.validate_capture(capture)?
         };
+        let policy = if capture.plan {
+            let policy = if capture.broad_command_reads {
+                "read-only-plan-profile-reads-v1"
+            } else {
+                "read-only-plan-v1"
+            };
+            Fingerprint::of(&(
+                capture.profile,
+                policy,
+                capture.mode,
+                capture.external_file_read,
+            ))?
+        } else if capture.mode == PermissionMode::FullAccess {
+            Fingerprint::of(&(capture.profile, "full-access-v1"))?
+        } else if capture.managed_command_network {
+            Fingerprint::of(&(
+                capture.profile,
+                "managed-command-network-v1",
+                capture.mode,
+                capture.external_file_read,
+            ))?
+        } else if capture.command_escalation {
+            Fingerprint::of(&(
+                capture.profile,
+                "reviewed-command-retry-v1",
+                capture.mode,
+                capture.command_network,
+                capture.external_file_read,
+            ))?
+        } else if capture.command_network {
+            Fingerprint::of(&(
+                capture.profile,
+                "command-network-socks-v1",
+                capture.mode,
+                capture.external_file_read,
+            ))?
+        } else if capture.mode == PermissionMode::ApproveForMe || capture.external_file_read {
+            Fingerprint::of(&(
+                capture.profile,
+                "reviewable-actions-v1",
+                capture.mode,
+                capture.external_file_read,
+            ))?
+        } else {
+            capture.profile
+        };
+        let policy = if capture.review_command_effects {
+            Fingerprint::of(&(policy, "review-command-effects-v1"))?
+        } else {
+            policy
+        };
+        let policy = if capture.review_shell {
+            Fingerprint::of(&(policy, "private-review-shell-v1"))?
+        } else {
+            policy
+        };
         let authority = AuthorityBinding {
             principal: PrincipalId::new("grida-local")?,
             binding: BindingId::new(format!(
                 "native-permissions/{}",
-                Fingerprint::of(&(
-                    session,
-                    turn,
-                    if capture.plan {
-                        let policy = if capture.broad_command_reads {
-                            "read-only-plan-profile-reads-v1"
-                        } else {
-                            "read-only-plan-v1"
-                        };
-                        Fingerprint::of(&(
-                            capture.profile,
-                            policy,
-                            capture.mode,
-                            capture.external_file_read,
-                        ))?
-                    } else if capture.mode == PermissionMode::FullAccess {
-                        Fingerprint::of(&(capture.profile, "full-access-v1"))?
-                    } else if capture.command_network {
-                        Fingerprint::of(&(
-                            capture.profile,
-                            "command-network-socks-v1",
-                            capture.mode,
-                            capture.external_file_read,
-                        ))?
-                    } else if capture.mode == PermissionMode::ApproveForMe
-                        || capture.external_file_read
-                    {
-                        Fingerprint::of(&(
-                            capture.profile,
-                            "reviewable-actions-v1",
-                            capture.mode,
-                            capture.external_file_read,
-                        ))?
-                    } else {
-                        capture.profile
-                    },
-                    workspace_identity
-                ))?
-                .to_hex()
+                Fingerprint::of(&(session, turn, policy, workspace_identity))?.to_hex()
             ))?,
             scope: capture.scope.clone(),
         };
@@ -1039,7 +1138,18 @@ impl PermissionProfile {
             approve_for_me: allow_review
                 && !primary_review
                 && capture.mode == PermissionMode::ApproveForMe,
-            allow_command_network: allow_review && !primary_review && capture.command_network,
+            review_command_effects: capture.review_command_effects,
+            review_shell: capture.review_shell,
+            command_network: if !allow_review || primary_review || !capture.command_network {
+                CommandNetwork::Offline
+            } else if capture.review_command_effects && capture.managed_command_network {
+                CommandNetwork::Managed
+            } else if capture.managed_command_network {
+                CommandNetwork::ManagedRetry
+            } else {
+                CommandNetwork::ExactDestination
+            },
+            allow_command_escalation: allow_review && !primary_review && capture.command_escalation,
             plan: capture.plan,
             shell_text_reads: capture.shell_text_reads,
             command_file_input: capture.command_file_input,
@@ -1064,6 +1174,8 @@ impl PermissionProfile {
                 authority,
                 grants: vec![GrantId::new("workspace-process-input")?],
             },
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            network_review: Arc::default(),
             state: Arc::new(Mutex::new(PermissionState {
                 read_only: capture.plan,
                 ..Default::default()
@@ -1077,30 +1189,33 @@ impl PermissionProfile {
         root: PathBuf,
         access: CommandAccess,
     ) -> Result<ExecutionScope> {
+        self.command_scope_with_authority(grants, root, access, ConfinedCommandAuthority::Default)
+    }
+
+    fn command_scope_with_authority(
+        &self,
+        grants: GrantSelection,
+        root: PathBuf,
+        access: CommandAccess,
+        authority: ConfinedCommandAuthority,
+    ) -> Result<ExecutionScope> {
         let command = self.command.as_ref().ok_or_else(command_unavailable)?;
         let mut protected = self.command_denials.clone();
         if access == CommandAccess::ReadWrite {
-            // Version-control and agent metadata stay read-only inside a
-            // writable root. Metadata that does not exist yet when the command
-            // starts is protected only for agent configuration, so a command
-            // can create a repository. See the permission policy's protected
-            // paths.
-            protected.extend(
-                PROTECTED_METADATA
-                    .iter()
-                    .map(|name| root.join(name))
-                    .filter(|path| {
-                        path.symlink_metadata().is_ok()
-                            || path
-                                .file_name()
-                                .and_then(|name| name.to_str())
-                                .is_some_and(|name| PROTECTED_WHEN_MISSING.contains(&name))
-                    })
-                    .map(|path| ProtectedPath {
+            // Agent configuration stays protected across approval. A reviewed
+            // write can also modify ordinary workspace metadata.
+            protected.extend(PROTECTED_METADATA.iter().filter_map(|name| {
+                if matches!(authority, ConfinedCommandAuthority::ReviewedOffline) && *name == ".git"
+                {
+                    return None;
+                }
+                let path = root.join(name);
+                (PROTECTED_WHEN_MISSING.contains(name) || path.symlink_metadata().is_ok())
+                    .then_some(ProtectedPath {
                         path,
                         access: DeniedAccess::Write,
-                    }),
-            );
+                    })
+            }));
         }
         let (read, write) = match access {
             CommandAccess::Read => (vec![root], Vec::new()),
@@ -1127,7 +1242,38 @@ impl PermissionProfile {
             temporary_parent: command.temporary_parent.clone(),
             termination: command.termination,
             disk_read: command.disk_read,
+            listen_port: match authority {
+                ConfinedCommandAuthority::Listener(port) => Some(port),
+                _ => None,
+            },
         })
+    }
+
+    fn escalated_command_scope(
+        &self,
+        grants: GrantSelection,
+        root: PathBuf,
+        access: CommandAccess,
+        listen_port: Option<std::num::NonZeroU16>,
+    ) -> Result<ProcessScope> {
+        let authority = listen_port.map_or(
+            ConfinedCommandAuthority::ReviewedOffline,
+            ConfinedCommandAuthority::Listener,
+        );
+        let mut scope = self.command_scope_with_authority(grants, root, access, authority)?;
+        scope.valid_until = Instant::now() + SESSION_LIFETIME;
+        Ok(ProcessScope::Confined(scope))
+    }
+
+    fn unconfined_command_scope(&self, grants: GrantSelection) -> Result<ProcessScope> {
+        let command = self.command.as_ref().ok_or_else(command_unavailable)?;
+        Ok(ProcessScope::Unconfined(UnconfinedScope {
+            grants,
+            revision: self.revision.clone(),
+            valid_until: Instant::now() + SESSION_LIFETIME,
+            temporary_parent: command.temporary_parent.clone(),
+            termination: Termination::ProcessGroup,
+        }))
     }
 
     fn process_scope(
@@ -1136,15 +1282,8 @@ impl PermissionProfile {
         root: PathBuf,
         access: CommandAccess,
     ) -> Result<ProcessScope> {
-        let command = self.command.as_ref().ok_or_else(command_unavailable)?;
         if self.unconfined {
-            Ok(ProcessScope::Unconfined(UnconfinedScope {
-                grants,
-                revision: self.revision.clone(),
-                valid_until: Instant::now() + SESSION_LIFETIME,
-                temporary_parent: command.temporary_parent.clone(),
-                termination: Termination::ProcessGroup,
-            }))
+            self.unconfined_command_scope(grants)
         } else {
             let mut scope = self.command_scope(grants, root, access)?;
             scope.valid_until = Instant::now() + SESSION_LIFETIME;
@@ -1192,6 +1331,10 @@ fn shared_temporary_directory() -> Option<PathBuf> {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ApprovalRequest {
+    /// Original launch capture for comparing new destination requests after a
+    /// denial. The live enforcement scope still binds the running process.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch_scope: Option<Fingerprint>,
     pub session: SessionId,
     pub turn: TurnId,
     pub operation: OperationId,
@@ -1229,6 +1372,20 @@ impl ApprovalRequest {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandRetryNetwork {
+    Denied,
+    Managed,
+    Listen,
+}
+
+impl CommandRetryNetwork {
+    pub(crate) fn valid_port(self, port: Option<std::num::NonZeroU16>) -> bool {
+        (self == Self::Listen) == port.is_some()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ApprovalEffect {
@@ -1238,6 +1395,21 @@ pub enum ApprovalEffect {
         #[serde(skip_serializing_if = "Option::is_none")]
         query: Option<String>,
     },
+    EscalatedCommand {
+        command: String,
+        justification: String,
+        cwd: PathBuf,
+        executable: PathBuf,
+        environment_names: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filesystem: Option<grida_agent_master::approval_review::CommandFilesystem>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        access: Option<CommandAccess>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        network: Option<CommandRetryNetwork>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        listen_port: Option<std::num::NonZeroU16>,
+    },
     Command {
         access: CommandAccess,
         /// The command line the shell runs.
@@ -1246,6 +1418,9 @@ pub enum ApprovalEffect {
         terminal: bool,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         finite: bool,
+        /// The process receives a broker. Each destination requires a separate decision.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        managed_network: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem: Option<grida_agent_master::approval_review::CommandFilesystem>,
         cwd: PathBuf,
@@ -1283,15 +1458,62 @@ struct ApprovalAnswer {
 }
 
 pub(crate) fn is_approval(wait: &WaitRecord) -> bool {
-    wait.request.schema().as_str() == REQUEST
+    matches!(
+        wait.request.schema().as_str(),
+        REQUEST | SCOPED_REVIEW | NETWORK_REVIEW | NETWORK_HANDOFF
+    )
 }
 
 pub fn read_approval(wait: &WaitRecord) -> Result<ApprovalRequest> {
-    let request: ApprovalRequest = decode(REQUEST, &wait.request)?;
-    if wait.id != wait_id(&request.operation)? || wait.response != response_contract()? {
+    let schema = wait.request.schema().as_str();
+    if !is_approval(wait) {
+        return Err(approval_invalid());
+    }
+    let request: ApprovalRequest = decode(schema, &wait.request)?;
+    let ordinary =
+        matches!(schema, REQUEST | SCOPED_REVIEW) && wait.id == wait_id(&request.operation)?;
+    if (!ordinary && !is_live_network_wait(wait, &request)) || wait.response != response_contract()?
+    {
         return Err(approval_invalid());
     }
     Ok(request)
+}
+
+pub(crate) fn is_live_network_wait(wait: &WaitRecord, request: &ApprovalRequest) -> bool {
+    matches!(
+        request.effect,
+        ApprovalEffect::Command {
+            network: Some(_),
+            ..
+        }
+    ) && network_wait_id(
+        request.scope,
+        wait.request.schema().as_str() == NETWORK_HANDOFF,
+    )
+    .is_ok_and(|expected| expected == wait.id)
+}
+
+fn network_wait_id(scope: Fingerprint, human: bool) -> Result<WaitId> {
+    let phase = if human { "network/human" } else { "network" };
+    WaitId::new(format!("approval/{phase}/{}", scope.to_hex()))
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) fn live_network_wait(request: &ApprovalRequest, human: bool) -> Result<WaitRecord> {
+    Ok(WaitRecord {
+        id: network_wait_id(request.scope, human)?,
+        request: encode(
+            if human {
+                NETWORK_HANDOFF
+            } else {
+                NETWORK_REVIEW
+            },
+            request,
+        )?,
+        response: response_contract()?,
+        answer: None,
+        withdrawn: false,
+    })
 }
 
 /// Prepare a reply for an authenticated reviewer. The host commits this through
@@ -1346,7 +1568,10 @@ fn encode_approval_answer(
 /// cleanup. Model commands run as the chat's processes in the host's store.
 #[derive(Clone)]
 pub struct TurnPermissions {
-    allow_command_network: bool,
+    review_shell: bool,
+    review_command_effects: bool,
+    command_network: CommandNetwork,
+    allow_command_escalation: bool,
     plan: bool,
     shell_text_reads: bool,
     command_file_input: bool,
@@ -1368,10 +1593,18 @@ pub struct TurnPermissions {
     /// and needing no approval of its own.
     processes: GrantSelection,
     state: Arc<Mutex<PermissionState>>,
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    network_review: Arc<OnceLock<Arc<ReviewNetwork>>>,
 }
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+type ReviewNetwork =
+    dyn Fn(ApprovalRequest, CancellationToken) -> BoxFuture<'static, bool> + Send + Sync;
 
 #[derive(Default)]
 struct PermissionState {
+    /// Invalidate private command evidence and stop all readers of the previous scope.
+    review_readers: CancellationToken,
     revoked: BTreeSet<BindingId>,
     ready: BTreeMap<OperationId, Ready>,
     /// Set when the turn's regime withholds changes, for example Plan.
@@ -1722,6 +1955,18 @@ impl TurnPermissions {
                 })
     }
 
+    fn command_tool_mode(&self) -> CommandToolMode {
+        if self.plan {
+            CommandToolMode::Plan
+        } else {
+            CommandToolMode::Act {
+                unconfined: self.profile.unconfined,
+                network: self.command_network,
+                allow_escalation: self.allow_command_escalation,
+            }
+        }
+    }
+
     fn insert_command_tools(
         self: &Arc<Self>,
         inventory: &mut Inventory,
@@ -1746,14 +1991,7 @@ impl TurnPermissions {
                 command.limits,
                 processes.clone(),
                 self.selection.0.clone(),
-                if self.plan {
-                    CommandToolMode::Plan
-                } else {
-                    CommandToolMode::Act {
-                        unconfined: self.profile.unconfined,
-                        allow_network: self.allow_command_network,
-                    }
-                },
+                self.command_tool_mode(),
                 self.command_file_input(),
                 Arc::new(move |invocation| owner.process_authority(invocation)),
             )?;
@@ -1781,7 +2019,9 @@ impl TurnPermissions {
             return Err(denied());
         }
         let mut state = self.state()?;
-        state.revoked.insert(directory.clone());
+        if state.revoked.insert(directory.clone()) {
+            std::mem::take(&mut state.review_readers).cancel();
+        }
         for ready in state.ready.values().filter(|ready| {
             &ready.request.directory == directory
                 || (ready.feeds_command() && self.profile.workspace.primary() == Some(directory))
@@ -1833,12 +2073,14 @@ impl TurnPermissions {
                     .command
                     .as_ref()
                     .ok_or_else(command_unavailable)?;
-                let input = ExecArguments::parse_workspace(
+                let mode = self.command_tool_mode();
+                let input = ExecArguments::parse_for_mode(
                     invocation.arguments(),
                     command.limits.max_input_bytes,
-                    self.plan,
+                    mode,
                     self.command_file_input(),
                 )?;
+                input.check_retry_scope(mode)?;
                 let directory = self.captured_directory(input.directory.as_ref())?;
                 let access = input.access.ok_or_else(denied)?;
                 let rules = self
@@ -1847,17 +2089,21 @@ impl TurnPermissions {
                     .get(&directory.spec().id)
                     .copied()
                     .unwrap_or_default();
-                let rule = match access {
-                    CommandAccess::Read => rules.command_read,
-                    CommandAccess::ReadWrite => rules.command_read_write,
-                };
-                if rule == AccessRule::Deny
-                    || (input.input_file.is_some() && rule != AccessRule::Allow)
-                {
+                let escalation = input.escalation_justification();
+                let needs_review = escalation.is_some()
+                    || (self.review_command_effects
+                        && grida_agent_master::approval_review::requires_command_review(
+                            &input.cmd,
+                        ));
+                let rule = rules.command_rule(access, needs_review)?;
+                if input.input_file.is_some() && rule != AccessRule::Allow {
                     return Err(denied());
                 }
                 let rule = if input.network.is_some() {
-                    if !self.allow_command_network || self.profile.unconfined {
+                    if self.command_network != CommandNetwork::ExactDestination
+                        || self.profile.unconfined
+                        || !matches!(&invocation.definition().input, InputFormat::Json(schema) if schema.pointer("/properties/network").is_some())
+                    {
                         return Err(denied());
                     }
                     AccessRule::Ask
@@ -1867,18 +2113,30 @@ impl TurnPermissions {
                 let finite = self.plan
                     || input.input_file.is_some()
                     || input.network.is_some()
-                    || (self.approve_for_me && rule == AccessRule::Ask && input.supports_finite());
+                    || (self.approve_for_me
+                        && rule == AccessRule::Ask
+                        && self.command_network != CommandNetwork::Managed
+                        && input.supports_finite());
                 let spec = input.spec(directory.root(), &command.environment, finite);
                 let cwd = spec.cwd.clone();
                 let executable = spec.executable.clone();
-                #[cfg(unix)]
-                let unconfined_cwd = if self.profile.unconfined {
-                    Some(std::fs::File::open(&spec.cwd).map_err(|_| command_unavailable())?)
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                let exact_cwd = if escalation.is_some() {
+                    Some(open_escalated_cwd(directory, &cwd)?)
+                } else if self.profile.unconfined {
+                    Some(std::fs::File::open(&cwd).map_err(|_| command_unavailable())?)
                 } else {
                     None
                 };
                 let root = directory.root().to_owned();
-                let scope = if input.input_file.is_some() {
+                let scope = if escalation.is_some() && !input.network_access {
+                    self.profile.escalated_command_scope(
+                        self.commands.clone(),
+                        root,
+                        access,
+                        input.listen_port,
+                    )?
+                } else if input.input_file.is_some() {
                     self.command_input_scope(root)?
                 } else {
                     self.model_command_scope(root, access)?
@@ -1886,35 +2144,63 @@ impl TurnPermissions {
                 let process = scope
                     .prepare(&command.sandbox, spec)
                     .map_err(|error| problem(error.kind, "command_preparation_refused"))?;
-                #[cfg(unix)]
-                if let Some(cwd) = unconfined_cwd {
-                    process.validate_working_root(&cwd)?;
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                if let Some(cwd) = exact_cwd {
+                    process.validate_working_directory(&cwd)?;
                 } else {
                     validate_working_root(&process, directory)?;
                 }
-                #[cfg(not(unix))]
+                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
                 validate_working_root(&process, directory)?;
                 let capture = process.capture_fingerprint()?;
                 if let Some(source) = &input.input_file {
                     return self.capture_command_input(admission, source, capture);
                 }
-                let effect = ApprovalEffect::Command {
-                    access,
-                    command: input.cmd.clone(),
-                    terminal: input.tty,
-                    finite,
-                    filesystem: if finite {
-                        process
-                            .filesystem_grants()
-                            .ok()
-                            .and_then(command_filesystem)
-                    } else {
-                        None
-                    },
-                    cwd,
-                    executable,
-                    environment_names: command.environment.keys().cloned().collect(),
-                    network: input.network.clone(),
+                let environment_names = command.environment.keys().cloned().collect();
+                let effect = if let Some(justification) = escalation {
+                    let filesystem = command_filesystem(process.filesystem_grants()?)
+                        .ok_or_else(command_unavailable)?;
+                    ApprovalEffect::EscalatedCommand {
+                        justification: justification.to_owned(),
+                        command: input.cmd,
+                        cwd: PathBuf::from(&filesystem.resolved_cwd),
+                        executable: PathBuf::from(&filesystem.resolved_executable),
+                        environment_names,
+                        filesystem: Some(filesystem),
+                        access: Some(access),
+                        network: Some(if input.listen_port.is_some() {
+                            CommandRetryNetwork::Listen
+                        } else if input.network_access {
+                            CommandRetryNetwork::Managed
+                        } else {
+                            CommandRetryNetwork::Denied
+                        }),
+                        listen_port: input.listen_port,
+                    }
+                } else {
+                    ApprovalEffect::Command {
+                        access,
+                        command: input.cmd,
+                        terminal: input.tty,
+                        finite,
+                        managed_network: !finite && self.command_network == CommandNetwork::Managed,
+                        filesystem: if finite
+                            || (self.review_command_effects
+                                && (rule == AccessRule::Ask
+                                    || self.command_network == CommandNetwork::Managed))
+                        {
+                            process
+                                .filesystem_grants()
+                                .ok()
+                                .and_then(command_filesystem)
+                        } else {
+                            None
+                        },
+                        cwd,
+                        executable,
+                        environment_names,
+                        network: input.network,
+                    }
                 };
                 (directory, effect, Some(capture), rule)
             }
@@ -1949,6 +2235,7 @@ impl TurnPermissions {
                     return Ok((
                         Ready {
                             request: ApprovalRequest {
+                                launch_scope: None,
                                 session: self.selection.0.clone(),
                                 turn: self.selection.1.clone(),
                                 operation: admission.operation.clone(),
@@ -2030,11 +2317,16 @@ impl TurnPermissions {
                 network,
                 ..
             } => Fingerprint::of(&(scope, "finite-command-v1", network))?,
+            ApprovalEffect::Command {
+                managed_network: true,
+                ..
+            } => Fingerprint::of(&(scope, "managed-command-network-v2"))?,
             _ => scope,
         };
         Ok((
             Ready {
                 request: ApprovalRequest {
+                    launch_scope: None,
                     session: self.selection.0.clone(),
                     turn: self.selection.1.clone(),
                     operation: admission.operation.clone(),
@@ -2110,6 +2402,7 @@ impl TurnPermissions {
         Ok(Some((
             Ready {
                 request: ApprovalRequest {
+                    launch_scope: None,
                     session: self.selection.0.clone(),
                     turn: self.selection.1.clone(),
                     operation: admission.operation.clone(),
@@ -2140,7 +2433,9 @@ impl TurnPermissions {
                 return Err(denied());
             }
             ApprovalEffect::Write { .. } => true,
-            ApprovalEffect::Command { .. } => return Err(denied()),
+            ApprovalEffect::Command { .. } | ApprovalEffect::EscalatedCommand { .. } => {
+                return Err(denied());
+            }
         };
         Ok(SettingsAccess {
             configuration,
@@ -2238,7 +2533,9 @@ impl TurnPermissions {
             ApprovalEffect::Read { .. } => false,
             ApprovalEffect::Write { .. } if state.read_only => return Err(denied()),
             ApprovalEffect::Write { .. } => true,
-            ApprovalEffect::Command { .. } => return Err(denied()),
+            ApprovalEffect::Command { .. } | ApprovalEffect::EscalatedCommand { .. } => {
+                return Err(denied());
+            }
         };
         let grant = DirectoryGrant::bind(
             &self.profile.workspace,
@@ -2269,6 +2566,92 @@ impl TurnPermissions {
         }
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub(crate) fn bind_network_review(
+        &self,
+        review: impl Fn(ApprovalRequest, CancellationToken) -> BoxFuture<'static, bool>
+        + Send
+        + Sync
+        + 'static,
+    ) {
+        if matches!(
+            self.command_network,
+            CommandNetwork::ManagedRetry | CommandNetwork::Managed
+        ) {
+            let _ = self.network_review.set(Arc::new(review));
+        }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn managed_proxy(
+        &self,
+        request: &ApprovalRequest,
+        stop: CancellationToken,
+    ) -> Result<crate::processes::ManagedCommandProxy> {
+        let mut request = request.clone();
+        match &request.effect {
+            ApprovalEffect::Command {
+                network: None,
+                managed_network: true,
+                ..
+            } if self.command_network == CommandNetwork::Managed => {}
+            ApprovalEffect::EscalatedCommand {
+                command,
+                cwd,
+                executable,
+                filesystem,
+                environment_names,
+                access: Some(access),
+                network: Some(CommandRetryNetwork::Managed),
+                ..
+            } if self.command_network == CommandNetwork::ManagedRetry => {
+                request.effect = ApprovalEffect::Command {
+                    access: *access,
+                    command: command.clone(),
+                    terminal: false,
+                    finite: false,
+                    managed_network: true,
+                    filesystem: filesystem.clone(),
+                    cwd: cwd.clone(),
+                    executable: executable.clone(),
+                    environment_names: environment_names.clone(),
+                    network: None,
+                };
+            }
+            _ => return Err(denied()),
+        }
+        let home = self
+            .profile
+            .command_network_home
+            .as_ref()
+            .ok_or_else(command_unavailable)?;
+        let review = self
+            .network_review
+            .get()
+            .cloned()
+            .ok_or_else(command_unavailable)?;
+        let process = uuid::Uuid::new_v4().simple().to_string();
+        let authorize: Arc<crate::processes::ApproveDestination> = Arc::new(move |destination| {
+            let mut request = request.clone();
+            let review = review.clone();
+            let stop = stop.clone();
+            let scope = Fingerprint::of(&(request.scope, &process, &destination));
+            Box::pin(async move {
+                let Ok(scope) = scope else {
+                    return false;
+                };
+                let ApprovalEffect::Command { network, .. } = &mut request.effect else {
+                    return false;
+                };
+                request.launch_scope = Some(request.scope);
+                request.scope = scope;
+                *network = Some(destination);
+                review(request, stop).await
+            })
+        });
+        crate::processes::ManagedCommandProxy::bind(home, authorize)
+    }
+
     fn process_authority(self: &Arc<Self>, invocation: &Invocation) -> Result<AuthorizedProcess> {
         if self.profile.hooks_only {
             return Err(denied());
@@ -2281,21 +2664,44 @@ impl TurnPermissions {
             drop(state);
             return self.command_file_authority(invocation);
         }
-        let ApprovalEffect::Command {
-            access,
-            finite,
-            network,
-            terminal,
-            ..
-        } = &ready.request.effect
-        else {
-            return Err(denied());
+        let (scope, finite) = match &ready.request.effect {
+            ApprovalEffect::Command {
+                access,
+                finite,
+                network,
+                terminal,
+                ..
+            } if !self.plan || (*finite && network.is_none() && !terminal) => (
+                self.model_command_scope(ready.request.root.clone(), *access)?,
+                *finite,
+            ),
+            ApprovalEffect::EscalatedCommand {
+                filesystem: Some(_),
+                access: Some(access),
+                network: Some(network),
+                listen_port,
+                ..
+            } if self.allow_command_escalation
+                && ready.approval.is_some()
+                && network.valid_port(*listen_port)
+                && (*network != CommandRetryNetwork::Managed
+                    || self.command_network == CommandNetwork::ManagedRetry) =>
+            {
+                let root = ready.request.root.clone();
+                let scope = if *network == CommandRetryNetwork::Managed {
+                    self.model_command_scope(root, *access)?
+                } else {
+                    self.profile.escalated_command_scope(
+                        self.commands.clone(),
+                        root,
+                        *access,
+                        *listen_port,
+                    )?
+                };
+                (scope, false)
+            }
+            _ => return Err(denied()),
         };
-        if self.plan && (!finite || network.is_some() || *terminal) {
-            return Err(denied());
-        }
-        let finite = *finite;
-        let scope = self.model_command_scope(ready.request.root.clone(), *access)?;
         let expected = ready.command_capture.ok_or_else(command_unavailable)?;
         let environment = self
             .profile
@@ -2358,6 +2764,41 @@ impl TurnPermissions {
                 let ready = state.ready.get_mut(&operation).ok_or_else(denied)?;
                 if finite || ready.active.is_some() {
                     return Err(problem(ErrorKind::Conflict, "permission_action_dispatched"));
+                }
+                if let ApprovalEffect::EscalatedCommand { cwd, .. } = &ready.request.effect {
+                    let directory = owner.profile.workspace.permission_directory(
+                        Some(&ready.request.directory),
+                        &owner.profile.protected,
+                    )?;
+                    prepared.validate_working_directory(&open_escalated_cwd(directory, cwd)?)?;
+                }
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                if matches!(
+                    (&ready.request.effect, owner.command_network),
+                    (
+                        ApprovalEffect::Command {
+                            network: None,
+                            managed_network: true,
+                            ..
+                        },
+                        CommandNetwork::Managed
+                    ) | (
+                        ApprovalEffect::EscalatedCommand {
+                            network: Some(CommandRetryNetwork::Managed),
+                            ..
+                        },
+                        CommandNetwork::ManagedRetry
+                    )
+                ) {
+                    let proxy = owner.managed_proxy(&ready.request, stop.clone())?;
+                    let running = prepared.spawn_session_with_http_proxy(
+                        options,
+                        proxy.endpoint(),
+                        stop.clone(),
+                    )?;
+                    ready.active = Some(stop.clone());
+                    tokio::spawn(proxy.serve(stop));
+                    return Ok(running);
                 }
                 let running = prepared.spawn_session(options, stop.clone())?;
                 // Revoking the directory stops the process.
@@ -2428,7 +2869,14 @@ impl ToolGate for TurnPermissions {
                     .operations
                     .request_input(WaitRecord {
                         id: wait_id.clone(),
-                        request: encode(REQUEST, &ready.request)?,
+                        request: encode(
+                            if self.approve_for_me {
+                                SCOPED_REVIEW
+                            } else {
+                                REQUEST
+                            },
+                            &ready.request,
+                        )?,
                         response: response_contract()?,
                         answer: None,
                         withdrawn: false,
@@ -2461,7 +2909,9 @@ impl AuthorityValidator for TurnPermissions {
                 let selection = match ready.request.effect {
                     ApprovalEffect::Read { .. } if ready.feeds_command() => &self.commands,
                     ApprovalEffect::Read { .. } | ApprovalEffect::Write { .. } => &self.files,
-                    ApprovalEffect::Command { .. } => &self.commands,
+                    ApprovalEffect::Command { .. } | ApprovalEffect::EscalatedCommand { .. } => {
+                        &self.commands
+                    }
                 };
                 if &request.selection != selection {
                     return Err(denied());
@@ -2512,6 +2962,17 @@ fn current<'a>(
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+fn open_escalated_cwd(root: &DirectoryBinding, cwd: &Path) -> Result<std::fs::File> {
+    let relative = cwd.strip_prefix(root.root()).map_err(|_| denied())?;
+    crate::file_tools::open_root_directory(root.pinned_directory(), root.root(), relative)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn open_escalated_cwd(_: &DirectoryBinding, _: &Path) -> Result<std::fs::File> {
+    Err(command_unavailable())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn validate_working_root(
     prepared: &agent_kit_sandbox::PreparedProcess,
     root: &DirectoryBinding,
@@ -2525,6 +2986,21 @@ fn validate_working_root(
     _: &DirectoryBinding,
 ) -> Result<()> {
     Err(command_unavailable())
+}
+
+/// A decision is evidence only for the action and scope named in the receipt.
+pub(crate) fn bound_approval_decision(
+    wait: &WaitRecord,
+    request: &ApprovalRequest,
+) -> Result<Option<(ApprovalDecision, Option<OperationId>)>> {
+    let Some(envelope) = &wait.answer else {
+        return Ok(None);
+    };
+    let answer: ApprovalAnswer = decode(ANSWER, envelope)?;
+    Ok(
+        (!wait.withdrawn && answer.action == request.action && answer.scope == request.scope)
+            .then_some((answer.decision, answer.review)),
+    )
 }
 
 pub(crate) enum ReviewResolution {
@@ -2554,7 +3030,26 @@ pub(crate) fn review_resolution(
     })
 }
 
-fn approved(wait: &WaitRecord, request: &ApprovalRequest) -> Result<bool> {
+/// Only a committed automatic denial can supply a reason to the foreground model.
+pub(crate) fn denied_review(
+    wait: &WaitRecord,
+    request: &ApprovalRequest,
+) -> Result<Option<OperationId>> {
+    let Some(answer) = &wait.answer else {
+        return Ok(None);
+    };
+    let answer: ApprovalAnswer = decode(ANSWER, answer)?;
+    if wait.withdrawn
+        || answer.action != request.action
+        || answer.scope != request.scope
+        || answer.decision != ApprovalDecision::Decline
+    {
+        return Ok(None);
+    }
+    Ok(answer.review)
+}
+
+pub(crate) fn approved(wait: &WaitRecord, request: &ApprovalRequest) -> Result<bool> {
     if wait.withdrawn {
         return Ok(false);
     }
@@ -2618,7 +3113,7 @@ fn problem(kind: ErrorKind, code: &'static str) -> Error {
 mod full_access_tests {
     use super::*;
 
-    fn profile(root: &Path) -> PermissionProfile {
+    pub(super) fn profile(root: &Path) -> PermissionProfile {
         let protected = ProtectedRoots::new(Vec::new()).unwrap();
         let id = BindingId::new("project").unwrap();
         let workspace = WorkspaceSnapshot::capture(
@@ -2732,6 +3227,186 @@ mod full_access_tests {
     }
 
     #[test]
+    fn an_escalated_launch_respects_directory_denials_and_always_asks() {
+        use AccessRule::{Allow, Ask, Deny};
+        use CommandAccess::{Read, ReadWrite};
+        let rules = |read, write| DirectoryAccess {
+            command_read: read,
+            command_read_write: write,
+            ..Default::default()
+        };
+        assert_eq!(rules(Allow, Deny).command_rule(Read, false).unwrap(), Allow);
+        assert_eq!(rules(Allow, Deny).command_rule(Read, true).unwrap(), Ask);
+        assert!(rules(Allow, Deny).command_rule(ReadWrite, true).is_err());
+        assert!(rules(Deny, Allow).command_rule(Read, true).is_err());
+        for access in [Read, ReadWrite] {
+            assert_eq!(rules(Allow, Allow).command_rule(access, true).unwrap(), Ask);
+            assert_eq!(rules(Ask, Ask).command_rule(access, true).unwrap(), Ask);
+        }
+    }
+
+    #[test]
+    fn queued_work_keeps_its_original_outbound_offer() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let mut launch = profile(&path);
+        launch.allow_command_escalation = true;
+        launch.command_network_home = Some(path);
+        let profile = Arc::new(launch);
+        let scope = ScopeId::new("input").unwrap();
+        let current = profile.capture(scope.clone());
+        let mut earlier = current.clone();
+        earlier.review_command_effects = false;
+        earlier.context = profile.captured_context(&earlier);
+        let explicit = profile.recapture(&earlier, scope.clone()).unwrap();
+        earlier.managed_command_network = false;
+        let exact = profile.recapture(&earlier, scope).unwrap();
+        let mut bindings = BTreeSet::new();
+        for (capture, expected) in [
+            (&current, CommandNetwork::Managed),
+            (&explicit, CommandNetwork::ManagedRetry),
+            (&exact, CommandNetwork::ExactDestination),
+        ] {
+            let owner = profile
+                .prepare_scope(
+                    capture,
+                    (
+                        &SessionId::new("chat").unwrap(),
+                        &TurnId::new("turn").unwrap(),
+                    ),
+                    Arc::new(SqliteStore::open_in_memory().unwrap()),
+                    true,
+                    false,
+                    None,
+                )
+                .unwrap();
+            assert!(
+                matches!(owner.command_tool_mode(), CommandToolMode::Act { network, .. }
+                if network == expected)
+            );
+            assert!(bindings.insert(owner.commands.authority.binding.clone()));
+        }
+    }
+
+    #[test]
+    fn escalation_requires_both_the_accepted_offer_and_current_host_authority() {
+        let root = tempfile::tempdir().unwrap();
+        let mut profile = profile(&root.path().canonicalize().unwrap());
+        let scope = ScopeId::new("input").unwrap();
+        let mut queued = serde_json::to_value(profile.capture(scope.clone())).unwrap();
+        queued
+            .as_object_mut()
+            .unwrap()
+            .remove("review_command_effects");
+        assert!(queued.get("command_escalation").is_none());
+        let restricted: PermissionCapture = serde_json::from_value(queued).unwrap();
+        assert!(profile.clone().with_command_escalation(true).is_err());
+        // Capture and binding are independent of a native launch.
+        profile.allow_command_escalation = true;
+        profile.allow_full_access = true;
+        assert_eq!(
+            profile.recapture(&restricted, scope.clone()).unwrap(),
+            restricted
+        );
+        let captured = profile.capture(scope.clone());
+        assert!(captured.command_escalation);
+        let plan = profile
+            .capture_plan(scope.clone(), PermissionMode::Restricted)
+            .unwrap();
+        assert!(!plan.command_escalation);
+        assert!(
+            !profile
+                .capture_mode(scope.clone(), PermissionMode::FullAccess)
+                .unwrap()
+                .command_escalation
+        );
+        let profile = Arc::new(profile);
+        let session = SessionId::new("chat").unwrap();
+        let turn = TurnId::new("turn").unwrap();
+        let prepare =
+            |profile: &Arc<PermissionProfile>, capture: &PermissionCapture, allow_review| {
+                profile.prepare_scope(
+                    capture,
+                    (&session, &turn),
+                    Arc::new(SqliteStore::open_in_memory().unwrap()),
+                    allow_review,
+                    false,
+                    None,
+                )
+            };
+        for (offer, allow_review, expected) in [
+            (&restricted, true, false),
+            (&captured, true, true),
+            (&captured, false, false),
+            (&plan, true, false),
+        ] {
+            let owner = prepare(&profile, offer, allow_review).unwrap();
+            assert_eq!(
+                matches!(
+                    owner.command_tool_mode(),
+                    CommandToolMode::Act {
+                        allow_escalation: true,
+                        ..
+                    }
+                ),
+                expected
+            );
+        }
+        let legacy_workspace = profile.validate_capture(&restricted).unwrap();
+        let binding = |policy, workspace| {
+            let identity = Fingerprint::of(&(&session, &turn, policy, workspace)).unwrap();
+            format!("native-permissions/{}", identity.to_hex())
+        };
+        assert_eq!(
+            prepare(&profile, &restricted, true)
+                .unwrap()
+                .commands
+                .authority
+                .binding
+                .as_str(),
+            binding(restricted.profile, legacy_workspace)
+        );
+        let binding_for_reviewed = prepare(&profile, &captured, true)
+            .unwrap()
+            .commands
+            .authority
+            .binding
+            .clone();
+        for old_policy in ["command-escalation-v1", "protected-command-escalation-v1"] {
+            let legacy_escalation_policy = Fingerprint::of(&(
+                captured.profile,
+                old_policy,
+                captured.mode,
+                captured.command_network,
+                captured.external_file_read,
+            ))
+            .unwrap();
+            assert_ne!(
+                binding_for_reviewed.as_str(),
+                binding(legacy_escalation_policy, legacy_workspace)
+            );
+        }
+        let mut legacy_escalation = captured.clone();
+        legacy_escalation.context =
+            profile.mode_context(captured.mode, captured.external_file_read);
+        assert_eq!(
+            prepare(&profile, &legacy_escalation, true)
+                .err()
+                .unwrap()
+                .code,
+            "permission_profile_changed"
+        );
+        let mut invalid_plan = plan;
+        invalid_plan.command_escalation = true;
+        assert!(prepare(&profile, &invalid_plan, true).is_err());
+
+        let withdrawn = Arc::new((*profile).clone().with_command_escalation(false).unwrap());
+        assert!(withdrawn.recapture(&captured, scope).is_err());
+        assert!(prepare(&withdrawn, &captured, true).is_err());
+        assert!(prepare(&withdrawn, &restricted, true).is_ok());
+    }
+
+    #[test]
     fn old_finite_command_receipts_retain_their_scope_without_gaining_review_evidence() {
         let scope = Fingerprint::of(&"original native scope").unwrap();
         let old: ApprovalRequest = serde_json::from_value(serde_json::json!({
@@ -2760,6 +3435,27 @@ mod full_access_tests {
         };
         wait.answer = Some(approval_answer(&wait, ApprovalDecision::ApproveOnce).unwrap());
         assert!(approved(&wait, &current).unwrap());
+    }
+
+    #[test]
+    fn old_unconfined_approvals_cannot_authorize_confined_escalation() {
+        let scope = Fingerprint::of(&"old scope").unwrap();
+        let legacy: ApprovalRequest = serde_json::from_value(serde_json::json!({
+            "session":"chat", "turn":"turn", "operation":"tool", "action":Fingerprint::of(&"command").unwrap(),
+            "scope":scope, "directory":"project", "root":"/project",
+            "effect":{"kind":"escalated_command","command":"git add file","justification":"Stage the requested file.",
+                "cwd":"/project","executable":"/bin/sh","environment_names":[]}
+        })).unwrap();
+        let mut current = serde_json::to_value(&legacy).unwrap();
+        current["effect"]["filesystem"] = serde_json::json!({
+            "disk_read":true, "read_roots":[], "write_roots":["/project"], "runtime_roots":["/bin"],
+            "private_temp_write":true, "resolved_cwd":"/project", "resolved_executable":"/bin/sh"
+        });
+        let mut current: ApprovalRequest = serde_json::from_value(current).unwrap();
+        assert_eq!(
+            current.bind_retained(&legacy).unwrap_err().code,
+            "permission_action_changed"
+        );
     }
 
     #[test]

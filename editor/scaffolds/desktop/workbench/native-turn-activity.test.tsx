@@ -85,9 +85,22 @@ describe("NativeTurnActivity", () => {
     const html = renderToStaticMarkup(
       <NativeTurnActivity
         block={block as Extract<typeof block, { kind: "turn" }>}
+        onReconsider={() => {}}
         approvalReviews={[
           { decision: "approved", action: "/reference/prices.csv" },
-          { decision: "declined", action: "example.org:443" },
+          { decision: "reviewing", action: "first.txt" },
+          { decision: "reviewing", action: "second.txt" },
+          {
+            decision: "declined",
+            action: "example.org:443",
+            reviewId: "review-1",
+            rationale: "The transfer exceeds the request.",
+          },
+          {
+            decision: "declined",
+            action: "timeout.test",
+            failure: "timed_out",
+          },
         ]}
         renderMessage={(message) => (
           <p key={message.messageId}>{message.text}</p>
@@ -95,12 +108,51 @@ describe("NativeTurnActivity", () => {
       />
     );
     // The kit's read card names the action and the file, not the tool id.
-    expect(html).toContain("Automatically approved");
+    expect(html).toMatch(
+      /Reviewing (?:<!-- -->)?2(?:<!-- -->)? approval requests/
+    );
+    expect(html).not.toContain("Automatically approved");
+    expect(html).not.toContain("prices.csv");
+    expect(html).toContain("The transfer exceeds the request.");
+    expect(html).toContain("Automatic review timed out");
+    expect(html.match(/Request reconsideration/g)).toHaveLength(1);
     expect(html).toContain("example.org:443");
     expect(html).toContain("Automatically declined");
     expect(html).toContain("Read file");
     expect(html).toContain("cart.js");
     expect(html).not.toContain("read_file");
+  });
+
+  it("keeps a denial visible when reopening a completed turn", () => {
+    const html = renderToStaticMarkup(
+      <NativeTurnActivity
+        block={{
+          kind: "turn",
+          turnId: "done",
+          finished: true,
+          outcome: "succeeded",
+          durationMs: 0,
+          requests: [],
+          work: [],
+          answers: [],
+        }}
+        onReconsider={() => {}}
+        approvalReviews={[
+          {
+            decision: "declined",
+            action: "example.org:443",
+            reviewId: "review",
+            reconsidered: true,
+            rationale: "Unconfirmed destination.",
+          },
+        ]}
+        renderMessage={() => null}
+      />
+    );
+    expect(html).toContain('data-state="collapsed"');
+    expect(html).toContain("Unconfirmed destination.");
+    expect(html).toContain("Reconsideration requested.");
+    expect(html).not.toContain("Request reconsideration");
   });
 
   it("labels legacy unplaced events and makes a child-only finished turn expandable", async () => {

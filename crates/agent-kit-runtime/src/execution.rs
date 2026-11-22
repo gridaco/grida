@@ -17,7 +17,7 @@ use std::num::NonZeroU64;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use tokio::sync::{Mutex as AsyncMutex, Semaphore, broadcast, mpsc, watch};
+use tokio::sync::{Mutex as AsyncMutex, RwLock, Semaphore, broadcast, mpsc, watch};
 
 /// Shared execution services and capacity from which turns are opened.
 pub struct Runtime {
@@ -106,6 +106,7 @@ impl Runtime {
             inference_permits: Arc::clone(&self.inference_permits),
             tool_permits: Arc::clone(&self.tool_permits),
             serial: AsyncMutex::new(()),
+            attached: RwLock::new(()),
             active: Mutex::new(BTreeMap::new()),
             closing: AtomicBool::new(false),
             frozen: AtomicBool::new(false),
@@ -261,6 +262,18 @@ impl Turn {
         state_change: Option<DriverStateChange>,
         withdraw: std::collections::BTreeSet<WaitId>,
     ) -> Result<FinishOutcome> {
+        // A host callback admitted by a retained tool may still own an
+        // interaction after its foreground invocation published a process handle.
+        // Let it record its outcome before closing operation admission. Holding
+        // the write guard through the commit also refuses newly arriving work.
+        let _drained = match self
+            .inner
+            .drain_attached(draft.expected_control, draft.expected_history)
+            .await
+        {
+            Ok(guard) => guard,
+            Err(error) => return Ok(FinishOutcome::Continue(error)),
+        };
         self.inner.closing.store(true, Ordering::SeqCst);
         let _serial = self.inner.serial.lock().await;
         let state = self.inner.refresh().await?;
@@ -333,6 +346,14 @@ impl Turn {
     /// interactions are retained for a later owner, and helpers waiting on
     /// them return `WaitOutcome::Pending`.
     pub async fn try_suspend(&mut self, draft: SuspensionDraft) -> Result<SuspendOutcome> {
+        let _drained = match self
+            .inner
+            .drain_attached(draft.expected_control, draft.expected_history)
+            .await
+        {
+            Ok(guard) => guard,
+            Err(error) => return Ok(SuspendOutcome::Continue(error)),
+        };
         self.inner.closing.store(true, Ordering::SeqCst);
         let _serial = self.inner.serial.lock().await;
         let state = self.inner.refresh().await?;
@@ -441,6 +462,21 @@ impl TurnObserver {
         self.view.borrow().clone()
     }
 
+    /// Inspect the retained operation associated with a streamed update without
+    /// cloning the transcript or retaining the turn's execution lease.
+    pub fn inspect_operation(
+        &self,
+        id: &OperationId,
+        predicate: impl FnOnce(&agent_kit_core::turn::OperationState) -> bool,
+    ) -> bool {
+        self.view
+            .borrow()
+            .state
+            .operations()
+            .get(id)
+            .is_some_and(predicate)
+    }
+
     /// The next update. A lagging observer receives the current snapshot in
     /// place of missed updates. Returns `None` once the turn is gone.
     pub async fn next(&mut self) -> Option<TurnUpdate> {
@@ -461,10 +497,51 @@ pub struct TurnOperations {
     pub(crate) inner: Arc<Inner>,
 }
 
+/// Observe or act on a turn while an execution owner still holds it.
+pub struct WeakTurnOperations(std::sync::Weak<Inner>);
+
+impl WeakTurnOperations {
+    pub fn upgrade(&self) -> Option<TurnOperations> {
+        self.0.upgrade().map(|inner| TurnOperations { inner })
+    }
+}
+
 impl TurnOperations {
+    /// Run a bounded callback owned by this turn after a tool yields. A
+    /// settlement or suspension waits for admitted callbacks to finish, and refuses
+    /// callbacks arriving after it seals the owner. The callback must observe
+    /// normal cancellation and cannot itself suspend or settle the turn.
+    pub async fn run_attached<T>(&self, work: impl std::future::Future<Output = T>) -> Result<T> {
+        let _attached = self.inner.attached.read().await;
+        self.inner.ensure_open()?;
+        if !self.inner.view.borrow().state.controls().admits_work() {
+            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
+        }
+        Ok(work.await)
+    }
+
+    /// Borrow turn authority without retaining the execution owner.
+    pub fn downgrade(&self) -> WeakTurnOperations {
+        WeakTurnOperations(Arc::downgrade(&self.inner))
+    }
+
     /// A copy of the latest view.
     pub fn view(&self) -> TurnView {
         self.inner.view.borrow().clone()
+    }
+
+    /// Wait until this execution owner is cancelled, paused, closed, or lost.
+    /// Attached work uses this signal to stop private native operations.
+    pub async fn wait_for_interruption(&self, admitted_at: ControlRevision) {
+        let mut views = self.inner.view.subscribe();
+        tokio::select! {
+            _ = self.inner.cancellation.cancelled() => {}
+            _ = views.wait_for(|view| {
+                let controls = view.state.controls();
+                view.admission_closed || !controls.admits_work() ||
+                    controls.interruption.is_some_and(|stop| stop.revision > admitted_at)
+            }) => {}
+        }
     }
 
     /// The stable operation identity this turn derives from `key`.
@@ -485,7 +562,8 @@ impl TurnOperations {
         request: PreparedRequest,
         grants: GrantSelection,
     ) -> Result<InferenceOutcome> {
-        self.infer_updates(key, request, grants, None, None).await
+        self.infer_updates(key, request, grants, None, None, None)
+            .await
     }
 
     /// Execute ordinary inference with a caller-selected earlier deadline.
@@ -497,8 +575,29 @@ impl TurnOperations {
         grants: GrantSelection,
         deadline: Instant,
     ) -> Result<InferenceOutcome> {
-        self.infer_updates(key, request, grants, None, Some(deadline))
+        self.infer_updates(key, request, grants, None, Some(deadline), None)
             .await
+    }
+
+    /// Execute inference for a bounded caller that can disappear, while still
+    /// recording the admitted attempt's outcome when its caller cancels.
+    pub async fn infer_while_needed(
+        &self,
+        key: OperationKey,
+        request: PreparedRequest,
+        grants: GrantSelection,
+        deadline: Instant,
+        cancellation: &CancellationToken,
+    ) -> Result<InferenceOutcome> {
+        self.infer_updates(
+            key,
+            request,
+            grants,
+            None,
+            Some(deadline),
+            Some(cancellation),
+        )
+        .await
     }
 
     pub(crate) async fn infer_updates(
@@ -508,6 +607,7 @@ impl TurnOperations {
         grants: GrantSelection,
         updates: Option<mpsc::Sender<ToolCall>>,
         deadline_cap: Option<Instant>,
+        cancellation: Option<&CancellationToken>,
     ) -> Result<InferenceOutcome> {
         let id = self.operation_id(&key)?;
         self.inner.ensure_open()?;
@@ -541,6 +641,27 @@ impl TurnOperations {
             }
             Claim::Owner(owner) => owner,
         };
+        let run = self.run_inference(&owner, &record, request, updates, deadline_cap);
+        tokio::pin!(run);
+        if let Some(cancellation) = cancellation {
+            tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => owner.admission.cancellation.cancel(),
+                result = &mut run => return result,
+            }
+        }
+        run.await
+    }
+
+    async fn run_inference(
+        &self,
+        owner: &Owner,
+        record: &OperationRecord,
+        request: PreparedRequest,
+        updates: Option<mpsc::Sender<ToolCall>>,
+        deadline_cap: Option<Instant>,
+    ) -> Result<InferenceOutcome> {
+        let id = record.id.clone();
         let provider = match self
             .inner
             .services
@@ -570,7 +691,7 @@ impl TurnOperations {
             }
         };
         if let Err(failure) = self
-            .authorize_inference(&record, &owner.admission, deadline)
+            .authorize_inference(record, &owner.admission, deadline)
             .await
         {
             drop(permit);
@@ -591,7 +712,7 @@ impl TurnOperations {
             }
             // A count can outlive the grants or control state it began with.
             if let Err(failure) = self
-                .authorize_inference(&record, &owner.admission, deadline)
+                .authorize_inference(record, &owner.admission, deadline)
                 .await
             {
                 drop(permit);
@@ -604,7 +725,7 @@ impl TurnOperations {
                 .reject_inference(&id, "deadline", FailureKind::Cancelled)
                 .await;
         }
-        let attempt = match self.inner.start_attempt(&owner).await {
+        let attempt = match self.inner.start_attempt(owner).await {
             Ok(attempt) => attempt,
             Err(error) if error.kind == ErrorKind::InvalidState => {
                 return self
@@ -1373,6 +1494,7 @@ pub(crate) struct Inner {
     inference_permits: Arc<Semaphore>,
     tool_permits: Arc<Semaphore>,
     serial: AsyncMutex<()>,
+    attached: RwLock<()>,
     active: Mutex<BTreeMap<OperationId, Active>>,
     closing: AtomicBool,
     frozen: AtomicBool,
@@ -1602,6 +1724,21 @@ impl Inner {
                     if self.refresh().await.is_err() { self.freeze("journal_unavailable"); break }
                 }
             }
+        }
+    }
+
+    async fn drain_attached(
+        &self,
+        control: ControlRevision,
+        history: HistoryPosition,
+    ) -> Result<tokio::sync::RwLockWriteGuard<'_, ()>> {
+        let mut views = self.view.subscribe();
+        tokio::select! {
+            biased;
+            guard = self.attached.write() => Ok(guard),
+            _ = views.wait_for(|view| view.state.controls().revision != control
+                || view.state.history().position() != history) =>
+                Err(Error::new(ErrorKind::Conflict, "stale_completion_basis")),
         }
     }
 

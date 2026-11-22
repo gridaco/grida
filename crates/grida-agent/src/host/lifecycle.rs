@@ -251,12 +251,18 @@ mod tests {
             let (view, _, resume) = host.inspect_snapshot(session.clone()).await.unwrap();
             assert!(view.current.is_none() && !view.admission_paused);
             assert_eq!(view.queued[0].input.id.as_str(), "next");
+            let queued: StoredPrompt = decode_input(&view.queued[0].input).unwrap();
+            assert!(queued.preceding_turn.is_none());
+            assert!(settled_predecessor(&view).unwrap().is_none());
             assert!(!resume);
             drop(drain);
             sponsorship::tests::synthetic_reply(&provider).await;
             loop {
                 let view = host.store.inspect(session.clone()).await.unwrap();
                 if view.current.is_none() && view.queued.is_empty() {
+                    let latest = &view.latest.as_ref().unwrap().binding.turn;
+                    let expected = preceding_turn_fingerprint(&session, latest).unwrap();
+                    assert_eq!(settled_predecessor(&view).unwrap(), Some(expected));
                     break;
                 }
                 tokio::task::yield_now().await;

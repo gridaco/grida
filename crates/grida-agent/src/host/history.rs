@@ -220,7 +220,7 @@ impl Host {
                 }
             }
             if automatic_review {
-                let reviews = self
+                let mut reviews = self
                     .store
                     .inspect_turn_with(
                         session.clone(),
@@ -228,6 +228,26 @@ impl Host {
                         super::permissions::approval_review_facts,
                     )
                     .await?;
+                let with_ids = reviews
+                    .iter_mut()
+                    .filter_map(|review| {
+                        let id =
+                            super::reconsideration::annotation_id(turn, review.review_id.as_ref()?);
+                        Some(id.map(|id| (review, id)))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                if !with_ids.is_empty() {
+                    let receipts = self
+                        .store
+                        .context_annotation_receipts(
+                            session.clone(),
+                            with_ids.iter().map(|(_, id)| id.clone()).collect(),
+                        )
+                        .await?;
+                    for (review, id) in with_ids {
+                        review.reconsidered = receipts.contains_key(&id);
+                    }
+                }
                 if !reviews.is_empty() {
                     facts.approval_reviews.insert(turn.clone(), reviews);
                 }
@@ -581,7 +601,8 @@ impl Host {
             {
                 continue;
             }
-            let messages = prompt_input(&input.id, &stored.parts)?;
+            let messages =
+                prompt_input_with_predecessor(&input.id, &stored.parts, stored.preceding_turn)?;
             if !matches!(messages.as_slice(), [message] if &message.id == original && message.content == visible.content)
             {
                 continue;
@@ -757,8 +778,16 @@ impl Host {
                     host.check_ready_capacity(&session).await?;
                 }
                 let policy = host.submission_policy(&replacement, false)?;
-                host.capture_input(&view, replacement.id, replacement.parts, policy)
-                    .await?
+                // The edit replaces history through the anchor. The old tip cannot
+                // identify what preceded the replacement in the revised conversation.
+                host.capture_input_with_predecessor(
+                    &view,
+                    replacement.id,
+                    replacement.parts,
+                    policy,
+                    None,
+                )
+                .await?
             };
             let revised = host
                 .store

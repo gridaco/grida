@@ -254,6 +254,7 @@ fn context_view(
 ) -> Result<(View, Option<i64>)> {
     let selection = before_turn.map_or(HistorySelection::Current, HistorySelection::BeforeTurn);
     let (mut view, before) = select_view(connection, session, selection)?;
+    view.annotation_after = Some(view.after);
     let replacement = connection
         .query_row(
             "SELECT turn_ordinal,through_ordinal,seed,identity FROM context_replacements
@@ -279,6 +280,13 @@ fn context_view(
             ));
         }
         view.after = through;
+        // A full replacement covers the history before the maintenance turn.
+        // Contributions anchored after the maintenance turn are still newer.
+        view.annotation_after = Some(if through == ordinal {
+            through - 1
+        } else {
+            through
+        });
         view.seed = Some(decode(&seed)?);
         view.seed_identity = Some(stored_identity(identity)?);
     }

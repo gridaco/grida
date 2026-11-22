@@ -376,6 +376,67 @@ async fn wait_for_count(counter: &AtomicUsize, expected: usize) {
 }
 
 #[tokio::test]
+async fn settlement_drains_admitted_callbacks_and_refuses_late_callbacks() {
+    let runtime = runtime(
+        ScriptedProvider::complete(),
+        &CounterTool::new(None),
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let mut turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let operations = turn.operations();
+    let (started, start) = tokio::sync::oneshot::channel();
+    let (release, released) = tokio::sync::oneshot::channel();
+    let worker = tokio::spawn({
+        let operations = operations.clone();
+        async move {
+            operations
+                .run_attached(async move {
+                    started.send(()).unwrap();
+                    released.await.unwrap();
+                })
+                .await
+        }
+    });
+    start.await.unwrap();
+    let initial = turn.view();
+    let draft = CompletionDraft {
+        expected_control: initial.state.controls().revision,
+        expected_history: initial.state.history().position(),
+        outcome: TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        },
+    };
+    let mut finishing = std::pin::pin!(turn.try_finish(draft));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut finishing)
+            .await
+            .is_err()
+    );
+    let mut late = std::pin::pin!(
+        operations.run_attached(async { panic!("sealed turn dispatched a callback") })
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut late)
+            .await
+            .is_err()
+    );
+    release.send(()).unwrap();
+    worker.await.unwrap().unwrap();
+    assert!(matches!(
+        finishing.await.unwrap(),
+        FinishOutcome::Settled(_)
+    ));
+    assert_eq!(late.await.unwrap_err().code, "admission_closed");
+}
+
+#[tokio::test]
 async fn simple_master_publishes_history_and_checkpoint_atomically() {
     let provider = ScriptedProvider::complete();
     let tool = CounterTool::new(None);
@@ -644,6 +705,14 @@ async fn coalesced_pause_interrupts_older_inference_but_not_work_started_after_r
         agent_kit_core::inference::FailureKind::Cancelled
     );
     assert_eq!(failure.code, "turn_paused");
+    // A private operation can begin observing after the pause and resume
+    // coalesced. The original admission still receives the interruption.
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        operations.wait_for_interruption(ControlRevision(0)),
+    )
+    .await
+    .unwrap();
     assert!(!turn.view().state.controls().paused);
     assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
 }
@@ -3092,6 +3161,44 @@ async fn an_adapter_interruption_after_the_deadline_records_the_deadline() {
         (failure.kind, failure.code.as_str()),
         (FailureKind::Cancelled, "deadline")
     );
+}
+
+#[tokio::test]
+async fn caller_cancellation_finishes_its_inference_and_leaves_the_turn_open() {
+    let (provider, _events) = ScriptedProvider::streaming();
+    let tool = CounterTool::new(None);
+    let turn = runtime_with(provider.clone(), inventory(&tool), Duration::from_secs(20))
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let stop = agent_kit_core::CancellationToken::new();
+    let operations = turn.operations();
+    let key = OperationKey::new("caller-owned").unwrap();
+    let id = operations.operation_id(&key).unwrap();
+    let infer = operations.infer_while_needed(
+        key,
+        request(&provider, &inventory(&tool)),
+        grants(),
+        Instant::now() + Duration::from_secs(20),
+        &stop,
+    );
+    let (outcome, ()) = tokio::join!(infer, async {
+        wait_for_count(&provider.starts, 1).await;
+        stop.cancel();
+    });
+    let outcome = outcome.unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert_eq!(
+        outcome.failure.as_ref().unwrap().kind,
+        FailureKind::Cancelled
+    );
+    assert_eq!(
+        operations.view().state.operations()[&id].outcome(),
+        Some(&agent_kit_core::turn::OperationOutcome::Inference(outcome))
+    );
+    assert!(operations.view().state.controls().admits_work());
+    assert!(!operations.view().active.contains(&id));
 }
 
 #[tokio::test]

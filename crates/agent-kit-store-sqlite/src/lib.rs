@@ -1,7 +1,9 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+mod annotation;
 pub mod catalog;
 pub mod catalog_reader;
+pub mod checkpoint;
 pub mod context;
 mod control_pair;
 pub mod deletion;
@@ -122,6 +124,7 @@ struct Inner {
     /// Unsettled turns as this store last wrote or read them.
     turns: Mutex<turn_layout::TurnCache>,
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<catalog_reader::TurnOwner>>>,
+    private_contexts: Mutex<checkpoint::Reservations>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
     conversations: Option<catalog::ConversationProjection>,
@@ -316,6 +319,7 @@ impl SqliteStore {
                 connection: Mutex::new(connection),
                 turns: Mutex::new(turn_layout::TurnCache::default()),
                 owners: Mutex::new(BTreeMap::new()),
+                private_contexts: Mutex::default(),
                 changed: Notify::new(),
                 catalog,
                 conversations,
@@ -2129,6 +2133,7 @@ fn apply_turn_change(
         (state.is_suspended(), requests)
     };
     let previous_activity = changes_activity.then(|| activity(state));
+    checkpoint::release_answered(tx, state.binding(), change.actions())?;
     let receipt = state.apply(change)?;
     if previous_activity.is_some_and(|previous| previous != activity(state)) {
         catalog_reader::Marker::stage_turn(tx, &state.binding().session)?;

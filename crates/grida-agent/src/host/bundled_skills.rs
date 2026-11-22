@@ -153,6 +153,52 @@ impl Tool for TurnSkills {
     }
 }
 
+/// Public bundled documentation already opened in this turn can explain a
+/// command's behavior. Workspace file contents and arbitrary tool output
+/// are outside this evidence source.
+pub(super) fn review_evidence(state: &agent_kit_core::turn::TurnState) -> Vec<String> {
+    use agent_kit_core::turn::{OperationInput, OperationOutcome};
+    let mut evidence = Vec::new();
+    let mut remaining = 12 * 1024;
+    for record in state.operations().values() {
+        let OperationInput::Tool(call) = &record.record.input else {
+            continue;
+        };
+        if call.definition().id.as_str() != READ_SKILL
+            || record.record.grants.authority.principal.as_str() != "grida-local"
+            || !record
+                .record
+                .grants
+                .authority
+                .binding
+                .as_str()
+                .starts_with("bundled-skills/")
+        {
+            continue;
+        }
+        let Some(OperationOutcome::Tool(outcome)) = record.outcome() else {
+            continue;
+        };
+        let [ResultContent::Text(body)] = outcome.content.as_slice() else {
+            continue;
+        };
+        let Ok(selected) = request(call.arguments()) else {
+            continue;
+        };
+        if outcome.status == OutcomeStatus::Succeeded
+            && !outcome.truncated
+            && body.len() <= remaining
+        {
+            remaining -= body.len();
+            evidence.push(format!(
+                "Bundled documentation for {}:\n{}",
+                selected.name, body
+            ));
+        }
+    }
+    evidence
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Read {

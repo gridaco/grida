@@ -218,24 +218,54 @@ semantics differ from the native ones.
 
 ## Network and filesystem limits
 
-A trusted launcher can offer one TCP destination to a finite, noninteractive
-command. On macOS, Seatbelt permits the connection to the supervisor’s Unix
-socket. On Linux, bubblewrap isolates the network namespace. A private
-loopback SOCKS listener forwards over a single preconnected broker socket,
-and seccomp restricts the payload’s socket families. Direct host networking
-remains denied on both platforms.
+On a managed profile, an ordinary confined Act command receives an authenticated
+HTTP CONNECT proxy when it starts. Its first connection to a destination requests
+a decision for that public host and port. On macOS, Seatbelt limits outgoing TCP to the exact IPv4
+loopback proxy port. On Linux, bubblewrap gives the command a private network
+namespace. A trusted listener there relays streams over an exact protected
+Unix socket. The host injects the per-command proxy credential into the child's
+environment and omits it from approval records.
 
-The broker authenticates the client, checks the exact approved hostname and
-port, resolves the name and connects to one validated public IPv4 address.
-The broker forwards opaque bytes to that TCP peer. It does not inspect HTTP paths, HTTP host headers or TLS contents.
-A compatible client uses the supplied SOCKS proxy. The grant permits one
-connection, up to 8 MiB in each direction, within the 30-second process
-deadline. Exceeding either byte limit fails the tool call, including when the
-program accepts a partial stream and exits successfully. Finite commands have
-no interactive process number. The host tracks their native cleanup through
-cancellation, chat retirement and shutdown.
+The native host authorizes the exact public DNS name and port before resolving
+or dialing. It checks each resolved address and dials that address directly. CONNECT
+relays opaque TCP without inspecting the enclosed protocol.
+Once decided, a destination reuses the decision across repeated or concurrent
+requests from the same process. The broker bounds open connections,
+destinations, handshake and connect time, and closes idle tunnels. Active
+transfers stream in bounded chunks. When the process exits or is cancelled,
+the broker closes its listener and all tunnels. New decisions require an
+admitting turn. The sandbox still applies the captured filesystem scope.
+On macOS, a descendant that outlives its process group retains the Seatbelt
+port rule. The broker still revokes its credential and closes its tunnels.
+
+Work accepted with an earlier tool contract retains its explicit managed retry
+or one-destination SOCKS grant. Plan and offline profiles keep networking disabled.
+
+A private command investigation uses the read-only intersection of the turn’s
+filesystem grants. The helper gets private scratch and a minimal environment.
+It runs the command to completion with closed stdin and networking disabled,
+and checks cleanup and live read authority before returning bounded stdout and
+stderr to the host. The host can send this output to the captured review
+provider. The foreground process registry has no handle for these commands.
+[Review shell](../src/permissions/review_shell.rs).
 
 Provider HTTP and structured downloads use separately authorized host services.
+
+## Escalation within confinement
+
+A separately approved Act command keeps its confined `ExecutionScope`. The
+scope retains the filesystem read ceiling, directory grants, host exclusions
+and agent configuration protections. A reviewed workspace write can update
+version-control metadata. On macOS, a listener retry keeps the ordinary
+filesystem scope and adds one nonzero TCP port. Seatbelt also allows connections to loopback on that same
+port so the command can check readiness. Other outbound traffic stays denied.
+The command controls its bind address. Automatic review checks that a local
+preview binds to loopback. Linux refuses this listener
+scope while keeping its existing network namespace and mediated outbound path.
+
+Approval authorizes the captured launch once. A retained pipe session has
+closed stdin, and its owning chat can read output or interrupt it. Subsequent
+commands use their own scope.
 
 ## Explicit unconfined execution
 
@@ -257,9 +287,9 @@ platform; hostile same-user code can also interfere with the host and helper.
 An owner-only temporary directory is cleanup organization, not isolation from
 other same-user processes.
 
-Product Full access selection, consent, persistence and permission capture
-belong to the host. Reviewed hooks retain their confined scope. No automatic
-reviewer or credential injection is introduced by this execution capability.
+The host selects this backend for explicit Full access. Plan executions and
+reviewed hooks use confined scopes. The adapter enforces the supplied authority
+and owns the process lifecycle.
 
 ## Filesystem identity limits
 

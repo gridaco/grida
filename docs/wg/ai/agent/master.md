@@ -53,17 +53,11 @@ which eligible actions require another decision. The reviewer is a person or
 a separately configured automatic reviewer. Product presets can combine these
 selections while preserving their individual meanings.
 
-New Desktop chats default to asking the user before granting additional access.
-Previously granted scope remains subject to its existing constraints. Automatic
-review requires an explicit selection and its own eligibility policy.
-
-An automatic-review mode delegates eligible decisions within host policy. The
-master supplies review policy, reviewer selection, evidence preparation, resource
-allowance, and fallback behavior. Host-mandated denials and human decisions remain
-effective. The host authorization adapter owns the review lifecycle and validates
-the decision against the exact action. Runtime enforces the resulting grant and
-current controls before dispatch. Review timeout, denial, and unavailable
-reviewer remain distinguishable outcomes.
+The master selects evidence, assessment policy, resource limits and fallback
+for automatic review. The host supervises the review, records its decision
+and verifies the exact action and current authority before execution. The
+permission policy owns the [preset defaults](./permissions.md#presets) and
+the [automatic review contract](./permissions.md#automatic-review).
 
 Plan/Act and Standard/Ultra remain separate from these permission selections.
 Planning constrains the allowed work, effort constrains allocation, and approval

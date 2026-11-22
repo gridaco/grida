@@ -1,7 +1,8 @@
 # agent-kit-sandbox
 
 Run a bounded process, or a long-running process session, under a
-host-issued native filesystem scope with raw networking denied. A separate,
+host-issued native filesystem scope with networking denied by default.
+macOS also supports a scoped TCP listener on one port. A separate,
 explicitly unconfined API runs an authorized ordinary-user process with no OS
 filesystem or network confinement. The caller validates current authority and
 chooses the approved executable, working directory, environment, and limits.
@@ -55,6 +56,22 @@ it through shutdown. The existing output budget covers streamed stdout and
 captured stderr together, and the separate stdin budget stops excess input.
 The running handle still owns cancellation, cleanup, and native evidence.
 
+## Confined commands with an HTTP proxy
+
+After admission, a trusted host can supply an authenticated `HttpProxy` to
+`PreparedProcess::spawn_with_http_proxy` or `spawn_session_with_http_proxy`.
+Both supply standard HTTP and HTTPS proxy environment variables. The host
+owns authentication, destination approvals, and the lifetime of the proxy.
+Filesystem denials remain in effect.
+
+On macOS, Seatbelt allows outbound IPv4 TCP connections only to the chosen
+loopback port. On Linux, the sandbox mounts the host-provided Unix socket
+read-only, after checking its canonical location is under a mandatory
+read/write denial. The helper bridges parallel TCP streams from the private
+network namespace's loopback to that socket. The payload cannot open named
+Unix sockets, access the host loopback directly, or inherit a broker descriptor.
+Process-local anonymous Unix stream pairs are available for runtime wakeups.
+
 ## Finite commands with a SOCKS broker
 
 A host can approve one finite confined command and supply an authenticated
@@ -68,7 +85,7 @@ socket. The command receives a SOCKS5-over-Unix proxy URL. On Linux, the
 helper verifies the private network namespace, connects the host-mounted
 socket and exposes a one-connection TCP forwarder on the namespace's
 loopback. The inherited seccomp filter permits IPv4 TCP streams inside
-that namespace. Unix sockets, raw sockets and other families stay denied.
+that namespace. Named Unix sockets, raw sockets and other families stay denied.
 The broker descriptor closes on payload exec. The host's network and
 loopback are unreachable directly. Both platforms supply proxy environment
 variables to the command and retain ordinary filesystem confinement.

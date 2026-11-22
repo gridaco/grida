@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type {
   NativeChatApprovalAction,
   NativeChatCommandScope,
+  NativeChatEscalatedCommandNetwork,
   NativeApprovalReviewFailure,
 } from "@grida/desktop-bridge";
 import fs from "node:fs/promises";
@@ -56,12 +57,14 @@ type ApprovalBasis = Readonly<{
   controlRevision: number;
   directory: string;
   root: string;
+  reviewing?: true;
   reviewFailure?: NativeApprovalReviewFailure;
 }>;
 
 export type NativeApprovalReview = ApprovalBasis & NativeChatApprovalAction;
 
 type ScopedAccess = Readonly<{
+  commandEscalation?: boolean;
   project: { id: string; path: string };
   protectedPaths: readonly string[];
   workspaceId: string;
@@ -89,6 +92,7 @@ export class NativeAgentPermissions {
     [APPROVALS]: 1,
     [ANSWER]: 1,
   } as const);
+  static readonly reconsideration = "co.grida/session/reconsider-denial";
   static readonly answerMethod = `_${ANSWER}`;
 
   /**
@@ -269,8 +273,26 @@ export class NativeAgentPermissions {
     );
     if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
       throw invalidApproval();
-    for (const review of reviews) issuedReviews.set(review, this.authority);
-    return Object.freeze(reviews);
+    const actionable = reviews.filter((review) => !review.reviewing);
+    for (const review of actionable) issuedReviews.set(review, this.authority);
+    return Object.freeze(actionable);
+  }
+
+  async reconsiderDenial(
+    sessionId: string,
+    turnId: string,
+    reviewId: string
+  ): Promise<void> {
+    if (!identity(sessionId) || !identity(turnId) || !identity(reviewId))
+      throw invalidApproval();
+    const result = object(
+      await this.request(`_${NativeAgentPermissions.reconsideration}`, {
+        sessionId,
+        turnId,
+        reviewId,
+      })
+    );
+    if (result?.recorded !== true) throw invalidApproval();
   }
 
   /** Use the review returned to main. A retry keeps its original revision basis. */
@@ -284,7 +306,9 @@ export class NativeAgentPermissions {
       issuedReviews.get(review) !== this.authority ||
       (decision === "approve_once" &&
         review.tool === "exec_command" &&
-        !review.scope) ||
+        (!review.scope ||
+          (review.sandboxPermissions === "require_escalated" &&
+            (!review.access || !review.network)))) ||
       (decision !== "approve_once" && decision !== "decline")
     )
       throw invalidApproval();
@@ -379,6 +403,9 @@ function readReview(
   )
     throw invalidApproval();
   const { directory, root } = request;
+  const reviewing = row.reviewing;
+  if (reviewing !== undefined && typeof reviewing !== "boolean")
+    throw invalidApproval();
   const failure = row.reviewFailure;
   if (
     failure !== undefined &&
@@ -398,17 +425,14 @@ function readReview(
     controlRevision,
     directory,
     root,
+    ...(reviewing && { reviewing }),
     ...(failure && { reviewFailure: failure }),
   };
-  if (effect.kind === "command") {
-    const network = object(effect.network);
+  if (effect.kind === "command" || effect.kind === "escalated_command") {
     if (
       !scoped ||
       directory !== scoped.project.id ||
       root !== scoped.project.path ||
-      effect.finite !== true ||
-      effect.terminal !== false ||
-      (effect.access !== "read" && effect.access !== "read_write") ||
       !boundedText(effect.command, MAX_COMMAND_BYTES) ||
       !boundedText(effect.cwd, MAX_PATH_BYTES) ||
       !within(root, effect.cwd) ||
@@ -416,7 +440,91 @@ function readReview(
       !path.isAbsolute(effect.executable)
     )
       throw invalidApproval();
-    const scope = commandScope(effect);
+    if (effect.kind === "escalated_command") {
+      if (
+        !scoped.commandEscalation ||
+        !boundedText(effect.justification, 1024) ||
+        !effect.justification.trim() ||
+        /\p{Cc}/u.test(effect.justification)
+      )
+        throw invalidApproval();
+      const knownEffect = Object.keys(effect).every((key) =>
+        [
+          "kind",
+          "command",
+          "justification",
+          "cwd",
+          "executable",
+          "environment_names",
+          "filesystem",
+          "access",
+          "network",
+          "listen_port",
+        ].includes(key)
+      );
+      const access = effect.access;
+      const knownAccess = access === "read" || access === "read_write";
+      const network = escalatedCommandNetwork(effect);
+      const reported =
+        knownEffect && knownAccess && network
+          ? commandScope(effect)
+          : undefined;
+      const scope =
+        reported?.resolvedCwd === effect.cwd &&
+        reported.resolvedExecutable === effect.executable &&
+        (access !== "read" || reported.writeRoots.length === 0)
+          ? reported
+          : undefined;
+      return Object.freeze({
+        ...basis,
+        tool: "exec_command",
+        sandboxPermissions: "require_escalated",
+        command: effect.command,
+        executable: effect.executable,
+        cwd: effect.cwd,
+        justification: effect.justification,
+        environmentNames:
+          scope?.environmentNames ??
+          commandEnvironment(effect.environment_names),
+        ...(scope && knownAccess && network && { scope, access, network }),
+      });
+    }
+    if (
+      (effect.finite !== undefined && typeof effect.finite !== "boolean") ||
+      typeof effect.terminal !== "boolean" ||
+      (effect.managed_network !== undefined &&
+        typeof effect.managed_network !== "boolean") ||
+      (effect.finite === true && (effect.terminal || effect.managed_network)) ||
+      (effect.access !== "read" && effect.access !== "read_write")
+    )
+      throw invalidApproval();
+    const network = object(effect.network);
+    const knownEffect = Object.keys(effect).every((key) =>
+      [
+        "kind",
+        "command",
+        "cwd",
+        "executable",
+        "environment_names",
+        "filesystem",
+        "access",
+        "terminal",
+        "finite",
+        "managed_network",
+        "network",
+      ].includes(key)
+    );
+    const knownDestination =
+      !network ||
+      Object.keys(network).every((key) => key === "host" || key === "port");
+    const declared =
+      knownEffect && knownDestination ? commandScope(effect) : undefined;
+    const scope =
+      declared?.resolvedCwd === effect.cwd &&
+      declared.resolvedExecutable === effect.executable &&
+      (effect.access !== "read" || declared.writeRoots.length === 0)
+        ? declared
+        : undefined;
     const command: Extract<NativeApprovalReview, { tool: "exec_command" }> = {
       ...basis,
       tool: "exec_command" as const,
@@ -424,6 +532,10 @@ function readReview(
       cwd: effect.cwd,
       executable: effect.executable,
       access: effect.access,
+      ...(effect.finite !== true && {
+        process: effect.terminal ? ("terminal" as const) : ("session" as const),
+      }),
+      ...(effect.managed_network && { managedNetwork: true as const }),
       ...(scope && { scope }),
     };
     if (effect.network === undefined || effect.network === null)
@@ -432,10 +544,7 @@ function readReview(
       !network ||
       !boundedText(network.host, 253) ||
       !/^[a-z0-9.-]+$/.test(network.host) ||
-      typeof network.port !== "number" ||
-      !Number.isSafeInteger(network.port) ||
-      network.port < 1 ||
-      network.port > 65535
+      !commandPort(network.port)
     )
       throw invalidApproval();
     return Object.freeze({
@@ -497,11 +606,46 @@ function readReview(
   });
 }
 
+function escalatedCommandNetwork(
+  effect: Record<string, unknown>
+): NativeChatEscalatedCommandNetwork | undefined {
+  if (effect.network === "denied" && !Object.hasOwn(effect, "listen_port"))
+    return Object.freeze({ kind: "denied" });
+  if (effect.network === "managed" && !Object.hasOwn(effect, "listen_port"))
+    return Object.freeze({ kind: "managed" });
+  if (effect.network === "listen" && commandPort(effect.listen_port))
+    return Object.freeze({ kind: "listen", port: effect.listen_port });
+}
+
+function commandPort(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 1 &&
+    value <= 65535
+  );
+}
+
 function commandScope(
   effect: Record<string, unknown>
 ): NativeChatCommandScope | undefined {
   if (effect.filesystem == null) return undefined;
   const fs = object(effect.filesystem);
+  if (
+    fs &&
+    !Object.keys(fs).every((key) =>
+      [
+        "disk_read",
+        "read_roots",
+        "write_roots",
+        "runtime_roots",
+        "private_temp_write",
+        "resolved_executable",
+        "resolved_cwd",
+      ].includes(key)
+    )
+  )
+    return undefined;
   if (
     !fs ||
     !boundedText(fs.resolved_executable, MAX_PATH_BYTES) ||
@@ -524,7 +668,19 @@ function commandScope(
       throw invalidApproval();
     return Object.freeze([...value]);
   };
-  const names = effect.environment_names;
+  return Object.freeze({
+    diskRead: fs.disk_read,
+    resolvedExecutable: fs.resolved_executable,
+    resolvedCwd: fs.resolved_cwd,
+    readRoots: roots(fs.read_roots),
+    writeRoots: roots(fs.write_roots),
+    runtimeRoots: roots(fs.runtime_roots),
+    privateTempWrite: fs.private_temp_write,
+    environmentNames: commandEnvironment(effect.environment_names),
+  });
+}
+
+function commandEnvironment(names: unknown): readonly string[] {
   if (
     !Array.isArray(names) ||
     names.length > 512 ||
@@ -534,16 +690,7 @@ function commandScope(
     )
   )
     throw invalidApproval();
-  return Object.freeze({
-    diskRead: fs.disk_read,
-    resolvedExecutable: fs.resolved_executable,
-    resolvedCwd: fs.resolved_cwd,
-    readRoots: roots(fs.read_roots),
-    writeRoots: roots(fs.write_roots),
-    runtimeRoots: roots(fs.runtime_roots),
-    privateTempWrite: fs.private_temp_write,
-    environmentNames: Object.freeze([...names]),
-  });
+  return Object.freeze([...names]);
 }
 
 function within(root: string, target: string): boolean {

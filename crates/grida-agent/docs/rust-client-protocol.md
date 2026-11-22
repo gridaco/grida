@@ -1187,7 +1187,8 @@ returns pending `approvals` with `input_required` and exit code `6`.
 
 `co.grida/session/permission-mode` version 1 is available only to a negotiated
 private supervising stdio connection. It grants no authority by itself. The
-trusted launcher enables the available choices. Full access and automatic review have independent opt-ins.
+trusted launcher enables the available choices. Full access, automatic review
+and one-command escalation have independent launch opt-ins.
 
 - `_co.grida/session/permission-mode` takes `{cwd, sessionId}` and returns
   `{sessionId, revision, mode, available}`. An unselected chat starts at
@@ -1208,8 +1209,10 @@ The update selects the mode for inputs accepted after it in this ordinary
 parent chat. Running turns, queued inputs and worker assignments keep their
 captured mode through replay and recovery. Child and side chats cannot select
 their own broader posture. A running command retains its launch permissions.
-Only turns with Full access can read or write its terminal when it launched
-unconfined. The supervisor can always list and stop the chat's processes.
+Only turns with Full access can drive a terminal launched in Full access. A
+reviewed command retry stays confined and uses pipes with closed stdin. Its chat can poll the output or
+interrupt it on later turns. The
+supervisor can always list and stop the chat's processes.
 When the launcher withdraws automatic review, the next permission inspection,
 update or new input for a chat with a saved `approve_for_me` selection records
 `restricted` at the next revision. An exact retry still returns its historical
@@ -1218,19 +1221,53 @@ Saved Full access is unavailable when the current trusted launch does not
 authorize it. Earlier implementations can return `permission_mode_busy` when
 work or running processes remain.
 
-With `approve_for_me`, the reviewer's decision resolves the original
-exact-action wait. An indeterminate review leaves that wait with the
-supervisor. Its optional `reviewFailure` is one of `timed_out`, `interrupted`,
-`unavailable`, `invalid_reply` or `needs_human`. Use the original wait and
-revision basis to answer manually.
+With `approve_for_me`, a scoped assessment approves or declines the exact
+action. A timeout or failed assessment closes an eligible action. If a request
+cannot enter automatic review, the supervising client can receive a human
+approval request. Pending rows with `reviewing: true` carry observational
+state. A client may answer a scoped wait only after the host hands it off.
+Ordinary manual decisions suspend the turn. For a running command, the broker
+opens a distinct human-owned wait at handoff and publishes its wait ID. Use
+that ID and its observed revisions. Snapshot and catalogue `inputNeeded`
+reflect the handoff. The independent configured single-read reviewer retains
+its manual fallback and optional `reviewFailure` field.
 
-A finite command's effect can carry `network: {host, port}`, as well as
+A command launch reports `managed_network: true` when its restricted process receives
+a destination broker. The `terminal` and `finite` flags describe actual input and
+lifetime, with an omitted `finite` meaning false. A destination approval effect
+carries `network: {host, port}`, as well as
 `filesystem` with the captured `disk_read`, `read_roots`, `write_roots`,
 `runtime_roots`, `private_temp_write`, `resolved_executable` and
 `resolved_cwd`. The effect's `environment_names` lists names only. A client
-that cannot present the scope can decline the request. A transcript turn can
-include `approvalReviews: [{action, decision}]` with bounded display text
-and a decision of `reviewing`, `approved`, `declined` or `needs_human`.
+that cannot present the scope can decline the request. A host offering
+per-command escalation can issue a separate `escalated_command` effect. It
+carries the exact `command`, `justification`, `cwd`, `executable`,
+`environment_names`, `access` and captured `filesystem` scope. Its `network`
+is `denied`, `listen`, or `managed` for a retained outbound retry. On a managed
+profile, an ordinary confined command emits destination waits directly as it
+connects. Each identifies the public host and port and uses the same reply contract. Each destination decision belongs to the running process and
+is reused for its later connections. A `listen` effect has a required nonzero integer
+`listen_port` and represents incoming TCP and same-port loopback connections.
+The command controls its bind address. The listener grant does not include Internet access. Every retry keeps host filesystem
+exclusions and can remain live after the turn. A client must be able to present
+the captured filesystem and network scope to approve it.
+A transcript turn can include `approvalReviews` with bounded action text and
+a decision of `reviewing`, `approved`, `declined` or `needs_human`. Scoped
+assessments can carry `riskLevel`, `userAuthorization`, a bounded plain-text `rationale` and a
+technical `failure` when applicable. Desktop shows pending review as activity.
+Approval clears that activity. A denial or timeout appears with the action.
+Concurrent connections to distinct destinations have independent reviews. A
+resolved decision leaves the other pending reviews visible.
+The acting model receives the public reason for a blocked action alongside its
+tool result. When the assessment input contains private inspection output, the
+host supplies a fixed rationale identifying the investigation and decision. This
+also applies to failed inspections and observations reused from earlier reviews.
+The raw output and the reviewer's own explanation stay private.
+An eligible denied assessment carries a `reviewId`. A private client that
+negotiates `co.grida/session/reconsider-denial` can select that exact denial
+using `sessionId`, `turnId` and `reviewId`. A `recorded: true` reply confirms
+the user's instruction to reconsider the exact action. The transcript then reports `reconsidered: true`. Recording it starts no work. Any subsequent
+attempt receives a new assessment under the current policy.
 
 Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts

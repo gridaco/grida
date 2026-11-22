@@ -3047,6 +3047,60 @@ it("keeps the original mode and input identity when a draft is retried", async (
   controller.disconnect();
 });
 
+it("keeps reconsideration acknowledged across transcript updates without sending input", async () => {
+  const { bridge, controller } = fixture();
+  const reconsider = vi
+    .fn<NonNullable<DesktopNativeChat["reconsiderDenial"]>>()
+    .mockResolvedValue(undefined);
+  bridge.reconsiderDenial = reconsider;
+  const submit = vi.spyOn(bridge, "submit");
+  const enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>();
+  bridge.enqueue = enqueue;
+  bridge.transcriptPage = async (_id, before) => ({
+    view: 1,
+    older: before ? null : "earlier",
+    messages: [],
+    turns: before
+      ? []
+      : [
+          {
+            turnId: "denied-turn",
+            startedAtMs: 1,
+            status: "succeeded",
+            approvalReviews: [
+              {
+                decision: "declined",
+                action: "example.org:443",
+                reviewId: "exact-denial",
+              },
+            ],
+          },
+        ],
+  });
+  await controller.select("chat-a");
+  await controller.reconsiderDenial("other-turn", "exact-denial");
+  expect(reconsider).not.toHaveBeenCalled();
+  await controller.reconsiderDenial("denied-turn", "exact-denial");
+  expect(reconsider).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "denied-turn",
+    "exact-denial"
+  );
+  expect(
+    controller.read().turnRecords[0].approvalReviews?.[0].reconsidered
+  ).toBe(true);
+  await controller.loadEarlierMessages();
+  expect(controller.read().canReadEarlier).toBe(false);
+  expect(
+    controller.read().turnRecords[0].approvalReviews?.[0].reconsidered
+  ).toBe(true);
+  await controller.reconsiderDenial("denied-turn", "exact-denial");
+  expect(reconsider).toHaveBeenCalledOnce();
+  expect(submit).not.toHaveBeenCalled();
+  expect(enqueue).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
 it("reviews the exact pending request and removes authority on chat switch", async () => {
   const { bridge, controller, waiting } = fixture();
   waiting.add("chat-a");
@@ -3077,7 +3131,10 @@ it("reviews the exact pending request and removes authority on chat switch", asy
   expect(controller.read().approvals).toEqual([review]);
   expect(approvals).toHaveBeenCalledExactlyOnceWith(
     "chat-a",
-    "observation-chat-a"
+    "observation-chat-a",
+    true,
+    true,
+    true
   );
   await controller.answerApproval("review-a", "approve_once");
   expect(answer).toHaveBeenCalledExactlyOnceWith(
@@ -3090,6 +3147,55 @@ it("reviews the exact pending request and removes authority on chat switch", asy
   await controller.answerApproval("review-a", "decline");
   expect(answer).toHaveBeenCalledTimes(1);
   controller.disconnect();
+});
+
+it("loads a running command approval after Auto hands off the same wait", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const observation = await observe(id);
+    const { snapshot } = observation;
+    return snapshot.current
+      ? {
+          ...observation,
+          snapshot: {
+            ...snapshot,
+            current: { ...snapshot.current, inputNeeded: true },
+          },
+        }
+      : observation;
+  };
+  const review = {
+    reviewId: "network-review",
+    tool: "exec_command",
+    command: "curl https://registry.example.test/",
+    executable: "/bin/sh",
+    cwd: "/chosen",
+    root: "/chosen",
+    access: "read",
+    network: { host: "registry.example.test", port: 443 },
+  } as const;
+  let handedOff = false;
+  bridge.approvals = vi.fn<NonNullable<DesktopNativeChat["approvals"]>>(
+    async () => (handedOff ? [review] : [])
+  );
+  bridge.answerApproval = async () => {
+    throw new Error("unexpected answer");
+  };
+  try {
+    await controller.select("chat-a");
+    expect(controller.read().approvals).toEqual([]);
+    expect(bridge.approvals).toHaveBeenCalledTimes(1);
+    handedOff = true;
+    controller.checkObservation();
+    await vi.waitFor(() =>
+      expect(controller.read().approvals).toEqual([review])
+    );
+    expect(bridge.approvals).toHaveBeenCalledTimes(2);
+  } finally {
+    controller.disconnect();
+  }
 });
 
 it("drops a late review from the previous chat", async () => {

@@ -4,7 +4,7 @@ use agent_kit_core::{Error, ErrorKind, Result};
 use serde::{Deserialize, Serialize};
 
 /// TCP endpoint whose name and port appear in the durable approval.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommandNetworkDestination {
     pub host: String,
@@ -43,6 +43,9 @@ impl CommandNetworkDestination {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use native::*;
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(super) mod managed;
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod native {
@@ -265,7 +268,7 @@ mod native {
 
     // Keep routing local, private, carrier, special-purpose, documentation,
     // benchmarking, multicast and reserved address space out of this grant.
-    fn public_address(ip: Ipv4Addr) -> bool {
+    pub(super) fn public_address(ip: Ipv4Addr) -> bool {
         !matches!(
             ip.octets(),
             [0 | 10 | 127 | 224..=255, ..]
@@ -373,6 +376,7 @@ mod native {
                 temporary_parent: temporary,
                 termination: Termination::ProcessGroup,
                 disk_read: true,
+                listen_port: None,
             };
             for exceeded in [false, true] {
                 let destination = CommandNetworkDestination {

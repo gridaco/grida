@@ -482,13 +482,11 @@ impl Master {
                     .map_or(0, effort::Policy::reserved_child_generation_steps),
             )?
         };
-        let allowance = self.approval_reviewer.as_ref().map_or(0, |reviewer| {
-            reviewer
-                .allowance(max_steps)
-                .min(max_steps.saturating_sub(1))
-        });
-        let reviewer = self.approval_reviewer.as_ref().filter(|_| allowance > 0);
-        let max_steps = max_steps - allowance;
+        let reviewer = self
+            .approval_reviewer
+            .as_ref()
+            .filter(|reviewer| reviewer.reserved_foreground_steps() < max_steps);
+        let max_steps = max_steps - reviewer.map_or(0, |r| r.reserved_foreground_steps());
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         Self::retain_orphaned_work(&turn, &turn.view()).await?;
@@ -846,8 +844,8 @@ impl Master {
                     && step.inference.failure.is_none()
                     && continuation.request_history == Some(current.state.history().position())
                     && let Some(reviewer) = reviewer
-                    && reviewer
-                        .review_with_allowance(&turn.operations(), &current, &deferred, allowance)
+                    && Arc::clone(reviewer)
+                        .review(&turn.operations(), &current, &deferred)
                         .await?
                 {
                     continue;
@@ -1344,11 +1342,26 @@ impl Master {
         messages.extend(self.history.iter().cloned());
         // Model context replaces a response the person interrupted with a
         // note; see history::model_context.
+        let current_messages = messages.len();
         messages.extend(
             history::model_context(&view.state)
                 .into_iter()
                 .map(|HistoryRecord::Message(message)| message),
         );
+        if let Some(reviewer) = &self.approval_reviewer {
+            let mut denied = reviewer.denied_actions(&view.state)?;
+            for message in &mut messages[current_messages..] {
+                if let [Content::ToolResult(result)] = message.content.as_mut_slice()
+                    && let Some(decisions) = denied.remove(&message.id)
+                {
+                    result.content.extend(
+                        decisions
+                            .into_iter()
+                            .map(agent_kit_core::messages::ResultContent::Text),
+                    );
+                }
+            }
+        }
         for content in messages.iter_mut().flat_map(|message| &mut message.content) {
             if let Content::Media(media) = content
                 && let Some(display) =
@@ -1780,6 +1793,49 @@ impl Master {
             }
             None => None,
         };
+        // Completion checks must see the original proposal even on recovery.
+        // Reconcile work completed after the proposal only in the final receipt.
+        let account = outcome_account(&outcome)?;
+        let finished: Vec<_> = account
+            .unresolved
+            .iter()
+            .filter(|id| {
+                basis.state.operations().get(*id).is_some_and(|op| {
+                    op.outcome().is_some()
+                        && !op.is_uncertain()
+                        && !account.completion_checks.iter().any(|check| {
+                            check.operation.as_ref() == Some(*id)
+                                && check.status == hooks::CheckStatus::Uncertain
+                        })
+                })
+            })
+            .cloned()
+            .collect();
+        let additional: Vec<_> = basis
+            .state
+            .operations()
+            .keys()
+            .filter(|id| !outcome.evidence.contains(id))
+            .cloned()
+            .collect();
+        if !finished.is_empty() || !additional.is_empty() {
+            let usage = usage::InferenceUsage::from_turn(&basis.state)?;
+            update_account(&mut outcome, |account| {
+                account.unresolved.retain(|id| !finished.contains(id));
+                account.unresolved.extend(
+                    additional
+                        .iter()
+                        .filter(|id| {
+                            basis.state.operations()[*id].is_uncertain()
+                                || basis.state.operations()[*id].outcome().is_none()
+                        })
+                        .cloned(),
+                );
+                account.inference_usage = usage;
+                account.tool_activity = ToolActivity::from_turn(basis);
+            })?;
+            outcome.evidence.extend(additional);
+        }
         let draft = CompletionDraft {
             expected_control: basis.state.controls().revision,
             expected_history: basis.state.history().position(),

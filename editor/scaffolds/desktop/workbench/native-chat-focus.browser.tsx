@@ -887,7 +887,7 @@ it("shows review progress and its decision in the open chat while the turn keeps
   await waitForReplay();
   await expect
     .element(page.getByText(`Automatically approved "${action}"`))
-    .toBeVisible();
+    .not.toBeInTheDocument();
   await expect.element(reviewing).not.toBeInTheDocument();
   // A second review opens and resolves entirely between two observations.
   approvalReviews = [

@@ -2874,6 +2874,114 @@ describe("native chat IPC", () => {
     );
   });
 
+  it("records a reconsideration in the requesting window’s attached chat", async () => {
+    const { ipc, first, second, chat } = setup();
+    const attachment = await ipc.create(first.event);
+    const reconsiderDenial = vi
+      .fn<() => Promise<void>>()
+      .mockResolvedValue(undefined);
+    await expect(
+      ipc.reconsiderDenial(
+        first.event,
+        attachment.attachmentId,
+        "turn",
+        "review"
+      )
+    ).rejects.toThrow("native_chat_reconsideration_unavailable");
+    Object.assign(chat, { reconsiderDenial });
+    await expect(
+      ipc.reconsiderDenial(
+        second.event,
+        attachment.attachmentId,
+        "turn",
+        "review"
+      )
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(reconsiderDenial).not.toHaveBeenCalled();
+    await ipc.reconsiderDenial(
+      first.event,
+      attachment.attachmentId,
+      "turn",
+      "review"
+    );
+    expect(reconsiderDenial).toHaveBeenCalledExactlyOnceWith(
+      { id: attachment.sessionId },
+      "turn",
+      "review"
+    );
+  });
+
+  it("binds approval of a managed terminal command to a renderer that can present its scope", async () => {
+    const { ipc, first, chat } = setup();
+    const attachment = await ipc.create(first.event);
+    const view = await ipc.observe(first.event, attachment.attachmentId);
+    const reviewed = {
+      sessionId: attachment.sessionId,
+      turnId: "turn",
+      waitId: "launch",
+      sessionRevision: view.snapshot.sessionRevision,
+      controlRevision: view.snapshot.current!.controlRevision,
+      directory: "project",
+      root: "/project",
+      tool: "exec_command",
+      command: "sh",
+      cwd: "/project",
+      executable: "/bin/sh",
+      access: "read",
+      process: "terminal",
+      managedNetwork: true,
+      scope: {
+        diskRead: true,
+        resolvedExecutable: "/bin/sh",
+        resolvedCwd: "/project",
+        readRoots: [],
+        writeRoots: [],
+        runtimeRoots: [],
+        privateTempWrite: true,
+        environmentNames: [],
+      },
+    } as const;
+    vi.spyOn(chat, "approvals").mockResolvedValue([reviewed]);
+    const answer = vi.spyOn(chat, "answerApproval");
+    const [legacy] = await ipc.approvals(
+      first.event,
+      attachment.attachmentId,
+      view.observationId,
+      true,
+      true
+    );
+    expect(legacy).not.toMatchObject({ scope: reviewed.scope });
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        attachment.attachmentId,
+        legacy.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_approval_unavailable");
+    expect(answer).not.toHaveBeenCalled();
+    const [shown] = await ipc.approvals(
+      first.event,
+      attachment.attachmentId,
+      view.observationId,
+      true,
+      true,
+      true
+    );
+    expect(shown).toMatchObject({
+      scope: reviewed.scope,
+      process: "terminal",
+      managedNetwork: true,
+    });
+    await ipc.answerApproval(
+      first.event,
+      attachment.attachmentId,
+      shown.reviewId,
+      "approve_once"
+    );
+    expect(answer).toHaveBeenCalledOnce();
+  });
+
   it("issues stable exact approval tokens only to their observing attachment", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);
@@ -2890,16 +2998,82 @@ describe("native chat IPC", () => {
       tool: "read_file",
       relativePath: "note.txt",
     } as const;
-    const list = vi.spyOn(chat, "approvals").mockResolvedValue([review]);
+    const escalatedAction = {
+      tool: "exec_command",
+      sandboxPermissions: "require_escalated",
+      command: "next start --hostname 127.0.0.1 --port 43123",
+      cwd: "/fixture/chosen",
+      executable: "/bin/sh",
+      justification: "Start the requested local preview",
+      environmentNames: ["PATH"],
+      access: "read",
+      network: { kind: "listen", port: 43123 },
+      scope: {
+        diskRead: true,
+        resolvedExecutable: "/bin/sh",
+        resolvedCwd: "/fixture/chosen",
+        readRoots: [],
+        writeRoots: [],
+        runtimeRoots: [],
+        privateTempWrite: true,
+        environmentNames: ["PATH"],
+      },
+    } as const;
+    const escalated = {
+      sessionId: review.sessionId,
+      turnId: review.turnId,
+      waitId: "launch",
+      sessionRevision: review.sessionRevision,
+      controlRevision: review.controlRevision,
+      root: review.root,
+      directory: "project",
+      ...escalatedAction,
+    };
+    const list = vi
+      .spyOn(chat, "approvals")
+      .mockResolvedValue([review, escalated]);
     const answer = vi.spyOn(chat, "answerApproval");
     await expect(
       ipc.approvals(second.event, two.attachmentId, basis.observationId)
     ).rejects.toThrow("native_chat_observation_unavailable");
-    const [shown] = await ipc.approvals(
+    const [, legacy] = await ipc.approvals(
       first.event,
       one.attachmentId,
       basis.observationId
     );
+    expect(legacy).not.toHaveProperty("network");
+    expect(legacy).not.toHaveProperty("scope");
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        one.attachmentId,
+        legacy.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_approval_unavailable");
+    const [shown, launch] = await ipc.approvals(
+      first.event,
+      one.attachmentId,
+      basis.observationId,
+      true
+    );
+    expect(legacy.reviewId).not.toBe(launch.reviewId);
+    await ipc.answerApproval(
+      first.event,
+      one.attachmentId,
+      legacy.reviewId,
+      "decline"
+    );
+    expect(answer).toHaveBeenLastCalledWith(
+      { id: one.sessionId },
+      escalated,
+      "decline"
+    );
+    expect(launch).toEqual({
+      reviewId: expect.any(String),
+      root: review.root,
+      ...escalatedAction,
+    });
     expect(list).toHaveBeenCalledWith({ id: one.sessionId }, basis.snapshot);
     expect(shown).toEqual({
       reviewId: expect.any(String),
@@ -2908,8 +3082,30 @@ describe("native chat IPC", () => {
       relativePath: "note.txt",
     });
     await expect(
-      ipc.approvals(first.event, one.attachmentId, basis.observationId)
-    ).resolves.toEqual([shown]);
+      ipc.approvals(first.event, one.attachmentId, basis.observationId, true)
+    ).resolves.toEqual([shown, launch]);
+    list.mockResolvedValueOnce([
+      review,
+      { ...escalated, network: { kind: "listen", port: 43124 } },
+    ]);
+    const [, changedPort] = await ipc.approvals(
+      first.event,
+      one.attachmentId,
+      basis.observationId,
+      true
+    );
+    expect(changedPort).toMatchObject({
+      network: { kind: "listen", port: 43124 },
+    });
+    expect(changedPort.reviewId).not.toBe(launch.reviewId);
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        one.attachmentId,
+        launch.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_approval_unavailable");
     await expect(
       ipc.answerApproval(
         second.event,
@@ -2953,7 +3149,7 @@ describe("native chat IPC", () => {
         "approve_once"
       )
     ).rejects.toThrow("native_chat_attachment_unavailable");
-    expect(answer).toHaveBeenCalledTimes(2);
+    expect(answer).toHaveBeenCalledTimes(3);
   });
 
   it("starts only the admitted route's workspace and shares the pending start", async () => {

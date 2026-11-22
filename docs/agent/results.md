@@ -137,8 +137,10 @@ uses the kept image, including after you reopen the chat.
 
 In a macOS or Linux workspace chat, you can also ask for a PNG through FX.
 The agent can preview the request using your chosen FX route. Live generation
-requires **Full access** and uses your provider budget or subscription. FX
-saves the PNG in the workspace and records the run.
+needs access to that route and uses your provider budget or subscription. In
+**Auto** or **Ask for approval**, a compatible build can request access for
+the individual FX command. FX saves the PNG in the workspace and records the
+run. [Understand agent permissions](./permissions.md#choose-who-reviews-extra-access)
 
 ## See an artifact while work continues
 

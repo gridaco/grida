@@ -2382,7 +2382,7 @@ struct NeverApproves;
 
 impl approval_review::Reviewer for NeverApproves {
     fn review<'a>(
-        &'a self,
+        self: Arc<Self>,
         _: &'a TurnOperations,
         _: &'a TurnView,
         _: &'a [WaitId],

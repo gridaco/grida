@@ -591,7 +591,10 @@ impl From<TurnView> for TurnSummary {
             cancelled: turn.controls.cancelled,
             disposition: turn.disposition,
             input_needed: !turn.controls.cancelled
-                && crate::host::needs_user_input(&turn.pending_request_schemas),
+                && crate::host::needs_user_input(
+                    &turn.pending_request_schemas,
+                    Some(turn.disposition),
+                ),
             status: turn.outcome.map(|outcome| outcome.status),
         }
     }

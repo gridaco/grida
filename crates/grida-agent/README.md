@@ -890,9 +890,12 @@ command authorities have separate opt-ins. In a narrow read profile,
 the `external-file` directory and supply a path relative to `/`. Shell-enabled
 turns pass those arguments as `exec_command.input_file`. Standalone file
 readers use the same directory. Approval is for that invocation and file
-version. `allowCommandNetwork`
-separately permits a finite, noninteractive `exec_command` to request one
-supported TCP destination with `network: {"host": "example.org", "port": 443}`.
+version. A profile with `allowCommandNetwork` and `allowCommandEscalation`
+gives ordinary confined Act commands a managed proxy. Each first connection
+to a public hostname and port gets its own decision. A profile with networking
+alone can offer one destination to a finite, noninteractive command.
+Automatic review can infer authority for that destination from the authorized
+command. Sensitive transfers require authority for the data and destination.
 The host rechecks the captured authority at dispatch. A broader retry after a
 sandbox refusal needs a fresh decision.
 
@@ -903,12 +906,32 @@ installation. A chat still starts in Default unless the trusted launcher
 explicitly chooses an initial mode. Selecting automatic review retains the
 workspace sandbox and delegates eligible decisions to the accepted turn's
 model and connection. The reviewer receives the exact proposed action and
-the owning chat's original user instructions. Missing or oversized evidence,
-an exhausted allowance, or an indeterminate verdict leaves the request for
-the person. A turn can fund up to four such reviews within its step budget.
-The review has no tools and a ten-second deadline. See the
+the owning chat's instructions and selected references. It assesses risk and
+authorization separately. A provider with tool support can receive bounded output
+from private command investigations under the turn’s read permissions. A captured
+shell grant permits up to four finite commands, each limited to 10 seconds and
+8 KiB of returned output. An eligible file-only profile can instead use the
+primary-directory reader. Compatible reviews can resume a private conversation
+within the same chat. Concurrent reviews fork its last committed snapshot.
+Each action gets its own decision. Malformed assessments and transient failures can retry up to three attempts within a
+90-second deadline. A timeout or exhausted retry blocks the action. Actions
+reserved for a person and requests exceeding the review context budget can
+open a manual approval. Three consecutive policy denials or ten in the last
+fifty reviewed actions interrupt the turn. See the
 [permission guide](../../docs/agent/permissions.md#choose-who-reviews-extra-access)
 and [sandbox contract](./docs/rust-sandbox.md).
+
+An independent `allowCommandEscalation: true` in a trusted permission profile,
+or `--allow-reviewed-command-retry` alongside `--permission-profile`, allows a
+workspace Act turn to request one confined command for review. The model sets
+`sandbox_permissions` to `require_escalated` and supplies a short
+`justification`. The command retains the directory's configured access, the
+filesystem read ceiling, host exclusions and agent configuration protections.
+On macOS, `listen_port` requests incoming TCP and same-port loopback
+connections for the process lifetime. For a local server, use a loopback-only
+server or an explicit loopback bind. Other outbound networking stays denied. The supervising client or an eligible
+automatic reviewer decides on the exact scope. The chat can poll or stop
+the closed-stdin process. Later commands use their own captured permissions.
 
 ### Select Full access explicitly
 
@@ -998,7 +1021,9 @@ polls: 5000 to 300000) and `max_output_tokens`. A pipe process accepts only
 `"\u0003"`, delivered as an interrupt; a terminal process receives the
 characters. A call's wait ends two seconds before its operation deadline. It
 needs no approval of its own and reaches only the calling chat's processes.
-Reading or writing an unconfined process requires a turn with captured Full access.
+A process started in Full access requires a Full-access turn to read or write it.
+A command launched with a one-time escalation can be polled or interrupted by its
+own chat. Its stdin stays closed.
 The supervisor can list and stop it after a change to Default.
 The response text is:
 

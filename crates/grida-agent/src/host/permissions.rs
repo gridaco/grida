@@ -430,25 +430,33 @@ impl Host {
                                 "approval_binding_changed",
                             ));
                         }
-                        let deferred_review = grida_agent_master::approval_review::recorded_review(
+                        let review = grida_agent_master::approval_review::recorded_review(
                             state,
                             &request.operation,
                             request.action,
                             request.scope,
-                        )?
-                        .filter(|review| {
-                            state.is_suspended()
-                                || grida_agent_master::approval_review::failure_reason(review)
-                                    .is_some()
-                        })
-                        .map(|review| review.record.id.clone());
+                        )?;
+                        if wait.is_pending() && approval_is_reviewing(state, wait, &request) {
+                            return Err(problem(
+                                ErrorKind::Conflict,
+                                "approval_review_in_progress",
+                            ));
+                        }
+                        let deferred_review = review
+                            .filter(|review| {
+                                state.is_suspended()
+                                    || grida_agent_master::approval_review::failure_reason(review)
+                                        .is_some()
+                            })
+                            .map(|review| review.record.id.clone());
                         Ok((
                             crate::permissions::manual_approval_answer(
                                 wait,
                                 decision,
                                 deferred_review,
                             )?,
-                            state.outcome().is_none()
+                            !crate::permissions::is_live_network_wait(wait, &request)
+                                && state.outcome().is_none()
                                 && state.controls().admits_work()
                                 && state.waits().values().all(|other| {
                                     other.id == wait_id
@@ -472,14 +480,27 @@ impl Host {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ApprovalReview {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) review_id: Option<agent_kit_core::OperationId>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(super) reconsidered: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_authorization: Option<grida_agent_master::approval_review::UserAuthorization>,
     decision: &'static str,
     action: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    failure: Option<grida_agent_master::approval_review::AskReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rationale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    risk_level: Option<grida_agent_master::approval_review::RiskLevel>,
 }
 
 pub(super) fn approval_review_facts(state: &TurnState) -> Result<Vec<ApprovalReview>> {
     let mut reviews = Vec::new();
-    use crate::permissions::{ApprovalEffect, ReviewResolution};
+    use crate::permissions::ReviewResolution;
     for wait in state
         .waits()
         .values()
@@ -502,73 +523,18 @@ pub(super) fn approval_review_facts(state: &TurnState) -> Result<Vec<ApprovalRev
                 Some(ReviewResolution::Deferred) => "needs_human",
                 None => continue,
             }
-        } else if state.controls().admits_work()
-            && !state.is_suspended()
-            && grida_agent_master::approval_review::failure_reason(review).is_none()
-        {
+        } else if shows_review_activity(state, wait, &request, Some(review)) {
             "reviewing"
         } else {
             "needs_human"
         };
-        let action = match request.effect {
-            ApprovalEffect::Read { relative_path, .. } => {
-                request.root.join(relative_path).display().to_string()
-            }
-            ApprovalEffect::Command {
-                finite: true,
-                network,
-                command,
-                cwd,
-                filesystem,
-                ..
-            } => {
-                let destination = network.map_or_else(
-                    || "Network denied".to_owned(),
-                    |destination| format!("Network {}:{}", destination.host, destination.port),
-                );
-                match filesystem {
-                    Some(fs) => {
-                        let reads = if fs.disk_read {
-                            "Disk reads outside protected paths".to_owned()
-                        } else {
-                            format!(
-                                "Read roots {}",
-                                fs.read_roots
-                                    .iter()
-                                    .chain(&fs.runtime_roots)
-                                    .chain(&fs.write_roots)
-                                    .cloned()
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            )
-                        };
-                        let mut writes = fs.write_roots;
-                        if fs.private_temp_write {
-                            writes.push("private temporary directory".into());
-                        }
-                        format!(
-                            "{destination} · {reads} · Write roots {} · in {} · {command}",
-                            writes.join(", "),
-                            fs.resolved_cwd
-                        )
-                    }
-                    None => format!(
-                        "{destination} · Filesystem details unavailable · in {} · {command}",
-                        cwd.display()
-                    ),
-                }
-            }
-            _ => continue,
+        let can_reconsider = decision == "declined"
+            && (!crate::permissions::is_live_network_wait(wait, &request)
+                || request.launch_scope.is_some())
+            && super::reconsideration::eligible_review(review);
+        let Some((action, complete)) = approval_review_action(&request) else {
+            continue;
         };
-        // Actions are display labels. Remove control and bidirectional formatting
-        // characters so the label cannot change the framing of adjacent UI.
-        let mut action: String = action.chars().map(|c| {
-            if c.is_control() || matches!(c, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}') { '�' } else { c }
-        }).collect();
-        if action.len() > 4096 {
-            action.truncate(action.floor_char_boundary(4096 - '…'.len_utf8()));
-            action.push('…');
-        }
         let call = state
             .operations()
             .get(&request.operation)
@@ -580,10 +546,172 @@ pub(super) fn approval_review_facts(state: &TurnState) -> Result<Vec<ApprovalRev
             .flat_map(|HistoryRecord::Message(message)| &message.content)
             .position(|part| matches!(part, Content::ToolCall(tool) if Some(&tool.id) == call))
             .unwrap_or(usize::MAX);
-        reviews.push((position, ApprovalReview { decision, action }));
+        let assessment = grida_agent_master::approval_review::scoped_assessment(review);
+        let failure = visible_review_failure(decision == "reviewing", Some(review));
+        reviews.push((
+            position,
+            ApprovalReview {
+                review_id: (can_reconsider && complete).then(|| review.record.id.clone()),
+                reconsidered: false,
+                user_authorization: assessment.as_ref().map(|a| a.user_authorization),
+                decision,
+                action,
+                failure,
+                risk_level: assessment.as_ref().map(|review| review.risk_level),
+                rationale: assessment.map(|review| review.rationale),
+            },
+        ));
     }
     reviews.sort_by_key(|(position, _)| *position);
     Ok(reviews.into_iter().map(|(_, review)| review).collect())
+}
+
+/// Project the full action label used to inform reconsideration. Its
+/// completeness must agree at display time and when recording the request.
+pub(super) fn approval_review_action(request: &ApprovalRequest) -> Option<(String, bool)> {
+    use crate::permissions::ApprovalEffect;
+    let action = match &request.effect {
+        ApprovalEffect::Read { relative_path, .. } => {
+            request.root.join(relative_path).display().to_string()
+        }
+        ApprovalEffect::EscalatedCommand {
+            command,
+            cwd,
+            filesystem,
+            network,
+            listen_port,
+            ..
+        } => {
+            use crate::permissions::CommandRetryNetwork;
+            let network = match (network, listen_port) {
+                (Some(CommandRetryNetwork::Denied), _) => "Network denied".into(),
+                (Some(CommandRetryNetwork::Managed), _) => "Managed network access".into(),
+                (Some(CommandRetryNetwork::Listen), Some(port)) => {
+                    format!("TCP listener on port {port}")
+                }
+                _ => "Network details unavailable".into(),
+            };
+            command_review_label(command, cwd, filesystem.as_ref(), network)
+        }
+        ApprovalEffect::Command {
+            network,
+            command,
+            cwd,
+            filesystem,
+            managed_network,
+            ..
+        } => {
+            let network = match network {
+                Some(destination) => {
+                    format!("Network {}:{}", destination.host, destination.port)
+                }
+                None if *managed_network => "Managed network access".into(),
+                None => "Command access".into(),
+            };
+            command_review_label(command, cwd, filesystem.as_ref(), network)
+        }
+        _ => return None,
+    };
+    Some(display_review_action(action))
+}
+
+fn command_review_label(
+    command: &str,
+    cwd: &std::path::Path,
+    filesystem: Option<&grida_agent_master::approval_review::CommandFilesystem>,
+    network: String,
+) -> String {
+    let Some(fs) = filesystem else {
+        return format!(
+            "{network} · Filesystem details unavailable · in {} · {command}",
+            cwd.display()
+        );
+    };
+    let reads = if fs.disk_read {
+        "Disk reads outside protected paths".to_owned()
+    } else {
+        let roots = fs
+            .read_roots
+            .iter()
+            .chain(&fs.runtime_roots)
+            .chain(&fs.write_roots)
+            .cloned()
+            .collect::<Vec<_>>();
+        format!("Read roots {}", roots.join(", "))
+    };
+    let mut writes = fs.write_roots.clone();
+    if fs.private_temp_write {
+        writes.push("private temporary directory".into());
+    }
+    format!(
+        "{network} · {reads} · Write roots {} · in {} · {command}",
+        writes.join(", "),
+        fs.resolved_cwd
+    )
+}
+
+/// The action is plain display text. A shortened or masked label cannot ground
+/// informed reconsideration of the exact denied operation.
+fn display_review_action(action: String) -> (String, bool) {
+    let masked = |c: char| {
+        c.is_control()
+            || matches!(c,
+        '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+    };
+    let complete = action.len() <= 4096 && !action.chars().any(masked);
+    if complete {
+        return (action, true);
+    }
+    let mut display: String = action
+        .chars()
+        .map(|c| if masked(c) { '�' } else { c })
+        .collect();
+    if display.len() > 4096 {
+        display.truncate(display.floor_char_boundary(4096 - '…'.len_utf8()));
+        display.push('…');
+    }
+    (display, false)
+}
+
+fn approval_is_reviewing(
+    state: &TurnState,
+    wait: &agent_kit_core::turn::WaitRecord,
+    request: &ApprovalRequest,
+) -> bool {
+    if crate::permissions::is_live_network_wait(wait, request) {
+        // The broker records a separate, exact wait only once it hands off.
+        return wait.request.schema().as_str() != crate::permissions::NETWORK_HANDOFF;
+    }
+    wait.request.schema().as_str() == crate::permissions::SCOPED_REVIEW && !state.is_suspended()
+}
+
+/// Configured single-read review can still be preempted by its supervising
+/// client. Both observational contracts show its pending review as activity.
+fn shows_review_activity(
+    state: &TurnState,
+    wait: &agent_kit_core::turn::WaitRecord,
+    request: &ApprovalRequest,
+    review: Option<&agent_kit_core::turn::OperationState>,
+) -> bool {
+    approval_is_reviewing(state, wait, request)
+        || (!state.is_suspended()
+            && state.controls().admits_work()
+            && review.is_some_and(|op| {
+                grida_agent_master::approval_review::is_configured_read_review(op)
+                    && grida_agent_master::approval_review::failure_reason(op).is_none()
+            }))
+}
+
+/// An internal tool step or retry can temporarily have no valid assessment.
+fn visible_review_failure(
+    reviewing: bool,
+    review: Option<&agent_kit_core::turn::OperationState>,
+) -> Option<grida_agent_master::approval_review::AskReason> {
+    if reviewing {
+        None
+    } else {
+        review.and_then(grida_agent_master::approval_review::failure_reason)
+    }
 }
 
 pub(super) fn pending_approvals(state: &TurnState) -> Result<Approvals> {
@@ -602,14 +730,11 @@ pub(super) fn pending_approvals(state: &TurnState) -> Result<Approvals> {
                 request.action,
                 request.scope,
             )?;
-            let review_failure =
-                review.and_then(grida_agent_master::approval_review::failure_reason);
+            let reviewing = shows_review_activity(state, wait, &request, review);
+            let review_failure = visible_review_failure(reviewing, review);
             Ok(PendingApproval {
                 wait_id: wait.id.clone(),
-                reviewing: review.is_some()
-                    && review_failure.is_none()
-                    && state.controls().admits_work()
-                    && !state.is_suspended(),
+                reviewing,
                 review_failure,
                 request,
             })
@@ -651,4 +776,21 @@ pub(super) async fn finish_commands(
         return Err(problem(ErrorKind::Uncertain, "command_cleanup_unverified"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod review_display_tests {
+    use super::display_review_action;
+
+    #[test]
+    fn shortened_or_masked_actions_cannot_offer_reconsideration() {
+        assert!(display_review_action("printf ok".into()).1);
+        let (label, complete) = display_review_action(format!("{}tail", "é".repeat(2048)));
+        assert!(label.len() <= 4096 && label.ends_with('…'));
+        assert!(!complete);
+        assert_eq!(
+            display_review_action("printf\u{202e}ok".into()),
+            ("printf�ok".into(), false)
+        );
+    }
 }
