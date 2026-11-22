@@ -512,6 +512,17 @@ export function create_default_menu(
         { role: "cut", accelerator: "CmdOrCtrl+X" },
         { role: "copy", accelerator: "CmdOrCtrl+C" },
         { role: "paste", accelerator: "CmdOrCtrl+V" },
+        { role: "pasteAndMatchStyle", accelerator: "Shift+CmdOrCtrl+V" },
+        ...(process.platform === "darwin"
+          ? [
+              {
+                role: "pasteAndMatchStyle" as const,
+                accelerator: "Command+Option+Shift+V",
+                visible: false,
+                acceleratorWorksWhenHidden: true,
+              },
+            ]
+          : []),
         { role: "selectAll", accelerator: "CmdOrCtrl+A" },
       ],
     },

@@ -21,8 +21,10 @@ export {
   type ComposerMenuAction,
 } from "./composer-menu";
 export {
+  ComposerToolbarChip,
   ComposerToolbarTooltip,
   composerToolbarButtonClassName,
+  composerToolbarLabelClassName,
 } from "./composer-toolbar";
 
 export { ComposerDropZone } from "./composer-drop-zone";

@@ -1,8 +1,10 @@
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
-import { composerToolbarButtonClassName } from "@/kits/composer";
+import {
+  composerToolbarButtonClassName,
+  composerToolbarLabelClassName,
+} from "@/kits/composer";
 
-export const composerAccessLabelClassName = "hidden @[26rem]:inline";
 export const composerAccessReviewLabel = "Ask for approval";
 
 export function ComposerControlSkeleton({
@@ -33,7 +35,7 @@ export function ComposerControlSkeleton({
           <span
             className={cn(
               "invisible whitespace-nowrap pl-4.5 text-xs font-medium",
-              composerAccessLabelClassName
+              composerToolbarLabelClassName
             )}
           >
             {composerAccessReviewLabel}

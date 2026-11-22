@@ -688,7 +688,7 @@ function AgentComposerInner({
         }
       }}
       className={cn(
-        "relative select-none rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
+        "@container relative select-none rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
         className
       )}
     >

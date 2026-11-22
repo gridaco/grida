@@ -126,6 +126,8 @@ Opening it dismisses active text completion so the two menus cannot overlap.
 Pair footer controls with `composerToolbarButtonClassName` for the shared 28px
 height and pill shape. `ComposerToolbarTooltip` accepts a short label and an
 optional shortcut keycap for a binding the host already supports.
+`ComposerToolbarChip` renders removable modes and shares the permission
+control’s icon-only layout below a 26rem composer width.
 
 Use the provider/controller for behavior:
 

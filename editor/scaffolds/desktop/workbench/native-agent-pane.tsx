@@ -1428,7 +1428,6 @@ function NativeChatPane({
             }
             autofocus={autofocus}
             catalog={catalog}
-            className="@container"
             commands={controller.composerCommands.map((id) => ({
               id,
               run: () => controller.runComposerCommand(id),

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import type { NativeChatPermissionMode } from "@grida/desktop-bridge";
 import {
   CheckIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
   ShieldQuestionMarkIcon,
-  XIcon,
 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import {
@@ -18,13 +17,14 @@ import {
 import { cn } from "@app/ui/lib/utils";
 import {
   ComposerActionMenu,
+  ComposerToolbarChip,
   ComposerToolbarTooltip,
   composerToolbarButtonClassName,
+  composerToolbarLabelClassName,
   type ComposerMenuAction,
 } from "@/kits/composer";
 import {
   ComposerControlSkeleton,
-  composerAccessLabelClassName,
   composerAccessReviewLabel,
 } from "./composer-control-skeleton";
 
@@ -90,7 +90,7 @@ export function AgentComposerTools({
                 disabled={access?.busy}
               >
                 <AccessIcon className="size-3.5" />
-                <span className={composerAccessLabelClassName}>{label}</span>
+                <span className={composerToolbarLabelClassName}>{label}</span>
               </Button>
             </PopoverTrigger>
           </ComposerToolbarTooltip>
@@ -201,44 +201,17 @@ export function AgentComposerTools({
         </Popover>
       )}
       {children}
-      {intents.map((intent) => {
-        const label = `Remove ${intent.label.toLowerCase()}`;
-        return (
-          <ComposerToolbarTooltip key={intent.id} label={intent.tooltip}>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={intent.disabled}
-              aria-label={label}
-              onClick={intent.onRemove}
-              className={cn(
-                composerToolbarButtonClassName,
-                "group/chip px-1.5 font-normal text-muted-foreground [&_svg]:size-3.5"
-              )}
-            >
-              <span className="group-hover/chip:hidden group-focus-visible/chip:hidden">
-                {intent.icon}
-              </span>
-              <XIcon className="hidden group-hover/chip:block group-focus-visible/chip:block" />
-              {intent.label}
-            </Button>
-          </ComposerToolbarTooltip>
-        );
-      })}
+      {intents.map(({ id, ...intent }) => (
+        <ComposerToolbarChip key={id} {...intent} />
+      ))}
     </>
   );
 }
 
 export namespace AgentComposerTools {
-  export type Intent = Readonly<{
-    id: string;
-    icon: ReactNode;
-    label: string;
-    tooltip?: string;
-    disabled?: boolean;
-    onRemove(): void;
-  }>;
+  export type Intent = Readonly<
+    ComponentProps<typeof ComposerToolbarChip> & { id: string }
+  >;
   export type Props = Readonly<{
     actions: readonly ComposerMenuAction[];
     access?: Readonly<{
