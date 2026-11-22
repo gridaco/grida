@@ -30,6 +30,7 @@ import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
 import type { NativeChatQuestionReply } from "@grida/desktop-bridge";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
+import markdownStyles from "@/components/chat-markdown.module.css";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
@@ -99,6 +100,7 @@ import { EditorSelectionIndicator } from "./editor-selection-indicator";
 import { MessageContextParts } from "./message-context-parts";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import { WorkingIndicator } from "./working-indicator";
+import { userMessageRemarkPlugins } from "./user-message-markdown";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -112,7 +114,7 @@ const CHAT_TEXT = "text-[14px] leading-[23px]";
 
 const markdown = {
   // Markdown uses the shared chat reading size; see CHAT_TEXT.
-  className: `grida-ai-response-markdown ${CHAT_TEXT}`,
+  className: cn(markdownStyles.markdown, markdownStyles.agent, CHAT_TEXT),
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
@@ -121,6 +123,26 @@ const markdown = {
   rehypePlugins: workspace_links.rehypePlugins,
   components: workspace_links.components,
 } as const;
+
+function UserMessageText({ text }: { text: string }) {
+  return (
+    <MessageResponse
+      className={cn(
+        markdownStyles.user,
+        "wrap-anywhere [&_p]:whitespace-pre-wrap"
+      )}
+      mode="static"
+      controls={false}
+      lineNumbers={false}
+      plugins={markdown.plugins}
+      remarkPlugins={userMessageRemarkPlugins}
+      rehypePlugins={markdown.rehypePlugins}
+      components={markdown.components}
+    >
+      {text}
+    </MessageResponse>
+  );
+}
 
 /**
  * Shared class string for the hover/focus-revealed action rows. The
@@ -285,13 +307,7 @@ export function ChatMessageView({
                         {reply.skipped ? (
                           <span className="text-muted-foreground">Skipped</span>
                         ) : (
-                          <MessageResponse
-                            plugins={markdown.plugins}
-                            rehypePlugins={markdown.rehypePlugins}
-                            components={markdown.components}
-                          >
-                            {reply.answer}
-                          </MessageResponse>
+                          <UserMessageText text={reply.answer} />
                         )}
                       </div>
                     ))}
@@ -303,13 +319,7 @@ export function ChatMessageView({
                         {questionReplyData}
                       </blockquote>
                     )}
-                    <MessageResponse
-                      plugins={markdown.plugins}
-                      rehypePlugins={markdown.rehypePlugins}
-                      components={markdown.components}
-                    >
-                      {text}
-                    </MessageResponse>
+                    <UserMessageText text={text} />
                   </>
                 )}
               </CollapsibleBubbleBody>
@@ -376,6 +386,7 @@ export function ChatMessageView({
                 key={group.key}
                 className={markdown.className}
                 controls={markdown.controls}
+                lineNumbers={false}
                 plugins={markdown.plugins}
                 rehypePlugins={markdown.rehypePlugins}
                 components={markdown.components}

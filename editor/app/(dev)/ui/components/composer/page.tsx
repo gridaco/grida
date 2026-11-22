@@ -9,6 +9,7 @@ import { DictateDemo } from "./dictate-demo";
 import { ComposerKitDemo } from "./kit-demo";
 import { LinkDemo } from "./link-demo";
 import { LongPasteDemo } from "./long-paste-demo";
+import { MarkdownComparison } from "./markdown-comparison";
 import { PreviewRefreshDemo } from "./preview-refresh-demo";
 
 export default function ComposerPage() {
@@ -68,6 +69,9 @@ function ComposerExamples() {
       </Example>
       <Example id="links" title="Links">
         <LinkDemo />
+      </Example>
+      <Example id="markdown" title="Markdown comparison">
+        <MarkdownComparison />
       </Example>
       <Example id="web-preview" title="Web preview">
         <DesktopComposerDemo scenario="web-preview" />

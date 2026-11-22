@@ -23,7 +23,10 @@ messages.map((m, i) => (
 - **Editor selection** → the live composer supplies the selected layer’s label,
   such as its shape type or a short text preview. A sent message with captured
   selection context shows a passive marker.
-- **Text** parts → `MessageResponse` (Streamdown Markdown). Web links share the
+- **User text** → renders the composer’s formatting, such as bold, lists,
+  links, quotes, and code. Unsupported Markdown such as headings and tables
+  appears as source text. Answers to question prompts use the same treatment.
+- **Assistant text** → `MessageResponse` (Streamdown Markdown). Web links share the
   composer's blue style and destination icons. Grida, GitHub, Figma, Linear,
   Slack, and Notion have their own marks. Google Docs, Sheets, and Drive share
   the Drive mark. Other web links use a globe.

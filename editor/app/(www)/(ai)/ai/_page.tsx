@@ -42,6 +42,7 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { catalog as models, type ModelTier } from "@grida/ai/catalogue";
 import { cn } from "@app/ui/lib/utils";
+import markdownStyles from "@/components/chat-markdown.module.css";
 import { resolveAiError } from "@/lib/ai/error";
 import { AiCredits, useAiCredits } from "@/lib/ai/credits";
 import { AI_GATE_FLOOR_CENTS, fmtUsd } from "@/lib/billing/fees";
@@ -58,7 +59,7 @@ type Props = {
 };
 
 const markdown = {
-  className: "grida-ai-response-markdown space-y-2 text-sm leading-6",
+  className: cn(markdownStyles.markdown, "space-y-2 text-sm leading-6"),
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },

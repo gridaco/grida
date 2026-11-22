@@ -49,6 +49,11 @@ sample transcript.
   it to see the result. Hover **Grida docs** for a favicon and preview image,
   **CSS Grid guide** for a text preview, or **Linear** for the domain-only
   fallback.
+- **Markdown comparison** shows the same paragraphs, inline formatting, lists,
+  quote, and code block in the draft, sent message, and agent response. Send an
+  edited draft to update both transcript examples. **Extended Markdown** adds
+  six heading levels, a table, task list, image, footnote, math, Mermaid,
+  and highlighted code. User bubbles show unsupported formats as source text.
 - **Web preview** shows the gallery's title, favicon, and description. Scroll up
   and hover **workflow viewer** to see the FX Viewer label shared with its
   response card. The transcript also includes an unavailable preview and replies
@@ -92,8 +97,9 @@ sample transcript.
 - **Permission approval** and **Library request** use the same floating cards
   above the composer as questions. The Library picker uses one local image that
   you can select or skip.
-- **Kit and files** exercises the reusable composer kit with file references
-  and drop modes.
+- **Kit and files** starts with a compact folder, a square image, a sample
+  PDF thumbnail, and a file without a preview. Add more files to scroll the
+  attachment strip, or change the drop mode to insert inline references.
 
 Examples are independent. The local bridge lives in `desktop-chat-fixture.ts`.
 Its example records live in `desktop-conversation-fixtures.ts` and

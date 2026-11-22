@@ -4,6 +4,7 @@ import type { JSONContent } from "@tiptap/core";
 
 import { Kbd } from "@app/ui/components/kbd";
 import { cn } from "@app/ui/lib/utils";
+import markdownStyles from "@/components/chat-markdown.module.css";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   createContext,
@@ -35,6 +36,7 @@ import {
 import { ComposerFormattingMenu } from "./composer-formatting-menu";
 import { ComposerTiptap } from "./composer-tiptap";
 import { ComposerTransfer } from "./composer-transfer";
+import "@/components/chat-web-link.css";
 import "./composer-content.css";
 
 type ComposerContextValue = {
@@ -508,7 +510,7 @@ export function ComposerContent({
   return (
     <div
       {...props}
-      className={cn("composer-content", className)}
+      className={cn("composer-content", markdownStyles.draft, className)}
       data-composer-content
       data-composer-suggestion={suggestion ? "" : undefined}
     >

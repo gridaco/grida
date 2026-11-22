@@ -12,7 +12,6 @@
     transparent
   );
   --composer-paragraph-margin-block: 0.125rem;
-  --composer-code-padding: 0.5rem;
   --composer-chip-margin-inline: 0.125rem;
   --composer-chip-padding-block: 0.125rem;
   --composer-chip-padding-inline: 0.25rem;
@@ -121,15 +120,6 @@
   max-height: 7rem;
   margin-block: 0.375rem;
   overflow: auto;
-  border-radius: 0.375rem;
-  background: var(--muted);
-  padding: var(--composer-code-padding);
-}
-
-.composer-content [data-composer-editor] .composer-inline-code {
-  border-radius: 0.25rem;
-  background: var(--muted);
-  padding-inline: 0.25rem;
 }
 
 .composer-content
@@ -141,8 +131,6 @@
 
 .composer-content [data-composer-editor] .composer-blockquote {
   margin-block: 0.375rem;
-  border-inline-start: 2px solid var(--border);
-  padding-inline-start: 0.75rem;
 }
 
 .composer-content [data-composer-editor] .composer-list-node {

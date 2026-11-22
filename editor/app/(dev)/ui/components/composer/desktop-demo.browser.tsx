@@ -6,6 +6,7 @@ import { DesktopConversationFixtures } from "./desktop-conversation-fixtures";
 import ComposerPage from "./page";
 import { DesktopComposerDemo } from "./desktop-demo";
 import { LinkDemo } from "./link-demo";
+import { MarkdownComparison } from "./markdown-comparison";
 import { PreviewRefreshDemo } from "./preview-refresh-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
@@ -24,7 +25,6 @@ import {
   DESKTOP_BRIDGE_PROTOCOL,
   type NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
-import "@/components/chat-web-link.css";
 
 // These examples exercise Desktop layout and chat IPC with local fixtures.
 vi.mock("@/app/(library)/library/attachment", () => ({
@@ -742,6 +742,36 @@ it("formats a draft selection and edits a link without sending the draft", async
   expect(
     link.element().querySelector('em [data-streamdown="strong"]')
   ).not.toBeNull();
+});
+
+it("renders composer formatting in the user bubble and extended Markdown in agent replies", async () => {
+  const container = await mountDemo(<MarkdownComparison />);
+  const user = page.getByRole("group", { name: "Message text" }).nth(1);
+
+  await expect.element(user).toHaveTextContent("# Gallery handout");
+  expect(user.element().textContent).toContain(
+    "| Stop | Location | Minutes |\n| :--- | :------: | ------: |"
+  );
+  expect(
+    user.element().querySelector('[data-streamdown="strong"]')?.textContent
+  ).toBe("10:00");
+  expect(
+    user.element().querySelector("h1, table, del, img, input, .katex")
+  ).toBeNull();
+  await expect
+    .element(page.getByRole("heading", { name: "Gallery handout", level: 1 }))
+    .toBeVisible();
+  await expect
+    .element(
+      page.getByRole("table").getByRole("cell", { name: "Print gallery" })
+    )
+    .toBeVisible();
+  await expect
+    .element(page.getByRole("img", { name: "Wind Garden artwork" }))
+    .toBeVisible();
+  expect(
+    container.querySelector("[data-composer-editor] pre")?.textContent
+  ).toContain('const label = "Gallery";');
 });
 
 it("continues composer lists on Shift+Enter and hides the empty-list placeholder", async () => {

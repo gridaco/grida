@@ -1,0 +1,278 @@
+@reference "../app/ui.css";
+
+.markdown {
+  color: color-mix(in srgb, var(--foreground) 90%, var(--background));
+}
+
+.markdown p {
+  @apply my-4 leading-[23px] font-[375];
+}
+
+.markdown [data-streamdown="heading-1"] {
+  @apply mt-4 mb-2 text-xl leading-7 font-semibold text-inherit;
+}
+
+.markdown [data-streamdown="heading-2"] {
+  @apply mt-4 mb-2 text-[17px] leading-[26px] font-semibold text-inherit;
+}
+
+.markdown [data-streamdown="heading-3"] {
+  @apply mt-4 mb-2 text-[15px] leading-6 font-semibold text-inherit;
+}
+
+.markdown [data-streamdown="heading-4"] {
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
+}
+
+.markdown [data-streamdown="heading-5"] {
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
+}
+
+.markdown [data-streamdown="heading-6"] {
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
+}
+
+.markdown
+  :is([data-streamdown="heading-4"], [data-streamdown="heading-5"])
+  + :is([data-streamdown="heading-5"], [data-streamdown="heading-6"]) {
+  margin-top: 0;
+}
+
+.markdown [data-streamdown="unordered-list"],
+.markdown [data-streamdown="ordered-list"] {
+  @apply my-3 list-outside space-y-0 pl-7 leading-[23px];
+}
+
+.markdown [data-streamdown="list-item"] {
+  @apply my-0 p-0 leading-[23px] font-[375];
+}
+
+.markdown [data-streamdown="list-item"] > p {
+  @apply my-0 block leading-[23px];
+}
+
+.markdown [data-streamdown="list-item"] > p + p {
+  @apply mt-4;
+}
+
+.markdown [data-streamdown="list-item"] > [data-streamdown="unordered-list"],
+.markdown [data-streamdown="list-item"] > [data-streamdown="ordered-list"] {
+  @apply my-0;
+}
+
+.markdown
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"] {
+  list-style-type: circle;
+}
+
+.markdown
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"] {
+  list-style-type: square;
+}
+
+.markdown [data-streamdown="list-item"]:global(.task-list-item) {
+  @apply -ml-7 list-none;
+}
+
+.markdown :global(.task-list-item) input[type="checkbox"] {
+  @apply mr-2 size-3.5 align-middle accent-current;
+}
+
+.markdown [data-streamdown="blockquote"] {
+  @apply my-3;
+}
+
+.markdown [data-streamdown="horizontal-rule"] {
+  @apply my-4;
+}
+
+.markdown [data-streamdown="inline-code"] {
+  @apply px-1 py-0.5 text-[0.93em];
+}
+
+.markdown [data-streamdown="code-block"],
+.markdown [data-streamdown="mermaid-block"],
+.markdown [data-streamdown="table-wrapper"] {
+  @apply my-3;
+}
+
+.markdown [data-streamdown="code-block"] {
+  --chat-code-header-height: calc(var(--spacing) * 7);
+  @apply gap-0 rounded-md border-border/60 bg-transparent p-0;
+}
+
+.markdown [data-streamdown="code-block-header"] {
+  height: var(--chat-code-header-height);
+  @apply px-2;
+}
+
+/* Streamdown overlays actions with a negative margin. Match our compact
+   header so the copy button stays inside the code block's paint containment. */
+.markdown
+  [data-streamdown="code-block-header"]
+  + div:has(> [data-streamdown="code-block-actions"]) {
+  height: var(--chat-code-header-height);
+  margin-top: calc(-1 * var(--chat-code-header-height));
+  @apply top-0 px-1;
+}
+
+.markdown [data-streamdown="code-block-header"] span {
+  @apply ml-0 text-[11px];
+}
+
+.markdown [data-streamdown="code-block-body"] {
+  @apply rounded-none border-0 bg-transparent p-2 text-xs;
+}
+
+.markdown [data-streamdown="code-block-actions"] {
+  @apply border-0 bg-transparent px-1 py-0 shadow-none backdrop-blur-none;
+}
+
+.markdown [data-streamdown="code-block-copy-button"] {
+  @apply p-0.5;
+}
+
+.markdown [data-streamdown="code-block-copy-button"] svg {
+  @apply size-3;
+}
+
+.markdown [data-streamdown="table-wrapper"] {
+  @apply gap-1 rounded-none border-0 bg-transparent p-0;
+}
+
+.markdown [data-streamdown="table-wrapper"] > div:first-child {
+  @apply h-6 gap-0;
+}
+
+.markdown [data-streamdown="table-wrapper"] > div:first-child button {
+  @apply rounded-sm p-1 opacity-60 hover:bg-muted hover:opacity-100;
+}
+
+.markdown
+  [data-streamdown="table-wrapper"]
+  > div:has(> [data-streamdown="table"]) {
+  @apply rounded-none border-0 bg-transparent;
+}
+
+.markdown [data-streamdown="table"] {
+  @apply text-[13px];
+}
+
+.markdown [data-streamdown="table-header"] {
+  @apply bg-transparent;
+}
+
+.markdown [data-streamdown="table-body"] {
+  @apply divide-border/60;
+}
+
+.markdown [data-streamdown="table-header-cell"] {
+  @apply px-3 py-3 text-[13px] leading-5 font-semibold first:pl-0 last:pr-0;
+}
+
+.markdown [data-streamdown="table-cell"] {
+  @apply px-3 py-3 text-[13px] leading-5 first:pl-0 last:pr-0;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.agent,
+.user,
+.draft {
+  --chat-code-surface: color-mix(in oklab, currentColor 6%, transparent);
+  --chat-inline-code-surface: color-mix(in oklab, currentColor 8%, transparent);
+}
+
+:is(.agent, .user) [data-streamdown="inline-code"],
+.draft [data-composer-editor] :global(.composer-inline-code) {
+  border-radius: 0.3em;
+  background: var(--chat-inline-code-surface);
+  padding: 0.08em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.93em;
+}
+
+:is(.agent, .user) [data-streamdown="blockquote"],
+.draft [data-composer-editor] :global(.composer-blockquote) {
+  border: 0;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 0.75rem;
+  color: inherit;
+  font-style: normal;
+}
+
+:is(.agent, .user) [data-streamdown="blockquote"] > p {
+  margin-block: 0;
+}
+
+:is(.agent, .user) [data-streamdown="blockquote"] > p + p {
+  margin-block-start: 0.5rem;
+}
+
+.user
+  :is([data-streamdown="unordered-list"], [data-streamdown="ordered-list"]) {
+  @apply my-2 list-outside space-y-0;
+  padding-inline-start: 1.25rem;
+}
+
+.user
+  [data-streamdown="list-item"]
+  > :is([data-streamdown="unordered-list"], [data-streamdown="ordered-list"]) {
+  margin-block: 0;
+}
+
+:is(.agent, .user) [data-streamdown="code-block"],
+.draft [data-composer-editor] :global(.composer-code-block) {
+  background: var(--chat-code-surface);
+}
+
+.agent [data-streamdown="code-block"] {
+  --chat-code-header-height: 2.25rem;
+  @apply rounded-xl;
+}
+
+.agent [data-streamdown="code-block-header"] {
+  @apply px-3;
+}
+
+.agent [data-streamdown="code-block-header"] span {
+  @apply font-sans text-xs normal-case;
+}
+
+.agent [data-streamdown="code-block-body"] {
+  @apply px-3 pt-1 pb-3;
+}
+
+.user [data-streamdown="code-block"] {
+  @apply gap-0 rounded-lg border-0 p-0;
+}
+
+.user [data-streamdown="code-block-header"] {
+  display: none;
+}
+
+.user [data-streamdown="code-block-body"] {
+  @apply rounded-none border-0 bg-transparent px-2.5 py-2;
+}
+
+.draft [data-composer-editor] :global(.composer-code-block) {
+  @apply rounded-lg px-2.5 py-2;
+}
+
+:is(.agent, .user) [data-streamdown="code-block-body"],
+.draft [data-composer-editor] :global(.composer-code-block) {
+  @apply font-mono text-[13px] leading-5;
+}
+
+:is(.agent, .user) [data-streamdown="code-block-body"] pre {
+  background: transparent;
+}

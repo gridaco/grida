@@ -233,6 +233,22 @@ export function toAttachment(file: MockItem): ComposerAttachmentInput {
   };
 }
 
+export const samplePdfAttachmentId = "sample-project-brief";
+
+export const demoStartingAttachments: readonly ComposerAttachmentInput[] = [
+  toAttachment(folders[0]),
+  toAttachment(files[0]),
+  {
+    id: samplePdfAttachmentId,
+    name: "Project brief.pdf",
+    mime: "application/pdf",
+  },
+  {
+    name: "Research notes.hwp",
+    mime: "application/x-hwp",
+  },
+];
+
 export function toFileReference(file: MockItem): ComposerFileReference {
   return {
     id: `inline-${file.id}`,

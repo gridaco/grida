@@ -9,6 +9,7 @@ import {
   usePagePreview,
 } from "@/lib/desktop/browser-open-context";
 import { LinkPreviewCard } from "./link-preview-card";
+import "@/components/chat-web-link.css";
 
 /**
  * Links in agent replies that point at files in the person's workspace: a

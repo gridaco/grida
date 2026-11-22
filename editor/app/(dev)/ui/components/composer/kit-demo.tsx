@@ -35,6 +35,7 @@ import {
 import {
   demoAttachmentFilters,
   demoCatalog,
+  demoStartingAttachments,
   mockFileDragType,
   readMockItem,
   resolveDropMode,
@@ -44,6 +45,7 @@ import {
   type DropMode,
   type MockItem,
 } from "./demo-data";
+import { DemoAttachmentCard } from "./demo-attachment-card";
 import { FileSidebar } from "./demo-file-sidebar";
 import { type DemoMessage, MessageLog } from "./demo-message-log";
 
@@ -63,8 +65,16 @@ function ComposerDemo() {
   const [isDraggingOverComposer, setIsDraggingOverComposer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const objectUrls = useRef<string[]>([]);
+  const seededAttachments = useRef(false);
+  const { addAttachment } = composer;
 
   const selectedItem = sidebarItems.find((item) => item.id === selectedItemId);
+
+  useEffect(() => {
+    if (seededAttachments.current) return;
+    seededAttachments.current = true;
+    for (const attachment of demoStartingAttachments) addAttachment(attachment);
+  }, [addAttachment]);
 
   const revokeTrackedObjectUrl = (url: string | undefined) => {
     if (!url || !objectUrls.current.includes(url)) return;
@@ -129,7 +139,7 @@ function ComposerDemo() {
 
   return (
     <div className="grid h-[36rem] grid-cols-1 grid-rows-2 overflow-hidden rounded-xl border bg-background md:grid-cols-[minmax(0,1fr)_17rem] md:grid-rows-1">
-      <div className="flex min-h-0 flex-col border-b border-border md:border-r md:border-b-0">
+      <div className="flex min-h-0 min-w-0 flex-col border-b border-border md:border-r md:border-b-0">
         <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
           <MessageLog messages={messages} />
           <DemoComposerInput
@@ -234,8 +244,11 @@ function DemoComposerInput({
       >
         <ComposerTriggerMenu />
         <ComposerAttachmentCards
-          className="px-2 pt-2"
+          className="flex-nowrap items-end gap-2.5 overflow-x-auto overscroll-x-contain px-2.5 pt-2.5 pb-0.5 [scrollbar-width:none] [&>[data-composer-attachment]]:shrink-0"
           onRemoveAttachment={onRemoveAttachment}
+          renderAttachment={(attachment, { remove }) => (
+            <DemoAttachmentCard attachment={attachment} onRemove={remove} />
+          )}
         />
         <ComposerContent
           onSubmitRequest={requestSubmit}
