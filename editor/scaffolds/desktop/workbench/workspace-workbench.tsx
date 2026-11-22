@@ -373,12 +373,8 @@ export function WorkspaceWorkbench({
     [group, bumpTreeRefresh]
   );
 
-  // ⌘B / Ctrl+B toggles the file tree pane. We intentionally don't
-  // scope this to a particular focused element — the shortcut is
-  // global within the workspace window, matching VSCode. Editable
-  // children that need ⌘B for their own action (rich-text bold, etc.)
-  // would have to consume the event before bubbling, but none of the
-  // current viewers do.
+  // Workspace shortcuts run on bubble so focused controls can claim a chord
+  // with preventDefault() before the workspace handles it.
   //
   // The same listener also dispatches the three file actions
   // (Reveal in Finder / Copy path / Copy relative path) against the
@@ -389,6 +385,8 @@ export function WorkspaceWorkbench({
   // entries being unavailable on an empty viewer).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
+
       // ctrl+` toggles the terminal pane (VSCode). The terminal pane's
       // xterm key handler deliberately lets this chord bubble up here,
       // so the toggle works even while the shell has focus. Key-repeat

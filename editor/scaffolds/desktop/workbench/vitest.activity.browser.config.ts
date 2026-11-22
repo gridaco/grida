@@ -69,6 +69,7 @@ export default defineConfig(async () => {
         "scaffolds/desktop/workbench/native-agent-activity.browser.tsx",
         "scaffolds/desktop/workbench/native-activity-timeline.browser.tsx",
         "scaffolds/desktop/workbench/workspace-utilities.browser.tsx",
+        "scaffolds/desktop/workbench/workspace-shortcuts.browser.tsx",
         "scaffolds/desktop/workbench/subagent-tab-placement.browser.tsx",
       ],
       browser: {
