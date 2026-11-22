@@ -133,7 +133,7 @@ The expected user flow is:
 6. Browser returns to the app through the configured callback flow.
 7. App stores the resulting credential in an owner-readable local secret
    store.
-8. App validates model selection against its closed compatibility catalog.
+8. App verifies the model against the signed-in account’s offers and the installed adapter’s compatible catalog bindings.
 9. App marks the provider connected and shows its compatible models first in
    the native text-model picker.
 10. A model-picker choice records both the ChatGPT provider and the selected
@@ -268,18 +268,21 @@ Capability resolution SHOULD answer:
 - what context and output limits apply on this surface;
 - whether priority/fast processing is available.
 
-Dynamic, authenticated capability discovery remains the preferred stable
-contract. The current experimental implementation has no such surface. It
-uses a closed, fail-before-network model allowlist that mirrors the currently
-observed Zed/Codex-compatible subscription surface. That list is compatibility
-evidence, not entitlement discovery or an upstream guarantee: it may drift,
-and an account may reject a listed model. Any change to the list requires a
-grounded compatibility update rather than assuming parity with the public
-OpenAI API.
+Desktop intersects the signed-in account’s authenticated model offers with
+the OpenAI Codex selectors and canonical text-model facts from one verified
+public Models V2 release. A compatible selector must support the installed
+native adapter. Grida owns the recommendation and optional feature policies.
+Only the signed-in account can supply its current offers. A failed account
+lookup withholds new subscription choices. Catalog refresh can add compatible
+selectors without changing Desktop, while a new wire protocol requires an
+adapter update.
 
-The absence of an approved discovery/catalog contract is part of the external
-stable-release gate. Upstream rejection is an entitlement/capability error
-rather than an API-key error.
+An accepted input captures its canonical model, exact provider selector and
+connection. Queue dispatch and recovery revalidate that binding. A catalog
+refresh cannot substitute a different selector or connection for accepted
+work. Upstream may still reject a listed model at inference time. Stable
+support for the authenticated provider surface remains subject to the
+external release gate.
 
 Model ids that look similar to OpenAI API model ids MUST still be scoped
 to this provider. The same string can have different availability,
@@ -473,15 +476,15 @@ Provider selection is durable session intent, not a model-name side effect:
    and compaction may use that provider's lower-cost model tier.
 
 The model picker MUST expose provider and model as one explicit selection. When
-the ChatGPT provider is ready, its closed compatible model set appears before
+the ChatGPT provider is ready, its offered compatible models appear before
 other native model choices, and an untouched new Desktop conversation starts on
-the highest-capability compatible model (`GPT-5.6 Sol`). This default is derived
-from live readiness and MUST NOT be persisted as a global preference. The
+the recommended compatible model available to the account. When the preferred
+choice is absent, Desktop can recommend another available subscription model.
+This recommendation MUST NOT be persisted as an explicit user preference. The
 provider group order is ChatGPT Subscription when ready, Grida, configured text
 BYOK providers, then configured compatible endpoints. The Grida, OpenRouter,
 and Vercel AI Gateway groups may repeat catalog model ids because each tuple names a
-different cost and privacy boundary. OpenAI-shaped model ids outside the closed
-ChatGPT set never gain ChatGPT eligibility from their name alone.
+different cost and privacy boundary. A subscription choice requires the matching agent binding and account offer.
 
 An auth, entitlement, rate, or quota failure MUST leave the failed turn on its
 selected provider. The app MAY offer another available provider before a new
@@ -526,8 +529,8 @@ A conforming implementation satisfies all of the following:
   connection becomes the first session provider.
 - A ready ChatGPT connection appears first in the native text-model picker, and
   each of its choices records the `chatgpt` provider with an eligible model.
-- An untouched new conversation defaults to `GPT-5.6 Sol` while ChatGPT is
-  ready, without storing a global preference.
+- An untouched new conversation can use a recommended, offered subscription
+  model without storing a global preference.
 - The picker always exposes Grida-hosted models under **Grida** and identifies
   configured BYOK and endpoint choices by provider.
 - The picker never infers ChatGPT provider ownership from an `openai/*` model

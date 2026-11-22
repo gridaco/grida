@@ -363,8 +363,8 @@ required for metadata inspection or mutation.
 - `_co.grida/session/selection/update` takes `{cwd, sessionId,
 expectedRevision, operationId, selection}`. A selection is `{connectionId,
 model, effort, speed?}`: connection ID is a stable 64-character lowercase hex host
-  reference or null for the workspace default; model is the wire model ID;
-  effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
+  reference or null for the workspace default. The model is the canonical selection ID. Its provider selector is resolved privately at acceptance.
+  Effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
   normalizes to `medium`. Speed is `standard` (default), `fast`, or `ultrafast`. The supervisor validates configured connection and
   model availability separately from worker readiness. A successful response
   is `{sessionId, operationId, revision, selection}`. An invalid selection or
@@ -1920,7 +1920,11 @@ inputs can use different provider connections. The agent asks the supervisor
 to resolve the input's saved choice with `_co.grida/provider/resolve`.
 Its parameters are the saved `connectionId` (null selects the configured
 default) and the exact `model`. Only the supervising client supplies an
-endpoint, custody configuration or Gateway/subscription scope.
+endpoint, custody configuration or Gateway/subscription scope. On queue dispatch or recovery, a captured `retainedWireModel` requests the
+exact provider selector accepted with the input. This includes
+`retainedImageInput` and, for an accepted faster response, `retainedSpeed`
+(`fast` or `ultrafast`). The supervisor revalidates
+the original connection and the native host checks the returned binding.
 
 Every successful ordinary selection response carries the same model and a supervisor-local
 `routeId` UUID. The `kind` determines the remaining fields.
@@ -1945,6 +1949,13 @@ operation while keeping its original foreground model.
 | `http`    | `endpoint`, `protocol`, and applicable native provider settings: `maxOutputTokens`, `credentialHome`, `configuredEndpointKey`, `compatibleOutputLimitField`, `llamaCppInputCount`, `reasoning`, and `imageGenerationBinding`. |
 | `gateway` | `endpoint`, `scope`, optional `maxOutputTokens`, and `gatewayBilling` when the supervisor can read billing for this exact scope.                                                                                              |
 | `chatgpt` | `endpoint` and `scope` for the subscription connection.                                                                                                                                                                       |
+
+For `chatgpt` and built-in OpenRouter or Vercel `http` routes, the supervisor
+may supply `wireModel` and `imageInput`. The native adapter sends that exact
+selector and enables image input only when the selected adapter supports it.
+The canonical model remains the identity in session settings and turn history.
+The equivalent private launch arguments are `--supervised-wire-model` and
+`--supervised-image-input`. Older supervisors can omit both fields.
 
 For alternate routes every provider exchange action and cancellation includes
 the `routeId`. Image generation and Gateway billing reads also include this

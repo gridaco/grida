@@ -2015,8 +2015,16 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
                         function: {
                           name: "question",
                           arguments: JSON.stringify({
-                            question: "Keep the original chat waiting?",
-                            options: ["Keep", "Continue"],
+                            questions: [
+                              {
+                                id: "continue_chat",
+                                question: "Keep the original chat waiting?",
+                                options: [
+                                  { label: "Keep" },
+                                  { label: "Continue" },
+                                ],
+                              },
+                            ],
                           }),
                         },
                       },

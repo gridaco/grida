@@ -90,6 +90,7 @@ use crate::gg::{
     GatewayChildBilling, GatewayChildBillingPage, GatewayChildBillingRef, GgConnection,
 };
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
+use crate::supervised_provider::SupervisedModel;
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
@@ -256,6 +257,8 @@ pub struct Host {
 }
 
 struct Execution {
+    /// Private catalog selector captured with accepted inputs for exact replay.
+    model_binding: Option<SupervisedModel>,
     /// The supervisor offers billing lookup for this Gateway route.
     gateway_billing: bool,
     configuration: Fingerprint,
@@ -506,6 +509,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     provider_configuration: Option<Fingerprint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    model_binding: Option<SupervisedModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     inherited_route: Option<execution_routes::Selection>,
     #[serde(
         default,
@@ -606,6 +611,8 @@ struct CapturedAuthority {
 #[derive(Deserialize)]
 struct CapturedRoute {
     #[serde(default)]
+    model_binding: Option<SupervisedModel>,
+    #[serde(default)]
     provider_configuration: Option<Fingerprint>,
     #[serde(default)]
     model: Option<agent_kit_core::ModelId>,
@@ -622,9 +629,10 @@ impl CapturedRoute {
         }
         let live = &execution.authority.inference.authority;
         decode_input::<Self>(input).is_ok_and(|route| {
-            route
-                .provider_configuration
-                .is_none_or(|captured| captured == execution.configuration)
+            execution.matches_model_binding(route.model_binding.as_ref())
+                && route
+                    .provider_configuration
+                    .is_none_or(|captured| captured == execution.configuration)
                 && route
                     .model
                     .map_or(legacy_execution == execution.configuration, |model| {
@@ -2950,6 +2958,7 @@ impl Host {
                 editor_instructions: None,
                 question_instructions: (questions && !child_work)
                     .then(|| operating_regime.question_instructions().to_owned()),
+                model_binding: execution.model_binding.clone(),
                 provider_configuration: self
                     .selected_route
                     .as_ref()
@@ -3097,9 +3106,10 @@ impl Host {
                     config.instructions.push_str(guidance);
                 }
                 if !cancellation_only
-                    && stored
+                    && (stored
                         .provider_configuration
                         .is_some_and(|captured| captured != execution.configuration)
+                        || !execution.matches_model_binding(stored.model_binding.as_ref()))
                 {
                     return Err(problem(ErrorKind::Conflict, "chat_selection_route_changed"));
                 }
@@ -4147,6 +4157,27 @@ impl From<TurnLinkCursor> for GatewayChildBillingRef {
 }
 
 impl Execution {
+    /// A retained receipt without a selector predates runtime model bindings.
+    /// Compare it with the historical mapping of the same connection type.
+    fn matches_model_binding(&self, captured: Option<&SupervisedModel>) -> bool {
+        let legacy = |wire: &ModelId| match &self.authorization.credential {
+            Credential::SupervisedChatGpt(_) => {
+                crate::chatgpt_subscription::legacy_subscription_selector(&self.config.model)
+                    .as_ref()
+                    == Some(wire)
+            }
+            _ => &self.config.model == wire,
+        };
+        match (&self.model_binding, captured) {
+            (Some(actual), Some(captured)) => actual == captured,
+            (Some(binding), None) => legacy(&binding.selector),
+            (None, Some(binding)) => {
+                legacy(&binding.selector) && self.accepts_selected_png == binding.image_input
+            }
+            (None, None) => true,
+        }
+    }
+
     fn subscription_provider_for_capture(&self, image_input: bool) -> Option<Arc<dyn Provider>> {
         if image_input {
             None
@@ -4191,9 +4222,36 @@ impl Execution {
         retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
         bind: impl FnOnce(Arc<HttpTransport>) -> Arc<dyn StreamingTransport>,
     ) -> Result<Self> {
+        let model_binding = supervised
+            .as_ref()
+            .and_then(|supervisor| supervisor.model_binding.clone());
+        if model_binding.is_some()
+            && !(options.protocol == ProviderProtocol::OpenAiCompatible
+                && options.credential_home.is_some()
+                && supervised
+                    .as_ref()
+                    .is_some_and(|host| host.configured_endpoint_key().is_none())
+                && matches!(
+                    options.endpoint.as_str(),
+                    "https://openrouter.ai/api/v1" | "https://ai-gateway.vercel.sh/v1"
+                ))
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "supervised_model_binding_unavailable",
+            ));
+        }
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
         let dispatch = bind(transport.clone());
-        let configuration = transport.selection();
+        let wire_model = model_binding
+            .as_ref()
+            .map(|binding| binding.selector.clone());
+        let configuration = match &wire_model {
+            Some(wire) if wire != &options.model => {
+                Fingerprint::of(&(transport.selection(), "wire-model-v1", wire))?
+            }
+            _ => transport.selection(),
+        };
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
         if options.reasoning {
@@ -4201,7 +4259,10 @@ impl Execution {
                 .into_iter()
                 .collect();
         }
-        let compatible_png = transport.accepts_compatible_png(&options.model);
+        let compatible_png = model_binding.as_ref().map_or_else(
+            || transport.accepts_compatible_png(&options.model),
+            |binding| binding.image_input && transport.supports_openrouter_png(),
+        );
         let gemini_flash = transport.is_reviewed_gemini_flash();
         let responses_png = transport.accepts_responses_png(&options.model);
         let image_profile = if responses_png {
@@ -4237,6 +4298,7 @@ impl Execution {
                     BTreeMap::from([(
                         options.model.clone(),
                         ModelProfile {
+                            wire_model: wire_model.clone(),
                             capabilities,
                             output_limit: match options.compatible_output_limit_field {
                                 Some(CompatibleOutputLimitField::MaxTokens) => {
@@ -4315,6 +4377,7 @@ impl Execution {
             binding,
             Credential::Http(transport),
         )?;
+        execution.model_binding = model_binding;
         execution.accepts_selected_png = images.is_some();
         execution.image_tools = images;
         execution.tool_result_images = tool_result_images;
@@ -4348,6 +4411,7 @@ impl Execution {
             capabilities.input_modalities.insert(Modality::Image);
         }
         let profile = ModelProfile {
+            wire_model: None,
             capabilities,
             output_limit: OutputLimitField::CompletionTokens,
             include_usage: true,
@@ -4395,6 +4459,23 @@ impl Execution {
             &connection.replay_binding,
             &model,
         ))?;
+        // Existing inputs captured the canonical selection and the compiled selector.
+        // Preserve their fingerprint only when the exact historical mapping agrees.
+        let model_binding = connection.model_binding().cloned();
+        let wire_model = model_binding.as_ref().map(|binding| &binding.selector);
+        let configuration = if wire_model.is_some()
+            && crate::chatgpt_subscription::legacy_subscription_selector(&model).as_ref()
+                != wire_model
+        {
+            Fingerprint::of(&(configuration, "wire-model-v1", &wire_model))?
+        } else {
+            configuration
+        };
+        let images = images.filter(|_| {
+            model_binding
+                .as_ref()
+                .is_none_or(|binding| binding.image_input)
+        });
         let binding = connection.binding.clone();
         let legacy_profile = ResponsesProfile {
             capabilities: ModelCapabilities {
@@ -4444,6 +4525,7 @@ impl Execution {
             binding,
             Credential::SupervisedChatGpt(connection),
         )?;
+        execution.model_binding = model_binding;
         execution.legacy_subscription_provider =
             images.as_ref().map(|_| legacy as Arc<dyn Provider>);
         execution.accepts_selected_png = images.is_some();
@@ -4498,6 +4580,7 @@ impl Execution {
         })?;
         Ok(Self {
             configuration,
+            model_binding: None,
             owner,
             runtime,
             gateway_billing: true,

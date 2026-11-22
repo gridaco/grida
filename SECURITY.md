@@ -1009,9 +1009,11 @@ pixels through this reader, with no additional filesystem or model grant.
   [Main's grant owner](desktop/src/main/provider-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.
-  Built-in OpenRouter and Vercel profiles require a selected catalogue model and
-  a stored key from the supervisor's credential home. Their broker authorizes
-  only that provider's exact Chat Completions route. These profiles permit
+  Built-in OpenRouter and Vercel profiles require a compatible provider binding
+  for the selected canonical model and a stored key from the supervisor's
+  credential home. The catalog supplies the exact wire selector. It cannot
+  supply a destination or authorize a credential. Their broker authorizes
+  only that provider's fixed Chat Completions route. These profiles permit
   manual subagents, ordinary Ultra reviews, and Goal-funded reviews under the
   same captured authority, as do other supported native provider connections.
   The built-in stored-key launch path is limited
@@ -2996,17 +2998,23 @@ trusted merely because it is “local.”
    The credential owner enforces current hosted-search permission for requests
    that include search and rechecks the captured account immediately before
    each authenticated generation attempt, including token-refresh retries.
-   Standard inference without search needs no catalog read.
-   The private native launch carries the opaque scope and selected model.
+   Once the connection and selector are captured, standard inference without
+   hosted search or a priority tier needs no additional account catalog read.
+   The private native launch carries the opaque scope, canonical model and
+   exact provider selector.
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner exposes the OAuth ceremony as
    direct start/complete/cancel/status/sign-out calls (no HTTP route or
    in-process router), bounds their string inputs, and injects the selected token and account headers at the provider edge.
-   Ordinary Desktop offers the closed compatible model set through its normal
-   connection catalogue. Product membership and the default are authored once
-   in `data/ai/chatgpt-subscription.json`; generated TypeScript and Rust finite wire maps
-   use the pinned Models bindings. Retired IDs permit reading saved metadata
-   only, grant no execution, and remain unavailable until explicitly replaced.
+   For ordinary Desktop, Main intersects the current OAuth connection's visible
+   selectors with compatible OpenAI Codex bindings in one verified public
+   Models V2 release. The public catalog contributes model facts and candidate
+   selectors only. Its refresh reads fixed public HTTPS assets without OAuth
+   credentials, checks the concrete release and its manifest hashes, and can
+   neither change the private inference destination nor confer account access.
+   A new binding requires a current offer for that exact selector and sign-in
+   scope. An account lookup failure withholds new choices. An unavailable saved
+   choice remains identifiable for explicit replacement.
    A saved subscription choice hashes the captured
    connection scope and exact model; it contains no credential. Main recaptures
    and compares that binding before admitting its native worker. Refresh keeps
@@ -3024,7 +3032,10 @@ trusted merely because it is “local.”
    harness reserves generation steps and bounds time and response bytes without
    claiming to impose a provider-side quota ceiling.
 6. **Accepted work keeps its provider authority.** The native host captures the
-   model, provider principal and scope when it accepts work. Continuations, retries,
+   canonical model, provider selector, principal and scope when it accepts
+   work. The host compares the retained selector before dispatch even if the
+   same canonical model has acquired a different mapping. Historical
+   subscription inputs use their original fixed model mapping. Continuations, retries,
    queued inputs, compaction and its recovery refuse with a conflict when the
    live launch authority or provider differs, rather than moving accepted work onto
    another credential or cost boundary. Automatic titles run as a temporary,
@@ -3117,12 +3128,14 @@ platform credential store is a separate hardening step.
   `providers/{chatgpt-credentials,chatgpt}.ts`, and `src/index.ts` — safe
   vocabulary, OAuth lifecycle, captured native transport, and public type
   projection.
-- `data/ai/chatgpt-subscription.json`, `scripts/ai-catalogue/{generate,projection}.mjs`,
-  and `crates/grida-agent/data/chatgpt-subscription-models.json` — explicit
-  subscription membership, generated finite adapter mappings, and retired
-  metadata IDs kept separate from execution permission. The generator's
-  [regressions](scripts/ai-catalogue/generation.test.mjs) reject stale copies,
-  invalid defaults and unsupported bindings.
+- The [Models V2 store](packages/grida-ai/src/catalogue/store.ts) verifies the
+  public assets. [Catalog resolution](packages/grida-ai/src/catalogue/chat-models.ts)
+  joins eligible model facts to a supplied connection offer.
+  [Product defaults and historical IDs](data/ai/chatgpt-subscription.json)
+  supply recommendation and compatibility data. Older receipts decode through
+  the [frozen subscription mapping](crates/grida-agent/data/chatgpt-subscription-models.json).
+  [Native process cases](crates/grida-agent/tests/process/responses.rs) exercise
+  new selectors, queued inputs, remaps and sign-in changes across restart.
 - `packages/grida-daemon/src/auth/file.ts` and
   `packages/grida-daemon/src/http/server.ts` — shared race-safe credential
   persistence.

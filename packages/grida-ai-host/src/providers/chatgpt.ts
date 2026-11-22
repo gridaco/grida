@@ -9,6 +9,7 @@
  * app-server.
  */
 
+import { isChatModelIdentifier } from "@grida/ai/catalogue";
 import { createHash } from "node:crypto";
 import {
   CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID,
@@ -22,7 +23,11 @@ import {
   type ChatGptCredentialManager,
   type ChatGptOAuthConfig,
 } from "./chatgpt-credentials";
-import { ChatGptModels, noSubscriptionFeatures } from "./chatgpt-models";
+import {
+  ChatGptModels,
+  type ChatGptModelOffer,
+  noSubscriptionFeatures,
+} from "./chatgpt-models";
 import type { ProviderHttp } from "./http";
 
 const RESPONSES_SUFFIX = "/responses";
@@ -58,16 +63,37 @@ export type ChatGptProviderRuntime = Readonly<{
   turnPreferences?: () => Promise<Readonly<{ webSearchAllowed: boolean }>>;
 }>;
 
+/** Host-resolved binding, scoped to the sign-in that supplied the picker offer. */
+export type ChatGptModelBinding = Readonly<{
+  scope: string;
+  wireModel: string;
+  speeds: ChatGptTurnCapabilities["speeds"];
+}>;
+
+export type ChatGptModelInventory =
+  | Readonly<{
+      status: "available";
+      scope: string;
+      selectors: readonly string[];
+    }>
+  | Readonly<{
+      status: "unavailable" | "reauthenticationRequired";
+      selectors: readonly [];
+    }>;
+
 export type NativeChatGptConnection = Readonly<{
   scope: string;
   target: string;
-  model: ChatGptSubscriptionModelId;
+  model: string;
+  wireModel: string;
   capabilities(): Promise<ChatGptTurnCapabilities>;
   isCurrent(): Promise<boolean>;
   request(body: Uint8Array, signal: AbortSignal): Promise<Response | null>;
 }>;
 
-export type ChatGptProviderErrorCode = "chatgpt_model_not_available";
+export type ChatGptProviderErrorCode =
+  | "chatgpt_model_not_available"
+  | "chatgpt_catalog_unavailable";
 
 /** Code-led, body-free inference failures safe to cross the daemon boundary. */
 export class ChatGptProviderError extends Error {
@@ -117,15 +143,10 @@ export namespace ChatGptProvider {
     }
   }
 
-  /** Bind the native transport to one model and one durable OAuth connection. */
-  export async function captureNative(
+  async function captureAccount(
     runtime: ChatGptProviderRuntime,
-    model: string,
     providerHttp: ProviderHttp
-  ): Promise<NativeChatGptConnection> {
-    validate(runtime.config);
-    if (!isChatGptSubscriptionModelId(model))
-      throw new ChatGptProviderError("chatgpt_model_not_available");
+  ) {
     const connection = await runtime.credentials.captureConnection();
     const target = new URL(runtime.config.responses_url).href;
     const originator = runtime.config.originator;
@@ -139,56 +160,123 @@ export namespace ChatGptProvider {
         ])
       )
       .digest("hex");
-    const wireModel = CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID[model];
     const catalogUrl = modelsUrl(runtime.config);
-    const catalogOffer = async (): Promise<ChatGptTurnCapabilities> => {
+    const read = async (): Promise<ChatGptModelOffer> => {
       try {
         await connection.validate();
-        if (!runtime.catalog || !catalogUrl)
-          return noSubscriptionFeatures("unavailable");
-        const result = await runtime.catalog.capabilities(
-          scope,
-          model,
-          (signal) =>
-            requestWithRetry(
-              runtime.credentials,
-              connection.access,
-              async (credential) => {
-                await connection.validate();
-                signal.throwIfAborted();
-                return requestWithCredential(
-                  providerHttp,
-                  catalogUrl,
-                  {
-                    method: "GET",
-                    headers: { accept: "application/json" },
-                    signal,
-                    redirect: "manual",
-                  },
-                  originator,
-                  credential
-                );
-              }
-            ).catch((error: unknown) => {
-              if (
-                error instanceof ChatGptCredentialError &&
-                error.code !== "chatgpt_token_refresh_failed"
-              )
-                return new Response(null, { status: 401 });
-              throw error;
-            })
+        if (!runtime.catalog || !catalogUrl) return "unavailable";
+        const result = await runtime.catalog.read(scope, (signal) =>
+          requestWithRetry(
+            runtime.credentials,
+            connection.access,
+            async (credential) => {
+              await connection.validate();
+              signal.throwIfAborted();
+              return requestWithCredential(
+                providerHttp,
+                catalogUrl,
+                {
+                  method: "GET",
+                  headers: { accept: "application/json" },
+                  signal,
+                  redirect: "manual",
+                },
+                originator,
+                credential
+              );
+            }
+          ).catch((error: unknown) => {
+            if (
+              error instanceof ChatGptCredentialError &&
+              error.code !== "chatgpt_token_refresh_failed"
+            )
+              return new Response(null, { status: 401 });
+            throw error;
+          })
         );
         await connection.validate();
         return result;
       } catch (error) {
-        return noSubscriptionFeatures(
-          error instanceof ChatGptCredentialError &&
-            error.code !== "chatgpt_token_refresh_failed"
-            ? "reauthenticationRequired"
-            : "unavailable"
-        );
+        return discoveryFailure(error);
       }
     };
+    return { scope, target, originator, connection, read };
+  }
+
+  function discoveryFailure(error: unknown) {
+    return error instanceof ChatGptCredentialError &&
+      error.code !== "chatgpt_token_refresh_failed"
+      ? ("reauthenticationRequired" as const)
+      : ("unavailable" as const);
+  }
+
+  /** Local account capture only. Callers can compare a receipt before querying the account. */
+  export async function scope(
+    runtime: ChatGptProviderRuntime,
+    providerHttp: ProviderHttp
+  ): Promise<string> {
+    return (await captureAccount(runtime, providerHttp)).scope;
+  }
+
+  export async function inventory(
+    runtime: ChatGptProviderRuntime,
+    providerHttp: ProviderHttp
+  ): Promise<ChatGptModelInventory> {
+    try {
+      const account = await captureAccount(runtime, providerHttp);
+      const offer = await account.read();
+      if (typeof offer === "string") return { status: offer, selectors: [] };
+      const selectors = [...offer]
+        .filter(([, row]) => row.visible)
+        .map(([slug]) => slug);
+      return { status: "available", scope: account.scope, selectors };
+    } catch (error) {
+      return { status: discoveryFailure(error), selectors: [] };
+    }
+  }
+
+  /** Bind the native transport to one model and one durable OAuth connection. */
+  export async function captureNative(
+    runtime: ChatGptProviderRuntime,
+    model: string,
+    providerHttp: ProviderHttp,
+    binding?: ChatGptModelBinding
+  ): Promise<NativeChatGptConnection> {
+    validate(runtime.config);
+    const wireModel = binding
+      ? binding.wireModel
+      : isChatGptSubscriptionModelId(model)
+        ? CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID[model]
+        : undefined;
+    if (!isChatModelIdentifier(model) || !isChatModelIdentifier(wireModel))
+      throw new ChatGptProviderError("chatgpt_model_not_available");
+    const { scope, target, originator, connection, read } =
+      await captureAccount(runtime, providerHttp);
+    if (binding && binding.scope !== scope)
+      throw new ChatGptCredentialError("chatgpt_credential_changed");
+    const supportedSpeeds = binding && new Set(binding.speeds);
+    const catalogOffer = async (): Promise<ChatGptTurnCapabilities> => {
+      const offer = await read();
+      if (typeof offer === "string") return noSubscriptionFeatures(offer);
+      const match = offer.get(wireModel)?.capabilities;
+      if (!match) return noSubscriptionFeatures("unsupported");
+      return {
+        ...match,
+        speeds: match.speeds.filter(
+          (speed) => !supportedSpeeds || supportedSpeeds.has(speed)
+        ),
+      };
+    };
+    if (binding) {
+      // Only the account behind this connection can admit a newly resolved selector.
+      const offer = await read();
+      if (offer === "reauthenticationRequired")
+        throw new ChatGptCredentialError("chatgpt_reauthentication_required");
+      if (offer === "unavailable")
+        throw new ChatGptProviderError("chatgpt_catalog_unavailable");
+      if (!offer.get(wireModel)?.visible)
+        throw new ChatGptProviderError("chatgpt_model_not_available");
+    }
     const searchAllowed = async (): Promise<boolean> => {
       if (!runtime.turnPreferences) return true;
       try {
@@ -206,6 +294,7 @@ export namespace ChatGptProvider {
       scope,
       target,
       model,
+      wireModel,
       capabilities,
       isCurrent: () =>
         connection.validate().then(
@@ -410,5 +499,7 @@ function providerErrorDescription(code: ChatGptProviderErrorCode): string {
   switch (code) {
     case "chatgpt_model_not_available":
       return "the selected model is not available through this subscription";
+    case "chatgpt_catalog_unavailable":
+      return "the subscription model list could not be checked";
   }
 }

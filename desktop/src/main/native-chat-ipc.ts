@@ -1,7 +1,6 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { GG_PROVIDER_ID } from "@grida/ai-host";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
@@ -3202,7 +3201,7 @@ export class NativeChatIpc {
           owner.active.chat.acceptsPng ||
           owner.active.chat.acceptsSelectedImage === true
         );
-      return NativeChatProfiles.imageInput(GG_PROVIDER_ID, selection.modelId);
+      return NativeChatProfiles.gatewayImageInput(selection.modelId);
     }
     const catalogue = await this.profilesOwner?.list(owner.active.workspaceId);
     return (

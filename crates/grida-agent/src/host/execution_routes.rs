@@ -1,7 +1,7 @@
 //! Resolve the private supervisor's provider for one submission or retained turn.
 //! The store, scheduler and controls remain shared across these Host clones.
 use super::*;
-use crate::supervised_provider::{ProviderRoute, RoutePurpose, SupervisedProvider};
+use crate::supervised_provider::{ProviderRoute, RetainedModel, RoutePurpose, SupervisedProvider};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -187,7 +187,7 @@ impl Host {
         if !self.has_routes() {
             return Ok(self.clone());
         }
-        self.resolve_for(selection, None).await
+        self.resolve_for(selection, None, None).await
     }
 
     /// An optional model request inherits the completed turn's credential
@@ -212,13 +212,14 @@ impl Host {
         });
         let local = matches!(&source.authorization.credential, Credential::Http(http) if http.is_loopback());
         let target = grida_agent_master::prediction::model(&selection.model, local)?;
-        self.resolve_for(Some(selection), Some(target)).await
+        self.resolve_for(Some(selection), Some(target), None).await
     }
 
     async fn resolve_for(
         &self,
         selection: Option<Selection>,
         prediction_model: Option<ModelId>,
+        retained: Option<RetainedModel>,
     ) -> Result<Self> {
         let routes = self.routes.get().ok_or_else(route_changed)?;
         let mut host = self.clone();
@@ -238,7 +239,7 @@ impl Host {
         let expected_model = prediction_model.unwrap_or_else(|| selection.model.clone());
         let descriptor = routes
             .supervisor
-            .resolve(selection.connection_id, selection.model, purpose)
+            .resolve(selection.connection_id, selection.model, purpose, retained)
             .await?;
         let retained = routes.launch.retained_inputs.clone();
         let limit = |value: Option<u64>| -> Result<u64> {
@@ -259,6 +260,8 @@ impl Host {
                 return Ok(host);
             }
             ProviderRoute::Http {
+                wire_model,
+                image_input,
                 route_id,
                 model,
                 endpoint,
@@ -273,7 +276,8 @@ impl Host {
             } if model == expected_model => {
                 let supervisor = routes
                     .supervisor
-                    .routed(route_id, configured_endpoint_key.as_deref())?;
+                    .routed(route_id, configured_endpoint_key.as_deref())?
+                    .with_model_binding(wire_model, image_input)?;
                 let image_endpoint = protocol == ProviderProtocol::OpenAiCompatible
                     && matches!(
                         endpoint.as_str(),
@@ -340,6 +344,8 @@ impl Host {
                 (route_id, execution)
             }
             ProviderRoute::Chatgpt {
+                wire_model,
+                image_input,
                 route_id,
                 model,
                 endpoint,
@@ -349,7 +355,10 @@ impl Host {
                     &endpoint,
                     &model,
                     &scope,
-                    routes.supervisor.routed(route_id, None)?,
+                    routes
+                        .supervisor
+                        .routed(route_id, None)?
+                        .with_model_binding(wire_model, image_input)?,
                 )?);
                 host.desktop_image_generation = None;
                 (
@@ -386,6 +395,9 @@ impl Host {
         }
         #[derive(Deserialize)]
         struct Capture {
+            model_binding: Option<SupervisedModel>,
+            #[serde(default)]
+            request_options: RequestOptions,
             selection: Option<SelectionSnapshot>,
             inherited_route: Option<Selection>,
         }
@@ -394,15 +406,21 @@ impl Host {
             .selection
             .and_then(|s| s.selection.as_ref().map(Selection::from))
             .or(capture.inherited_route);
-        let host = self.resolve_route(selection).await?;
-        // New selections always carry an explicit model and authority. Verify
-        // them here as well as at admission for consumers such as queue edits
-        // and historical billing which do not run a new turn.
-        if host.selected_route.is_some() {
-            let execution = host.execution()?;
-            if !CapturedRoute::admits(input, execution, execution.configuration) {
-                return Err(problem(ErrorKind::Conflict, mismatch));
-            }
+        let retained = capture
+            .model_binding
+            .as_ref()
+            .map(|binding| binding.retained(capture.request_options.speed));
+        let host = self.resolve_for(selection, None, retained).await?;
+        let execution = host.execution()?;
+        // Explicit selections also carry the credential authority. Verify these
+        // on read for queue edits and billing, which do not run admission.
+        let matches = if host.selected_route.is_some() {
+            CapturedRoute::admits(input, execution, execution.configuration)
+        } else {
+            execution.matches_model_binding(capture.model_binding.as_ref())
+        };
+        if !matches {
+            return Err(problem(ErrorKind::Conflict, mismatch));
         }
         Ok(host)
     }

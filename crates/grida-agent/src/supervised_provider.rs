@@ -3,8 +3,8 @@
 use crate::custody::CapturedCredential;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::{Client, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
-use agent_kit_core::inference::RequestControl;
-use agent_kit_core::{Error, ErrorKind, Result};
+use agent_kit_core::inference::{RequestControl, ResponseSpeed};
+use agent_kit_core::{Error, ErrorKind, ModelId, Result};
 use agent_kit_providers::{TransportFailure, TransportResponse};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
@@ -27,8 +27,36 @@ const TIMEOUT: Duration = Duration::from_secs(120);
 #[derive(Clone, Default)]
 pub struct SupervisedProvider {
     connection: Arc<Mutex<Connection>>,
+    pub(crate) model_binding: Option<SupervisedModel>,
     configured_endpoint_key: Option<String>,
     route_id: Option<Uuid>,
+}
+
+/// Exact wire selector admitted by the private supervisor for this route.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SupervisedModel {
+    pub selector: ModelId,
+    pub image_input: bool,
+}
+
+/// Hints from the accepted input. The supervisor still has to authorize this binding.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RetainedModel {
+    retained_wire_model: ModelId,
+    retained_image_input: bool,
+    #[serde(default, skip_serializing_if = "ResponseSpeed::is_standard")]
+    retained_speed: ResponseSpeed,
+}
+
+impl SupervisedModel {
+    pub(crate) fn retained(&self, speed: ResponseSpeed) -> RetainedModel {
+        RetainedModel {
+            retained_wire_model: self.selector.clone(),
+            retained_image_input: self.image_input,
+            retained_speed: speed,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -40,6 +68,24 @@ enum Connection {
 }
 
 impl SupervisedProvider {
+    pub fn with_model_binding(
+        mut self,
+        wire_model: Option<ModelId>,
+        image_input: bool,
+    ) -> Result<Self> {
+        if image_input && wire_model.is_none() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "supervised_model_binding_required",
+            ));
+        }
+        self.model_binding = wire_model.map(|selector| SupervisedModel {
+            selector,
+            image_input,
+        });
+        Ok(self)
+    }
+
     pub fn for_configured_endpoint(key: &str) -> Result<Self> {
         if !key.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
             || key.len() > 32
@@ -86,6 +132,7 @@ impl SupervisedProvider {
         connection_id: Option<String>,
         model: agent_kit_core::ModelId,
         purpose: Option<RoutePurpose>,
+        retained: Option<RetainedModel>,
     ) -> Result<ProviderRoute> {
         let unavailable = || Error::new(ErrorKind::Unavailable, "chat_selection_route_unavailable");
         let client = match &*self.connection.lock().unwrap() {
@@ -98,6 +145,7 @@ impl SupervisedProvider {
                     connection_id,
                     model,
                     purpose,
+                    retained,
                 })
                 .block_task()
                 .await
@@ -400,6 +448,8 @@ struct Resolve {
     model: agent_kit_core::ModelId,
     #[serde(flatten)]
     purpose: Option<RoutePurpose>,
+    #[serde(flatten)]
+    retained: Option<RetainedModel>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -444,6 +494,9 @@ pub(crate) enum ProviderRoute {
         model: agent_kit_core::ModelId,
     },
     Http {
+        wire_model: Option<ModelId>,
+        #[serde(default)]
+        image_input: bool,
         route_id: Uuid,
         model: agent_kit_core::ModelId,
         endpoint: String,
@@ -468,6 +521,9 @@ pub(crate) enum ProviderRoute {
         gateway_billing: bool,
     },
     Chatgpt {
+        wire_model: Option<ModelId>,
+        #[serde(default)]
+        image_input: bool,
         route_id: Uuid,
         model: agent_kit_core::ModelId,
         endpoint: String,

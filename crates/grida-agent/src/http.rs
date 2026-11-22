@@ -259,13 +259,16 @@ impl HttpTransport {
     }
 
     pub(crate) fn accepts_compatible_png(&self, model: &ModelId) -> bool {
+        self.supports_openrouter_png() && openrouter_png_model(model)
+    }
+
+    pub(crate) fn supports_openrouter_png(&self) -> bool {
         self.protocol == ProviderProtocol::OpenAiCompatible
             && self.target.as_str() == "https://openrouter.ai/api/v1/chat/completions"
             && self
                 .credential
                 .as_ref()
                 .is_some_and(|credential| credential.is_stored_for("openrouter"))
-            && openrouter_png_model(model)
     }
 
     /// A Responses connection to an exact OpenAI model id whose bundled model

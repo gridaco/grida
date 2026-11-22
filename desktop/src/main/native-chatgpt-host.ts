@@ -1,5 +1,8 @@
 // GRIDA-SEC-008 — native Desktop subscription authority and private launch.
-import { ChatGptSubscriptionHost } from "@grida/ai-host/chatgpt-host";
+import {
+  ChatGptSubscriptionHost,
+  type ChatGptModelBinding,
+} from "@grida/ai-host/chatgpt-host";
 import {
   CHATGPT_RESPONSES_URL,
   CHATGPT_MODELS_URL,
@@ -67,25 +70,36 @@ export class NativeChatGptHost {
     return this.owner.close();
   }
 
+  scope() {
+    return this.owner.scope();
+  }
+
+  inventory() {
+    return this.owner.inventory();
+  }
+
   async launch(
     modelId: string,
-    lifetime?: AbortSignal
+    lifetime?: AbortSignal,
+    binding?: ChatGptModelBinding
   ): Promise<
     Pick<
       NativeAgentLaunch,
-      | "provider"
-      | "endpoint"
-      | "model"
-      | "providerNetwork"
-      | "subscriptionScope"
-      | "subscriptionCapabilities"
-    >
+      "provider" | "endpoint" | "model" | "wireModel" | "providerNetwork"
+    > &
+      Required<
+        Pick<
+          NativeAgentLaunch,
+          "subscriptionScope" | "subscriptionCapabilities"
+        >
+      >
   > {
-    const connection = await this.owner.capture(modelId);
+    const connection = await this.owner.capture(modelId, binding);
     return {
       provider: "responses",
       endpoint: CHATGPT_RESPONSES_URL.slice(0, -"/responses".length),
       model: connection.model,
+      ...(binding && { wireModel: connection.wireModel }),
       subscriptionScope: connection.scope,
       subscriptionCapabilities: connection.capabilities,
       providerNetwork: {

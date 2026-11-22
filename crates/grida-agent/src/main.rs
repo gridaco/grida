@@ -170,6 +170,26 @@ fn command() -> Command {
                         .hide(true),
                 )
                 .arg(
+                    Arg::new("supervised-wire-model")
+                        .long("supervised-wire-model")
+                        .value_name("SELECTOR")
+                        .requires("supervised-provider")
+                        .conflicts_with_all([
+                            "supervised-gateway-scope",
+                            "supervised-configured-endpoint-key",
+                            "credential-env",
+                            "listen",
+                        ])
+                        .hide(true),
+                )
+                .arg(
+                    Arg::new("supervised-image-input")
+                        .long("supervised-image-input")
+                        .requires("supervised-wire-model")
+                        .action(ArgAction::SetTrue)
+                        .hide(true),
+                )
+                .arg(
                     Arg::new("supervised-configured-endpoint-key")
                         .long("supervised-configured-endpoint-key")
                         .value_name("ENDPOINT_ID")
@@ -850,7 +870,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             match args.get_one::<String>("supervised-configured-endpoint-key") {
                 Some(key) => grida_agent::SupervisedProvider::for_configured_endpoint(key)?,
                 None => grida_agent::SupervisedProvider::default(),
-            },
+            }
+            .with_model_binding(
+                args.get_one::<String>("supervised-wire-model")
+                    .map(ModelId::new)
+                    .transpose()?,
+                args.get_flag("supervised-image-input"),
+            )?,
         )
     } else {
         None

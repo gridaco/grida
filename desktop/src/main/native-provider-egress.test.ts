@@ -94,6 +94,42 @@ function open(overrides: Record<string, unknown> = {}) {
   };
 }
 
+it("authorizes the exact captured BYOK selector before provider dispatch", async () => {
+  const dispatch = vi.fn<() => Promise<Response>>(
+    async () => new Response(null)
+  );
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+  const egress = new NativeProviderEgress(
+    { prepare },
+    "openai-compatible",
+    endpoint,
+    "vendor/card",
+    undefined,
+    undefined,
+    undefined,
+    "provider-alias"
+  );
+  try {
+    for (const model of ["vendor/card", "provider-alias"]) {
+      expect(
+        await egress.exchange(
+          open({
+            initial: Buffer.from(JSON.stringify({ model })).toString("base64"),
+          })
+        )
+      ).toEqual({ status: "accepted" });
+      const result = await egress.exchange({ id, action: "dispatch" });
+      expect(result.status).toBe(
+        model === "provider-alias" ? "ready" : "unavailable"
+      );
+    }
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  } finally {
+    egress.close();
+  }
+});
+
 it("holds upload until dispatch and rechecks the live route grant", async () => {
   let allowed = true;
   const fetch = vi.fn<() => Promise<Response>>(async () => new Response(null));

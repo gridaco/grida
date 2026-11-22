@@ -13,7 +13,7 @@ description: >
 
 | Subject                                                                                   | Canonical owner                                                                                                                                                             |
 | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model identities, labels, releases, labs, provider bindings, capabilities, regular prices | Public [`gridaco/models`](https://github.com/gridaco/models), consumed as the pinned `@grida/ai-models` release.                                                            |
+| Model identities, labels, releases, labs, provider bindings, capabilities, regular prices | Public [`gridaco/models`](https://github.com/gridaco/models), used by Desktop chat through its V2 catalogue store and bundled in the exact `@grida/ai-models` dependency.   |
 | Currently served GG models, effective capabilities, prices and operation schemas          | [GG models](https://gateway.grida.ai/v1/models), [endpoints](https://gateway.grida.ai/v1/endpoints), [operation schemas](https://gateway.grida.ai/schemas/operations.json). |
 | Product membership, defaults, tier choices and feature subsets                            | `data/ai/presets.json`.                                                                                                                                                     |
 | Executable native/BYOK inputs and adapters                                                | `data/ai/native-inputs.json`, `packages/grida-ai/src/`, `crates/grida-ai/src/`.                                                                                             |
@@ -30,10 +30,13 @@ choices and the retained schema-1 installed-client protocol. It is not a second
 facts authoring home. Unknown prices/estimates remain unknown, never zero.
 Historical client estimates cannot authorize or settle hosted spending.
 
-Grida Desktop's ChatGPT subscription model list is a closed compatibility list
-with its own membership, order and default in
-[`data/ai/chatgpt-subscription.json`](../../../data/ai/chatgpt-subscription.json).
-For manual updates, follow the [subscription provider runbook](../../../packages/grida-ai-host/docs/chatgpt-subscription-provider.md#update-membership-and-the-default).
+Desktop foreground chat resolves public facts through `ChatModels` in
+`@grida/ai/catalogue`. Subscription choices require a selector in the public
+`agents.json`, a compatible native adapter and an offer from the signed-in
+account. OpenRouter and Vercel use the exact selected provider binding.
+For subscription policy, `data/ai/chatgpt-subscription.json` owns the preferred
+default and historical saved IDs. Update active public selectors in the Models
+project. See the [subscription provider runbook](../../../packages/grida-ai-host/docs/chatgpt-subscription-provider.md#update-membership-and-the-default).
 
 ## Updating the public dependency or product presets
 
@@ -74,9 +77,9 @@ execution credential. Respect cache expiry and unavailable state rather than
 restoring retired GG models from a bundled list. The hosted renderer preserves
 released binaries lacking the discovery bridge through their existing finite
 native choices; never enter that compatibility path after a capable host's
-empty, failed or expired read. BYOK/offline metadata remains
-available independently from the immutable release pin. New hosts do not fetch
-the legacy native catalogue. Keep `/api/v1/models/catalog` readable for older
+empty, failed or expired read. Desktop checks for newer V2 foreground chat facts in the background. Its
+validated local snapshot and bundled seed provide offline metadata. Media
+adapters continue to use their shipped compatibility projections. Keep `/api/v1/models/catalog` readable for older
 clients using `catalog.snapshot.legacy()`; omit only shapes its schema cannot
 represent, retaining exact facts in the current seed. Never treat that endpoint
 as current GG inventory.

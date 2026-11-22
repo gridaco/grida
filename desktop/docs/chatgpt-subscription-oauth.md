@@ -39,22 +39,16 @@ The authorization query also pins
 `codex_cli_simplified_flow=true`, and `originator=grida`. Inference sends
 `originator: grida`.
 
-The current closed model compatibility projection offers **GPT-6.2 Sol** as
-its default, alongside GPT-6.2 Astra and earlier compatible models. Access
-depends on the person's ChatGPT plan and workspace. This is a subscription
-compatibility projection; public API availability does not establish
-subscription entitlement.
+The preferred default is **GPT-6.2 Sol** when the account offers it. Desktop
+intersects the signed-in account's listed selectors with the latest available
+public Models V2 snapshot and the installed Responses adapter. The Models
+release supplies labels and provider bindings. It also maps exact subscription
+selectors to canonical model IDs through `agents.json`.
 
-Membership and the default are authored once in
-[`data/ai/chatgpt-subscription.json`](../../data/ai/chatgpt-subscription.json),
-with the dedicated
-[`subscription schema`](../../data/ai/schemas/chatgpt-subscription.schema.json).
-The standard AI catalogue generator writes both the marked TypeScript
-projection in `packages/grida-ai-host/src/protocol/chatgpt.ts` and the native
-`crates/grida-agent/data/chatgpt-subscription-models.json` asset. Follow the
-[catalogue update workflow](../../data/ai/README.md), regenerate the projections
-and check for drift; do not hand-edit a consumer's model list or default.
-Runtime consumers use these bundled generated projections.
+The [subscription definition](../../data/ai/chatgpt-subscription.json) owns
+the preferred default and historical saved choices. Follow the [catalogue
+authoring guide](../../data/ai/README.md) to update policy or refresh the
+bundled offline seed.
 
 A Main-only provider network grant admits exact `auth.openai.com` and
 `chatgpt.com` HTTPS origins only on the credential-bearing provider lane. It is
@@ -63,7 +57,7 @@ credential-free asset-download lane, and lookalike subdomains are refused.
 
 ## Model selection
 
-Ordinary macOS and Linux Desktop exposes the closed subscription model list in
+Ordinary macOS and Linux Desktop exposes the account’s compatible models in
 the Welcome and workspace model pickers when its Main-owned subscription host
 reports a ready connection. A fresh chat with no persisted or explicit choice
 prefers that connection. An explicit choice takes precedence; connecting
@@ -72,7 +66,7 @@ ChatGPT never reassigns an existing chat's provider or funding.
 Each choice records the subscription provider and exact model. Main resolves
 the selection through the existing OAuth host, captures that model under the
 current opaque account and sign-in lineage, and supplies only the captured
-scope and model to the native agent. Saved subscription selections are bound
+scope, canonical model and exact selector to the native agent. Saved subscription selections are bound
 to that lineage. Reconnecting requires a new explicit selection; another
 account cannot inherit the previous selection or reopen its chat authority.
 Token rotation within the same connection preserves the lineage.

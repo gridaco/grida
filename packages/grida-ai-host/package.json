@@ -52,6 +52,16 @@
         "types": "./dist/media-transport.d.cts",
         "default": "./dist/media-transport.cjs"
       }
+    },
+    "./model-catalogue": {
+      "import": {
+        "types": "./dist/model-catalogue.d.mts",
+        "default": "./dist/model-catalogue.mjs"
+      },
+      "require": {
+        "types": "./dist/model-catalogue.d.cts",
+        "default": "./dist/model-catalogue.cjs"
+      }
     }
   },
   "scripts": {

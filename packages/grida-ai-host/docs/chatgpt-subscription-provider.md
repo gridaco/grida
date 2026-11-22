@@ -103,19 +103,26 @@ provider.
 
 ## Native inference
 
-`capture(modelId)` binds one supported model to the current credential lineage
-and returns a connection with the fixed Responses `target`, the bare wire
-`model`, an opaque 64-hex `scope` for that account lineage, and a
-`request(body, signal)` function. The scope carries no credential or account
-identifier.
+The host exposes three operations for trusted subscription routing.
 
-Desktop launches the native host with `serve --stdio --supervised-provider
---supervised-chatgpt-scope <scope>` and the Responses provider. The native
-adapter prepares each request and sends it over the
+- `scope()` reads the current sign-in lineage locally so the caller can
+  reject a choice captured under another account before issuing a request.
+- `inventory()` returns the visible selectors offered by the signed-in
+  account and an opaque scope for that sign-in. It distinguishes an empty
+  account offer, a discovery failure and a sign-in that needs attention.
+  Desktop joins the selectors to one public Models V2 release to obtain the
+  canonical chat IDs and supported native capabilities.
+- `capture(modelId, binding)` binds the exact subscription wire selector to
+  that account. A replaced sign-in or a selector absent from the account
+  offer cannot authorize dispatch. The captured connection returns the fixed
+  Responses target, wire selector and a `request(body, signal)` function.
+
+Desktop passes the canonical model, resolved wire selector and opaque
+subscription scope privately to the supervised native process. The native
+adapter sends each request through
 [supervised provider egress](../../../crates/grida-agent/docs/rust-client-protocol.md#supervised-provider-egress)
-with only `Content-Type` and `Accept` headers and no credential. Main accepts
-only that exact target and header set, then passes the body to the captured
-connection, which attaches the credential headers above.
+with only `Content-Type` and `Accept` headers. Main accepts the exact target
+and header set and attaches the credential inside the captured connection.
 
 The connection refuses any body that departs from the native request shape:
 the captured model, streaming, `store: false`, string `instructions`, and
@@ -131,87 +138,43 @@ accepted request that uses search. A connection captured under a replaced
 account lineage answers `401` without dispatch, and a new capture yields
 a different scope.
 
-Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
-host maps the closed supported set to the bare model names required by the
-subscription backend and refuses any other model. The current default is
-**GPT-6.2 Sol**. The picker also offers GPT-6.2 Astra and earlier compatible
-models from the subscription list below.
+The canonical chat model ID and the subscription selector may differ. The
+selected public ID identifies the user's model in the chat while the captured
+selector identifies the model on the provider request. An accepted input
+keeps its captured selector when a public release changes the mapping. The
+signed-in account must still offer that selector.
 
 ### Optional features on the selected connection
 
 The subscription host reads the signed-in account's fixed
-`GET /backend-api/codex/models?client_version=…` through Main. It intersects
-the offered rows with the installed wire-model list and projects only supported
-service tiers and hosted-search availability. The hosted full Responses search
-profile currently covers GPT-6.2 Sol. The subscription catalogue's preferred
-transport does not change Grida's full HTTP Responses implementation.
+`GET /backend-api/codex/models?client_version=…` through Main. Accelerated
+speeds require both the public agent entry and a compatible tier in the
+authenticated offer. The verified full HTTP Responses hosted search profile
+currently covers GPT-6.2 Sol. Search also requires the user's current
+permission.
 
-Concurrent requests share a bounded discovery read for the same sign-in
-lineage. Successful offers expire after five minutes. A failed refresh
-withdraws the optional features until discovery succeeds. Account replacement
-invalidates the captured lineage, including previously cached offers. Standard
-inference without search does not require a catalogue read. Renderer and
-native consumers receive eligibility or an availability reason; the raw feed,
-provider instructions and subscription credentials stay in Main.
+Concurrent requests share one discovery read per sign-in lineage. Successful
+offers expire after five minutes. Discovery failures briefly suppress retries
+and withhold new choices. An old sign-in's response cannot repopulate the
+current offer. Raw account data, provider instructions and credentials stay in
+the host.
 
 ### Update membership and the default
 
+Desktop reads canonical text model facts from `models.json` and subscription
+selectors from the OpenAI Codex entry in `agents.json` of the same public
+Models V2 release. The picker lists compatible models that the current account
+offers. A new compatible selector can become usable when the catalogue
+refreshes. Adding a wire protocol or changing Grida's verified search
+compatibility still requires an adapter change.
+
 [`data/ai/chatgpt-subscription.json`](../../../data/ai/chatgpt-subscription.json)
-is the single authoring home for subscription membership and the default,
-validated by
-[`chatgpt-subscription.schema.json`](../../../data/ai/schemas/chatgpt-subscription.schema.json).
-The standard AI catalogue generator projects it into the marked block in
-[`src/protocol/chatgpt.ts`](../src/protocol/chatgpt.ts) and the native
-[`chatgpt-subscription-models.json`](../../../crates/grida-agent/data/chatgpt-subscription-models.json)
-asset. Neither projection is edited independently. Canonical model facts remain
-owned by the pinned public Models dependency, including the labels and input
-capabilities used by the picker. Runtime consumers use the bundled projections.
-
-Use the relevant `gridaco/models` PR to identify candidate IDs and OpenAI's
-ChatGPT Work or Codex release notes to verify subscription availability and
-plan restrictions. Check that the pinned Models release has the exact OpenAI
-wire binding for each addition. When a new binding is missing, follow the
-[catalogue update workflow](../../../data/ai/README.md) to update the pin.
-Review picker order and the default separately from membership.
-
-Keep withdrawn IDs in the source's `retired_model_ids` so older saved choices
-remain readable. The generated retired-ID list grants no picker availability
-or inference authority.
-
-After changing the product source, run from the repository root:
-
-```sh
-node scripts/ai-catalogue/generate.mjs
-pnpm --filter @grida/ai build
-node scripts/ai-catalogue/generate.mjs --bundle
-node scripts/ai-catalogue/generate.mjs --bundle --check
-```
-
-Commit the source and generated projections together, and run the affected
-host, Desktop and native selection tests. The list is Grida's subscription
-compatibility projection rather than authenticated account discovery. Access
-depends on the ChatGPT plan and workspace; API model availability does not
-establish subscription access.
-
-For a live check, connect an eligible account through Grida Desktop and send
-a short turn with each added model. Check that a fresh chat offers the
-intended default and that a withdrawn saved selection asks for an explicit
-replacement. Record the tested plan and build, and flag any live checks that
-remain pending.
-
-GPT-5.5 and GPT-5.4 have been withdrawn from subscription offerings. Existing
-saved choices remain visible as unavailable and require an explicit replacement.
-Neither a catalogue update nor the new default silently changes a saved model,
-the chat's account connection or its funding.
-
-Copy this prompt for a manual update.
-
-```text
-Use $ai-models to update Grida Desktop's ChatGPT subscription model list for
-<release or PR>. Follow “Update membership and the default” in
-packages/grida-ai-host/docs/chatgpt-subscription-provider.md. Report membership
-and default changes, subscription evidence, and which checks passed.
-```
+owns the product default and historical retired IDs. The default is recommended
+when available. Saved choices whose model or account is unavailable require an
+explicit replacement. The host also supports the bundled compatibility map
+for callers that supply only a model ID. See the
+[catalogue update workflow](../../../data/ai/README.md) for generating and
+checking the offline seed and compatibility projections.
 
 ## Network authority
 

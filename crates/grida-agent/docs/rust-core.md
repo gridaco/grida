@@ -1420,14 +1420,14 @@ above.
 `Responses` and `Gemini` also take a replay binding that the host retains only
 while provider account and endpoint continuity is verified.
 
-The Grida host's subscription adapter admits only the generated
-[subscription compatibility projection](../data/chatgpt-subscription-models.json).
-This finite model-to-wire mapping is generated from the dedicated
-[subscription definition](../../../data/ai/chatgpt-subscription.json);
-an ordinary OpenAI API binding is not subscription eligibility. Unsupported
-or retired members fail before the host opens session state or sends provider
-work. Catalogue membership updates do not change owner, route or continuation
-bindings, and do not migrate saved choices to another model.
+The Desktop supervisor resolves a canonical model to a provider selector for
+its subscription and built-in BYOK connections. The native host binds that
+selector to the adapter and records it with the accepted input. A refreshed
+catalog can supply new model IDs without a native release. Historical
+subscription inputs and supervisors without explicit selectors use the frozen
+[subscription selector mapping](../data/chatgpt-subscription-models.json).
+Queue dispatch and recovery require the original selector, model and authorized
+connection. A missing or remapped binding cannot redirect accepted work.
 
 A top-level chat can accept inputs on an explicitly selected authorized
 connection while earlier work uses a different one. The host binds the model,

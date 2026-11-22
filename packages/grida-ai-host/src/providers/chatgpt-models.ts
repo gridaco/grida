@@ -1,14 +1,21 @@
 // GRIDA-SEC-008 — only scoped, bounded capability facts leave subscription discovery.
+import { isChatModelIdentifier } from "@grida/ai/catalogue";
 import {
   CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID,
-  type ChatGptSubscriptionModelId,
   type ChatGptTurnCapabilities,
 } from "../protocol/chatgpt";
 
 const MAX_CATALOG_BYTES = 4 * 1024 * 1024;
 const FRESH_MS = 5 * 60 * 1000;
-type Offer = ReadonlyMap<string, ChatGptTurnCapabilities>;
-type Result = Offer | "unavailable" | "reauthenticationRequired";
+type AccountModel = Readonly<{
+  visible: boolean;
+  capabilities: ChatGptTurnCapabilities;
+}>;
+type Offer = ReadonlyMap<string, AccountModel>;
+export type ChatGptModelOffer =
+  | Offer
+  | "unavailable"
+  | "reauthenticationRequired";
 
 export function noSubscriptionFeatures(
   status: Exclude<ChatGptTurnCapabilities["status"], "available">
@@ -22,14 +29,13 @@ export class ChatGptModels {
   private current?: {
     scope: string;
     expires: number;
-    result: Promise<Result>;
+    result: Promise<ChatGptModelOffer>;
   };
 
-  async capabilities(
+  async read(
     scope: string,
-    model: ChatGptSubscriptionModelId,
     get: (signal: AbortSignal) => Promise<Response>
-  ): Promise<ChatGptTurnCapabilities> {
+  ): Promise<ChatGptModelOffer> {
     let entry = this.current;
     if (!entry || entry.scope !== scope || entry.expires <= Date.now()) {
       const result = readCatalog(get).catch(() => "unavailable" as const);
@@ -42,18 +48,13 @@ export class ChatGptModels {
           Date.now() + (typeof value === "string" ? 3000 : FRESH_MS);
       });
     }
-    const offer = await entry.result;
-    if (typeof offer === "string") return noSubscriptionFeatures(offer);
-    const match = offer.get(CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID[model]);
-    return match
-      ? { ...match, speeds: [...match.speeds] }
-      : noSubscriptionFeatures("unsupported");
+    return entry.result;
   }
 }
 
 async function readCatalog(
   get: (signal: AbortSignal) => Promise<Response>
-): Promise<Result> {
+): Promise<ChatGptModelOffer> {
   const signal = AbortSignal.timeout(8000);
   const response = await get(signal);
   const reader = response.body?.getReader();
@@ -92,8 +93,7 @@ async function readCatalog(
       raw.models.length > 2048
     )
       return "unavailable";
-    const models = new Map<string, ChatGptTurnCapabilities>();
-    const installed = Object.values(CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID);
+    const models = new Map<string, AccountModel>();
     for (const row of raw.models) {
       if (
         !row ||
@@ -103,19 +103,19 @@ async function readCatalog(
         !row.slug
       )
         return "unavailable";
-      if (!installed.includes(row.slug)) continue;
+      if (!isChatModelIdentifier(row.slug)) continue;
       if (models.has(row.slug)) return "unavailable";
       // Whitelist the small projection. Provider-owned prompts, remote tools,
-      // suggested defaults, and unrelated models are never configuration.
+      // and suggested defaults are never configuration.
       if (row.visibility !== "list") {
-        models.set(
-          row.slug,
-          noSubscriptionFeatures(
+        models.set(row.slug, {
+          visible: false,
+          capabilities: noSubscriptionFeatures(
             row.visibility === "hide" || row.visibility === "none"
               ? "unsupported"
               : "unavailable"
-          )
-        );
+          ),
+        });
         continue;
       }
       // The upstream catalog omits an empty tier list. An offered model
@@ -132,7 +132,10 @@ async function readCatalog(
             typeof t.id !== "string"
         )
       ) {
-        models.set(row.slug, noSubscriptionFeatures("unavailable"));
+        models.set(row.slug, {
+          visible: true,
+          capabilities: noSubscriptionFeatures("unavailable"),
+        });
         continue;
       }
       const ids = new Set(tiers.map((t: { id: string }) => t.id));
@@ -142,11 +145,14 @@ async function readCatalog(
       // Directly verified on our full HTTP Responses adapter. The catalog's
       // Responses Lite preference describes a different transport.
       models.set(row.slug, {
-        status: "available",
-        speeds,
-        webSearch:
-          row.slug ===
-          CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID["openai/gpt-6.2-sol"],
+        visible: true,
+        capabilities: {
+          status: "available",
+          speeds,
+          webSearch:
+            row.slug ===
+            CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID["openai/gpt-6.2-sol"],
+        },
       });
     }
     return models;

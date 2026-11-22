@@ -413,13 +413,12 @@ Ordinary macOS and Linux launches offer connected subscription models in the
 Welcome and workspace model pickers. Sign in under **Settings → LLM Providers
 → ChatGPT Subscription**. A new chat without a saved or explicit model choice
 prefers a ready subscription; explicit choices and existing chats retain their
-connection. The subscription's current default is **GPT-6.2 Sol**. Its closed
-membership and default are authored in `data/ai/chatgpt-subscription.json`,
-validated by `data/ai/schemas/chatgpt-subscription.schema.json`, and generated
-for TypeScript and the native host. Runtime consumers use those bundled
-projections. The catalogue does not use authenticated discovery, and access
-depends on the ChatGPT plan and
-workspace. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
+connection. The preferred subscription default is **GPT-6.2 Sol**
+when offered. Desktop intersects the signed-in account's listed models with the
+public Models V2 subscription selectors and installed adapter capabilities.
+Main refreshes the public catalogue in the background and retains a local
+snapshot for offline use. The preferred default and historical IDs live in
+`data/ai/chatgpt-subscription.json`. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
 require an explicit replacement. Text, tools, reasoning settings, attached images
 and image-viewing tools are supported. Provider-native compaction is unavailable;
 Grida can summarize conversation context through its own compaction workflow.

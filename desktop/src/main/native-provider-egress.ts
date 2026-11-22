@@ -75,7 +75,8 @@ export class NativeProviderEgress {
     model: string,
     llamaCppInputCount?: true,
     private readonly gatewayCeilings?: true,
-    private readonly permission?: AbortSignal
+    private readonly permission?: AbortSignal,
+    private readonly wireModel?: string
   ) {
     this.targets = providerTargets(
       protocol,
@@ -181,11 +182,16 @@ export class NativeProviderEgress {
 
   private async dispatch(id: string, exchange: Exchange): Promise<Reply> {
     exchange.phase = "dispatch";
+    const body = Buffer.concat(exchange.uploaded, exchange.requestBytes);
+    exchange.uploaded.length = 0;
     let dispatch: Dispatch | null;
     try {
-      dispatch = this.permission?.aborted
-        ? null
-        : this.network.prepare(exchange.target, exchange.headers);
+      dispatch =
+        this.permission?.aborted ||
+        (this.wireModel &&
+          JSON.parse(body.toString("utf8"))?.model !== this.wireModel)
+          ? null
+          : this.network.prepare(exchange.target, exchange.headers);
     } catch {
       dispatch = null;
     }
@@ -193,8 +199,6 @@ export class NativeProviderEgress {
       this.end(id, exchange);
       return { status: "unavailable" };
     }
-    const body = Buffer.concat(exchange.uploaded, exchange.requestBytes);
-    exchange.uploaded.length = 0;
     try {
       const signal = this.permission
         ? AbortSignal.any([exchange.controller.signal, this.permission])

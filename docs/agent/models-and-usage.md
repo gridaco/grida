@@ -21,9 +21,9 @@ Desktop can run chat on:
 - an approved compatible endpoint, which can use a key saved under its own ID.
 
 For a new chat with no saved or explicit model choice, Desktop prefers a ready
-ChatGPT subscription, currently with **GPT-6.2 Sol** as its default. Your saved
-or explicit choice takes precedence, including a saved model that has become
-unavailable.
+ChatGPT subscription. It recommends Grida’s preferred model when your account
+offers it, or another available subscription model. Your saved or explicit
+choice takes precedence, including a saved model that has become unavailable.
 
 An endpoint on another device must use HTTPS; plain HTTP works only for
 `localhost` or `127.0.0.1`. A saved HTTP endpoint on another device stays in
@@ -79,12 +79,19 @@ A selected file or nested deck window keeps its fixed model and inherits the
 last chosen effort when starting a new chat. This does not change the saved
 preference for ordinary project chats.
 
-Grida lists its current Gateway models that can use tools. Connecting ChatGPT
-adds its compatible models in a **ChatGPT Subscription** group. Add an
-OpenRouter or Vercel AI Gateway key, or connect a compatible endpoint
-in Desktop settings, to see those models too. A model in the list is not a
-promise that your subscription, key, credits or model access work; send a
-short message to check.
+The list groups models by the connection that runs them. A model offered by
+two connections appears in both groups. Choose the account or key you want
+to use. ChatGPT Subscription lists compatible models offered by your signed-in
+account. OpenRouter and Vercel AI Gateway list compatible models for that
+provider once you add its key. Grida Gateway and your configured endpoints
+supply their own model lists.
+
+Desktop checks for new model data in the background. You can open the picker
+using the last verified catalog, or the copy included with Desktop on first
+launch. A compatible model can therefore appear without a Desktop update.
+ChatGPT still needs a recent model list from your signed-in account. If that
+check fails, new subscription choices are unavailable until it succeeds.
+Your provider checks access, available credits and quota when you send.
 
 Chats belong to the workspace: every model connection shares its chat list.
 Connecting a provider or refreshing the list leaves your selected connection
@@ -107,14 +114,12 @@ Choose a model in the **ChatGPT Subscription** group to use your plan for a
 new chat or an eligible next turn in an existing chat.
 
 This integration is experimental. Model access depends on your ChatGPT plan,
-workspace and the subscription service. The listed models come from Grida's
-compatibility list; reloading the picker checks connection readiness rather
-than discovering models from your account.
-
-GPT-5.5 and GPT-5.4 have been withdrawn from subscription offerings. A saved
-choice of either remains visible as unavailable. Choose an available model
-explicitly; a refresh or changed default does not replace your saved choice.
-OpenAI API model availability is separate from subscription access.
+workspace and the subscription service. Desktop matches models offered by your
+account with the models Grida can run. OpenAI API model availability is
+separate from subscription access. If a saved choice becomes unavailable, its
+name stays visible and you can choose a replacement. A refreshed listing
+affects future messages. Queued and paused messages still require the provider
+model and connection they had when you sent them.
 
 Subscription chats support text, tools and the model's available reasoning
 settings. **Ultra** can run an independent reviewer on that same subscription

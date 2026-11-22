@@ -1,4 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — native provider admission and custody.
+import { ChatModels } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
@@ -298,6 +300,145 @@ function byokTool(name: string, args: object) {
     "tool_calls"
   );
 }
+
+it.runIf(sharedCustody && Boolean(packaged))(
+  "lists a new model on configured providers and sends each provider's exact selector",
+  async () => {
+    const root = await privateHome();
+    const cwd = path.join(root, "workspace");
+    const credentialHome = path.join(root, "credentials");
+    const store = new SecretsStore(
+      new AuthStore(path.join(root, "legacy")),
+      credentialHome
+    );
+    const model = "fixture/published-chat";
+    const wires = {
+      openrouter: "fixture/router-edition",
+      vercel: "fixture/gateway-edition",
+    };
+    const facts = {
+      tools: true,
+      reasoning: false,
+      imageInput: false,
+      streaming: true,
+    };
+    const snapshot: ModelCatalogueSnapshot = {
+      version: "2.20990101.1",
+      agents: {},
+      text: {
+        [model]: {
+          id: model,
+          label: "Published chat",
+          tools: true,
+          imageInputMimes: [],
+          bindings: {
+            openrouter: { ...facts, wireModel: wires.openrouter },
+            vercel: { ...facts, wireModel: wires.vercel },
+          },
+        },
+      },
+    };
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(async () => byokReply({ content: "Fixture answer" }, "stop"));
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    const select = (
+      provider: string,
+      id: string,
+      binding: ChatModels.Binding
+    ) =>
+      NativeProviderSelection.builtInByok(
+        provider,
+        id,
+        {
+          credentialHome,
+          hasKey: (key) => store.has(key),
+          network: async () => ({ prepare }),
+        },
+        binding
+      );
+    const choices = () => NativeChatProfiles.builtInChoices(snapshot, select);
+    try {
+      await fs.mkdir(cwd, { mode: 0o700 });
+      await fs.mkdir(credentialHome, { mode: 0o700 });
+      await store.set("openrouter", "openrouter-fixture-key");
+      expect((await choices()).map((choice) => choice.providerId)).toEqual([
+        "openrouter",
+      ]);
+      const vercel = ChatModels.resolve(
+        snapshot,
+        { provider: "vercel" },
+        model
+      )!;
+      await expect(select("vercel", model, vercel)).rejects.toThrow(
+        "native_provider_byok_key_missing"
+      );
+      expect(prepare).not.toHaveBeenCalled();
+      await store.set("vercel", "vercel-fixture-key");
+      const available = await choices();
+      expect(available.map((choice) => choice.providerId).sort()).toEqual([
+        "openrouter",
+        "vercel",
+      ]);
+      for (const [provider, endpoint] of byokProviders) {
+        const choice = available.find(
+          (choice) => choice.providerId === provider
+        )!;
+        expect(choice).toMatchObject({
+          modelId: model,
+          model: "Published chat",
+        });
+        const binding = ChatModels.resolve(
+          snapshot,
+          { provider },
+          choice.modelId
+        )!;
+        const profile = await select(provider, choice.modelId, binding);
+        expect(NativeChatProfiles.binding(provider, profile)).toBe(choice.id);
+        const chat = await NativeAgentChat.start({
+          ...profile,
+          resourcesPath: packaged!,
+          stateDirectory: path.join(root, provider),
+          cwd,
+        });
+        try {
+          const session = await chat.create();
+          const accepted = await chat.submit(
+            session,
+            "published-model",
+            "Send a fixture turn"
+          );
+          await vi.waitFor(
+            async () => {
+              expect((await chat.observe(session)).latest).toMatchObject({
+                turnId: accepted.turnId,
+                status: "succeeded",
+              });
+            },
+            { timeout: 4000 }
+          );
+          expect(prepare).toHaveBeenCalledTimes(1);
+          const [target, headers] = prepare.mock.calls[0]!;
+          expect(target).toBe(endpoint + "/chat/completions");
+          expect(headers.get("authorization")).toBe(
+            `Bearer ${provider}-fixture-key`
+          );
+          expect(dispatch).toHaveBeenCalledTimes(1);
+          expect(
+            JSON.parse(dispatch.mock.calls[0]![0].toString())
+          ).toMatchObject({ model: wires[provider], stream: true });
+        } finally {
+          await chat.close();
+        }
+        prepare.mockClear();
+        dispatch.mockClear();
+      }
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  15_000
+);
 
 it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
   "enables bounded child work on the saved %s provider across restart",

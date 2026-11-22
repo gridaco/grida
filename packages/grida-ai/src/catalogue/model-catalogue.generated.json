@@ -1,0 +1,1359 @@
+{
+  "version": "2.20261121.1",
+  "text": {
+    "anthropic/claude-fable-5": {
+      "id": "anthropic/claude-fable-5",
+      "label": "Claude Fable 5",
+      "shortLabel": "Fable 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-fable-5.1": {
+      "id": "anthropic/claude-fable-5.1",
+      "label": "Claude Fable 5.1",
+      "shortLabel": "Fable 5.1",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5-1",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5.1",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-fable-5.2": {
+      "id": "anthropic/claude-fable-5.2",
+      "label": "Claude Fable 5.2",
+      "shortLabel": "Fable 5.2",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-fable-5-2",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-fable-5.2",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-haiku-5.5": {
+      "id": "anthropic/claude-haiku-5.5",
+      "label": "Claude Haiku 5.5",
+      "shortLabel": "Haiku 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-haiku-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-haiku-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-4.8": {
+      "id": "anthropic/claude-opus-4.8",
+      "label": "Claude Opus 4.8",
+      "shortLabel": "Opus 4.8",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-4-8",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-4.8",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-5": {
+      "id": "anthropic/claude-opus-5",
+      "label": "Claude Opus 5",
+      "shortLabel": "Opus 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-opus-5.5": {
+      "id": "anthropic/claude-opus-5.5",
+      "label": "Claude Opus 5.5",
+      "shortLabel": "Opus 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-opus-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-opus-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-sonnet-5": {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "shortLabel": "Sonnet 5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-sonnet-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-sonnet-5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "anthropic/claude-sonnet-5.5": {
+      "id": "anthropic/claude-sonnet-5.5",
+      "label": "Claude Sonnet 5.5",
+      "shortLabel": "Sonnet 5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "anthropic": {
+          "wireModel": "claude-sonnet-5-5",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "anthropic/claude-sonnet-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+      "contextWindow": 1000000,
+      "outputLimit": 128000
+    },
+    "google/gemini-3.1-pro-preview": {
+      "id": "google/gemini-3.1-pro-preview",
+      "label": "Gemini 3.1 Pro Preview",
+      "shortLabel": "Gemini 3.1 Pro",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 64000
+        },
+        "google": {
+          "wireModel": "gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.1-pro-preview",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 64000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-3.7-flash": {
+      "id": "google/gemini-3.7-flash",
+      "label": "Gemini 3.7 Flash",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        },
+        "google": {
+          "wireModel": "gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.7-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-3.8-flash": {
+      "id": "google/gemini-3.8-flash",
+      "label": "Gemini 3.8 Flash",
+      "bindings": {
+        "vercel": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        },
+        "google": {
+          "wireModel": "gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "grida": {
+          "wireModel": "google/gemini-3.8-flash",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65535
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-argon": {
+      "id": "google/gemini-4-argon",
+      "label": "Gemini 4 Argon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-argon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-carbon": {
+      "id": "google/gemini-4-carbon",
+      "label": "Gemini 4 Carbon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-carbon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 32768
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-hydrogen": {
+      "id": "google/gemini-4-hydrogen",
+      "label": "Gemini 4 Hydrogen",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-hydrogen",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "google/gemini-4-neon": {
+      "id": "google/gemini-4-neon",
+      "label": "Gemini 4 Neon",
+      "bindings": {
+        "google": {
+          "wireModel": "gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 65536
+        },
+        "vercel": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 1000000
+        },
+        "openrouter": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1048576,
+          "outputLimit": 943718
+        },
+        "grida": {
+          "wireModel": "google/gemini-4-neon",
+          "tools": false,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 65536
+        }
+      },
+      "tools": true,
+      "imageInputMimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "contextWindow": 1048576,
+      "outputLimit": 65536
+    },
+    "openai/gpt-5.5": {
+      "id": "openai/gpt-5.5",
+      "label": "GPT-5.5",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.5",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.5-pro": {
+      "id": "openai/gpt-5.5-pro",
+      "label": "GPT-5.5 Pro",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.5-pro",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1000000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-luna": {
+      "id": "openai/gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-sol": {
+      "id": "openai/gpt-5.6-sol",
+      "label": "GPT-5.6 Sol",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-5.6-terra": {
+      "id": "openai/gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-5.6-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-astra": {
+      "id": "openai/gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "bindings": {
+        "vercel": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openai": {
+          "wireModel": "gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-luna": {
+      "id": "openai/gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-luna",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6-sol": {
+      "id": "openai/gpt-6-sol",
+      "label": "GPT-6 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.1-sol": {
+      "id": "openai/gpt-6.1-sol",
+      "label": "GPT-6.1 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.1-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.1-terra": {
+      "id": "openai/gpt-6.1-terra",
+      "label": "GPT-6.1 Terra",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.1-terra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.2-astra": {
+      "id": "openai/gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.2-astra",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    },
+    "openai/gpt-6.2-sol": {
+      "id": "openai/gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "bindings": {
+        "openai": {
+          "wireModel": "gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "streaming": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "openrouter": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "vercel": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": true,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        },
+        "grida": {
+          "wireModel": "openai/gpt-6.2-sol",
+          "tools": true,
+          "reasoning": true,
+          "imageInput": false,
+          "contextWindow": 1050000,
+          "outputLimit": 128000
+        }
+      },
+      "tools": true,
+      "imageInputMimes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+      "contextWindow": 1050000,
+      "outputLimit": 128000
+    }
+  },
+  "agents": {
+    "anthropic-claude-code": {
+      "claude-fable-5": {
+        "canonicalModelId": "anthropic/claude-fable-5",
+        "serviceTiers": {}
+      },
+      "claude-fable-5-1": {
+        "canonicalModelId": "anthropic/claude-fable-5.1",
+        "serviceTiers": {}
+      },
+      "claude-fable-5-2": {
+        "canonicalModelId": "anthropic/claude-fable-5.2",
+        "serviceTiers": {}
+      },
+      "claude-haiku-5-5": {
+        "canonicalModelId": "anthropic/claude-haiku-5.5",
+        "serviceTiers": {}
+      },
+      "claude-opus-4-8": {
+        "canonicalModelId": "anthropic/claude-opus-4.8",
+        "serviceTiers": {}
+      },
+      "claude-opus-5": {
+        "canonicalModelId": "anthropic/claude-opus-5",
+        "serviceTiers": {}
+      },
+      "claude-opus-5-5": {
+        "canonicalModelId": "anthropic/claude-opus-5.5",
+        "serviceTiers": {}
+      },
+      "claude-sonnet-5": {
+        "canonicalModelId": "anthropic/claude-sonnet-5",
+        "serviceTiers": {}
+      },
+      "claude-sonnet-5-5": {
+        "canonicalModelId": "anthropic/claude-sonnet-5.5",
+        "serviceTiers": {}
+      }
+    },
+    "openai-codex": {
+      "gpt-5.6-luna": {
+        "canonicalModelId": "openai/gpt-5.6-luna",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-5.6-sol": {
+        "canonicalModelId": "openai/gpt-5.6-sol",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-5.6-terra": {
+        "canonicalModelId": "openai/gpt-5.6-terra",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6-astra": {
+        "canonicalModelId": "openai/gpt-6-astra",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6-luna": {
+        "canonicalModelId": "openai/gpt-6-luna",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6-sol": {
+        "canonicalModelId": "openai/gpt-6-sol",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6.1-sol": {
+        "canonicalModelId": "openai/gpt-6.1-sol",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6.1-terra": {
+        "canonicalModelId": "openai/gpt-6.1-terra",
+        "serviceTiers": {
+          "fast": "priority"
+        }
+      },
+      "gpt-6.2-astra": {
+        "canonicalModelId": "openai/gpt-6.2-astra",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      },
+      "gpt-6.2-sol": {
+        "canonicalModelId": "openai/gpt-6.2-sol",
+        "serviceTiers": {
+          "fast": "priority",
+          "ultrafast": "ultrafast"
+        }
+      }
+    }
+  }
+}

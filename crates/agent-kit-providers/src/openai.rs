@@ -34,6 +34,8 @@ pub enum OutputLimitField {
 /// Explicit capabilities of a model on the selected compatible endpoint.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelProfile {
+    /// Provider selector when it differs from the model used by the session.
+    pub wire_model: Option<ModelId>,
     /// The capabilities requests are validated against.
     pub capabilities: ModelCapabilities,
     /// The field that carries the output-token limit.
@@ -234,7 +236,9 @@ impl OpenAiCompatible {
                 "name": name, "description": offer.description, "parameters": parameters
             }}));
         }
-        let mut body = json!({ "model": request.model.as_str(), "messages": messages, "stream": true, "n": 1 });
+        let selector = model.wire_model.as_ref().unwrap_or(&request.model);
+        let mut body =
+            json!({ "model": selector.as_str(), "messages": messages, "stream": true, "n": 1 });
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
         }

@@ -1,17 +1,23 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — auxiliary inference inherits its foreground authority.
 import {
   GG_PROVIDER_ID,
-  isChatGptSubscriptionModelId,
   type EndpointProviderConfig,
   type GGModelsView,
 } from "@grida/ai-host";
-import { catalog, TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import {
+  bundledModelCatalogue,
+  catalog,
+  ChatModels,
+  TIER_MODEL_IDS,
+} from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeProviderRouteLaunch } from "./native-provider-routes";
 
 export namespace NativePredictionRoute {
   type Inventory = {
+    snapshot?: ModelCatalogueSnapshot;
     subscription?: (
       model: string,
       signal: AbortSignal
@@ -31,11 +37,6 @@ export namespace NativePredictionRoute {
     const nano = TIER_MODEL_IDS.nano;
     if (!source.providerNetwork) return;
     if (source.subscriptionScope) {
-      if (
-        !isChatGptSubscriptionModelId(source.model) ||
-        !isChatGptSubscriptionModelId(nano)
-      )
-        return;
       // A separate capture binds the exact Responses wire model and sign-in lineage.
       const target = await inventory.subscription?.(nano, signal);
       return target?.model === nano &&
@@ -91,16 +92,27 @@ export namespace NativePredictionRoute {
       };
     }
     const provider = NativeProviderSelection.builtInProviderId(source.endpoint);
-    if (!provider || !source.credentialHome || source.configuredEndpointKey)
+    if (
+      !provider ||
+      !NativeProviderSelection.isBuiltInByok(provider) ||
+      !source.credentialHome ||
+      source.configuredEndpointKey
+    )
       return;
-    // Built-in chat choices use the installed, listed text catalogue and an
-    // endpoint-specific key. Reuse its captured grant, including rotation checks.
+    const binding = ChatModels.resolve(
+      inventory.snapshot ?? bundledModelCatalogue(),
+      { provider },
+      nano
+    );
+    if (!binding) return;
     return {
       ...source,
       model: nano,
+      wireModel: binding.wireModel,
+      imageInput: binding.imageInput,
       imageGeneration: undefined,
-      maxOutputTokens: NativeChatProfiles.outputLimit(nano),
-      reasoning: NativeChatProfiles.reasons(provider, nano) || undefined,
+      maxOutputTokens: binding.maxOutputTokens,
+      reasoning: binding.reasoning || undefined,
     };
   }
 

@@ -1,6 +1,8 @@
 // Project public facts into the interfaces implemented by this client release.
 // GRIDA-SEC-008 — subscription compatibility stays explicit and finite.
 // These field names describe client compatibility, not another authored model list.
+import { isChatModelIdentifier } from "../../packages/grida-ai/src/catalogue/chat-model-identifier.mts";
+
 const fields = {
   "text.catalog": [
     "id",
@@ -322,56 +324,57 @@ export function projectFacts(source, presets) {
   return result;
 }
 
-/** Explicit subscription compatibility; API catalogue membership grants no access. */
-export function projectChatGptSubscription(source, profile) {
-  const validIds = (ids) =>
-    Array.isArray(ids) &&
-    ids.every(
-      (id) => typeof id === "string" && /^openai\/[A-Za-z0-9_.-]+$/.test(id)
-    ) &&
-    new Set(ids).size === ids.length;
-  if (
-    !profile ||
-    !validIds(profile.model_ids) ||
-    profile.model_ids.length === 0 ||
-    !validIds(profile.retired_model_ids) ||
-    !profile.model_ids.includes(profile.default_model_id) ||
-    profile.retired_model_ids.some((id) => profile.model_ids.includes(id))
-  )
-    throw Error("Invalid ChatGPT subscription membership or default");
-  const wireModels = {};
-  const metadata = {};
-  for (const id of profile.model_ids) {
-    const model = source["text.catalog"]?.[id];
-    const binding = model?.providers?.openai;
+/** Client-safe seed constants for hosts using the bundled release. */
+export function projectChatGptSubscription(snapshot, profile) {
+  const wireModels = Object.create(null);
+  const metadata = Object.create(null);
+  for (const [wire, { canonicalModelId: id }] of Object.entries(
+    snapshot.agents["openai-codex"] ?? {}
+  )) {
+    if (!isChatModelIdentifier(id) || !isChatModelIdentifier(wire)) continue;
+    const model = snapshot.text[id];
+    const binding = model.bindings.openai;
     if (
-      model?.id !== id ||
-      binding?.provider !== "openai" ||
-      typeof binding.id !== "string" ||
-      !/^[A-Za-z0-9_.-]+$/.test(binding.id) ||
-      binding.capabilities?.tools !== true ||
-      binding.capabilities?.reasoning !== true ||
-      binding.capabilities?.streaming !== true
+      !model.tools ||
+      !binding?.tools ||
+      !binding.reasoning ||
+      binding.streaming !== true
     )
-      throw Error(
-        `Missing compatible public OpenAI binding for subscription model: ${id}`
-      );
-    wireModels[id] = binding.id;
+      continue;
+    if (Object.hasOwn(wireModels, id))
+      throw Error("Ambiguous ChatGPT subscription selector");
+    wireModels[id] = wire;
     metadata[id] = {
-      label: model.short_label ?? model.label,
-      context_window: model.context_window ?? null,
+      label: model.shortLabel ?? model.label,
+      context_window: binding.contextWindow ?? model.contextWindow ?? null,
       image_input:
-        model.tool_call === true &&
-        model.image_input_mimes?.includes("image/png") === true &&
-        binding.capabilities.image_input === true,
+        model.tools &&
+        model.imageInputMimes.includes("image/png") &&
+        binding.imageInput,
     };
   }
-  if (new Set(Object.values(wireModels)).size !== profile.model_ids.length)
-    throw Error("Duplicate ChatGPT subscription wire binding");
+  if (
+    !Object.hasOwn(wireModels, profile.default_model_id) ||
+    !Array.isArray(profile.retired_model_ids) ||
+    new Set(profile.retired_model_ids).size !==
+      profile.retired_model_ids.length ||
+    profile.retired_model_ids.some(
+      (id) =>
+        typeof id !== "string" ||
+        !/^openai\/[a-zA-Z0-9_.-]+$/.test(id) ||
+        Object.hasOwn(wireModels, id)
+    )
+  )
+    throw Error("Invalid ChatGPT subscription default or retired ID");
   return {
     default_model_id: profile.default_model_id,
-    model_ids: [...profile.model_ids],
-    retired_model_ids: [...profile.retired_model_ids],
+    model_ids: [
+      profile.default_model_id,
+      ...Object.keys(wireModels).filter(
+        (id) => id !== profile.default_model_id
+      ),
+    ],
+    retired_model_ids: profile.retired_model_ids,
     wire_models: wireModels,
     metadata,
   };

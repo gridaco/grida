@@ -289,6 +289,8 @@ mod subscription_history {
         endpoint: &'static str,
         alternate_route: Option<String>,
         alternate_account: Option<char>,
+        catalog_route: Option<Value>,
+        retained_resolutions: Vec<Value>,
         prediction_route: Option<(Value, Option<Value>)>,
         // Saved named key and expected synthetic authorization for the alternate HTTP route.
         alternate_key: Option<(std::path::PathBuf, &'static str)>,
@@ -365,6 +367,8 @@ mod subscription_history {
                     .contains(&"provider/routes")
                     .then(|| uuid::Uuid::new_v4().to_string()),
                 alternate_account: None,
+                catalog_route: None,
+                retained_resolutions: Vec::new(),
                 prediction_route: None,
                 alternate_key: None,
                 replies: replies.into(),
@@ -447,7 +451,24 @@ mod subscription_history {
                         .alternate_route
                         .as_ref()
                         .expect("negotiated provider routes");
+                    if frame["params"]["retainedWireModel"].is_string() {
+                        assert!(frame["params"]["retainedImageInput"].is_boolean());
+                        self.retained_resolutions.push(frame["params"].clone());
+                    } else {
+                        assert!(frame["params"].get("retainedImageInput").is_none());
+                        assert!(frame["params"].get("retainedSpeed").is_none());
+                    }
                     let route = match model {
+                        model
+                            if self
+                                .catalog_route
+                                .as_ref()
+                                .is_some_and(|r| r["model"] == model) =>
+                        {
+                            let mut route = self.catalog_route.clone().unwrap();
+                            route["routeId"] = json!(route_id);
+                            route
+                        }
                         "fixture-a" | "openai/gpt-6.1-sol" => {
                             json!({"kind":"launch","routeId":LAUNCH_ROUTE,"model":model})
                         }
@@ -470,7 +491,11 @@ mod subscription_history {
                 }
                 Some("_co.grida/provider/turnCapabilities") => {
                     let expected = match frame["params"]["routeId"].as_str() {
-                        Some(route) if Some(route) == self.alternate_route.as_deref() => SECOND,
+                        Some(route) if Some(route) == self.alternate_route.as_deref() => self
+                            .catalog_route
+                            .as_ref()
+                            .and_then(|r| r["model"].as_str())
+                            .unwrap_or(SECOND),
                         None | Some(LAUNCH_ROUTE) => &self.model,
                         _ => panic!("unexpected capability route {frame}"),
                     };
@@ -496,9 +521,21 @@ mod subscription_history {
         async fn exchange(&mut self, frame: Value) {
             let params = &frame["params"];
             let id = params["id"].as_str().unwrap().to_owned();
+            let catalog_route = self.catalog_route.as_ref().filter(|_| {
+                self.alternate_route
+                    .as_ref()
+                    .is_some_and(|id| params["routeId"] == id.as_str())
+            });
             let (model, endpoint) = match params["routeId"].as_str() {
                 None | Some(LAUNCH_ROUTE) => (self.model.as_str(), self.endpoint),
                 Some(ECONOMY_ROUTE) => (ECONOMY_MODEL, ENDPOINT),
+                Some(_) if catalog_route.is_some() => {
+                    let descriptor = catalog_route.unwrap();
+                    (
+                        descriptor["wireModel"].as_str().unwrap(),
+                        descriptor["endpoint"].as_str().unwrap(),
+                    )
+                }
                 Some(id)
                     if Some(id) == self.alternate_route.as_deref()
                         && self.alternate_account.is_some() =>
@@ -521,7 +558,7 @@ mod subscription_history {
                     let expected_bearer = self
                         .alternate_key
                         .as_ref()
-                        .filter(|_| endpoint == ALTERNATE_ENDPOINT)
+                        .filter(|_| endpoint == ALTERNATE_ENDPOINT || catalog_route.is_some())
                         .map(|(_, key)| format!("Bearer {key}"));
                     let headers = params["headers"].as_array().unwrap();
                     assert_eq!(headers.len(), 2 + usize::from(expected_bearer.is_some()));
@@ -556,7 +593,9 @@ mod subscription_history {
                 "dispatch" => {
                     let exchange = self.exchanges.get_mut(&id).unwrap();
                     let request: Value = serde_json::from_slice(&exchange.body).unwrap();
-                    let model = if self.protocol == ProviderProtocol::Responses {
+                    let model = if self.protocol == ProviderProtocol::Responses
+                        && catalog_route.is_none()
+                    {
                         model.strip_prefix("openai/").unwrap()
                     } else {
                         model
@@ -1531,7 +1570,26 @@ mod subscription_history {
             .await;
         assert_eq!(unchanged["result"]["current"], retained["current"]);
 
-        reopened.alternate_account = Some('b');
+        // This receipt predates wireModel. Even a supervisor for the right account
+        // must recover its historical selector when upgrading to explicit bindings.
+        let binding = |wire: &str| {
+            json!({
+                "kind":"chatgpt","model":SECOND,"wireModel":wire,"imageInput":true,
+                "endpoint":ENDPOINT,"scope":"b".repeat(64)
+            })
+        };
+        reopened.catalog_route = Some(binding("fixture-remapped-model"));
+        let remapped = reopened
+            .request("_co.grida/session/resume", resume.clone())
+            .await;
+        assert_eq!(
+            remapped["error"]["data"], "session_active_route_changed",
+            "{remapped}"
+        );
+        assert!(reopened.requests.is_empty());
+        assert!(reopened.retained_resolutions.is_empty());
+
+        reopened.catalog_route = Some(binding(SECOND.strip_prefix("openai/").unwrap()));
         let resumed = reopened.request("_co.grida/session/resume", resume).await;
         assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
         assert_eq!(
@@ -1544,6 +1602,189 @@ mod subscription_history {
             SECOND.strip_prefix("openai/").unwrap()
         );
         reopened.close().await;
+    }
+
+    #[tokio::test]
+    async fn catalog_selectors_survive_queue_and_restart_and_remaps_require_the_original_selector()
+    {
+        use super::super::lifecycle::{prompt_request, task_basis};
+        let fixture = Fixture::new(false);
+        let session = "catalog-queue";
+        let model = "openai/fixture-new-public-model";
+        let wire = "fixture-subscription-revision";
+        let account = "b".repeat(64);
+        let descriptor = |selector: &str| {
+            json!({
+                "kind":"chatgpt","model":model,"wireModel":selector,"imageInput":true,
+                "endpoint":ENDPOINT,"scope":account
+            })
+        };
+        let input = |id: &str| {
+            let mut request = prompt_request(session, id, "Use the accepted model.");
+            request["_meta"] = json!({"co.grida/selectionRevision":1});
+            request
+        };
+        let capabilities = &[
+            "provider/routes",
+            "session/selection",
+            "provider/turn-capabilities",
+        ];
+        let mut first = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![Reply::Hold("Before pause")],
+            capabilities,
+        )
+        .await;
+        first.catalog_route = Some(descriptor(wire));
+        let created = first
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                    "selection":{"connectionId":account,"model":model,"effort":"medium","speed":"fast"}
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        first.load(&fixture, session).await;
+        let accepted = first
+            .request("_co.grida/session/submit", input("held"))
+            .await;
+        let turn = accepted["result"]["turnId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{accepted}"));
+        let queued = first
+            .request("_co.grida/session/enqueue", input("queued"))
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let paused = first.pause_dispatched(session, turn).await;
+        assert_eq!(paused["current"]["modelId"], model);
+        assert_eq!(first.requests[0]["model"], wire);
+        first.close().await;
+
+        let mut reopened = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![
+                Reply::Finished("Original turn resumed"),
+                Reply::Finished("Queued turn finished"),
+            ],
+            capabilities,
+        )
+        .await;
+        reopened.catalog_route = Some(descriptor("fixture-remapped"));
+        reopened.load(&fixture, session).await;
+        let resume = json!({
+            "task":task_basis(&paused,session,"resume"),"expectedEpoch":paused["current"]["epoch"],
+            "expectedJournalPosition":paused["current"]["journalPosition"]
+        });
+        let refused = reopened
+            .request("_co.grida/session/resume", resume.clone())
+            .await;
+        assert_eq!(
+            refused["error"]["data"], "session_active_route_changed",
+            "{refused}"
+        );
+        assert!(reopened.requests.is_empty());
+        assert!(!reopened.retained_resolutions.is_empty());
+        let mut changed_image = descriptor(wire);
+        changed_image["imageInput"] = false.into();
+        reopened.catalog_route = Some(changed_image);
+        let refused = reopened
+            .request("_co.grida/session/resume", resume.clone())
+            .await;
+        assert_eq!(
+            refused["error"]["data"], "session_active_route_changed",
+            "{refused}"
+        );
+        assert!(reopened.requests.is_empty());
+
+        reopened.catalog_route = Some(descriptor(wire));
+        let resumed = reopened.request("_co.grida/session/resume", resume).await;
+        assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
+        let settled = reopened
+            .wait_for_snapshot(session, |view| {
+                view["current"].is_null()
+                    && view["queuedInputs"] == 0
+                    && view["latest"]["turnId"] != turn
+                    && view["latest"]["status"] == "succeeded"
+            })
+            .await;
+        assert_eq!(settled["latest"]["modelId"], model);
+        assert_eq!(reopened.requests.len(), 2);
+        assert!(
+            reopened
+                .requests
+                .iter()
+                .all(|request| request["model"] == wire)
+        );
+        let expected = json!({"connectionId":account,"model":model,"retainedWireModel":wire,"retainedImageInput":true,"retainedSpeed":"fast"});
+        assert!(
+            reopened
+                .retained_resolutions
+                .iter()
+                .all(|params| params == &expected),
+            "{:?}",
+            reopened.retained_resolutions
+        );
+        assert!(
+            reopened
+                .requests
+                .iter()
+                .all(|body| body["service_tier"] == "priority")
+        );
+        reopened.close().await;
+    }
+
+    #[tokio::test]
+    async fn catalog_byok_selection_serializes_its_provider_selector_and_keeps_the_public_id() {
+        use super::super::lifecycle::prompt_request;
+        let fixture = Fixture::new(false);
+        let credentials = tempfile::tempdir().unwrap();
+        let home = credentials.path().canonicalize().unwrap();
+        grida_auth::ProviderStore::new(home.clone())
+            .unwrap()
+            .set("openrouter", "fixture-key")
+            .unwrap();
+        let model = "example/fixture-public-model";
+        let wire = "provider/fixture-wire-id";
+        let session = "catalog-byok";
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![Reply::Finished("Finished")],
+            &["provider/routes", "session/selection"],
+        )
+        .await;
+        worker.alternate_key = Some((home.clone(), "fixture-key"));
+        worker.catalog_route = Some(
+            json!({"kind":"http","model":model,"wireModel":wire,"imageInput":false,
+            "protocol":"openai-compatible","endpoint":"https://openrouter.ai/api/v1","credentialHome":home}),
+        );
+        let created = worker
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                    "selection":{"connectionId":"b".repeat(64),"model":model,"effort":"medium"}
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let mut request = prompt_request(session, "accepted", "Use the selected provider model.");
+        request["_meta"] = json!({"co.grida/selectionRevision":1});
+        let accepted = worker.request("_co.grida/session/submit", request).await;
+        assert!(accepted["result"]["turnId"].is_string(), "{accepted}");
+        let settled = worker.idle(session).await;
+        assert_eq!(settled["latest"]["status"], "succeeded", "{settled}");
+        assert_eq!(settled["latest"]["modelId"], model);
+        assert_eq!(worker.requests[0]["model"], wire);
+        worker.close().await;
     }
 
     #[tokio::test]

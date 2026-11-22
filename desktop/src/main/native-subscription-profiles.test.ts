@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — ordinary model selection keeps subscription custody and chat funding bound.
 import { AuthStore } from "@grida/daemon/server";
-import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { bundledModelCatalogue, TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +9,7 @@ import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
 import {
   CHATGPT_RESPONSES_URL,
+  CHATGPT_TOKEN_URL,
   CHATGPT_SUBSCRIPTION_CONFIG,
 } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
@@ -50,19 +52,6 @@ vi.mock("./services-sidecar-client", () => ({
 }));
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
-const supportedModels = [
-  "GPT-6.2 Sol",
-  "GPT-6.2 Astra",
-  "GPT-6.1 Sol",
-  "GPT-6 Astra",
-  "GPT-6.1 Terra",
-  "GPT-6 Luna",
-  "GPT-6 Sol",
-  "GPT-5.6 Sol",
-  "GPT-5.6 Terra",
-  "GPT-5.6 Luna",
-];
-
 beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
@@ -87,7 +76,7 @@ it("discovers features only on the selected live subscription receipt without st
       speeds: [],
       webSearch: false,
     });
-    expect(f.getModels).not.toHaveBeenCalled();
+    expect(f.getModels).toHaveBeenCalledTimes(1);
     expect(await view(sol.id)).toEqual({
       status: "available",
       speeds: ["fast", "ultrafast"],
@@ -113,18 +102,18 @@ it("discovers features only on the selected live subscription receipt without st
 });
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "offers the closed subscription list on Welcome and in an ordinary workspace without refreshing or dispatching",
+  "offers only discoverable, compatible subscription models on Welcome and in an ordinary workspace",
   async () => {
     const fixture = await subscriptionDesktop();
     try {
-      // An expired access token still permits observational catalog reads.
-      // Only a submitted request may refresh the durable connection.
-      await fixture.seed({ expires: 1 });
       const welcome = await fixture.agent.welcomeProfiles();
       const workspace = await fixture.agent.profiles(fixture.workspace.id);
-      expect(welcome.choices.map(({ model }) => model)).toEqual(
-        supportedModels
-      );
+      expect(welcome.choices.map(({ model }) => model)).toEqual([
+        "GPT-6.2 Sol",
+        "GPT-5.6 Terra",
+        "GPT-6 Luna",
+      ]);
+      expect(fixture.getModels).toHaveBeenCalledTimes(1);
       expect(workspace.choices).toEqual(welcome.choices);
       expect(workspace.saved).toEqual([]);
       expect(welcome.recommendedProfileId).toBe(welcome.choices[0].id);
@@ -157,7 +146,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         );
       }
       expect(new Set(welcome.choices.map(({ id }) => id)).size).toBe(
-        supportedModels.length
+        welcome.choices.length
       );
       const publicCatalog = JSON.stringify({ welcome, workspace });
       for (const privateValue of [
@@ -178,6 +167,194 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await fixture.close();
     }
   }
+);
+
+it("distinguishes an empty subscription offer, a discovery outage and an expired sign-in", async () => {
+  const f = await subscriptionDesktop();
+  try {
+    f.getModels.mockResolvedValueOnce(Response.json({ models: [] }));
+    const empty = await f.agent.welcomeProfiles();
+    expect(empty.choices).toEqual([]);
+    expect(empty).not.toHaveProperty("subscriptionIssue");
+
+    await f.seed({ lineage: "outage" });
+    f.getModels.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    expect(await f.agent.welcomeProfiles()).toMatchObject({
+      choices: [],
+      subscriptionIssue: "unavailable",
+    });
+    expect(await f.agent.profiles(f.workspace.id)).toMatchObject({
+      choices: [],
+      subscriptionIssue: "unavailable",
+    });
+    expect(f.getModels).toHaveBeenCalledTimes(2);
+    expect(f.prepare).not.toHaveBeenCalled();
+
+    await f.seed({ lineage: "revoked", expires: 1 });
+    f.prepare.mockImplementationOnce((target) =>
+      target === CHATGPT_TOKEN_URL
+        ? async () => Response.json({ error: "invalid_grant" }, { status: 400 })
+        : null
+    );
+    expect(await f.agent.welcomeProfiles()).toMatchObject({
+      choices: [],
+      subscriptionIssue: "reauthenticationRequired",
+    });
+    expect(f.dispatch).not.toHaveBeenCalled();
+  } finally {
+    await f.close();
+  }
+});
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "runs a newly published subscription selector and preserves its queued binding across a catalogue update",
+  async () => {
+    const f = await subscriptionDesktop();
+    const seed = bundledModelCatalogue();
+    const model = "openai/catalogue-fixture";
+    const label = "Catalogue fixture";
+    const first = "subscription-fixture-a";
+    const second = "subscription-fixture-b";
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC";
+    const source = seed.text["openai/gpt-6.2-sol"]!;
+    const publish = (selector: string, version: string) =>
+      f.publish({
+        version,
+        text: {
+          ...seed.text,
+          [model]: {
+            ...source,
+            id: model,
+            label,
+            bindings: {
+              openai: { ...source.bindings.openai!, wireModel: "api-fixture" },
+            },
+          },
+        },
+        agents: {
+          ...seed.agents,
+          "openai-codex": {
+            ...seed.agents["openai-codex"],
+            [selector]: {
+              canonicalModelId: model,
+              serviceTiers: { fast: "priority" },
+            },
+          },
+        },
+      });
+    let release: (() => void) | undefined;
+    try {
+      f.getModels.mockImplementation(async () =>
+        Response.json({
+          models: [first, second].map((slug) => ({
+            slug,
+            visibility: "list",
+            service_tiers: [{ id: "priority" }],
+          })),
+        })
+      );
+      expect((await f.agent.welcomeProfiles()).choices).toEqual([]);
+      publish(first, "2.20990101.1");
+      const { choices } = await f.agent.welcomeProfiles();
+      expect(choices).toHaveLength(1);
+      const [choice] = choices;
+      expect(choice).toMatchObject({
+        connection: "ChatGPT Subscription",
+        model: label,
+      });
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: choice.id },
+        () => {}
+      );
+      const chat = f.agent.current(f.workspace.id, choice.id)!.chat;
+      if (!chat.createSelected) throw new Error("selection not negotiated");
+      const session = await chat.createSelected({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: {
+          connectionId: choice.id,
+          model,
+          effort: "high",
+          speed: "fast",
+        },
+      });
+      const gate = new Promise<void>((done) => {
+        release = done;
+      });
+      f.dispatch.mockImplementationOnce(async () => {
+        await gate;
+        return subscriptionResponse("Ready.", "first-answer");
+      });
+      await chat.submit(
+        session,
+        "first",
+        "Start here",
+        "act",
+        undefined,
+        "high",
+        1
+      );
+      await vi.waitFor(() => expect(f.dispatch).toHaveBeenCalledTimes(1));
+      await chat.submitImage(session, {
+        action: "enqueue",
+        inputId: "queued",
+        text: "Describe the image",
+        operatingRegime: "act",
+        png: Uint8Array.from(Buffer.from(png, "base64")).buffer,
+        selectionRevision: 1,
+        effort: "high",
+      });
+      publish(second, "2.20990102.1");
+      release?.();
+      const wait = (id: string) =>
+        vi.waitFor(
+          async () => {
+            expect(await chat.inputReceipt(session, id)).toMatchObject({
+              disposition: "completed",
+            });
+          },
+          { timeout: 5000 }
+        );
+      await wait("queued");
+      await chat.submit(
+        session,
+        "next",
+        "Continue",
+        "act",
+        undefined,
+        "high",
+        1
+      );
+      await wait("next");
+      const requests = f.dispatch.mock.calls.map(([body]) =>
+        JSON.parse(body.toString())
+      );
+      expect(requests.map((request) => request.model)).toEqual([
+        first,
+        first,
+        second,
+      ]);
+      expect(requests.map((request) => request.service_tier)).toEqual([
+        "priority",
+        "priority",
+        "priority",
+      ]);
+      expect(JSON.stringify(requests[1].input)).toContain(
+        `data:image/png;base64,${png}`
+      );
+      expect(f.getModels).toHaveBeenCalledTimes(1);
+      expect((await f.agent.profiles(f.workspace.id)).saved).toContainEqual({
+        ...choice,
+        available: true,
+      });
+    } finally {
+      release?.();
+      await f.close();
+    }
+  },
+  30_000
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
@@ -201,9 +378,10 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(files).toHaveLength(1);
       const filename = path.join(fixture.base, files[0]);
       const saved = JSON.parse(await fs.readFile(filename, "utf8"));
+      const scope = await fixture.scope();
       const retired = ["openai/gpt-5.5", "openai/gpt-5.4"].map((modelId) => ({
         ...saved[0],
-        id: NativeChatProfiles.subscriptionBinding("c".repeat(64), modelId),
+        id: NativeChatProfiles.subscriptionBinding(scope, modelId),
         modelId,
         model: modelId.replace(/^openai\/gpt-/, "GPT-"),
       }));
@@ -590,13 +768,21 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "refuses a search before admission when discovery fails and still sends Standard",
+  "refuses a search before admission when optional capabilities are malformed and still sends Standard",
   async () => {
     const f = await subscriptionDesktop();
     try {
       await f.setSearchPolicy("automatic");
-      f.getModels.mockImplementation(
-        async () => new Response(null, { status: 503 })
+      f.getModels.mockImplementation(async () =>
+        Response.json({
+          models: [
+            {
+              slug: "gpt-6.2-sol",
+              visibility: "list",
+              service_tiers: "malformed",
+            },
+          ],
+        })
       );
       const choice = (await f.agent.welcomeProfiles()).choices.find(
         (p) =>
@@ -618,7 +804,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           effort: "high",
         },
       });
-      expect(f.getModels).not.toHaveBeenCalled();
+      expect(f.getModels).toHaveBeenCalledTimes(1);
       const inputId = randomUUID();
       await expect(
         chat.submit(
@@ -941,10 +1127,14 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         await fixture.seed(connection);
         const profiles = await fixture.agent.profiles(fixture.workspace.id);
         expect(profiles.choices.map(({ id }) => id)).not.toContain(original.id);
-        expect(profiles.saved).toContainEqual({
-          ...original,
-          available: false,
-        });
+        expect(profiles.saved).toContainEqual(
+          expect.objectContaining({
+            id: original.id,
+            connection: original.connection,
+            model: original.model,
+            available: false,
+          })
+        );
         await expect(
           fixture.agent.selectProfile(
             fixture.workspace.id,
@@ -1198,6 +1388,10 @@ async function subscriptionDesktop() {
           use_responses_lite: true,
           service_tiers: [{ id: "priority" }, { id: "ultrafast" }],
         },
+        { slug: "gpt-5.6-terra", visibility: "list" },
+        { slug: "gpt-6-luna", visibility: "list" },
+        { slug: "gpt-6.2-astra", visibility: "hide" },
+        { slug: "uncatalogued-selector", visibility: "list" },
       ],
     })
   );
@@ -1225,6 +1419,12 @@ async function subscriptionDesktop() {
   });
   const workspace = await workspaces.openSelected(root);
   sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
+  let catalogue = bundledModelCatalogue();
+  const modelCatalogue = {
+    view: () => catalogue,
+    async start() {},
+    dispose() {},
+  };
   const launch = async () => {
     const { NativeDesktopAgent } = await import("./native-desktop-agent");
     return NativeDesktopAgent.prepareOrdinary(
@@ -1234,7 +1434,7 @@ async function subscriptionDesktop() {
       }),
       resources!,
       [source.userDataPath, source.providerHome],
-      { openExternal: browser }
+      { openExternal: browser, modelCatalogue }
     );
   };
   let agent: Awaited<ReturnType<typeof launch>>;
@@ -1249,6 +1449,18 @@ async function subscriptionDesktop() {
     workspace,
     seed,
     getModels,
+    async scope() {
+      const { NativeChatGptHost } = await import("./native-chatgpt-host");
+      const host = new NativeChatGptHost(source.userDataPath, { prepare });
+      try {
+        return await host.scope();
+      } finally {
+        await host.close();
+      }
+    },
+    publish(snapshot: ModelCatalogueSnapshot) {
+      catalogue = snapshot;
+    },
     dispatch,
     prepare,
     browser,

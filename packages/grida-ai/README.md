@@ -1,4 +1,5 @@
-Model facts are consumed from the pinned public `@grida/ai-models` release.
+The pinned public `@grida/ai-models` release seeds the catalogue. Desktop
+refreshes its foreground chat catalogue from the latest compatible V2 release.
 `@grida/ai/catalogue` owns only the client compatibility projection and Grida
 product presets; it is not the live GG offering list. See
 [`data/ai`](../../data/ai/README.md) for ownership and generation.
@@ -23,7 +24,7 @@ producer tests; there are no reserved executors or empty future subpaths.
 The configured [`@grida/ai-host`](../grida-ai-host), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
-setup. the pinned public `@grida/ai-models` release supplies canonical facts; its explicit
+setup. The pinned public `@grida/ai-models` release supplies canonical facts; its explicit
 `@grida/ai/catalogue` entry supplies this SDK's existing bundled service
 catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
 not promise service-policy neutrality. A result contains bytes
@@ -150,6 +151,14 @@ not a JSON output schema: results contain `Uint8Array`, and hosts choose their
 serialization, filenames, persistence, and receipts. Image output has at most the
 accepted `n` items. Discovery neither executes nor adds a universal media executor;
 callers dispatch to the existing typed clients, including the exact 3D model union.
+
+## Public Models V2
+
+Use `@grida/ai/model-catalogue` to parse exact-release Models V2 documents.
+`parseModelCatalogue(version, models, agents)` returns an immutable view of text
+model facts, provider bindings and agent selectors. See the
+[catalogue reference](./src/catalogue/README.md#models-v2-foreground-chat)
+for the host store and Grida chat integration.
 
 ## Current GG discovery and execution
 

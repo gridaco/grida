@@ -1038,6 +1038,7 @@ function WelcomeSurface({
                       initialError: awaitingProfiles ? profileReadError : null,
                       profiles: {
                         active: profileId,
+                        subscriptionIssue: profiles?.subscriptionIssue,
                         choices: profiles?.choices ?? [],
                         saved: profiles?.saved ?? [],
                       },

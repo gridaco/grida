@@ -106,6 +106,8 @@ export type NativeAgentLaunch = {
   provider: "openai-compatible" | "responses" | "anthropic" | "gemini";
   endpoint: string;
   model: string;
+  wireModel?: string;
+  imageInput?: boolean;
   maxOutputTokens?: number;
   compatibleOutputLimitField?: "max-tokens";
   llamaCppInputCount?: true;
@@ -124,6 +126,7 @@ export type NativeAgentLaunch = {
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
+  subscriptionSpeeds?: readonly string[];
   subscriptionCapabilities?: () => Promise<ChatGptTurnCapabilities>;
   /** Trusted Main opt-in for child work on the selected provider connection. */
   subagents?: true;
@@ -738,6 +741,10 @@ export class NativeAgentProcess {
       "--model",
       options.model,
     ];
+    if (options.wireModel !== undefined) {
+      args.push("--supervised-wire-model", options.wireModel);
+      if (options.imageInput) args.push("--supervised-image-input");
+    }
     if (options.maxOutputTokens !== undefined)
       args.push("--max-output-tokens", String(options.maxOutputTokens));
     if (options.compatibleOutputLimitField !== undefined)

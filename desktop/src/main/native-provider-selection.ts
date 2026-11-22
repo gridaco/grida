@@ -4,7 +4,7 @@ import {
   isValidEndpointProviderId,
   type EndpointProviderConfig,
 } from "@grida/ai-host";
-import { catalog } from "@grida/ai/catalogue";
+import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -28,6 +28,10 @@ export namespace NativeProviderSelection {
       | "provider"
       | "endpoint"
       | "model"
+      | "wireModel"
+      | "imageInput"
+      | "maxOutputTokens"
+      | "reasoning"
       | "credentialHome"
       | "configuredEndpointKey"
       | "configuredEndpointId"
@@ -78,11 +82,19 @@ export namespace NativeProviderSelection {
   export async function builtInByok(
     providerId: string,
     model: string,
-    settings: ByokSettings
+    settings: ByokSettings,
+    selected?: ChatModels.Binding
   ): Promise<Launch & Readonly<{ credentialHome: string }>> {
     if (!isBuiltInByok(providerId))
       throw new Error("native_provider_byok_unavailable");
-    if (!Object.hasOwn(catalog.text.catalog, model))
+    const binding =
+      selected ??
+      ChatModels.resolve(
+        bundledModelCatalogue(),
+        { provider: providerId },
+        model
+      );
+    if (!binding || binding.modelId !== model)
       throw new Error("native_provider_model_unavailable");
     const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
@@ -98,18 +110,16 @@ export namespace NativeProviderSelection {
           settings.imageRequest
         )
       : undefined;
-    // Reasoning is a published fact of this provider's binding of the model.
-    const reasoning =
-      catalog.text.catalog[
-        model as keyof typeof catalog.text.catalog
-      ]?.reasoningProviders?.includes(providerId) === true;
     return {
       provider: "openai-compatible",
       endpoint,
       model,
+      wireModel: binding.wireModel,
+      imageInput: binding.imageInput,
+      maxOutputTokens: binding.maxOutputTokens,
       credentialHome: home,
       subagents: true,
-      ...(reasoning && { reasoning: true as const }),
+      ...(binding.reasoning && { reasoning: true as const }),
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         isCurrent: () => custody.isCurrent(network),

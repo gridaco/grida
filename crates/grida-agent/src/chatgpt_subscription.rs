@@ -48,12 +48,17 @@ impl SupervisedChatGpt {
                 "chatgpt_subscription_scope_invalid",
             ));
         }
-        let wire_model = subscription_wire_model(model).ok_or_else(|| {
-            Error::new(
-                ErrorKind::Unsupported,
-                "chatgpt_subscription_model_unavailable",
-            )
-        })?;
+        let wire_model = supervisor
+            .model_binding
+            .as_ref()
+            .map(|binding| binding.selector.clone())
+            .or_else(|| legacy_subscription_selector(model))
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::Unsupported,
+                    "chatgpt_subscription_model_unavailable",
+                )
+            })?;
         Ok(Self {
             binding: ProviderBinding {
                 provider: ProviderId::new("chatgpt")?,
@@ -70,12 +75,16 @@ impl SupervisedChatGpt {
         })
     }
 
+    pub(crate) fn model_binding(&self) -> Option<&crate::supervised_provider::SupervisedModel> {
+        self.supervisor.model_binding.as_ref()
+    }
+
     pub(crate) fn validate(&self) -> Result<()> {
         self.supervisor.validate()
     }
 }
 
-fn subscription_wire_model(model: &ModelId) -> Option<ModelId> {
+pub(crate) fn legacy_subscription_selector(model: &ModelId) -> Option<ModelId> {
     #[derive(serde::Deserialize)]
     struct Catalogue {
         wire_models: BTreeMap<ModelId, ModelId>,
@@ -84,7 +93,7 @@ fn subscription_wire_model(model: &ModelId) -> Option<ModelId> {
     CATALOGUE
         .get_or_init(|| {
             serde_json::from_str(include_str!("../data/chatgpt-subscription-models.json"))
-                .expect("generated ChatGPT subscription compatibility projection")
+                .expect("historical ChatGPT subscription selector mapping")
         })
         .wire_models
         .get(model)

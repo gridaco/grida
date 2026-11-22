@@ -322,6 +322,8 @@ export type NativeChatProfileCatalog = Readonly<{
   modelChanges?: true;
   /** The live host can resolve each accepted input's saved connection independently. */
   inputRoutes?: true;
+  /** A signed-in subscription could not supply its model list. Other connections remain usable. */
+  subscriptionIssue?: "unavailable" | "reauthenticationRequired";
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */

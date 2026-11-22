@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — only Main can resolve a catalog selection to provider authority.
+import { isChatModelIdentifier, type ChatModels } from "@grida/ai/catalogue";
 import type { ChatGptTurnCapabilities } from "@grida/ai-host";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -9,6 +10,8 @@ export type NativeProviderRouteLaunch = Pick<
   NativeAgentLaunch,
   | "provider"
   | "endpoint"
+  | "wireModel"
+  | "imageInput"
   | "model"
   | "providerNetwork"
   | "maxOutputTokens"
@@ -21,6 +24,7 @@ export type NativeProviderRouteLaunch = Pick<
   | "gatewayScope"
   | "gatewayJobBilling"
   | "subscriptionScope"
+  | "subscriptionSpeeds"
   | "subscriptionCapabilities"
   | "imageGeneration"
 >;
@@ -30,6 +34,7 @@ export type PreparedProviderRoute = {
 };
 type Route = PreparedProviderRoute & {
   routeId: string;
+  selection?: string;
   egress: NativeProviderEgress;
 };
 const MAX_ROUTES = 256;
@@ -132,7 +137,8 @@ export class NativeProviderRoutes {
           options.model,
           options.llamaCppInputCount,
           options.gatewayScope && options.gatewayJobBilling ? true : undefined,
-          permission
+          permission,
+          options.subscriptionScope ? undefined : options.wireModel
         )
       : undefined;
   }
@@ -143,10 +149,28 @@ export class NativeProviderRoutes {
     const connectionId = params?.connectionId;
     const prediction = params?.purpose === "composerPrediction";
     const sourceRouteId = params?.sourceRouteId;
+    const wireModel = params?.retainedWireModel;
+    const imageInput = params?.retainedImageInput;
+    const speed = params?.retainedSpeed;
+    const allowed = prediction
+      ? ["model", "connectionId", "purpose", "sourceRouteId"]
+      : [
+          "model",
+          "connectionId",
+          "retainedWireModel",
+          "retainedImageInput",
+          "retainedSpeed",
+        ];
     if (
       this.lifetime.signal.aborted ||
-      Object.keys(params ?? {}).length !==
-        (prediction ? (sourceRouteId === undefined ? 3 : 4) : 2) ||
+      !params ||
+      Object.keys(params).some((key) => !allowed.includes(key)) ||
+      (wireModel !== undefined && !isChatModelIdentifier(wireModel)) ||
+      (imageInput !== undefined &&
+        (wireModel === undefined || typeof imageInput !== "boolean")) ||
+      (speed !== undefined &&
+        (wireModel === undefined ||
+          (speed !== "fast" && speed !== "ultrafast"))) ||
       (sourceRouteId !== undefined &&
         (typeof sourceRouteId !== "string" || sourceRouteId.length !== 36)) ||
       typeof model !== "string" ||
@@ -174,12 +198,17 @@ export class NativeProviderRoutes {
     const profile = await this.lookup(
       connectionId,
       model,
-      this.lifetime.signal
+      this.lifetime.signal,
+      ...(wireModel !== undefined
+        ? ([{ wireModel, imageInput, speed }] as const)
+        : [])
     );
     this.lifetime.signal.throwIfAborted();
     if (
       this.connectionId === connectionId &&
       model === this.launch.model &&
+      (!profile.binding ||
+        routeFacts(profile.binding) === routeFacts(this.launch)) &&
       (await this.launch.providerNetwork?.isCurrent?.()) !== false
     )
       return { kind: "launch", model, routeId: this.launchId };
@@ -224,8 +253,8 @@ export class NativeProviderRoutes {
   ) {
     // Only an issued foreground route can authorize its own auxiliary model.
     // A receipt for a different choice cannot open it through prediction.
-    const source = sourceRouteId ? await this.bySelection.get(key) : undefined;
-    if (sourceRouteId !== source?.routeId)
+    const source = sourceRouteId ? this.resolved.get(sourceRouteId) : undefined;
+    if (sourceRouteId && (!source || source.selection !== key))
       throw new Error("native_chat_profile_unavailable");
     // An implicit initial selection on a named worker uses its launch. A
     // later explicit Default selection can share that model on another account.
@@ -252,6 +281,7 @@ export class NativeProviderRoutes {
       source?.routeId ?? this.launchId,
       target.model,
       target.maxOutputTokens,
+      routeFacts(target),
     ]);
     // The host runs one prediction at a time. Its handle consumes no ordinary
     // selection slots, and an open exchange stays on the authority that began it.
@@ -275,10 +305,14 @@ export class NativeProviderRoutes {
   }
 
   private async acquire(
-    key: string,
+    selection: string,
     model: string,
     profile: NativeProviderRoutes.Profile
   ) {
+    const key = JSON.stringify([
+      selection,
+      profile.binding && routeFacts(profile.binding),
+    ]);
     const previous = this.bySelection.get(key);
     if (previous) {
       const captured = await previous;
@@ -295,7 +329,7 @@ export class NativeProviderRoutes {
     if (!opening) {
       if (Math.max(this.bySelection.size, this.resolved.size) >= MAX_ROUTES)
         throw new Error("native_chat_profile_unavailable");
-      opening = this.open(model, profile);
+      opening = this.open(selection, model, profile);
       this.bySelection.set(key, opening);
       void opening.catch(() => this.bySelection.delete(key));
     }
@@ -306,6 +340,8 @@ export class NativeProviderRoutes {
     return {
       routeId,
       model: launch.model,
+      wireModel: launch.wireModel,
+      imageInput: launch.imageInput,
       protocol: launch.provider,
       endpoint: launch.endpoint,
       kind: launch.gatewayScope
@@ -345,6 +381,7 @@ export class NativeProviderRoutes {
   }
 
   private async open(
+    selection: string,
     model: string,
     profile: NativeProviderRoutes.Profile
   ): Promise<Route> {
@@ -352,11 +389,14 @@ export class NativeProviderRoutes {
     try {
       this.lifetime.signal.throwIfAborted();
       const { launch } = prepared;
-      if (launch.model !== model)
+      if (
+        launch.model !== model ||
+        (profile.binding && routeFacts(launch) !== routeFacts(profile.binding))
+      )
         throw new Error("native_chat_profile_unavailable");
       const egress = NativeProviderRoutes.egress(launch);
       if (!egress) throw new Error("native_chat_profile_unavailable");
-      const route = { ...prepared, routeId: randomUUID(), egress };
+      const route = { ...prepared, selection, routeId: randomUUID(), egress };
       this.resolved.set(route.routeId, route);
       return route;
     } catch (error) {
@@ -383,11 +423,15 @@ export namespace NativeProviderRoutes {
     source: NativeProviderRouteLaunch,
     signal: AbortSignal
   ) => Promise<NativeProviderRouteLaunch | undefined>;
-  export type Profile = { prepare(): Promise<PreparedProviderRoute> };
+  export type Profile = {
+    binding?: NativeProviderRouteLaunch;
+    prepare(): Promise<PreparedProviderRoute>;
+  };
   export type Lookup = (
     connectionId: string | null,
     model: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    retained?: ChatModels.Retained
   ) => Promise<Profile>;
 }
 
@@ -395,4 +439,17 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+}
+
+/** Facts that are frozen into the native route. A refreshed selector or
+ * capability must get its own handle while previous exchanges finish. */
+function routeFacts(launch: NativeProviderRouteLaunch): string | undefined {
+  if (launch.wireModel === undefined) return undefined;
+  return JSON.stringify([
+    launch.wireModel,
+    launch.imageInput,
+    launch.reasoning,
+    launch.maxOutputTokens,
+    launch.subscriptionSpeeds,
+  ]);
 }

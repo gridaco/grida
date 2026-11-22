@@ -11,6 +11,7 @@ import {
 } from "./providers/chatgpt-credentials";
 import {
   ChatGptProvider,
+  type ChatGptModelBinding,
   type ChatGptProviderConfig,
   type ChatGptProviderRuntime,
 } from "./providers/chatgpt";
@@ -20,7 +21,11 @@ import {
 } from "./providers/chatgpt-models";
 import { ProviderHttp } from "./providers/http";
 
-export type { ChatGptProviderConfig } from "./providers/chatgpt";
+export type {
+  ChatGptModelBinding,
+  ChatGptModelInventory,
+  ChatGptProviderConfig,
+} from "./providers/chatgpt";
 
 const MAX_CEREMONY_BYTES = 32 * 1024;
 
@@ -150,13 +155,24 @@ export class ChatGptSubscriptionHost {
     return this.ceremony([], () => this.credentials.signOut());
   }
 
-  async capture(modelId: string) {
-    if (this.closed) throw new Error("chatgpt_host_closed");
-    const connection = await ChatGptProvider.captureNative(
-      this.runtime,
-      modelId,
-      this.http
+  scope() {
+    return this.ceremony([], () =>
+      ChatGptProvider.scope(this.runtime, this.http)
     );
+  }
+
+  inventory() {
+    return this.ceremony([], () =>
+      ChatGptProvider.inventory(this.runtime, this.http)
+    );
+  }
+
+  async capture(modelId: string, binding?: ChatGptModelBinding) {
+    if (this.closed) throw new Error("chatgpt_host_closed");
+    const connection = await this.track(
+      ChatGptProvider.captureNative(this.runtime, modelId, this.http, binding)
+    );
+    if (this.closed) throw new Error("chatgpt_host_closed");
     return Object.freeze({
       ...connection,
       capabilities: () =>

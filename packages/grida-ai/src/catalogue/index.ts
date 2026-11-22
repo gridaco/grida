@@ -8,3 +8,6 @@ export {
   type TierModelId,
 } from "./grida/tiers";
 export { default } from "./models";
+export { ChatModels } from "./chat-models";
+export { bundledModelCatalogue } from "./bundled-models";
+export { isChatModelIdentifier } from "./chat-model-identifier.mjs";

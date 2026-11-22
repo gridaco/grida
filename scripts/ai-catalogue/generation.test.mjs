@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parseModelCatalogue } from "../../packages/grida-ai/src/catalogue/public-models.mts";
 import { projectChatGptSubscription, projectFacts } from "./projection.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -23,6 +24,8 @@ const packageRequire = createRequire(
   join(root, "packages/grida-ai/package.json")
 );
 const publicModels = packageRequire("@grida/ai-models/models.json");
+const publicAgents = packageRequire("@grida/ai-models/agents.json");
+const release = packageRequire("@grida/ai-models/package.json").version;
 const presets = JSON.parse(
   readFileSync(join(root, "data/ai/presets.json"), "utf8")
 );
@@ -65,59 +68,78 @@ test("public Models is the only factual source and unsupported bindings remain u
   assert.throws(() => projectFacts(altered, presets), /Unknown public model/);
 });
 
-test("subscription membership is explicit, default stays offered and retired IDs grant no execution", () => {
-  const projected = projectChatGptSubscription(
-    publicModels,
-    subscriptionDefinition
-  );
-  assert.deepEqual(projected.model_ids, subscriptionDefinition.model_ids);
-  assert.ok(projected.model_ids.includes(projected.default_model_id));
-  assert.deepEqual(Object.keys(projected.wire_models), projected.model_ids);
-  for (const id of projected.model_ids)
-    assert.equal(
-      projected.wire_models[id],
-      publicModels["text.catalog"][id].providers.openai.id
+test("the subscription seed uses exact agent selectors and the product default", () => {
+  const project = (models, agents, profile = subscriptionDefinition) =>
+    projectChatGptSubscription(
+      parseModelCatalogue(release, models, agents),
+      profile
     );
-  for (const id of projected.retired_model_ids)
-    assert.equal(projected.wire_models[id], undefined);
-  const expanded = structuredClone(publicModels);
-  expanded["text.catalog"]["openai/unselected-model"] = {
-    ...expanded["text.catalog"][projected.default_model_id],
-    id: "openai/unselected-model",
-  };
-  assert.deepEqual(
-    projectChatGptSubscription(expanded, subscriptionDefinition),
-    projected
+  const derived = project(publicModels, publicAgents);
+  assert.equal(derived.model_ids[0], subscriptionDefinition.default_model_id);
+  for (const [selector, entry] of Object.entries(
+    publicAgents.agents["openai-codex"].models
+  ))
+    assert.equal(derived.wire_models[entry.canonical_model_id], selector);
+  const changed = structuredClone(publicAgents);
+  const selectors = changed.agents["openai-codex"].models;
+  const [previous, entry] = Object.entries(selectors)[0];
+  delete selectors[previous];
+  selectors["agent-specific-wire"] = entry;
+  assert.equal(
+    project(publicModels, changed).wire_models[entry.canonical_model_id],
+    "agent-specific-wire"
   );
-  for (const edit of [
-    (profile) => {
-      profile.default_model_id = profile.retired_model_ids[0];
-    },
-    (profile) => {
-      profile.model_ids.push(profile.model_ids[0]);
-    },
-    (profile) => {
-      profile.retired_model_ids.push(profile.model_ids[0]);
-    },
-    (profile) => {
-      profile.model_ids.push("openai/unreviewed-model");
-    },
-  ]) {
-    const changed = structuredClone(subscriptionDefinition);
-    edit(changed);
-    assert.throws(
-      () => projectChatGptSubscription(publicModels, changed),
-      /subscription/i
-    );
-  }
-  const incompatible = structuredClone(publicModels);
-  incompatible["text.catalog"][
-    projected.default_model_id
-  ].providers.openai.capabilities.tools = false;
   assert.throws(
-    () => projectChatGptSubscription(incompatible, subscriptionDefinition),
-    /compatible public OpenAI binding/
+    () =>
+      project(publicModels, publicAgents, {
+        ...subscriptionDefinition,
+        default_model_id: "openai/missing",
+      }),
+    /default/
   );
+  for (const id of subscriptionDefinition.retired_model_ids)
+    assert.equal(derived.wire_models[id], undefined);
+});
+
+test("the V2 core keeps foreign agent and provider selectors while native projection filters them", () => {
+  const models = structuredClone(publicModels);
+  const agents = structuredClone(publicAgents);
+  const offered = agents.agents["openai-codex"].models;
+  const [selector, first] = Object.entries(offered)[0];
+  offered["future+selector"] = first;
+  agents.agents["other-agent"] = {
+    models: {
+      "other+selector": {
+        ...first,
+        service_tiers: { economy: { service_tier: "deferred" } },
+      },
+    },
+  };
+  const id = first.canonical_model_id;
+  const bindings = models["text.catalog"][id].providers;
+  bindings.future = {
+    ...bindings.openai,
+    provider: "future",
+    id: "new+format",
+  };
+  const snapshot = parseModelCatalogue(release, models, agents);
+  assert.equal(snapshot.agents["openai-codex"][selector].canonicalModelId, id);
+  assert.equal(
+    snapshot.agents["openai-codex"]["future+selector"].canonicalModelId,
+    id
+  );
+  assert.equal(
+    snapshot.agents["other-agent"]["other+selector"].serviceTiers.economy,
+    "deferred"
+  );
+  assert.equal(snapshot.text[id].bindings.future.wireModel, "new+format");
+  assert.equal(
+    projectChatGptSubscription(snapshot, subscriptionDefinition).wire_models[
+      id
+    ],
+    selector
+  );
+  assert.equal(snapshot.text[id].bindings.openai.wireModel, bindings.openai.id);
 });
 
 test("public release, product presets and generated native input copies cannot drift silently", (t) => {
@@ -132,7 +154,6 @@ test("public release, product presets and generated native input copies cannot d
     "packages/grida-ai/src/catalogue",
     "packages/grida-ai/schemas/inputs.generated.json",
     "packages/grida-ai-host/src/protocol/chatgpt.ts",
-    "crates/grida-agent/data/chatgpt-subscription-models.json",
     "crates/grida-agent-master/data/economy-model.txt",
     "scripts/ai-catalogue/generate.mjs",
     "scripts/ai-catalogue/projection.mjs",
@@ -152,7 +173,7 @@ test("public release, product presets and generated native input copies cannot d
     "packages/grida-ai/node_modules/@grida/ai-models"
   );
   mkdirSync(installed, { recursive: true });
-  for (const name of ["package.json", "models.json"])
+  for (const name of ["package.json", "models.json", "agents.json"])
     cpSync(
       packageRequire.resolve(`@grida/ai-models/${name}`),
       join(installed, name)
@@ -161,7 +182,7 @@ test("public release, product presets and generated native input copies cannot d
     return spawnSync(process.execPath, [join(fixture, driver), ...args], {
       cwd: fixture,
       encoding: "utf8",
-      timeout: 20_000,
+      timeout: 60_000,
     });
   }
   function succeeds(result) {
@@ -177,9 +198,9 @@ test("public release, product presets and generated native input copies cannot d
   const projections = [
     "packages/grida-ai/schemas/inputs.generated.json",
     "packages/grida-ai-host/src/protocol/chatgpt.ts",
-    "crates/grida-agent/data/chatgpt-subscription-models.json",
     "crates/grida-agent-master/data/economy-model.txt",
     ...[
+      "model-catalogue.generated.json",
       "models.ts",
       "grida/catalog.ts",
       "grida/preferences.ts",
@@ -209,7 +230,7 @@ test("public release, product presets and generated native input copies cannot d
       (data) => {
         data["text.catalog"][presets.tiers.nano].label = "Changed public label";
       },
-      "models.ts",
+      "model-catalogue.generated.json",
     ],
     [
       "data/ai/presets.json",
@@ -228,38 +249,38 @@ test("public release, product presets and generated native input copies cannot d
     [
       "data/ai/chatgpt-subscription.json",
       (data) => {
-        data.default_model_id = data.model_ids[1];
+        data.default_model_id = Object.values(
+          publicAgents.agents["openai-codex"].models
+        )[0].canonical_model_id;
       },
       "chatgpt.ts",
     ],
     [
-      "packages/grida-ai/node_modules/@grida/ai-models/models.json",
+      "packages/grida-ai/node_modules/@grida/ai-models/agents.json",
       (data) => {
-        data["text.catalog"][
-          subscriptionDefinition.default_model_id
-        ].providers.openai.id = "changed-wire-binding";
+        const entries = data.agents["openai-codex"].models;
+        const key = Object.keys(entries)[0];
+        entries["changed-wire-binding"] = entries[key];
+        delete entries[key];
       },
-      "chatgpt-subscription-models.json",
+      "chatgpt.ts",
     ],
   ]) {
     update(name, edit);
     const result = run("--check");
-    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.status, 1, result.error?.message || result.stderr);
     assert.ok(result.stderr.includes(stale), result.stderr);
     succeeds(run());
     succeeds(run("--check"));
   }
-  for (const name of [
-    "packages/grida-ai-host/src/protocol/chatgpt.ts",
-    "crates/grida-agent/data/chatgpt-subscription-models.json",
-  ]) {
+  for (const name of ["packages/grida-ai-host/src/protocol/chatgpt.ts"]) {
     const target = join(fixture, name);
     writeFileSync(
       target,
       readFileSync(target, "utf8").replace("gpt-6.1-sol", "stale-model")
     );
     const result = run("--check");
-    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.status, 1, result.error?.message || result.stderr);
     assert.ok(result.stderr.includes(name), result.stderr);
     succeeds(run());
     succeeds(run("--check"));

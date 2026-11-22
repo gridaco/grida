@@ -54,6 +54,7 @@ import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeChatSelections } from "./main/native-chat-selections";
+import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeAgentProcess } from "./main/native-agent-process";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
@@ -953,6 +954,11 @@ app.on("ready", async () => {
             onLifecycle: onNativeLifecycle,
             openExternal: (url) => shell.openExternal(url),
             chatTitles: true,
+            modelCatalogue: new ModelCatalogueStore({
+              directory: path.join(app.getPath("userData"), "model-catalogue"),
+              fetch: net.fetch,
+              offline: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
+            }),
           }
         );
         nativeDocuments = ordinarySelectedSvgFiles(

@@ -244,15 +244,12 @@ For an existing closed store, `chat-selection --state-dir DIRECTORY --cwd
 WORKSPACE --session SESSION_ID` inspects the same metadata without credentials
 or model work. See the [durable selection protocol](docs/rust-client-protocol.md#durable-chat-selection).
 
-The private ChatGPT subscription profile also uses this pipe. Its finite
-model-to-wire mapping comes from the generated
-[subscription compatibility projection](data/chatgpt-subscription-models.json).
-The catalogue generator consumes the dedicated
-[subscription definition](../../data/ai/chatgpt-subscription.json) to emit this
-projection and the trusted host's selection data. Native execution does not infer subscription support
-from all OpenAI API models. A retired or unknown model refuses launch before
-opening session state or provider work. Existing saved metadata can remain
-available to the client without authorizing inference on that retired model.
+The private ChatGPT subscription profile also uses this pipe. The trusted host
+supplies the canonical model and exact subscription selector with the captured
+connection. The native agent retains that binding with admitted work. Older
+captures and callers use the frozen [historical selector
+mapping](data/chatgpt-subscription-models.json). Saved selections remain
+readable when their model is unavailable for new work.
 
 Responses and Gemini retain opaque model history across restarts when their
 protected credential proof still matches. A changed credential invalidates replay of

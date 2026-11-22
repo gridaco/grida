@@ -1,8 +1,9 @@
 # AI client configuration
 
 Model facts are maintained in the public [`gridaco/models`](https://github.com/gridaco/models)
-catalogue and consumed through the exact `@grida/ai-models` release pinned in
-`packages/grida-ai/package.json`. Effective GG offerings, prices and operation
+catalogue. The exact `@grida/ai-models` dependency in `packages/grida-ai/package.json`
+supplies the bundled seed. Desktop checks for newer V2 releases at runtime for its
+ChatGPT subscription, OpenRouter and Vercel foreground chat choices. Effective GG offerings, prices and operation
 contracts come from [GG discovery](https://gateway.grida.ai/v1/models).
 
 This directory contains only Grida-owned choices and executable native contracts:
@@ -10,7 +11,7 @@ This directory contains only Grida-owned choices and executable native contracts
 | Source | Responsibility |
 | --- | --- |
 | `presets.json` | Product membership, listed/staged and legacy choices, defaults, tiers and Library embedding storage pins. |
-| `chatgpt-subscription.json` | Subscription model membership, order, default and retired saved identities. No credentials or entitlement data. |
+| `chatgpt-subscription.json` | Preferred subscription default and historical saved identities. |
 | `native-inputs.json` | Input schemas implemented by the native/BYOK client adapters. GG operation schemas remain GG-owned. |
 | `schemas/presets.schema.json` | Structural envelope for product definitions. |
 | `schemas/chatgpt-subscription.schema.json` | Structural envelope for subscription compatibility. |
@@ -36,9 +37,9 @@ node scripts/ai-catalogue/generate.mjs --bundle
 node scripts/ai-catalogue/generate.mjs --bundle --check
 ```
 
-Generated TypeScript retains literal IDs and installed-client interfaces. Current
-hosts pin native/BYOK metadata to this immutable release; they do not refresh it
-from the older HTTP catalogue. The Rust `operations.json` asset contains only
+Generated TypeScript retains literal IDs and installed-client interfaces. Media
+adapters use this bundled release. Desktop foreground chat can use newer public
+facts through the [V2 catalogue store](../../packages/grida-ai/src/catalogue/README.md). The Rust `operations.json` asset contains only
 implemented native operation descriptors. GG runtime discovery is separate. These outputs are checked, not independent
 facts authoring homes. Updating the public dependency requires reviewing the
 model facts diff, regenerating and testing its consumers. Ordinary GG catalogue
@@ -52,22 +53,13 @@ The generator also projects context windows for exact OpenAI model bindings used
 by the native Responses profile. The host uses them only for the canonical
 OpenAI route.
 
-`chatgpt-subscription.json` owns the closed subscription model membership,
-order and default. These are product compatibility choices, separate from
-account entitlement and the general OpenAI API catalogue. The standard generator
-projects its TypeScript constants in `packages/grida-ai-host/src/protocol/chatgpt.ts`
-and the native `crates/grida-agent/data/chatgpt-subscription-models.json` asset.
-Exact wire IDs come from the pinned public Models OpenAI bindings; labels and
-other model facts stay there too. Do not edit either generated projection.
-
-`retired_model_ids` permits reading older saved selections without invalidating
-the rest of their settings. It grants no inference or picker availability.
-Retiring a subscription model requires current subscription-specific evidence;
-API retirement and subscription retirement can differ. The current subscription
-choices follow [OpenAI's model guidance](https://learn.chatgpt.com/docs/models),
-including the separate GPT-5.5 and GPT-5.4 subscription retirements. Existing
-GPT-5.6 selections stay compatible; GPT-6.2 Sol is the default for new untouched
-selections. Account and plan availability is still checked by the service.
+The `openai-codex` entries in the public `agents.json` map subscription selectors
+to canonical text models in the same release's `models.json`. Desktop intersects
+these entries with the account's model offer and installed transport capabilities.
+`chatgpt-subscription.json` owns the preferred default and historical saved IDs.
+The generator produces the host's bundled selectors for compatibility. The native
+mapping for historical captures stays frozen so its stored execution identity can
+be checked after public releases change.
 
 The generator lists the OpenRouter models that take PNG input: listed product
 models whose exact public OpenRouter binding declares tool calls and PNG input.
