@@ -66,6 +66,10 @@ describe("GptTranscription", () => {
   });
 
   it("uses Vercel's V4 base64 body and protocol/model headers", async () => {
+    const recording = Uint8Array.from(
+      { length: 70_001 },
+      (_, index) => index % 256
+    ).buffer;
     const dispatch = vi.fn<GptTranscription.Dispatch>(
       async (provider, headers, body) => {
         expect(provider).toBe("vercel");
@@ -76,7 +80,7 @@ describe("GptTranscription", () => {
         ).toBe("4");
         expect(headers.get("ai-model-id")).toBe("openai/gpt-transcribe");
         await expect(new Response(body).json()).resolves.toEqual({
-          audio: "AQID",
+          audio: Buffer.from(recording).toString("base64"),
           mediaType: "audio/webm",
           providerOptions: {
             openai: { languages: ["en"], keywords: ["Grida"] },
@@ -93,6 +97,7 @@ describe("GptTranscription", () => {
       GptTranscription.request({
         ...input,
         provider: "vercel",
+        audio: recording,
         language: "en",
         keywords: ["Grida"],
         dispatch,

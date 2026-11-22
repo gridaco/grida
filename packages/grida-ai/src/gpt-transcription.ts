@@ -86,14 +86,14 @@ function encodeRequest(
   if (provider === "openrouter") {
     return Response.json({
       model: HOSTED_MODEL,
-      input_audio: { data: new Uint8Array(audio).toBase64(), format: "webm" },
+      input_audio: { data: encodeAudioBase64(audio), format: "webm" },
       ...(hasHints && { provider: { options: { openai: hints } } }),
     });
   }
   if (provider === "vercel") {
     return Response.json(
       {
-        audio: new Uint8Array(audio).toBase64(),
+        audio: encodeAudioBase64(audio),
         mediaType: "audio/webm",
         ...(hasHints && { providerOptions: { openai: hints } }),
       },
@@ -120,6 +120,19 @@ function encodeRequest(
   if (language) form.append("languages[]", language);
   for (const keyword of keywords) form.append("keywords[]", keyword);
   return new Response(form);
+}
+
+function encodeAudioBase64(audio: ArrayBuffer): string {
+  const bytes = new Uint8Array(audio);
+  // Encode bounded chunks on three-byte boundaries so only the final chunk pads.
+  const chunkSize = 12_288;
+  let encoded = "";
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    encoded += btoa(
+      String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+    );
+  }
+  return encoded;
 }
 
 async function readTranscript(
