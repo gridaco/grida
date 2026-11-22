@@ -242,11 +242,13 @@ export function DesktopComposerDemo({
           </Button>
         </div>
         <div
-          className={
+          className={`flex w-full flex-col overflow-hidden rounded-xl border bg-background ${
             narrow
-              ? "flex h-[36rem] w-full max-w-[23rem] flex-col overflow-hidden rounded-xl border bg-background"
-              : "flex h-[min(42rem,80vh)] min-h-[36rem] w-full flex-col overflow-hidden rounded-xl border bg-background"
-          }
+              ? "h-[36rem] max-w-[23rem]"
+              : scenario === "streaming"
+                ? "h-[30rem]"
+                : "h-[min(42rem,80vh)] min-h-[36rem]"
+          }`}
         >
           <BrowserOpen value={webPreview ? openWeb : null}>
             <BrowserPreview value={webPreview ? previews : null}>

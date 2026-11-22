@@ -8,6 +8,7 @@ import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import styles from "./conversation.module.css";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
@@ -157,10 +158,13 @@ export const ConversationEmptyState = ({
   </div>
 );
 
-export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
+export type ConversationScrollButtonProps = ComponentProps<typeof Button> & {
+  working?: boolean;
+};
 
 export const ConversationScrollButton = ({
   className,
+  working = false,
   ...props
 }: ConversationScrollButtonProps) => {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
@@ -172,8 +176,12 @@ export const ConversationScrollButton = ({
   return (
     !isAtBottom && (
       <Button
+        aria-label="Scroll to latest message"
         className={cn(
-          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full",
+          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full motion-reduce:transition-none",
+          // Hold the hover target steady while the button transitions to icon size.
+          working &&
+            "group/scroll-button w-11 hover:w-9 focus-visible:w-9 before:absolute before:inset-y-0 before:left-1/2 before:w-11 before:-translate-x-1/2",
           className
         )}
         onClick={handleScrollToBottom}
@@ -182,7 +190,27 @@ export const ConversationScrollButton = ({
         variant="outline"
         {...props}
       >
-        <ArrowDownIcon className="size-4" />
+        {working && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "flex items-center gap-1 text-muted-foreground *:size-1 *:rounded-full *:bg-current group-hover/scroll-button:hidden group-focus-visible/scroll-button:hidden",
+              styles.workingDots
+            )}
+          >
+            <span />
+            <span />
+            <span />
+          </span>
+        )}
+        <ArrowDownIcon
+          aria-hidden="true"
+          className={cn(
+            "size-4",
+            working &&
+              "hidden group-hover/scroll-button:block group-focus-visible/scroll-button:block"
+          )}
+        />
       </Button>
     )
   );

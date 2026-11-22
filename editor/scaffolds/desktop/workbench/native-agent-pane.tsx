@@ -1113,7 +1113,9 @@ function NativeChatPane({
                   />
                 )}
             </ConversationContent>
-            <ConversationScrollButton />
+            <ConversationScrollButton
+              working={stillWorking || state.commandRunning === "compact"}
+            />
           </Conversation>
         </workspace_links.Opener.Provider>
         {!state.revisionDraft && state.revisionSubmitting ? (

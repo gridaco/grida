@@ -55,7 +55,15 @@ export namespace DesktopConversationFixtures {
       {
         messageId: "streaming-assistant",
         role: "assistant",
-        text: "I’m checking the composer’s keyboard navigation and attachment layout.\n\nNext I’ll compare the narrow layout and",
+        text: [
+          "I’m checking the composer’s keyboard navigation and attachment layout.",
+          "I started with an empty draft. The editor takes focus when I click the blank area, and the caret stays in place as the draft grows to several lines.",
+          "A selected phrase opens the formatting menu. I’m checking where that menu lands near either edge of the composer, especially when the selected text wraps onto a second line.",
+          "The attachment row shows the file name, type, and remove action. I tried adding a second image and removing the first to check that the remaining preview stays in the same order.",
+          "I also checked that the footer controls stay reachable when the editor scrolls. Tabbing through the composer reaches the attachment menu, access picker, model picker, and send button in that order.",
+          "The transcript keeps following the latest reply until I scroll up. With the viewport higher in the chat, a new paragraph should leave the part I’m reading in place.",
+          "Next I’ll compare the narrow layout and",
+        ].join("\n\n"),
       },
     ],
   } satisfies Omit<Example, "id">;

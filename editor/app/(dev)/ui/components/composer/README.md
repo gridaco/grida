@@ -73,7 +73,9 @@ an account, or a model.
   marker on eligible sent messages. Toggle the selection to check that sent
   context stays put.
 - **Tool activity**, **Streaming**, and **Empty conversation** show recorded
-  work, a partial reply, and an empty chat with a working composer.
+  work, a partial reply, and an empty chat with a working composer. Scroll up
+  during **Streaming** to see the animated scroll-to-bottom button. Turn
+  **Streaming** off to see the arrow.
 - **Compaction** shows the production transcript rows for a saved summary
   and compaction in progress on load. To try the full flow, send `/compact`
   in the example below and select **Finish compaction**.
