@@ -742,6 +742,15 @@ question styles can raise it. Consumers deduplicate the identity and read the
 current question through the authorized questions operation. An empty or
 expired result needs no attention. Older consumers ignore unknown fact kinds.
 
+A `settled` fact carries `turnId` and `status` for an ordinary turn or a
+manual compaction that ran as a standalone task. An
+`automatic_compaction_settled` fact carries the same fields for host-triggered
+context maintenance. Both use `succeeded`, `failed`, `uncertain`, or
+`cancelled`. The automatic fact describes the maintenance turn's outcome.
+An installed summary is available in the transcript, and the chat turn that
+follows has its own settlement. The lifecycle stream does not replay either
+fact after reconnecting.
+
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                           |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.                                       |

@@ -121,6 +121,179 @@ async fn prime_automatic_history(
 }
 
 #[tokio::test]
+async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compaction() {
+    use super::approvals::Stdio as PrivateStdio;
+
+    const LIFECYCLE: &str = "co.grida/session/lifecycle";
+    const WINDOW: &str = "co.grida/session/transcript-window";
+    async fn observe(
+        client: &mut PrivateStdio,
+        method: &str,
+        params: Value,
+        settlements: usize,
+    ) -> (Value, Vec<Value>) {
+        let id = client.send(method, params).await;
+        timeout(WAIT, async {
+            let mut reply = None;
+            let mut events = Vec::new();
+            loop {
+                let frame = client.read_frame().await;
+                if frame["id"] == id {
+                    assert!(frame.get("result").is_some(), "{frame}");
+                    reply = Some(frame["result"].clone());
+                }
+                if let Some(event) = frame["params"]["_meta"].get(LIFECYCLE) {
+                    events.push(event.clone());
+                }
+                if events.len() >= settlements
+                    && let Some(reply) = reply
+                {
+                    return (reply, events);
+                }
+            }
+        })
+        .await
+        .unwrap()
+    }
+
+    for (summary, status) in [
+        (
+            Reply::Finished("An automatic context summary."),
+            "succeeded",
+        ),
+        (Reply::Stop("length"), "failed"),
+    ] {
+        let temporary = TempDir::new().unwrap();
+        let state = temporary.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let endpoint = Endpoint::start(vec![
+            Reply::Finished("First original answer."),
+            Reply::Finished("Recent original answer."),
+            summary,
+            Reply::Finished("The queued chat reply."),
+            Reply::Finished("A manual context summary."),
+            Reply::Finished("The reply after reopening."),
+        ])
+        .await;
+        let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+        let mut capabilities = extension_initialize();
+        for key in [LIFECYCLE, WINDOW, "co.grida/session/compact"] {
+            capabilities["clientCapabilities"]["_meta"][key] = json!(1);
+        }
+        let ready = client.request("initialize", capabilities.clone()).await;
+        assert_eq!(ready["result"]["agentCapabilities"]["_meta"][LIFECYCLE], 1);
+        let created = client
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        for text in [
+            "Earlier requirements. ".repeat(5_200),
+            "Recent request.".into(),
+        ] {
+            let (_, facts) = observe(
+                &mut client,
+                "session/prompt",
+                json!({
+                    "sessionId":session,"prompt":[{"type":"text","text":text}],
+                }),
+                1,
+            )
+            .await;
+            assert_eq!(facts[0]["kind"], "settled", "{facts:?}");
+        }
+        let (_, facts) = observe(
+            &mut client,
+            "_co.grida/session/enqueue",
+            prompt_request(session, "next-input", "Continue the chat."),
+            2,
+        )
+        .await;
+        assert_eq!(facts.len(), 2, "{facts:?}");
+        assert_eq!(
+            facts[0]["kind"], "automatic_compaction_settled",
+            "{facts:?}"
+        );
+        assert_eq!(facts[0]["status"], status, "{facts:?}");
+        assert_eq!(facts[1]["kind"], "settled", "{facts:?}");
+        assert_eq!(facts[1]["status"], "succeeded", "{facts:?}");
+        assert_ne!(facts[0]["turnId"], facts[1]["turnId"]);
+
+        let (manual, manual_facts) = observe(
+            &mut client,
+            "_co.grida/session/compact",
+            compact(session, "manual"),
+            1,
+        )
+        .await;
+        assert_eq!(manual["status"], "installed", "{manual}");
+        assert_eq!(
+            manual_facts,
+            [json!({"kind":"settled","turnId":manual["turnId"],"status":"succeeded"})]
+        );
+        client.close().await;
+
+        let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+        client.request("initialize", capabilities).await;
+        let mut load = json!({
+            "sessionId":session, "cwd":workspace.path(), "mcpServers":[],
+            "_meta":{WINDOW:{"kind":"attach"}},
+        });
+        let (_, attachment_facts) = observe(&mut client, "session/load", load.clone(), 0).await;
+        assert!(attachment_facts.is_empty(), "{attachment_facts:?}");
+        load["_meta"][WINDOW] = json!({"kind":"read","requestId":"after-compaction"});
+        let (page, replay_facts) = observe(&mut client, "session/load", load, 0).await;
+        assert!(replay_facts.is_empty(), "{replay_facts:?}");
+        let turns = page["_meta"][WINDOW]["turns"]
+            .as_array()
+            .expect("transcript turns");
+        let automatic = turns
+            .iter()
+            .find(|turn| turn["turnId"] == facts[0]["turnId"])
+            .and_then(|turn| turn.get("compaction"));
+        if status == "succeeded" {
+            assert_eq!(
+                automatic,
+                Some(&json!({"summary":"An automatic context summary.","automatic":true})),
+                "{turns:?}"
+            );
+        } else {
+            assert!(automatic.is_none(), "{turns:?}");
+        }
+        assert!(
+            turns
+                .iter()
+                .any(|turn| turn["turnId"] == facts[1]["turnId"]),
+            "{turns:?}"
+        );
+        assert!(
+            turns.iter().any(|turn| {
+                turn["turnId"] == manual["turnId"]
+                    && turn["compaction"]
+                        == json!({"summary":"A manual context summary.","automatic":false})
+            }),
+            "{turns:?}"
+        );
+        let (submitted, fresh_facts) = observe(
+            &mut client,
+            "_co.grida/session/submit",
+            prompt_request(session, "after-reopen", "Continue after reopening."),
+            1,
+        )
+        .await;
+        assert!(submitted["turnId"].is_string(), "{submitted}");
+        assert_eq!(
+            fresh_facts,
+            [json!({"kind":"settled","turnId":submitted["turnId"],"status":"succeeded"})]
+        );
+        client.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
 async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction() {
     let workspace = TempDir::new().unwrap();
     identified_submit_compacts_in_regime("act", workspace.path(), None).await;

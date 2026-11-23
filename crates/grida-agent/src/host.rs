@@ -1618,6 +1618,8 @@ impl Host {
                 host.wake_ready().await;
             }
             let mut completion_tx = Some(completion_tx);
+            let automatic_compaction = matches!(&admitted.work, TurnWork::Compaction(_))
+                && compaction::is_automatic_turn(&worker_turn);
             let mut result = match admitted.work {
                 TurnWork::Conversation {
                     master,
@@ -1685,7 +1687,13 @@ impl Host {
             )
             .await;
             if let Ok(outcome) = &result {
-                live::publish_lifecycle(&host.live_updates, &worker_session, &worker_turn, outcome);
+                live::publish_lifecycle(
+                    &host.live_updates,
+                    &worker_session,
+                    &worker_turn,
+                    outcome,
+                    automatic_compaction,
+                );
             }
             if let Some(completion_tx) = completion_tx {
                 let _ = completion_tx.send(result);

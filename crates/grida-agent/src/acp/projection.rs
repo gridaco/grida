@@ -689,10 +689,7 @@ pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Va
     {
         facts["compaction"] = json!({
             "summary": summary,
-            "automatic": turn
-                .id
-                .as_str()
-                .starts_with(crate::host::compaction::AUTOMATIC_TURN_PREFIX),
+            "automatic": crate::host::compaction::is_automatic_turn(&turn.id),
         });
     }
     facts

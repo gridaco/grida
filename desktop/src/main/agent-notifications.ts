@@ -248,6 +248,7 @@ export async function notifyNativeChat(
   current: () => boolean,
   profileId?: string
 ): Promise<void> {
+  if (event.kind === "automatic_compaction_settled") return;
   const mayNotify = () =>
     current() &&
     navigation.can_open() &&

@@ -196,6 +196,10 @@ focus. When a turn succeeds, the notification shows the chat title and a short
 excerpt from the final reply. If the chat has no title, it shows **Grida
 Agent**. If the reply has no preview text, it shows **Turn completed**.
 
+Automatic context compaction is silent. A successful compaction appears in
+the transcript, and the following reply can still send a notification. When
+you run `/compact` yourself, Desktop can notify you when it finishes.
+
 When a question arrives in another chat or side tab, the notification shows
 its chat title and question. The system’s notification settings control where
 previews appear. A question in the chat already on screen appears in its card.

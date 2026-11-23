@@ -28,8 +28,8 @@ export namespace agent_notifications {
    * function IS the RFC `events` §when-to-notify table; if they disagree,
    * one of them drifted. A cancelled turn is silent: the user did it.
    *
-   * The switch is EXHAUSTIVE over the settled statuses, so growing that
-   * vocabulary fails the desktop build here until this table decides
+   * The mapping is exhaustive over lifecycle kinds and settled statuses,
+   * so growing either vocabulary fails the desktop build until this table decides
    * notify-or-silent for it. At runtime an unknown value (version skew)
    * falls through to SILENT — never to a wrong notification.
    */
@@ -45,6 +45,8 @@ export namespace agent_notifications {
       };
     if (event.kind === "approval_required")
       return { title, body: "Waiting for your approval" };
+    if (event.kind === "automatic_compaction_settled") return null;
+    if (event.kind !== "settled") return silentOnUnknown(event);
     switch (event.status) {
       case "succeeded":
         return {

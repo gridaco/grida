@@ -789,6 +789,12 @@ required and optional replies, expiry, recovery and CLI dispositions. The
 coexist with running work and that settlement clears it. Desktop verifies
 the corresponding [notification routing](../../../desktop/src/main/agent-notifications.test.ts)
 and [main and side chat interactions](../../../editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx).
+The [built-process compaction cases](../tests/process/compaction.rs) verify
+that automatic compaction has its own settlement and that reopening keeps
+installed summaries in the transcript without replaying settlements. The
+[notification routing test](../../../desktop/src/main/agent-notifications.test.ts)
+exercises an unfocused workspace. Automatic compaction stays silent on
+success and failure, while the following reply and manual compaction notify.
 The [chat controller tests](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
 exercise a pending question whose review expires as independent work advances.
 One click renews the same question and retries after a definite revision

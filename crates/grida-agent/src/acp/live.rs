@@ -206,6 +206,9 @@ pub(super) async fn forward(
                         LifecycleFact::Settled(status) => {
                             json!({"kind": "settled", "turnId": update.turn, "status": status})
                         }
+                        LifecycleFact::AutomaticCompactionSettled(status) => {
+                            json!({"kind": "automatic_compaction_settled", "turnId": update.turn, "status": status})
+                        }
                         LifecycleFact::ApprovalRequired(wait) => {
                             json!({"kind": "approval_required", "turnId": update.turn, "waitId": wait})
                         }

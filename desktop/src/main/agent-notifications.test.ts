@@ -1,10 +1,14 @@
 import { EventEmitter } from "node:events";
+import { realpath } from "node:fs/promises";
 import type { IpcMainInvokeEvent } from "electron";
 import { beforeEach, expect, it, vi } from "vitest";
-import type {
-  NativeChatCompletionPreview,
-  NativeChatLifecycle,
+import {
+  NativeAgentChat,
+  type NativeAgentChatLaunch,
+  type NativeChatCompletionPreview,
+  type NativeChatLifecycle,
 } from "./native-agent-chat";
+import { NativeAgentProcess } from "./native-agent-process";
 import {
   focusNativeChat,
   notifyNativeChat,
@@ -94,6 +98,117 @@ beforeEach(() => {
   vi.clearAllMocks();
   host.windows.mockReturnValue([]);
   host.click = undefined;
+});
+
+it("keeps automatic compaction silent and notifies for the next reply and manual compaction", async () => {
+  const key = "co.grida/session/lifecycle";
+  const sessionId = event.sessionId;
+  const nav = navigation();
+  const target = workspaceWindow();
+  host.windows.mockReturnValue([target.window]);
+  const request = vi.fn<NativeAgentProcess["request"]>(
+    async (method, params) => {
+      switch (method) {
+        case "session/new":
+          return { sessionId };
+        case "_co.grida/session/catalog-entry":
+          return {
+            sessionId,
+            title: "Background chat",
+            revision: 1,
+            archived: false,
+          };
+        case "_co.grida/session/turn-summary": {
+          const { turnId } = params as { turnId: string };
+          return {
+            turnId,
+            status: "succeeded",
+            text: turnId === "reply" ? "The reply is ready." : "",
+          };
+        }
+        default:
+          throw new Error(`Unexpected request ${method}`);
+      }
+    }
+  );
+  let onUpdate: ((params: unknown) => void) | undefined;
+  const start = vi
+    .spyOn(NativeAgentProcess, "start")
+    .mockImplementationOnce(async (launch) => {
+      onUpdate = launch.onSessionUpdate;
+      return {
+        request,
+        close: async () => {},
+      } as unknown as NativeAgentProcess;
+    });
+  const deliveries: Promise<void>[] = [];
+  const onLifecycle = vi.fn<NonNullable<NativeAgentChatLaunch["onLifecycle"]>>(
+    (fact, current) => {
+      deliveries.push(notifyNativeChat(workspaceId, fact, nav, current));
+    }
+  );
+  const cwd = await realpath(process.cwd());
+  let chat: NativeAgentChat | undefined;
+  try {
+    chat = await NativeAgentChat.start({
+      cwd,
+      resourcesPath: cwd,
+      stateDirectory: cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+      onLifecycle,
+    });
+    await chat.create();
+    request.mockClear();
+    const signal = (kind: string, turnId: string, status: string) =>
+      onUpdate!({
+        sessionId,
+        _meta: { [key]: { kind, turnId, status } },
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "" },
+        },
+      });
+    for (const status of ["succeeded", "failed", "uncertain", "cancelled"]) {
+      const turnId = `maintenance-${status}`;
+      signal("automatic_compaction_settled", turnId, status);
+      signal("automatic_compaction_settled", turnId, status);
+      expect(onLifecycle.mock.lastCall?.[0]).toEqual({
+        kind: "automatic_compaction_settled",
+        sessionId,
+        turnId,
+        status,
+      });
+    }
+    signal("automatic_compaction_settled", "bad-status", "unknown");
+    signal("future_kind", "unknown-event", "succeeded");
+    await Promise.all(deliveries);
+    expect(onLifecycle).toHaveBeenCalledTimes(4);
+    expect(request).not.toHaveBeenCalled();
+    expect(host.shown).not.toHaveBeenCalled();
+
+    for (const turnId of ["reply", "manual-compact"]) {
+      signal("settled", turnId, "succeeded");
+      await deliveries.at(-1);
+      expect(host.shown).toHaveBeenLastCalledWith({
+        title: "Background chat",
+        body: turnId === "reply" ? "The reply is ready." : "Turn completed",
+      });
+    }
+    expect(host.shown).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      "_co.grida/session/catalog-entry",
+      "_co.grida/session/turn-summary",
+      "_co.grida/session/catalog-entry",
+      "_co.grida/session/turn-summary",
+    ]);
+    host.click!();
+    expect(target.take()).toEqual({ sessionId });
+  } finally {
+    start.mockRestore();
+    await chat?.close();
+  }
 });
 
 it("keeps the saved model connection when reopening a workspace from a notification", () => {

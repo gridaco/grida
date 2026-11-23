@@ -23,8 +23,13 @@ use grida_agent_master::usage::InferenceUsage;
 
 const PLAN_SCHEMA: &str = "grida.agent.native.compaction.plan";
 const MAX_PRE_DISPATCH_IDENTITIES: usize = 4;
-pub(crate) const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
+const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
 const AUTOMATIC_SOURCE_BYTES: usize = 96 * 1024;
+
+/// Automatic compaction has a host-owned turn identity that survives recovery.
+pub(crate) fn is_automatic_turn(turn: &TurnId) -> bool {
+    turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX)
+}
 
 #[derive(Clone)]
 pub struct CompactRequest {
@@ -355,13 +360,10 @@ impl Host {
         if self.inference_only
             || configuration.subagent.is_some()
             || !is_stored_input(&head.payload)
-            || view.latest.as_ref().is_some_and(|latest| {
-                latest
-                    .binding
-                    .turn
-                    .as_str()
-                    .starts_with(AUTOMATIC_TURN_PREFIX)
-            })
+            || view
+                .latest
+                .as_ref()
+                .is_some_and(|latest| is_automatic_turn(&latest.binding.turn))
         {
             return Ok(None);
         }
@@ -548,7 +550,7 @@ impl Host {
             return Ok(());
         };
         let turn = &latest.binding.turn;
-        if !turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX) {
+        if !is_automatic_turn(turn) {
             return Ok(());
         }
         let Some(outcome) = latest

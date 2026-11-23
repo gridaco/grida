@@ -60,6 +60,7 @@ pub(crate) struct Lifecycle {
 #[derive(Clone)]
 pub(crate) enum LifecycleFact {
     Settled(OutcomeStatus),
+    AutomaticCompactionSettled(OutcomeStatus),
     ApprovalRequired(WaitId),
     QuestionAsked(WaitId),
 }
@@ -69,11 +70,15 @@ pub(super) fn publish_lifecycle(
     session: &SessionId,
     turn: &TurnId,
     result: &RunResult,
+    automatic_compaction: bool,
 ) {
     if sender.receiver_count() == 0 {
         return;
     }
     let fact = match result {
+        RunResult::Settled(outcome) if automatic_compaction => {
+            LifecycleFact::AutomaticCompactionSettled(outcome.status)
+        }
         RunResult::Settled(outcome) => LifecycleFact::Settled(outcome.status),
         RunResult::InputRequired(pending) => {
             let Some(approval) = pending.approvals.first() else {

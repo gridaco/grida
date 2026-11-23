@@ -245,6 +245,10 @@ export type NativeChatLifecycle = Readonly<
         status: NativeChatTurnSummary["status"];
         readPreview?: () => Promise<NativeChatCompletionPreview>;
       }
+    | {
+        kind: "automatic_compaction_settled";
+        status: NativeChatTurnSummary["status"];
+      }
     | { kind: "approval_required"; waitId: string }
     | {
         kind: "question_asked";
@@ -2990,7 +2994,7 @@ export class NativeAgentChat {
     if (kind === "approval_required") {
       event = { kind, sessionId, turnId, waitId: identity(record.waitId) };
     } else if (
-      kind === "settled" &&
+      (kind === "settled" || kind === "automatic_compaction_settled") &&
       (status === "succeeded" ||
         status === "failed" ||
         status === "cancelled" ||
@@ -3001,12 +3005,13 @@ export class NativeAgentChat {
         sessionId,
         turnId,
         status,
-        ...(status === "succeeded" && {
-          readPreview: () => this.completionPreview(session, turnId),
-        }),
+        ...(kind === "settled" &&
+          status === "succeeded" && {
+            readPreview: () => this.completionPreview(session, turnId),
+          }),
       };
     } else return;
-    const detail = event.kind === "settled" ? event.status : event.waitId;
+    const detail = "status" in event ? event.status : event.waitId;
     if (this.rememberLifecycle([sessionId, turnId, kind, detail]))
       this.onLifecycle?.(event, () => this.ownsSession(session));
   }
