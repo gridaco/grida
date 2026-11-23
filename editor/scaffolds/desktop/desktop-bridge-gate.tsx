@@ -143,7 +143,7 @@ function DesktopUpdateRequired({
           Update to continue
         </h1>
         <p className="mt-5 max-w-sm text-sm leading-relaxed text-neutral-400">
-          Download Grida Desktop {requiredVersion} and reinstall the app.
+          Install Grida Desktop {requiredVersion} to continue.
         </p>
         {downloadHref && (
           <Button
@@ -151,15 +151,11 @@ function DesktopUpdateRequired({
             className="mt-8 w-full max-w-xs bg-white text-black hover:bg-neutral-200 focus-visible:ring-white/70"
           >
             <a href={downloadHref} target="_blank" rel="noopener noreferrer">
-              Download update
+              Download installer
             </a>
           </Button>
         )}
-        <footer className="mt-8 max-w-xs space-y-2 text-xs text-neutral-400">
-          <p>
-            We’ve updated how Grida works with the desktop app. Your installed
-            version is no longer compatible.
-          </p>
+        <footer className="mt-8 max-w-xs text-xs text-neutral-400">
           <p className="tabular-nums">{children}</p>
         </footer>
       </div>

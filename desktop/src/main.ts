@@ -761,11 +761,7 @@ app.on("ready", async () => {
       openExternal: (url) => shell.openExternal(url),
       restart: requestDesktopUpdateRestart,
       installFailed: desktopUpdateInstallFailed,
-      showError: () =>
-        dialog.showErrorBox(
-          "Couldn't open the Grida update window",
-          "Reopen Grida and try again."
-        ),
+      showError: (title, message) => dialog.showErrorBox(title, message),
       feed:
         process.platform === "darwin" || process.platform === "win32"
           ? new DesktopUpdateFeed(

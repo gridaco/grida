@@ -29,6 +29,19 @@ describe("DesktopUpdateFeed", () => {
     const result = feed.check();
     expect(feed.check()).toBe(result);
     expect(electron.checkForUpdates).toHaveBeenCalledTimes(1);
+    const firstObserver = vi.fn<() => void>();
+    const stopObserving = feed.onDownloading(firstObserver);
+    expect(firstObserver).not.toHaveBeenCalled();
+    electron.emit("update-available");
+    expect(firstObserver).toHaveBeenCalledOnce();
+    stopObserving();
+    const joinedObserver = vi.fn<() => void>();
+    const stopJoinedObserver = feed.onDownloading(joinedObserver);
+    expect(joinedObserver).toHaveBeenCalledOnce();
+    electron.emit("update-available");
+    expect(firstObserver).toHaveBeenCalledOnce();
+    expect(joinedObserver).toHaveBeenCalledOnce();
+    stopJoinedObserver();
     const onFailure = vi.fn<() => void>();
     feed.install("0.7.1", onFailure);
     expect(electron.quitAndInstall).not.toHaveBeenCalled();
@@ -39,6 +52,9 @@ describe("DesktopUpdateFeed", () => {
       kind: "downloaded",
       version: "0.7.1",
     });
+    const finishedObserver = vi.fn<() => void>();
+    feed.onDownloading(finishedObserver)();
+    expect(finishedObserver).not.toHaveBeenCalled();
     onFailure.mockClear();
     feed.install("0.7.1", onFailure);
     expect(electron.quitAndInstall).toHaveBeenCalledOnce();

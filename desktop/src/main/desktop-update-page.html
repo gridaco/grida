@@ -24,11 +24,11 @@
       body {
         box-sizing: border-box;
         display: grid;
-        grid-template-rows: 1fr auto;
+        grid-template-rows: minmax(min-content, 1fr) auto;
         place-items: center;
         min-height: 100vh;
         margin: 0;
-        padding: var(--window-padding);
+        padding: 40px var(--window-padding) 20px;
         text-align: center;
       }
 
@@ -48,7 +48,7 @@
         display: block;
         width: 32px;
         height: 32px;
-        margin: 0 auto 24px;
+        margin: 0 auto 18px;
       }
 
       .symbol svg,
@@ -65,18 +65,57 @@
       }
 
       p {
-        max-width: 326px;
+        max-width: 270px;
         margin: 10px auto 0;
         color: #c4c4c4;
         font-size: 13px;
         overflow-wrap: anywhere;
-        white-space: pre-line;
+      }
+
+      .activity {
+        width: min(168px, 100%);
+        height: 3px;
+        margin: 20px auto 0;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #3a3a3a;
+      }
+
+      .activity::before {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: #f5f5f5;
+        content: "";
+        animation: sweep 1.4s linear infinite;
+      }
+
+      @keyframes sweep {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .activity {
+          background: #888;
+        }
+
+        .activity::before {
+          display: none;
+        }
       }
 
       .footer {
         display: grid;
-        gap: 16px;
+        justify-items: center;
+        gap: 6px;
         width: 100%;
+        padding-top: 16px;
       }
 
       .detail {
@@ -86,41 +125,19 @@
         overflow-wrap: anywhere;
       }
 
-      .actions {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .secondary-actions {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 4px 12px;
-      }
-
       a {
-        padding: 6px 8px;
+        padding: 5px 8px;
         border-radius: 8px;
         color: #b3b3b3;
         font-size: 13px;
         text-decoration: none;
       }
 
-      .detail a {
-        padding: 0;
-        border-radius: 2px;
-        color: inherit;
-        font: inherit;
-        white-space: nowrap;
-      }
-
       a:hover {
         color: #fff;
       }
 
-      a[data-action="download"]:hover {
+      .footer > a:hover {
         text-decoration: underline;
         text-underline-offset: 0.2em;
       }
@@ -130,8 +147,12 @@
         outline-offset: 3px;
       }
 
-      .actions > a {
-        align-self: stretch;
+      .primary {
+        width: 100%;
+      }
+
+      .primary a {
+        display: block;
         padding: 9px 20px;
         background: #fff;
         color: #000;
@@ -139,7 +160,7 @@
         font-weight: 600;
       }
 
-      .actions > a:hover {
+      .primary a:hover {
         background: #e6e6e6;
       }
     </style>
@@ -147,8 +168,8 @@
   <body>
     <main id="grida-desktop-update-page">
       <div class="symbol" aria-hidden="true">{{symbol}}</div>
-      <h1>{{title}}</h1>
-      {{message}}
+      <h1 id="update-status">{{title}}</h1>
+      {{message}} {{activity}}
     </main>
     {{footer}}
   </body>

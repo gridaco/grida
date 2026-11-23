@@ -1,5 +1,6 @@
 import {
   BrowserWindow,
+  dialog,
   screen,
   shell,
   type App,
@@ -296,7 +297,7 @@ export function create_desktop_window({
   const window = new BrowserWindow({
     ...get_window_constructor_options(presentation),
     title,
-    show,
+    show: show && urlPath === null,
     webPreferences: {
       // GRIDA-SEC-004 Electron hardening.
       nodeIntegration: false,
@@ -340,7 +341,29 @@ export function create_desktop_window({
   // Per-window nav-history push channel must observe the initial load too.
   attachNavigationEvents(window);
 
-  if (urlPath !== null) void window.loadURL(`${baseUrl}${urlPath}`);
+  if (urlPath !== null) {
+    if (show) {
+      // The hosted theme bootstrap runs before the renderer's first paint.
+      // Wait for that frame so the user never sees an unthemed blank window.
+      // See test/desktop-window-opening-appearance.md.
+      window.once("ready-to-show", () => window.show());
+    }
+    void window.loadURL(`${baseUrl}${urlPath}`).catch(() => {
+      if (
+        window.isDestroyed() ||
+        window.webContents.isLoadingMainFrame() ||
+        !show ||
+        window.isVisible()
+      ) {
+        return;
+      }
+      window.close();
+      dialog.showErrorBox(
+        "Couldn't open the Grida window",
+        "Try opening the window again."
+      );
+    });
+  }
 
   return window;
 }

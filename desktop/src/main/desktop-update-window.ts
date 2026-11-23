@@ -36,39 +36,32 @@ export class DesktopUpdateWindow {
   ) {}
 
   async show(view: DesktopUpdateWindow.View): Promise<void> {
-    const actions = [...(view.actions ?? [])];
-    const [primary, ...alternatives] = actions;
-    const installerInFooter =
-      primary === "restart" && alternatives.includes("download");
-    const secondary = installerInFooter
-      ? alternatives.filter((action) => action !== "download")
-      : alternatives;
-    const detail = [
-      view.detail && escapeText(view.detail),
-      installerInFooter && actionLink("download"),
+    const installerLink = view.installerLink && view.action !== "download";
+    const actions: DesktopUpdateWindow.Action[] = [];
+    if (view.action) actions.push(view.action);
+    if (installerLink) actions.push("download");
+    const footer = [
+      view.action && `<div class="primary">${actionLink(view.action)}</div>`,
+      view.detail && `<div class="detail">${escapeText(view.detail)}</div>`,
+      installerLink && actionLink("download"),
     ]
       .filter(Boolean)
-      .join(" · ");
-    const actionMarkup = primary
-      ? `<nav class="actions" aria-label="Update options">${actionLink(primary)}${
-          secondary.length
-            ? `<div class="secondary-actions">${secondary.map(actionLink).join("")}</div>`
-            : ""
-        }</nav>`
-      : "";
-    const footer =
-      actionMarkup + (detail ? `<div class="detail">${detail}</div>` : "");
+      .join("");
     const slots = {
       symbol: gridaSymbol,
       title: escapeText(view.title),
       message: view.message ? `<p>${escapeText(view.message)}</p>` : "",
+      activity: view.busy
+        ? '<div class="activity" role="progressbar" aria-labelledby="update-status"></div>'
+        : "",
       footer: footer ? `<footer class="footer">${footer}</footer>` : "",
     };
     const html = updatePage.replace(
-      /\{\{(symbol|title|message|footer)\}\}/g,
+      /\{\{(symbol|title|message|activity|footer)\}\}/g,
       (_match, slot: keyof typeof slots) => slots[slot]
     );
     const source = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    if (this.#document?.source === source) return;
     const window = this.#window ?? this.#create();
     const document = { source, actions };
     this.#document = document;
@@ -81,7 +74,13 @@ export class DesktopUpdateWindow {
       this.close();
       throw error;
     }
-    if (this.#window === window && this.#document === document) window.show();
+    if (
+      this.#window === window &&
+      this.#document === document &&
+      !window.isVisible()
+    ) {
+      window.show();
+    }
   }
 
   close(): void {
@@ -99,7 +98,7 @@ export class DesktopUpdateWindow {
     const window = new BrowserWindow({
       title: "Grida Desktop Updates",
       width: 350,
-      height: 525,
+      height: 328,
       backgroundColor: "#000000",
       titleBarStyle: "hidden",
       titleBarOverlay:
@@ -158,6 +157,8 @@ export namespace DesktopUpdateWindow {
     title: string;
     message?: string;
     detail?: string;
-    actions?: readonly Action[];
+    action?: Action;
+    installerLink?: boolean;
+    busy?: boolean;
   };
 }
