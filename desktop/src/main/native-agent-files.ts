@@ -7,6 +7,7 @@ import path from "node:path";
 import { parse, type TomlTable } from "smol-toml";
 
 const execute = promisify(execFile);
+const FILE_TOO_LARGE = "native_file_too_large";
 
 export async function boundedFile(
   location: string,
@@ -24,7 +25,6 @@ export async function boundedFile(
     const stat = await handle.stat();
     if (
       !stat.isFile() ||
-      stat.size > maximum ||
       (privateFile &&
         (stat.uid !== process.geteuid?.() ||
           (stat.mode & 0o7777) !== 0o600 ||
@@ -38,6 +38,7 @@ export async function boundedFile(
       (system && stat.uid !== 0)
     )
       throw new Error("native_hook_configuration_invalid");
+    if (stat.size > maximum) throw new Error(FILE_TOO_LARGE);
     if (privateFile || userOwned) await noAcl(location);
     const data = Buffer.alloc(stat.size + 1);
     const { bytesRead } = await handle.read(data, 0, data.length, 0);
@@ -93,41 +94,22 @@ export async function readGlobalConfig(
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
+    if (error instanceof Error && error.message === FILE_TOO_LARGE)
+      throw new Error("config_file_too_large");
+    throw new Error("config_file_unavailable");
   }
 }
 
-/** Each owner validates its own section; the version and the accepted root fields are shared. */
-export function parseGlobalConfig(bytes: Buffer) {
-  let text: string;
+/** Hook and personalization readers validate their own sections. */
+export function parseGlobalConfig(bytes: Buffer): TomlTable {
   let table: TomlTable;
   try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    table = parse(text);
+    table = parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes), {
+      integersAsBigInt: "asNeeded",
+    });
   } catch {
-    throw new Error("native_hooks_toml_invalid");
+    throw new Error("config_toml_invalid");
   }
-  const { desktop, hooks } = table;
-  if (
-    table.schema_version !== 1 ||
-    Object.keys(table).some(
-      (key) =>
-        ![
-          "schema_version",
-          "hooks",
-          "desktop",
-          "web_search",
-          // Preserve the retired feature table in existing config files.
-          "features",
-        ].includes(key)
-    ) ||
-    (hooks !== undefined && !Array.isArray(hooks)) ||
-    (desktop !== undefined &&
-      (!desktop ||
-        typeof desktop !== "object" ||
-        Array.isArray(desktop) ||
-        desktop instanceof Date))
-  )
-    throw new Error("native_hooks_schema_invalid");
-  return { text, table, desktop };
+  if (table.schema_version !== 1) throw new Error("config_schema_unsupported");
+  return table;
 }

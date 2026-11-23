@@ -158,9 +158,12 @@ it("holds upload until dispatch and rechecks the live route grant", async () => 
   egress.close();
 });
 
-it("allows only the opted-in loopback count route through the live provider grant", async () => {
+it("preserves generation for an existing llama.cpp profile and refuses counting", async () => {
   const countTarget = target + "/input_tokens";
-  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => null);
+  const dispatch = vi.fn<() => Promise<Response>>(
+    async () => new Response(null)
+  );
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
   const openCount = open({
     target: countTarget,
     headers: [
@@ -195,22 +198,44 @@ it("allows only the opted-in loopback count route through the live provider gran
     "fixture",
     true
   );
-  expect(await counted.exchange(open({ target: countTarget }))).toEqual({
+  expect(await counted.exchange(openCount)).toEqual({
     status: "unavailable",
   });
-  expect(
-    await counted.exchange({ ...openCount, target: countTarget + "?extra=1" })
-  ).toEqual({ status: "unavailable" });
-  expect(await counted.exchange(openCount)).toEqual({ status: "accepted" });
   expect(prepare).not.toHaveBeenCalled();
+  expect(await counted.exchange(open())).toEqual({ status: "accepted" });
   expect(await counted.exchange({ id, action: "dispatch" })).toEqual({
-    status: "unavailable",
+    status: "ready",
+    httpStatus: 200,
+    requestId: null,
+    retryAfterMs: null,
   });
-  expect(prepare).toHaveBeenCalledExactlyOnceWith(
-    countTarget,
-    expect.any(Headers)
-  );
+  expect(prepare).toHaveBeenCalledExactlyOnceWith(target, expect.any(Headers));
+  expect(dispatch).toHaveBeenCalledTimes(1);
   counted.close();
+});
+
+it("refuses the Responses count route before provider dispatch", async () => {
+  const responsesEndpoint = "https://api.openai.com/v1";
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => null);
+  const egress = new NativeProviderEgress(
+    { prepare },
+    "responses",
+    responsesEndpoint,
+    "fixture"
+  );
+  expect(
+    await egress.exchange(
+      open({
+        target: responsesEndpoint + "/responses/input_tokens",
+        headers: [
+          ["accept", "application/json"],
+          ["content-type", "application/json"],
+        ],
+      })
+    )
+  ).toEqual({ status: "unavailable" });
+  expect(prepare).not.toHaveBeenCalled();
+  egress.close();
 });
 
 it("bounds uploads and projects a bounded response stream with no replay", async () => {

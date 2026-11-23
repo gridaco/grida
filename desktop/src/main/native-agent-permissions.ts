@@ -20,16 +20,11 @@ const APPROVALS = "co.grida/session/approvals";
 const ANSWER = "co.grida/session/answer-approval";
 const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const READ_TOOLS = ["read_file", "list_files", "search_text"] as const;
-const WRITE_TOOLS = ["write_file", "edit_file"] as const;
-/** The host's directory ID and only path for the agent settings file. */
-const SETTINGS_DIRECTORY = "agent-settings";
-const SETTINGS_PATH = "config.toml";
 const MAX_PATH_BYTES = 4096;
 const MAX_QUERY_BYTES = 128;
 // The native exec_command tool accepts up to 64 KiB of encoded arguments.
 const MAX_COMMAND_BYTES = 64 * 1024;
 type ReadTool = (typeof READ_TOOLS)[number];
-type WriteTool = (typeof WRITE_TOOLS)[number];
 
 type Directory = Readonly<{
   id: string;
@@ -95,19 +90,13 @@ export class NativeAgentPermissions {
   static readonly reconsideration = "co.grida/session/reconsider-denial";
   static readonly answerMethod = `_${ANSWER}`;
 
-  /**
-   * `settingsRoot` is the canonical folder of the workspace's agent settings
-   * file. The host asks before every write to that one file.
-   */
   constructor(
     private readonly request: Request,
     private readonly askRoots: ReadonlyMap<string, string>,
-    private readonly settingsRoot?: string,
     private readonly scopedAccess?: ScopedAccess
   ) {
     this.authority = digest(
       JSON.stringify([
-        settingsRoot,
         [...askRoots].sort(([a], [b]) => a.localeCompare(b)),
         scopedAccess,
       ])
@@ -267,7 +256,6 @@ export class NativeAgentPermissions {
         sessionRevision,
         controlRevision,
         this.askRoots,
-        this.settingsRoot,
         this.scopedAccess
       )
     );
@@ -386,7 +374,6 @@ function readReview(
   sessionRevision: number,
   controlRevision: number,
   askRoots: ReadonlyMap<string, string>,
-  settingsRoot: string | undefined,
   scoped: ScopedAccess | undefined
 ): NativeApprovalReview {
   const row = object(entry);
@@ -562,7 +549,6 @@ function readReview(
   )
     throw invalidApproval();
   const external = directory === "external-file" && root === "/";
-  const settings = directory === SETTINGS_DIRECTORY;
   if (external) {
     const target = path.join("/", relative);
     if (
@@ -576,21 +562,12 @@ function readReview(
         scoped.project.path,
         ...askRoots.values(),
         ...scoped.protectedPaths,
-        ...(settingsRoot ? [settingsRoot] : []),
       ].some((p) => within(p, target))
     )
       throw invalidApproval();
-  } else if (reviewRoot(directory, askRoots, settingsRoot) !== root)
-    throw invalidApproval();
-  const tool = settings
-    ? effect.kind === "write" &&
-      writeTool(effect.tool) &&
-      relative === SETTINGS_PATH
-      ? effect.tool
-      : undefined
-    : effect.kind === "read" && readTool(effect.tool)
-      ? effect.tool
-      : undefined;
+  } else if (askRoots.get(directory) !== root) throw invalidApproval();
+  const tool =
+    effect.kind === "read" && readTool(effect.tool) ? effect.tool : undefined;
   if (
     !tool ||
     (effect.query !== undefined &&
@@ -717,21 +694,6 @@ function object(value: unknown): Record<string, unknown> | undefined {
 
 function readTool(value: unknown): value is ReadTool {
   return READ_TOOLS.some((tool) => tool === value);
-}
-
-function writeTool(value: unknown): value is WriteTool {
-  return WRITE_TOOLS.some((tool) => tool === value);
-}
-
-/** Where an approvable action may act: an ask folder or the settings file's. */
-function reviewRoot(
-  directory: string,
-  askRoots: ReadonlyMap<string, string>,
-  settingsRoot: string | undefined
-): string | undefined {
-  return directory === SETTINGS_DIRECTORY
-    ? settingsRoot
-    : askRoots.get(directory);
 }
 
 function identity(value: unknown): value is string {

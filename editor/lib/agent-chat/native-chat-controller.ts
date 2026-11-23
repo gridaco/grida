@@ -1211,6 +1211,7 @@ export class NativeChatController {
           case "native-provider-model-unavailable":
           case "native-hooks-review-required":
           case "native-hooks-configuration-invalid":
+          case "native-configuration-invalid":
           case "native-provider-endpoint-https-required":
           case "native-provider-endpoint-approval-required":
           case "native-gateway-unavailable":
@@ -9546,6 +9547,8 @@ function describe(error: unknown, fallback: string): string {
     return "This Desktop version couldn't safely continue the chat after a model change. Update Desktop and retry.";
   if (error.message.includes("session_active_route_changed"))
     return "This unfinished turn needs the model connection that accepted it. Restore that connection, or stop the turn.";
+  if (error.message.includes("retired_input_cap_requires_restart"))
+    return "This turn was paused under an older configuration. Stop it, then send the message again.";
   if (error.message.includes("session_queued_route_changed"))
     return "Queued messages need their original model connection. Restore it to run them, or remove those messages.";
   if (error.message.includes("session_goal_route_changed"))

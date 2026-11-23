@@ -7725,6 +7725,7 @@ it.each([
   ["native-provider-model-unavailable", "native-provider-model-unavailable"],
   ["native-hooks-review-required", "native-hooks-review-required"],
   ["native-hooks-configuration-invalid", "native-hooks-configuration-invalid"],
+  ["native-configuration-invalid", "native-configuration-invalid"],
   [
     "native-provider-endpoint-https-required",
     "native-provider-endpoint-https-required",
@@ -8484,6 +8485,10 @@ function message(id: string, content: string): NativeChatMessage {
 describe("Native workspace chat controller", () => {
   it.each([
     ["session_active_route_changed", /unfinished turn/],
+    [
+      "retired_input_cap_requires_restart",
+      /Stop it, then send the message again/,
+    ],
     ["session_queued_route_changed", /Queued messages/],
     ["session_goal_route_changed", /active goal/],
     ["session_delegated_route_changed", /Delegated work/],

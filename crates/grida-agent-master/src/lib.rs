@@ -195,7 +195,6 @@ pub struct Master {
     discovery: Option<discovery::Catalog>,
     authority: MasterAuthority,
     history: Vec<Message>,
-    input_limit: Option<NonZeroU64>,
     auto_compact_token_limit: Option<NonZeroU64>,
     retained_file_check: Option<Box<dyn Fn() -> BoxFuture<'static, Result<()>> + Send + Sync>>,
     effort: Option<effort::Policy>,
@@ -232,7 +231,9 @@ enum RequestRefresh {
 struct ConfigurationIdentity<'a> {
     config: &'a MasterConfig,
     history: &'a [Message],
-    input_limit: Option<NonZeroU64>,
+    /// Preserve the fingerprint of existing uncapped continuations.
+    #[serde(rename = "input_limit")]
+    retired_input_limit: (),
     #[serde(skip_serializing_if = "Option::is_none")]
     auto_compact_token_limit: Option<NonZeroU64>,
     completion_checks: Option<&'a hooks::CompletionChecks>,
@@ -285,6 +286,13 @@ impl Continuation {
     }
 }
 
+/// Version one conversations bound the workspace's former input-cap policy to their configuration.
+pub fn has_legacy_conversation_checkpoint(state: &TurnState) -> bool {
+    state.checkpoint().is_some_and(|checkpoint| {
+        checkpoint.schema().as_str() == CONTINUATION_SCHEMA && checkpoint.version() == 1
+    })
+}
+
 /// The retained deadline for the current retry step, if it has been reserved.
 pub fn pending_retry_not_before(state: &TurnState) -> Result<Option<u64>> {
     let has_rejection = state.operations().values().any(|operation| {
@@ -324,7 +332,6 @@ impl Master {
             discovery: None,
             authority,
             history: Vec::new(),
-            input_limit: None,
             auto_compact_token_limit: None,
             retained_file_check: None,
             effort: None,
@@ -380,12 +387,6 @@ impl Master {
             tools,
             grants,
         });
-        self
-    }
-
-    /// Apply the accepted task's hard limit to the complete provider input.
-    pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
-        self.input_limit = limit;
         self
     }
 
@@ -1160,7 +1161,7 @@ impl Master {
         let fingerprint = Fingerprint::of(&ConfigurationIdentity {
             config: &self.config,
             history: &self.history,
-            input_limit: self.input_limit,
+            retired_input_limit: (),
             auto_compact_token_limit: self.auto_compact_token_limit,
             completion_checks: self
                 .completion_checks
@@ -1241,11 +1242,7 @@ impl Master {
                 let HistoryRecord::Message(message) = record;
                 message.role == Role::User && index as u64 >= request_history.0
             });
-        let missing_limit = self
-            .input_limit
-            .is_some_and(|limit| request.input_limit() != Some(limit));
         if !new_input
-            && !missing_limit
             && !operation.as_ref().is_some_and(paused_before_generation)
             && request.binding().authority == self.authority.inference.authority
         {
@@ -1405,18 +1402,14 @@ impl Master {
                 .input_modalities
                 .contains(&agent_kit_core::inference::Modality::Image),
         );
-        let request = self.provider.prepare(InferenceRequest {
+        self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
             messages,
             tools: self.offers(discovered)?,
             max_output_tokens: self.config.max_output_tokens,
             extension: self.config.request_options.extension()?,
             reasoning: self.config.reasoning,
-        })?;
-        match self.input_limit {
-            Some(limit) => request.with_input_limit(limit),
-            None => Ok(request),
-        }
+        })
     }
 
     async fn retain_orphaned_work(turn: &Turn, view: &TurnView) -> Result<()> {
@@ -1554,18 +1547,7 @@ impl Master {
                     unresolved,
                     tool_activity: ToolActivity::from_turn(&view),
                     stop_reason,
-                    failure: delegation_failure.or_else(|| {
-                        inference_failure.and_then(|failure| {
-                            let kind = match failure.code.as_str() {
-                                "input_measurement_unavailable" | "input_bound_unavailable" => {
-                                    ErrorKind::Unsupported
-                                }
-                                "input_token_limit" => ErrorKind::LimitExceeded,
-                                _ => return None,
-                            };
-                            Some(Error::new(kind, &failure.code))
-                        })
-                    }),
+                    failure: delegation_failure,
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
                     independent_review: self
@@ -1958,14 +1940,24 @@ fn update_account(outcome: &mut TurnOutcome, change: impl FnOnce(&mut Account)) 
     Ok(())
 }
 
+fn current_schema_version(schema: &str) -> u32 {
+    if schema == CONTINUATION_SCHEMA { 2 } else { 1 }
+}
+
 fn encode<T: Serialize>(schema: &str, value: &T) -> Result<Envelope> {
     let bytes = serde_json::to_vec(value)
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_master_state"))?;
-    Envelope::new(SchemaId::new(schema)?, 1, bytes)
+    Envelope::new(
+        SchemaId::new(schema)?,
+        current_schema_version(schema),
+        bytes,
+    )
 }
 
 fn decode<T: serde::de::DeserializeOwned>(schema: &str, envelope: &Envelope) -> Result<T> {
-    if envelope.schema().as_str() != schema || envelope.version() != 1 {
+    if envelope.schema().as_str() != schema
+        || !(1..=current_schema_version(schema)).contains(&envelope.version())
+    {
         return Err(Error::new(
             ErrorKind::Unsupported,
             "unsupported_master_state",
@@ -2006,15 +1998,6 @@ fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
         }
         (FailureKind::Configuration, "retained_workspace_image_unavailable") => {
             "The captured workspace image is unavailable. Ask the agent to view the workspace image again."
-        }
-        (FailureKind::ContextLimit, "input_token_limit") => {
-            "The request exceeds the configured input limit. Shorten the input or change the limit in settings."
-        }
-        (
-            FailureKind::Configuration,
-            "input_measurement_unavailable" | "input_bound_unavailable",
-        ) => {
-            "The selected model cannot verify the configured input limit. Choose another model or change the limit in settings."
         }
         (FailureKind::Configuration, "model_unavailable") => {
             "The selected model is unavailable from this provider. Choose another model or check your access."

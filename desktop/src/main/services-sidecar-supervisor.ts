@@ -51,6 +51,7 @@ export type NativeChatPaths = Readonly<{
   /** Electron's browser profile, which holds the native chat store. */
   desktopUserDataPath: string;
   providerHome: string;
+  configHome: string;
   mediaRoot: string;
 }>;
 
@@ -169,11 +170,15 @@ export class ServicesSidecarSupervisor {
     ) {
       throw new Error("native_chat_selection_unavailable");
     }
+    const override = process.env.GRIDA_HOME;
+    if (ordinary && override && !path.isAbsolute(override))
+      throw new Error("config_home_must_be_absolute");
     this.ordinaryNativeChat = ordinary;
     return (this.nativeChat ??= Object.freeze({
       userDataPath: this.user_data_path,
       desktopUserDataPath: app.getPath("userData"),
       providerHome: this.provider_home,
+      configHome: ordinary ? home.dir() : this.provider_home,
       mediaRoot: this.media_root,
     }));
   }

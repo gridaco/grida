@@ -31,7 +31,7 @@ async fn queued_compaction_uses_reported_context_and_the_limits_captured_before_
         let temporary = TempDir::new().unwrap();
         let state = temporary.path().join("state");
         let workspace = TempDir::new().unwrap();
-        limits(&state, window, limit);
+        limits(&fixture_config_home(&state), window, limit);
         let (release, held) = tokio::sync::oneshot::channel();
         let mut replies = vec![
             reported_usage_answer("The originals have their own index.", 1_000, 10),
@@ -78,7 +78,11 @@ async fn queued_compaction_uses_reported_context_and_the_limits_captured_before_
 
         // The inflight input holds the queue while the new configuration takes
         // effect. The accepted input must still apply its original window/limit.
-        limits(&state, 50_000, if compact { 40_000 } else { 100 });
+        limits(
+            &fixture_config_home(&state),
+            50_000,
+            if compact { 40_000 } else { 100 },
+        );
         let inspect = ws_rpc(&mut socket, 6, "_co.grida/config/inspect", json!({})).await;
         let revision = &inspect["result"]["file_revision"];
         assert!(revision.is_string(), "{inspect}");
@@ -128,7 +132,7 @@ async fn growing_tool_output_compacts_before_the_same_turn_continues() {
         (Reply::Stop("length"), false),
     ] {
         let fixture = crate::approvals::Fixture::new(false);
-        limits(&fixture.state, 20_000, 1_024);
+        limits(&fixture.profile.with_file_name("grida-home"), 20_000, 1_024);
         let archive = format!("{MARKER}{}", "x".repeat(6_000));
         std::fs::write(fixture.primary.join("index.txt"), &archive).unwrap();
         let mut endpoint = Endpoint::start(vec![
@@ -287,7 +291,7 @@ async fn switching_models_estimates_the_new_context_instead_of_reusing_its_prede
     let state = temporary.path().join("state");
     let workspace = TempDir::new().unwrap();
     let original = format!("Earlier catalog notes {}", "a".repeat(8_000));
-    limits(&state, 100_000, 90_000);
+    limits(&fixture_config_home(&state), 100_000, 90_000);
     let mut endpoint = Endpoint::start(vec![
         Reply::Finished("The previous entry is preserved."),
         reported_usage_answer("Understood.", 100, 5),
@@ -315,7 +319,7 @@ async fn switching_models_estimates_the_new_context_instead_of_reusing_its_prede
     }
     larger.close().await;
 
-    limits(&state, 2_000, 1_000);
+    limits(&fixture_config_home(&state), 2_000, 1_000);
     let mut smaller = crate::model_change::start(&state, &endpoint.url, "small-model").await;
     let inspect = smaller.request("_co.grida/config/inspect", json!({})).await;
     let reload = smaller
@@ -388,7 +392,7 @@ async fn inline_compaction_items_keep_live_identity_through_turn_controls_and_re
         (Reply::Finished(SECOND), "succeeded", Ending::AnswerQuestion),
     ] {
         let fixture = crate::approvals::Fixture::new(false);
-        limits(&fixture.state, 20_000, 8_000);
+        limits(&fixture.profile.with_file_name("grida-home"), 20_000, 8_000);
         std::fs::write(
             fixture.primary.join("first.txt"),
             format!("Archive 302. {}", "x".repeat(6_000)),
@@ -679,7 +683,7 @@ async fn resuming_interrupted_inline_compaction_keeps_the_original_activity() {
     const LIFECYCLE: &str = "co.grida/session/lifecycle";
     const ARCHIVE: &str = "Archive entry 302.";
     let fixture = crate::approvals::Fixture::new(false);
-    limits(&fixture.state, 20_000, 8_000);
+    limits(&fixture.profile.with_file_name("grida-home"), 20_000, 8_000);
     std::fs::write(
         fixture.primary.join("index.txt"),
         format!("{ARCHIVE} {}", "x".repeat(6_000)),

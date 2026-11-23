@@ -143,8 +143,7 @@ export namespace NativeProviderSelection {
         isCurrent: () => custody.isCurrent(network),
         prepare: (url, headers) => {
           if (
-            (url !== target &&
-              (!isOpenAiProject || url !== `${target}/input_tokens`)) ||
+            url !== target ||
             !/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
           )
             return null;
@@ -207,9 +206,6 @@ export namespace NativeProviderSelection {
       : undefined;
     const network = await settings.network(config.id, endpoint);
     target.pathname = `${target.pathname.replace(/\/$/, "")}/chat/completions`;
-    const countTarget = llamaCppInputCount
-      ? `${target.href}/input_tokens`
-      : undefined;
     return {
       provider: "openai-compatible",
       endpoint,
@@ -227,7 +223,7 @@ export namespace NativeProviderSelection {
             ? custody.isCurrent(network)
             : (network.isCurrent?.() ?? true),
         prepare: (url, headers) =>
-          (url === target.href || url === countTarget) &&
+          url === target.href &&
           (hasKey
             ? /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
             : !headers.has("authorization"))

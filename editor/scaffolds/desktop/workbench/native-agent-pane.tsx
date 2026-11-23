@@ -320,6 +320,8 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Grida Gateway is unavailable. Retry the connection or choose another model.",
   "native-hooks-review-required":
     "A configured hook needs review before chat can start. Open Settings → Hooks to review it, or disable it in config.toml.",
+  "native-configuration-invalid":
+    "The agent configuration couldn’t be loaded. Open Settings → Configuration to review config.toml, then retry.",
   "native-hooks-configuration-invalid":
     "The global hook configuration couldn't be loaded. Open Settings → Hooks to inspect and fix it, then retry.",
   "native-provider-key-required":

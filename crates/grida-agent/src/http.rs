@@ -107,7 +107,6 @@ pub struct HttpTransport {
     replay_binding: Option<BindingId>,
     selection: Fingerprint,
     dispatch: Dispatch,
-    llama_cpp_input_count: bool,
 }
 
 enum Dispatch {
@@ -152,6 +151,7 @@ impl HttpTransport {
             base.as_str().strip_suffix('/').unwrap_or(base.as_str()),
             source_identity,
         ))?;
+        // Saved loopback profiles retain the lineage they originally selected.
         let lineage = if options.llama_cpp_input_count {
             Fingerprint::of(&(lineage, "llama-cpp-chat-input-count-v1"))?
         } else {
@@ -215,7 +215,6 @@ impl HttpTransport {
             replay_binding,
             selection,
             dispatch,
-            llama_cpp_input_count: options.llama_cpp_input_count,
         })
     }
 
@@ -229,10 +228,6 @@ impl HttpTransport {
 
     pub fn replay_binding(&self) -> Option<&BindingId> {
         self.replay_binding.as_ref()
-    }
-
-    pub(crate) fn supports_exact_input_counting(&self) -> bool {
-        self.protocol == ProviderProtocol::Responses || self.llama_cpp_input_count
     }
 
     pub(crate) fn is_loopback(&self) -> bool {
@@ -339,18 +334,6 @@ impl HttpTransport {
         if operation == &self.operation {
             return Ok(self.target.clone());
         }
-        if (self.protocol == ProviderProtocol::Responses
-            && operation == &TransportOperation::OpenAiResponsesInputTokens)
-            || (self.llama_cpp_input_count
-                && operation == &TransportOperation::LlamaCppChatInputTokens)
-        {
-            let mut target = self.target.clone();
-            target
-                .path_segments_mut()
-                .map_err(|_| TransportFailure::Unavailable)?
-                .push("input_tokens");
-            return Ok(target);
-        }
         Err(TransportFailure::Unavailable)
     }
 }
@@ -421,14 +404,7 @@ impl StreamingTransport for HttpTransport {
             }
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            headers.insert(
-                ACCEPT,
-                HeaderValue::from_static(match request.operation {
-                    TransportOperation::OpenAiResponsesInputTokens
-                    | TransportOperation::LlamaCppChatInputTokens => "application/json",
-                    _ => "text/event-stream",
-                }),
-            );
+            headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
             if self.protocol == ProviderProtocol::Anthropic {
                 headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
             }
@@ -903,7 +879,7 @@ mod tests {
     }
 
     #[test]
-    fn responses_can_count_only_under_the_same_fixed_api_route() {
+    fn responses_transport_accepts_only_its_generation_operation() {
         let state = tempfile::tempdir().unwrap();
         let transport =
             HttpTransport::new(state.path(), &options(ProviderProtocol::Responses), None).unwrap();
@@ -915,11 +891,8 @@ mod tests {
             "http://127.0.0.1:1/v1/responses"
         );
         assert_eq!(
-            transport
-                .request_target(&TransportOperation::OpenAiResponsesInputTokens)
-                .unwrap()
-                .as_str(),
-            "http://127.0.0.1:1/v1/responses/input_tokens"
+            transport.request_target(&TransportOperation::OpenAiResponsesInputTokens),
+            Err(TransportFailure::Unavailable)
         );
         assert_eq!(
             transport.request_target(&TransportOperation::ChatCompletions),
@@ -938,12 +911,11 @@ mod tests {
     }
 
     #[test]
-    fn llama_cpp_count_requires_explicit_fixed_numeric_loopback_route() {
+    fn saved_llama_cpp_binding_keeps_its_lineage_without_count_access() {
         let state = tempfile::tempdir().unwrap();
         let mut settings = options(ProviderProtocol::OpenAiCompatible);
         let unselected = HttpTransport::new(state.path(), &settings, None).unwrap();
         let count = TransportOperation::LlamaCppChatInputTokens;
-        assert!(!unselected.supports_exact_input_counting());
         assert_eq!(
             unselected.request_target(&count),
             Err(TransportFailure::Unavailable)
@@ -956,10 +928,9 @@ mod tests {
             selected.binding().authority.scope,
             unselected.binding().authority.scope
         );
-        assert!(selected.supports_exact_input_counting());
         assert_eq!(
-            selected.request_target(&count).unwrap().as_str(),
-            "http://127.0.0.1:1/v1/chat/completions/input_tokens"
+            selected.request_target(&count),
+            Err(TransportFailure::Unavailable)
         );
         for endpoint in [
             "http://localhost:1/v1",
@@ -978,8 +949,10 @@ mod tests {
         settings.endpoint = "http://[::1]:1/v1/".into();
         let ipv6 = HttpTransport::new(state.path(), &settings, None).unwrap();
         assert_eq!(
-            ipv6.request_target(&count).unwrap().as_str(),
-            "http://[::1]:1/v1/chat/completions/input_tokens"
+            ipv6.request_target(&TransportOperation::ChatCompletions)
+                .unwrap()
+                .as_str(),
+            "http://[::1]:1/v1/chat/completions"
         );
     }
 

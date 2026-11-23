@@ -856,13 +856,10 @@ impl Host {
         let provider = execution
             .subscription_provider_for_request(&plan.request)
             .unwrap_or_else(|| execution.provider.clone());
-        let mut prepared = provider.prepare(plan.request.request().clone())?;
+        let prepared = provider.prepare(plan.request.request().clone())?;
         if prepared.binding().provider != old.provider || &prepared.binding().authority != authority
         {
             return Ok(None);
-        }
-        if let Some(limit) = plan.request.input_limit() {
-            prepared = prepared.with_input_limit(limit)?;
         }
         Ok(Some(prepared))
     }

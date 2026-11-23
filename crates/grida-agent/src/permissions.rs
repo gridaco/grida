@@ -1,11 +1,10 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — host-selected roots and exact action approvals.
 
 use crate::command::{CommandAccess, CommandLimits, CommandSupervisor, ReviewedCommand};
-use crate::configuration::Configuration;
 use crate::file_tools::{
     CAPTURE_IMAGE_REFERENCE, EXTERNAL_FILE_DIRECTORY, FileAuthority, FileTools, ImageCapture,
-    PROTECTED_METADATA, PROTECTED_WHEN_MISSING, READ_SCOPED_FILE, SETTINGS_DIRECTORY,
-    SETTINGS_PATH, SettingsAccess, VIEW_IMAGE, read_request, write_request,
+    PROTECTED_METADATA, PROTECTED_WHEN_MISSING, READ_SCOPED_FILE, VIEW_IMAGE, read_request,
+    write_request,
 };
 use crate::goal_verification::ReadVerification;
 use crate::processes::{
@@ -213,7 +212,7 @@ pub struct PermissionCapture {
     /// Earlier Plan inputs keep the more restrictive command read policy they accepted.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     broad_command_reads: bool,
-    /// Earlier accepted inputs can finish with their original config tools.
+    /// Historical input field retained for decoding already accepted captures.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     client_managed_settings: bool,
 }
@@ -281,13 +280,6 @@ impl PermissionProfile {
             );
         }
         for id in directories.keys() {
-            // The settings file's directory ID cannot name a workspace folder.
-            if id.as_str() == SETTINGS_DIRECTORY {
-                return Err(problem(
-                    ErrorKind::InvalidInput,
-                    "permission_directory_reserved",
-                ));
-            }
             workspace.permission_directory(Some(id), &protected)?;
         }
         if command.is_none()
@@ -823,7 +815,6 @@ impl PermissionProfile {
         } else {
             self.capture_plan(scope, mode)?
         };
-        capture.client_managed_settings = true;
         // File verification consumes the exact native read receipt.
         capture.shell_text_reads = self.goal_read_verifications.is_empty()
             && ((!capture.plan && mode == PermissionMode::FullAccess)
@@ -988,31 +979,25 @@ impl PermissionProfile {
 
     /// Bind one owner epoch. Allowing a review means an authorized reviewer
     /// may resolve it later, even when no such client is currently attached.
-    /// The settings file is offered only while commands cannot reach its
-    /// directory; its writes always ask, whatever the directory rules allow.
     pub fn bind(
         self: &Arc<Self>,
         capture: &PermissionCapture,
         binding: TurnBinding,
         store: Arc<SqliteStore>,
         allow_review: bool,
-        settings: Option<Arc<Configuration>>,
     ) -> Result<Arc<TurnPermissions>> {
-        let settings = settings.filter(|settings| self.protects(settings.directory()));
         let owner = self.prepare_scope(
             capture,
             (&binding.session, &binding.turn),
             store,
             allow_review,
             false,
-            settings,
         )?;
         owner.bind_claim(binding)?;
         Ok(owner)
     }
 
-    /// Delegation narrows the captured profile: approvals and settings mutation
-    /// remain with the parent rather than becoming hidden child interactions.
+    /// Delegation narrows the captured profile so approvals remain with the parent.
     pub(crate) fn bind_worker(
         self: &Arc<Self>,
         capture: &PermissionCapture,
@@ -1025,7 +1010,6 @@ impl PermissionProfile {
             store,
             false,
             false,
-            None,
         )?;
         owner.bind_claim(binding)?;
         Ok(owner)
@@ -1037,14 +1021,7 @@ impl PermissionProfile {
         selection: (&SessionId, &TurnId),
         store: Arc<SqliteStore>,
     ) -> Result<Arc<TurnPermissions>> {
-        self.prepare_scope(capture, selection, store, false, true, None)
-    }
-
-    /// Whether commands are denied reading and writing this path.
-    fn protects(&self, path: &Path) -> bool {
-        self.command_denials.iter().any(|denial| {
-            denial.access == DeniedAccess::ReadWrite && path.starts_with(&denial.path)
-        })
+        self.prepare_scope(capture, selection, store, false, true)
     }
 
     fn prepare_scope(
@@ -1054,7 +1031,6 @@ impl PermissionProfile {
         store: Arc<SqliteStore>,
         allow_review: bool,
         primary_review: bool,
-        settings: Option<Arc<Configuration>>,
     ) -> Result<Arc<TurnPermissions>> {
         let workspace_identity = if primary_review {
             self.validate_primary_review(capture)?
@@ -1154,14 +1130,8 @@ impl PermissionProfile {
             shell_text_reads: capture.shell_text_reads,
             command_file_input: capture.command_file_input,
             broad_command_reads: capture.broad_command_reads,
-            client_managed_settings: capture.client_managed_settings,
             allow_external_file_read: allow_review && !primary_review && capture.external_file_read,
             primary_review,
-            settings: settings.filter(|_| {
-                !capture.client_managed_settings
-                    && !primary_review
-                    && capture.mode != PermissionMode::FullAccess
-            }),
             files: GrantSelection {
                 authority: authority.clone(),
                 grants: vec![GrantId::new("workspace-file-read")?],
@@ -1576,7 +1546,6 @@ pub struct TurnPermissions {
     shell_text_reads: bool,
     command_file_input: bool,
     broad_command_reads: bool,
-    client_managed_settings: bool,
     profile: Arc<PermissionProfile>,
     selection: (SessionId, TurnId),
     binding: Arc<OnceLock<TurnBinding>>,
@@ -1585,8 +1554,6 @@ pub struct TurnPermissions {
     approve_for_me: bool,
     allow_external_file_read: bool,
     primary_review: bool,
-    /// The agent settings file this turn may read and, with approval, change.
-    settings: Option<Arc<Configuration>>,
     files: GrantSelection,
     commands: GrantSelection,
     /// Input to and output from the chat's processes. Offered with commands
@@ -1774,8 +1741,7 @@ impl TurnPermissions {
             let files = self.bound_file_tools(capture_image, capture_reference, image_view)?;
             let scoped_read = if !self.command_file_input
                 && self.shell_text_reads
-                && (self.settings.is_some()
-                    || self.allow_external_file_read
+                && (self.allow_external_file_read
                     || self.profile.directories.values().any(|rule| {
                         rule.read != AccessRule::Deny && !self.profile.shell_covers_text_read(rule)
                     })) {
@@ -1830,12 +1796,6 @@ impl TurnPermissions {
         )?
         .with_image_view(image_view)
         .with_full_access(self.profile.unconfined);
-        if self.settings.is_some() {
-            let owner = self.clone();
-            files = files.with_settings(Arc::new(move |invocation| {
-                owner.settings_authority(invocation)
-            }));
-        }
         if self.allow_external_file_read {
             let owner = self.clone();
             files = files.with_external_file(Arc::new(move |invocation| {
@@ -1846,8 +1806,7 @@ impl TurnPermissions {
     }
 
     fn has_separately_granted_file_reads(&self) -> bool {
-        self.settings.is_some()
-            || self.allow_external_file_read
+        self.allow_external_file_read
             || self.profile.directories.values().any(|rule| {
                 (rule.read == AccessRule::Allow
                     || (self.allow_review && rule.read == AccessRule::Ask))
@@ -1856,20 +1815,11 @@ impl TurnPermissions {
     }
 
     fn command_file_input(&self) -> CommandFileInput {
-        if !self.command_file_input {
-            CommandFileInput::None
-        } else if self.broad_command_reads {
-            if self.settings.is_some() {
-                CommandFileInput::Settings
-            } else {
-                CommandFileInput::None
-            }
-        } else if self.has_separately_granted_file_reads() {
-            if self.client_managed_settings {
-                CommandFileInput::ScopedFiles
-            } else {
-                CommandFileInput::Scoped
-            }
+        if self.command_file_input
+            && !self.broad_command_reads
+            && self.has_separately_granted_file_reads()
+        {
+            CommandFileInput::Scoped
         } else {
             CommandFileInput::None
         }
@@ -2062,9 +2012,6 @@ impl TurnPermissions {
             )
         {
             return Err(denied());
-        }
-        if let Some(ready) = self.capture_settings_action(admission)? {
-            return Ok(ready);
         }
         let (directory, effect, command_capture, rule) = match invocation.definition().id.as_str() {
             EXEC_COMMAND if !self.profile.hooks_only && admission.grants == self.commands => {
@@ -2344,105 +2291,6 @@ impl TurnPermissions {
         ))
     }
 
-    /// An action on the settings file, which lives outside every workspace
-    /// directory. Reads run; writes and edits always ask, so neither a
-    /// directory's write rule nor an earlier approval covers them.
-    fn capture_settings_action(
-        &self,
-        admission: &ToolAdmission,
-    ) -> Result<Option<(Ready, AccessRule)>> {
-        let Some(settings) = &self.settings else {
-            return Ok(None);
-        };
-        let invocation = &admission.invocation;
-        let tool = invocation.definition().id.as_str();
-        let (request, write) = match tool {
-            "write_file" | "edit_file" => (write_request(invocation)?, true),
-            "read_file"
-            | READ_SCOPED_FILE
-            | "list_files"
-            | "search_text"
-            | VIEW_IMAGE
-            | CAPTURE_IMAGE_REFERENCE => (read_request(invocation)?, false),
-            _ => return Ok(None),
-        };
-        if request
-            .directory
-            .as_ref()
-            .is_none_or(|directory| directory.as_str() != SETTINGS_DIRECTORY)
-        {
-            return Ok(None);
-        }
-        if admission.grants != self.files
-            || (!matches!(tool, "read_file" | READ_SCOPED_FILE) && !write)
-            || request.path.as_deref() != Some(Path::new(SETTINGS_PATH))
-        {
-            return Err(denied());
-        }
-        let relative_path = PathBuf::from(SETTINGS_PATH);
-        let (effect, rule) = if write {
-            if self.primary_review || self.state()?.read_only {
-                return Err(denied());
-            }
-            let effect = ApprovalEffect::Write {
-                tool: invocation.definition().id.clone(),
-                relative_path,
-            };
-            (effect, AccessRule::Ask)
-        } else {
-            let effect = ApprovalEffect::Read {
-                tool: ToolId::new("read_file")?,
-                relative_path,
-                query: None,
-            };
-            (effect, AccessRule::Allow)
-        };
-        let root = settings.directory().to_owned();
-        let scope = Fingerprint::of(&(self.profile.identity, SETTINGS_DIRECTORY, &root))?;
-        Ok(Some((
-            Ready {
-                request: ApprovalRequest {
-                    launch_scope: None,
-                    session: self.selection.0.clone(),
-                    turn: self.selection.1.clone(),
-                    operation: admission.operation.clone(),
-                    action: invocation.fingerprint(),
-                    scope,
-                    directory: BindingId::new(SETTINGS_DIRECTORY)?,
-                    root,
-                    effect,
-                },
-                command_capture: None,
-                approval: None,
-                active: None,
-            },
-            rule,
-        )))
-    }
-
-    fn settings_authority(&self, invocation: &Invocation) -> Result<SettingsAccess> {
-        let configuration = self.settings.clone().ok_or_else(denied)?;
-        let state = self.state()?;
-        let ready = current(&state, invocation.id(), invocation.fingerprint())?;
-        if ready.request.directory.as_str() != SETTINGS_DIRECTORY {
-            return Err(denied());
-        }
-        let write = match ready.request.effect {
-            ApprovalEffect::Read { .. } => false,
-            ApprovalEffect::Write { .. } if state.read_only || ready.approval.is_none() => {
-                return Err(denied());
-            }
-            ApprovalEffect::Write { .. } => true,
-            ApprovalEffect::Command { .. } | ApprovalEffect::EscalatedCommand { .. } => {
-                return Err(denied());
-            }
-        };
-        Ok(SettingsAccess {
-            configuration,
-            write,
-        })
-    }
-
     fn remember(&self, ready: Ready) -> Result<()> {
         let mut state = self.state()?;
         if state.revoked.contains(&ready.request.directory) {
@@ -2526,9 +2374,6 @@ impl TurnPermissions {
     fn file_authority(&self, invocation: &Invocation) -> Result<FileAuthority> {
         let state = self.state()?;
         let ready = current(&state, invocation.id(), invocation.fingerprint())?;
-        if ready.request.directory.as_str() == SETTINGS_DIRECTORY {
-            return Err(denied());
-        }
         let write = match ready.request.effect {
             ApprovalEffect::Read { .. } => false,
             ApprovalEffect::Write { .. } if state.read_only => return Err(denied()),
@@ -3216,7 +3061,6 @@ mod full_access_tests {
                 Arc::new(SqliteStore::open_in_memory().unwrap()),
                 true,
                 false,
-                None,
             )
             .unwrap();
         assert!(Arc::ptr_eq(&profile, &turn.profile));
@@ -3277,7 +3121,6 @@ mod full_access_tests {
                     Arc::new(SqliteStore::open_in_memory().unwrap()),
                     true,
                     false,
-                    None,
                 )
                 .unwrap();
             assert!(
@@ -3331,7 +3174,6 @@ mod full_access_tests {
                     Arc::new(SqliteStore::open_in_memory().unwrap()),
                     allow_review,
                     false,
-                    None,
                 )
             };
         for (offer, allow_review, expected) in [

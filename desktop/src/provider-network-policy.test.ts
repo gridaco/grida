@@ -53,7 +53,6 @@ describe("ProviderNetworkPolicy", () => {
     for (const [method, path] of [
       ["GET", "models"],
       ["POST", "responses"],
-      ["POST", "responses/input_tokens"],
     ]) {
       const metadata = request(method!, `${OPENAI_API_BASE}/${path}`);
       expect(ProviderNetworkPolicy.authorize(native, metadata).method).toBe(
@@ -75,6 +74,7 @@ describe("ProviderNetworkPolicy", () => {
     for (const [method, url] of [
       ["POST", `${OPENAI_API_BASE}/models`],
       ["POST", `${OPENAI_API_BASE}/responses?other=1`],
+      ["POST", `${OPENAI_API_BASE}/responses/input_tokens`],
       ["POST", `${OPENAI_API_BASE}/chat/completions`],
       ["GET", "https://api.openai.com.example/v1/models"],
       ["POST", "https://chatgpt.com/backend-api/codex/responses"],

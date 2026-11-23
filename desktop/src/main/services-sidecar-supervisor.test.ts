@@ -248,6 +248,15 @@ describe("ServicesSidecarSupervisor recovery", () => {
     );
   });
 
+  it("requires an absolute home for ordinary agent configuration", () => {
+    vi.stubEnv("GRIDA_HOME", "invalid-relative-home");
+    const supervisor = new ServicesSidecarSupervisor();
+    expect(() => supervisor.selectNativeChat(true)).toThrow(
+      "config_home_must_be_absolute"
+    );
+    supervisor.stop();
+  });
+
   it("shares the canonical Grida home and isolates an explicit agent data override", async () => {
     vi.stubEnv("GRIDA_HOME", "/synthetic/grida-home");
     vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);

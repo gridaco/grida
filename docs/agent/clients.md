@@ -664,11 +664,12 @@ parent is up to the client.
 
 ## Set context size and compaction
 
-In Grida Desktop, edit the workspace's `config.toml` while Desktop is closed.
-Reopen the workspace to load the context settings. [Change agent settings](./settings.md)
+Agent context settings come from the user-wide `~/.grida/config.toml`.
+Set an absolute `GRIDA_HOME` to use a different Grida home. Edits take effect
+at startup. [Change agent settings](./settings.md)
 
-A trusted ACP client that negotiates the configuration operations can inspect,
-set, reset, and reload the model window and compaction threshold. [Agent configuration](../reference/agent-configuration.md#managed-changes)
+A trusted ACP client can negotiate inspection and reload of the active model
+window and compaction threshold. [Agent configuration](../reference/agent-configuration.md#client-operations)
 
 ## Attach a PNG to a message
 
@@ -806,7 +807,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/history`, `fork`, `revise`                                               | Browse retained message anchors, branch a chat, or replace an earlier text message.                       |
 | `co.grida/session/compact`                                                                 | Summarize earlier model context and keep the original transcript available.                               |
 | `co.grida/session/skills`                                                                  | List available skills for this chat and select a versioned reference for a prompt.                        |
-| `co.grida/config/inspect`, `update`, `reload`                                              | Inspect, change, or reload the host defaults.                                                             |
+| `co.grida/config/inspect`, `reload`                                                        | Inspect or reload the user-wide agent settings.                                                           |
 | `co.grida/session/wakeups`, `cancel-wakeup`, `recover-wakeup`, `continue-cancelled-wakeup` | Allow one check-in on an Act submission or goal start, then inspect, cancel, restore or continue past it. |
 | `co.grida/session/processes`                                                               | List a chat's long-running command processes, stop them, and receive the list when it changes.            |
 

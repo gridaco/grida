@@ -3,43 +3,13 @@
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UserDefaults {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_context_window: Option<NonZeroU64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_auto_compact_token_limit: Option<NonZeroU64>,
-    /// Preserve the exact serialized defaults and policy of previously accepted inputs.
-    #[serde(default, rename = "context", skip_serializing_if = "Option::is_none")]
-    legacy_context: Option<LegacyContext>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyContext {
-    max_input_tokens: Option<NonZeroU64>,
-}
-
-impl UserDefaults {
-    /// Only a stored input accepted under the previous policy can carry this value.
-    pub fn legacy_input_limit(&self) -> Option<NonZeroU64> {
-        self.legacy_context.as_ref()?.max_input_tokens
-    }
-
-    /// Once an older active configuration is authenticated, new work uses the current policy.
-    pub fn discard_legacy_context(&mut self) -> bool {
-        self.legacy_context.take().is_some()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
-pub enum SettingChange {
-    SetModelContextWindow { value: NonZeroU64 },
-    ResetModelContextWindow,
-    SetModelAutoCompactTokenLimit { value: NonZeroU64 },
-    ResetModelAutoCompactTokenLimit,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -65,7 +35,7 @@ pub const MODEL_CONTEXT_WINDOW: FieldDefinition = FieldDefinition {
     minimum: 1,
     maximum: 9_007_199_254_740_991,
     default_rule: "Use the selected model's known context window.",
-    scope: "Agent defaults in this configuration.",
+    scope: "Global agent defaults.",
     activation: "Applies to later accepted inputs.",
 };
 

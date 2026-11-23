@@ -73,7 +73,6 @@ fn open(root: &Path) -> Host {
         &root.join("state"),
         options(),
         crate::SupervisedProvider::default(),
-        None,
     )
     .unwrap()
     .with_subagents()
@@ -907,7 +906,6 @@ async fn a_committed_worker_admission_receipt_survives_owner_loss_and_reopen_wit
             &root.path().join("state"),
             options(),
             crate::SupervisedProvider::default(),
-            None,
         ) {
             Ok(host) => break host.with_subagents(),
             Err(error)
@@ -1196,7 +1194,6 @@ async fn reopened_stop_scanning_retires_a_worker_whose_owner_cancellation_was_no
             &root.path().join("state"),
             options(),
             crate::SupervisedProvider::default(),
-            None,
         ) {
             Ok(host) => break host.with_subagents(),
             Err(error)
@@ -1738,7 +1735,6 @@ async fn stopping_after_reopen_cannot_turn_an_old_unknown_command_into_verified_
             &root.path().join("state"),
             options(),
             crate::SupervisedProvider::default(),
-            None,
         ) {
             Ok(host) => break host.with_subagents(),
             Err(error)

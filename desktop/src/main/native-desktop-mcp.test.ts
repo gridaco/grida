@@ -150,7 +150,10 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         source.desktopUserDataPath,
         "gateway"
       );
-      sidecar.selectNativeChat.mockReturnValue(source);
+      sidecar.selectNativeChat.mockReturnValue({
+        ...source,
+        configHome: source.providerHome,
+      });
       const catalog = new NativeWorkspaceCatalog({
         browserData: source.desktopUserDataPath,
         projectsRoot: path.join(base, "projects"),

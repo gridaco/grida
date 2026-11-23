@@ -192,7 +192,7 @@ impl Host {
             .unwrap_or_else(|| execution.provider.clone());
         let model = &execution.config.model;
         let capabilities = provider.capabilities(model)?;
-        let mut prepared = provider.prepare(prediction::request(
+        let prepared = provider.prepare(prediction::request(
             &source,
             &reply,
             model,
@@ -205,9 +205,6 @@ impl Host {
         if prepared.binding().provider != captured.provider || &prepared.binding().authority != live
         {
             return Ok(Prediction::default());
-        }
-        if let Some(limit) = source.input_limit() {
-            prepared = prepared.with_input_limit(limit)?;
         }
         // A separate runtime gives optional work its own single operation, tight
         // stream bound (including subscription output), and no executable tools.

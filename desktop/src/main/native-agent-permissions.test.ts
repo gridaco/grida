@@ -42,6 +42,7 @@ function workspaceFixture() {
     workspace,
     additional,
     stateDirectory: path.join(base, "native-state"),
+    configHome: path.join(base, "grida-home"),
     close: () => fs.rmSync(base, { recursive: true, force: true }),
   };
 }
@@ -305,16 +306,11 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
             approvals: [pending],
           }
     );
-    const permissions = new NativeAgentPermissions(
-      request,
-      new Map(),
-      undefined,
-      {
-        project: { id: "project", path: "/project" },
-        protectedPaths: [],
-        workspaceId: "workspace",
-      }
-    );
+    const permissions = new NativeAgentPermissions(request, new Map(), {
+      project: { id: "project", path: "/project" },
+      protectedPaths: [],
+      workspaceId: "workspace",
+    });
 
     await expect(permissions.list("session", "turn")).resolves.toEqual([]);
     pending = { ...row, reviewing: "true" };
@@ -400,7 +396,6 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       new NativeAgentPermissions(
         req(directory, root, effect),
         new Map(),
-        "/settings",
         enabled ? scope : undefined
       ).list("s", "t");
     const [external] = await list("external-file", "/", read);
@@ -481,15 +476,10 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       "invalid"
     );
     const responder = req("project", "/project", escalated);
-    const owner = new NativeAgentPermissions(
-      responder,
-      new Map(),
-      "/settings",
-      {
-        ...scope,
-        commandEscalation: true,
-      }
-    );
+    const owner = new NativeAgentPermissions(responder, new Map(), {
+      ...scope,
+      commandEscalation: true,
+    });
     const [launch] = await owner.list("s", "t");
     expect(launch).toMatchObject({
       tool: "exec_command",
@@ -520,7 +510,6 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     const [offlineReview] = await new NativeAgentPermissions(
       req("project", "/project", { ...offline, network: "denied" }),
       new Map(),
-      "/settings",
       { ...scope, commandEscalation: true }
     ).list("s", "t");
     expect(offlineReview).toMatchObject({
@@ -530,7 +519,6 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     const [managed] = await new NativeAgentPermissions(
       req("project", "/project", { ...offline, network: "managed" }),
       new Map(),
-      "/settings",
       { ...scope, commandEscalation: true }
     ).list("s", "t");
     expect(managed).toMatchObject({
@@ -562,7 +550,6 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       const host = new NativeAgentPermissions(
         req("project", "/project", unverified),
         new Map(),
-        "/settings",
         { ...scope, commandEscalation: true }
       );
       const [review] = await host.list("s", "t");
@@ -575,13 +562,11 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     const other = new NativeAgentPermissions(
       req("external-file", "/", read),
       new Map(),
-      "/other-settings",
-      scope
+      { ...scope, protectedPaths: ["/other-private-store"] }
     );
     const oldHost = new NativeAgentPermissions(
       req("project", "/project", { ...command, filesystem: undefined }),
       new Map(),
-      "/settings",
       scope
     );
     const [unverifiedCommand] = await oldHost.list("s", "t");
@@ -597,7 +582,6 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     const foreignWorkspace = new NativeAgentPermissions(
       req("external-file", "/", read),
       new Map(),
-      "/settings",
       { ...scope, workspaceId: "other" }
     );
     await expect(
@@ -608,7 +592,7 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     );
   });
 
-  it("offers a write review only for the agent settings file", async () => {
+  it("rejects retained workspace settings file reviews", async () => {
     const settingsRoot = "/fixture/chats/workspaces/settings";
     const list = async (approval: Record<string, unknown>) => {
       const request =
@@ -632,8 +616,7 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
         });
       return new NativeAgentPermissions(
         request,
-        new Map([["additional", "/fixture/additional"]]),
-        settingsRoot
+        new Map([["additional", "/fixture/additional"]])
       ).list("session", "turn");
     };
     const write = (tool: string, relative_path: string) => ({
@@ -641,25 +624,11 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       tool,
       relative_path,
     });
-    await expect(
-      list({
-        directory: "agent-settings",
-        root: settingsRoot,
-        effect: write("edit_file", "config.toml"),
-      })
-    ).resolves.toEqual([
-      expect.objectContaining({
-        directory: "agent-settings",
-        root: settingsRoot,
-        tool: "edit_file",
-        relativePath: "config.toml",
-      }),
-    ]);
     for (const approval of [
       {
         directory: "agent-settings",
         root: settingsRoot,
-        effect: write("write_file", "agent.sqlite"),
+        effect: write("edit_file", "config.toml"),
       },
       {
         directory: "agent-settings",
@@ -704,6 +673,7 @@ it.runIf(Boolean(packaged) && supported)(
       const launch: NativeAgentLaunch = {
         resourcesPath: packaged!,
         stateDirectory: test.stateDirectory,
+        configHome: test.configHome,
         provider: "openai-compatible",
         endpoint: provider.endpoint,
         model: "fixture",
@@ -822,6 +792,7 @@ it.runIf(Boolean(packaged) && supported)(
         resourcesPath: packaged!,
         cwd: test.workspace.primary.path,
         stateDirectory: test.stateDirectory,
+        configHome: test.configHome,
         provider: "openai-compatible" as const,
         endpoint: provider.endpoint,
         model: "fixture",
@@ -951,6 +922,7 @@ it.runIf(Boolean(packaged) && supported)(
       resourcesPath: packaged!,
       cwd: test.workspace.primary.path,
       stateDirectory: test.stateDirectory,
+      configHome: test.configHome,
       model: "fixture",
       provider: "openai-compatible" as const,
       endpoint: provider.endpoint,
@@ -1063,6 +1035,7 @@ it.runIf(Boolean(packaged) && supported)(
       resourcesPath: packaged!,
       cwd: test.workspace.primary.path,
       stateDirectory: test.stateDirectory,
+      configHome: test.configHome,
       provider: "openai-compatible" as const,
       model: "fixture",
       endpoint: provider.endpoint,
@@ -1157,6 +1130,7 @@ it
         resourcesPath: packaged!,
         cwd: test.workspace.primary.path,
         stateDirectory: test.stateDirectory,
+        configHome: test.configHome,
         model: "fixture",
         provider: "openai-compatible",
         endpoint: provider.endpoint,

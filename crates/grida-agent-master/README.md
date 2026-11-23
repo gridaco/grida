@@ -135,11 +135,10 @@ replay twice.
 Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
 
-A supplied hard input limit binds to the complete prepared provider request.
-It requires an exact count or conservative bound before generation. A remote
-counter receives that input under the selected provider authority. An unavailable
-counter, estimate, or excessive input produces a persisted failed account.
-Automatic budgeting leaves that optional measurement to the selected policy.
+The master resolves the automatic compaction threshold from the captured
+settings and model window. It uses provider-reported context usage and
+estimates added material to decide when to summarize. Actual context limits
+are enforced by the selected provider.
 
 Inference usage is derived from recorded attempts. Newer cumulative observations
 replace older values for the same source, category, and unit. Missing reports

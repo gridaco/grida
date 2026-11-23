@@ -97,6 +97,31 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("passes the global home to the native host and surfaces bounded config errors", async () => {
+    const test = fixture(
+      "",
+      1,
+      undefined,
+      false,
+      `
+      if (process.argv.some(arg => arg.startsWith('--workspace-configuration'))) process.exit(2);
+      if (!process.env.GRIDA_HOME?.endsWith('/agent-config')) process.exit(2);
+      fs.writeSync(2, 'grida-agent: config_invalid_value_model_context_window ("/private/config.toml")\\n');
+      process.exit(1);
+      `
+    );
+    try {
+      await expect(
+        NativeAgentProcess.start({
+          ...test.options,
+          configHome: path.join(test.root, "agent-config"),
+        })
+      ).rejects.toThrow(/^config_invalid_value_model_context_window$/);
+    } finally {
+      test.close();
+    }
+  });
+
   it("gates scoped requests on the installed executable and retries failed probes", async () => {
     const test = fixture(
       `

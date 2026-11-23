@@ -69,6 +69,7 @@ import type {
   NativeLibrarySelectionReview,
   NativeQuestionReview,
 } from "./native-agent-chat";
+import { configurationErrorMessage } from "./native-agent-config";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
   NativeAgentGoals,
@@ -4694,7 +4695,10 @@ export class NativeChatIpc {
 function startupFailure(error: unknown): NativeChatReadiness {
   if (error instanceof DesktopGatewayGrantUnavailable)
     return "native-gateway-unavailable";
-  switch (error instanceof Error ? error.message : null) {
+  const message = error instanceof Error ? error.message : null;
+  if (message && configurationErrorMessage(message))
+    return "native-configuration-invalid";
+  switch (message) {
     case "native_provider_byok_key_missing":
       return "native-provider-key-required";
     case "native_chat_profile_unavailable":

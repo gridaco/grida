@@ -1,6 +1,6 @@
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
-use grida_agent::configuration::WorkspaceConfiguration;
+use grida_agent::configuration::{self, GlobalConfigEdit};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::mcp_client::McpClient;
 use grida_agent::process::{self, RunOptions};
@@ -38,7 +38,17 @@ fn main() -> ExitCode {
     match result {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
-            eprintln!("grida-agent: {}", error.code);
+            if error.code.starts_with("config_")
+                && let Ok(directory) = configuration::global_directory()
+            {
+                eprintln!(
+                    "grida-agent: {} ({:?})",
+                    error.code,
+                    directory.join("config.toml")
+                );
+            } else {
+                eprintln!("grida-agent: {}", error.code);
+            }
             ExitCode::from(if error.kind == ErrorKind::Uncertain {
                 5
             } else {
@@ -53,6 +63,19 @@ fn command() -> Command {
         .version(env!("CARGO_PKG_VERSION"))
         .about("Native Grida Agent host")
         .subcommand_required(true)
+        .subcommand(
+            Command::new("config")
+                .hide(true)
+                .subcommand_required(true)
+                .arg(Arg::new("confirm-stdio").long("confirm-stdio").action(ArgAction::SetTrue))
+                .subcommand(Command::new("create"))
+                .subcommand(Command::new("check"))
+                .subcommand(
+                    Command::new("set-personalization")
+                        .arg(Arg::new("key").required(true).value_parser(["suggested-prompts", "web-search"]))
+                        .arg(Arg::new("value").required(true)),
+                ),
+        )
         .subcommand(launch(
             Command::new("run")
                 .about("Run one prompt without interactive UI")
@@ -151,23 +174,6 @@ fn command() -> Command {
                             "supervised-chatgpt-scope",
                             "listen",
                         ])
-                        .hide(true),
-                )
-                .arg(
-                    Arg::new("workspace-configuration")
-                        .long("workspace-configuration")
-                        .value_name("DIRECTORY")
-                        .value_parser(value_parser!(PathBuf))
-                        .requires_all(["supervised-provider", "workspace-configuration-epoch"])
-                        .conflicts_with("listen")
-                        .hide(true),
-                )
-                .arg(
-                    Arg::new("workspace-configuration-epoch")
-                        .long("workspace-configuration-epoch")
-                        .value_name("UUID")
-                        .value_parser(value_parser!(uuid::Uuid))
-                        .requires("workspace-configuration")
                         .hide(true),
                 )
                 .arg(
@@ -517,7 +523,7 @@ fn launch(command: Command) -> Command {
             Arg::new("llama-cpp-input-count")
                 .long("llama-cpp-input-count")
                 .action(ArgAction::SetTrue)
-                .help("Use the llama.cpp text request counter on a direct numeric-loopback /v1 endpoint"),
+                .hide(true),
         )
         .arg(
             Arg::new("reasoning")
@@ -534,8 +540,53 @@ fn launch(command: Command) -> Command {
         )
 }
 
+fn global_config_edit(args: &ArgMatches) -> Result<()> {
+    use std::io::{Read, Write};
+
+    let invalid = || problem(ErrorKind::InvalidInput, "config_invalid_personalization");
+    let edit = match args.subcommand().expect("required config command") {
+        ("create", _) => GlobalConfigEdit::Create,
+        ("set-personalization", args) => {
+            let key = args.get_one::<String>("key").expect("required key");
+            let value = args.get_one::<String>("value").expect("required value");
+            match (key.as_str(), value.as_str()) {
+                ("suggested-prompts", "true") => GlobalConfigEdit::SuggestedPrompts(true),
+                ("suggested-prompts", "false") => GlobalConfigEdit::SuggestedPrompts(false),
+                ("web-search", "automatic") => GlobalConfigEdit::WebSearch(true),
+                ("web-search", "disabled") => GlobalConfigEdit::WebSearch(false),
+                _ => return Err(invalid()),
+            }
+        }
+        _ => return Err(invalid()),
+    };
+    configuration::edit_global_config(&configuration::global_directory()?, edit, || {
+        if args.get_flag("confirm-stdio") {
+            let rejected = || problem(ErrorKind::Unavailable, "config_write_admission_denied");
+            let mut stdout = std::io::stdout().lock();
+            stdout.write_all(b"ready\n").map_err(|_| rejected())?;
+            stdout.flush().map_err(|_| rejected())?;
+            let mut decision = [0];
+            std::io::stdin()
+                .read_exact(&mut decision)
+                .map_err(|_| rejected())?;
+            if decision != *b"y" {
+                return Err(rejected());
+            }
+        }
+        Ok(())
+    })
+}
+
 async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let (name, args) = matches.subcommand().expect("required subcommand");
+    if name == "config" {
+        if args.subcommand_matches("check").is_some() {
+            let check = configuration::Configuration::check(&configuration::global_directory()?)?;
+            process::write_record(&check).await?;
+            return Ok(0);
+        }
+        return global_config_edit(args).map(|()| 0);
+    }
     if name == "bake-prompt" {
         let regime = if args.get_one::<String>("mode").map(String::as_str) == Some("plan") {
             OperatingRegime::Plan
@@ -944,13 +995,6 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             "desktop_image_generation_provider_invalid",
         ));
     }
-    let workspace_configuration = if name == "serve" {
-        args.get_one::<PathBuf>("workspace-configuration")
-            .zip(args.get_one::<uuid::Uuid>("workspace-configuration-epoch"))
-            .map(|(directory, epoch)| WorkspaceConfiguration::new(directory.clone(), *epoch))
-    } else {
-        None
-    };
     let host = match (&supervisor, gateway_scope, chatgpt_scope) {
         (Some(supervisor), _, Some(scope)) => {
             if provider.protocol != ProviderProtocol::Responses {
@@ -965,7 +1009,6 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 provider.model,
                 scope,
                 supervisor.clone(),
-                workspace_configuration.as_ref(),
             )?
         }
         (Some(supervisor), Some(scope), None) => {
@@ -981,15 +1024,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 &provider.endpoint,
                 scope,
                 supervisor.clone(),
-                workspace_configuration.as_ref(),
             )?
         }
-        (Some(supervisor), None, None) => Host::open_supervised(
-            state_dir,
-            provider,
-            supervisor.clone(),
-            workspace_configuration.as_ref(),
-        )?,
+        (Some(supervisor), None, None) => {
+            Host::open_supervised(state_dir, provider, supervisor.clone())?
+        }
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = match supervisor.as_ref().and_then(|_| {

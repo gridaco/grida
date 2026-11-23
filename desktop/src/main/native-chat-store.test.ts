@@ -54,11 +54,13 @@ async function fixture() {
     return directory;
   };
   const agentData = child("agent");
+  const configHome = child("config");
   const cwd = child("workspace");
   electron.temp = child("temp");
   electron.userData = child("desktop");
   electron.media = child("media");
   vi.stubEnv("GRIDA_AGENT_USER_DATA", agentData);
+  vi.stubEnv("GRIDA_HOME", configHome);
   const nativeState = path.join(electron.userData, "chats");
   const marker = path.join(nativeState, "store.json");
   const launch: Omit<NativeAgentChatLaunch, "stateDirectory"> = {
@@ -78,6 +80,7 @@ async function fixture() {
     nativeState,
     marker,
     agentData,
+    configHome,
   };
 }
 
@@ -203,6 +206,49 @@ describe.skipIf(!supported)("Native chat store", () => {
     await expect(NativeChatStore.prepareFresh()).rejects.toThrow(
       "native_chat_store_source_changed"
     );
+  });
+
+  it("keeps ordinary config separate from an explicit temporary agent data override", async () => {
+    const test = await fixture();
+    const opened = await test.NativeChatStore.prepareOrdinary([]);
+    expect(opened.configHome).toBe(test.configHome);
+    expect(opened.protectedPaths).toContain(test.configHome);
+  });
+
+  it("keeps the isolated config inside the disposable native profile", async () => {
+    const test = await fixture();
+    const opened = await test.NativeChatStore.prepareFresh();
+    expect(opened.configHome).toBe(test.agentData);
+    expect(opened.protectedPaths).toContain(test.agentData);
+  });
+
+  it("resolves config ancestor aliases with filesystem traversal semantics", async () => {
+    const test = await fixture();
+    const configParent = test.child("physical-config-parent");
+    const nested = path.join(configParent, "nested");
+    fs.mkdirSync(nested, { mode: 0o700 });
+    const alias = path.join(path.dirname(configParent), "config-alias");
+    fs.symlinkSync(nested, alias);
+    vi.stubEnv("GRIDA_HOME", `${alias}/../grida`);
+    vi.resetModules();
+    const { NativeChatStore: configured } = await import("./native-chat-store");
+    const store = await configured.prepareOrdinary([]);
+    const configHome = path.join(configParent, "grida");
+    expect(store.configHome).toBe(configHome);
+    expect(store.protectedPaths).toContain(configHome);
+    expect(fs.existsSync(configHome)).toBe(false);
+  });
+
+  it("keeps a symlink at the config home visible to source validation", async () => {
+    const test = await fixture();
+    const alias = path.join(path.dirname(test.configHome), "config-alias");
+    fs.symlinkSync(test.configHome, alias);
+    vi.stubEnv("GRIDA_HOME", alias);
+    vi.resetModules();
+    const { NativeChatStore: configured } = await import("./native-chat-store");
+    const store = await configured.prepareOrdinary([]);
+    expect(store.configHome).toBe(alias);
+    expect(store.protectedPaths).toContain(test.configHome);
   });
 
   it("refuses a store marker with fields it does not define", async () => {

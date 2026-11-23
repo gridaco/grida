@@ -9,6 +9,7 @@ export namespace SettingsNavigation {
     { id: "credits", label: "Credits" },
     { id: "models", label: "LLM Providers" },
     { id: "media", label: "Media Providers" },
+    { id: "configuration", label: "Configuration" },
     { id: "hooks", label: "Hooks" },
     { id: "archived-chats", label: "Archived chats" },
     { id: "about", label: "About" },

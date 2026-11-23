@@ -1,6 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — native Desktop composition.
 // GRIDA-GG: desktop — exact Gateway model and organization for each worker.
-import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { lstatSync, realpathSync } from "node:fs";
@@ -8,6 +7,7 @@ import path from "node:path";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
+  isValidEndpointProviderId,
   type ChatGptTurnCapabilities,
 } from "@grida/ai-host";
 import {
@@ -62,6 +62,7 @@ import type {
   PreparedProviderRoute,
 } from "./native-provider-routes";
 import { NativeAgentHooks } from "./native-agent-hooks";
+import { NativeAgentConfig } from "./native-agent-config";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
@@ -133,7 +134,6 @@ export class NativeDesktopAgent {
   private accountGeneration = 0;
   private transitions = 0;
   private closed = false;
-  private readonly configurationEpoch = randomUUID();
   private readonly workspaceActivity = new Map<string, WorkspaceActivity>();
   /** Catalogue identity survives retiring the default workspace worker. */
   private readonly gatewayScopes = new Map<string, string>();
@@ -142,7 +142,8 @@ export class NativeDesktopAgent {
 
   get globalHooks(): NativeAgentHooks {
     return (this.hookSettingsOwner ??= NativeAgentHooks.settings(
-      this.store.hooksHome
+      this.store.configHome,
+      this.config
     ));
   }
 
@@ -150,6 +151,7 @@ export class NativeDesktopAgent {
     private readonly store: NativeChatStore,
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
+    private readonly config: NativeAgentConfig,
     readonly personalization: DesktopPersonalization,
     private readonly subscription?: Subscription,
     private readonly workspaceCatalogRoot?: string,
@@ -245,8 +247,12 @@ export class NativeDesktopAgent {
     options?: LaunchOptions,
     ordinaryWorkspaceChat = false
   ) {
+    const config = new NativeAgentConfig(store.configHome, () =>
+      NativeAgentProcess.executable(resourcesPath)
+    );
     const personalization = new DesktopPersonalization(
-      path.join(store.hooksHome, "config.toml")
+      path.join(store.configHome, "config.toml"),
+      config
     );
     let subscription: Subscription | undefined;
     if (options && (options.provider === "chatgpt" || ordinaryWorkspaceChat)) {
@@ -270,6 +276,7 @@ export class NativeDesktopAgent {
       store,
       account,
       resourcesPath,
+      config,
       personalization,
       subscription,
       options?.workspaceCatalogRoot,
@@ -605,7 +612,30 @@ export class NativeDesktopAgent {
             NativeChatProfiles.read(directory),
           ]);
         requireCurrent();
-        const available = new Set(choices.map(({ id }) => id));
+        const savedProfiles = await Promise.all(
+          saved.map(async (profile) => {
+            // A saved receipt keeps only identity; window facts come from
+            // the current choice or the exact retained connection.
+            const current = choices.find(({ id }) => id === profile.id);
+            if (current) return { ...publicProfile(current), available: true };
+            const legacy = await this.legacyConfiguredLaunch(
+              profile,
+              requireCurrent
+            );
+            return {
+              ...publicProfile({
+                ...profile,
+                connection: profile.connection.replace(
+                  / \(llama\.cpp counting\)?$/u,
+                  " (legacy)"
+                ),
+                contextWindow: legacy?.contextWindowTokens,
+              }),
+              available: !!legacy,
+            };
+          })
+        );
+        requireCurrent();
         const defaultWindow = NativeChatProfiles.contextWindow(
           DEFAULT_GATEWAY_MODEL
         );
@@ -621,19 +651,7 @@ export class NativeDesktopAgent {
             defaultContextWindow: defaultWindow,
           }),
           choices: choices.map(publicProfile),
-          saved: saved.map((profile) => {
-            // A saved receipt keeps only identity; window facts come from
-            // the current choice for the same binding.
-            const current = choices.find(({ id }) => id === profile.id);
-            return {
-              ...publicProfile({
-                ...profile,
-                ...current,
-                contextWindow: current?.contextWindow,
-              }),
-              available: available.has(profile.id),
-            };
-          }),
+          saved: savedProfiles,
         };
       }
     );
@@ -649,14 +667,24 @@ export class NativeDesktopAgent {
         throw new Error("native_chat_selection_unavailable");
       return { connectionId: null, model: active.modelId };
     }
-    return this.withWorkspace(workspaceId, async (_workspace, check) => {
+    return this.withWorkspace(workspaceId, async (workspace, check) => {
       if (profileId === null)
         return { connectionId: null, model: DEFAULT_GATEWAY_MODEL };
       const { choices } = await this.availableProfiles(workspaceId);
       check();
       const choice = choices.find(({ id }) => id === profileId);
-      if (!choice) throw new Error("native_chat_selection_unavailable");
-      return { connectionId: choice.id, model: choice.modelId };
+      if (choice) return { connectionId: choice.id, model: choice.modelId };
+      const directory = await this.store.workspaceDirectory(
+        workspace.id,
+        workspace.root
+      );
+      const saved = (await NativeChatProfiles.read(directory)).find(
+        ({ id }) => id === profileId
+      );
+      check();
+      if (saved && (await this.legacyConfiguredLaunch(saved, check)))
+        return { connectionId: saved.id, model: saved.modelId };
+      throw new Error("native_chat_selection_unavailable");
     });
   }
 
@@ -906,37 +934,26 @@ export class NativeDesktopAgent {
       workspace.requireDirectoryCurrent?.();
     };
     const resolve = async () => {
-      const launch = builtIn
-        ? await this.byokLaunch(profile.providerId, profile.modelId, retained)
-        : await servicesSidecarClient.nativeConfiguredEndpoint(
-            profile.providerId,
-            profile.modelId
-          );
-      requireRoute();
       if (builtIn) {
+        const launch = await this.byokLaunch(
+          profile.providerId,
+          profile.modelId,
+          retained
+        );
+        requireRoute();
         if (
           NativeChatProfiles.binding(profile.providerId, launch) === profile.id
         )
           return launch;
       } else {
-        const configured = NativeChatProfiles.configuredLaunch(launch);
-        if (
-          NativeChatProfiles.binding(profile.providerId, configured) ===
-          profile.id
-        )
-          return configured;
-        const counted = await servicesSidecarClient
-          .nativeConfiguredEndpoint(profile.providerId, profile.modelId, true)
-          .catch(() => null);
-        requireRoute();
-        if (counted?.llamaCppInputCount) {
-          const configuredCount = NativeChatProfiles.configuredLaunch(counted);
-          if (
-            NativeChatProfiles.binding(profile.providerId, configuredCount) ===
-            profile.id
-          )
-            return configuredCount;
-        }
+        const launch =
+          (await NativeChatProfiles.resolveConfigured(
+            profile,
+            servicesSidecarClient.nativeConfiguredEndpoint,
+            requireRoute
+          )) ??
+          (saved && (await this.legacyConfiguredLaunch(saved, requireRoute)));
+        if (launch) return launch;
       }
       throw new Error("native_chat_profile_changed");
     };
@@ -958,6 +975,22 @@ export class NativeDesktopAgent {
         return { launch: current };
       },
     };
+  }
+
+  private async legacyConfiguredLaunch(
+    profile: NativeChatProfiles.Saved,
+    requireCurrent: () => void
+  ) {
+    // Only an existing workspace receipt can reopen this obsolete binding.
+    if (!isValidEndpointProviderId(profile.providerId)) return;
+    const launch = await NativeChatProfiles.resolveConfigured(
+      profile,
+      servicesSidecarClient.nativeConfiguredEndpoint,
+      requireCurrent,
+      true
+    ).catch(() => undefined);
+    requireCurrent();
+    return launch;
   }
 
   private async subscriptionProfile(
@@ -1530,39 +1563,33 @@ export class NativeDesktopAgent {
     nestedProtectedPaths?: readonly string[]
   ) {
     const { id, root, identity } = workspace;
-    const workspaceConfiguration =
-      this.selectableProfiles && !nestedProtectedPaths
-        ? {
-            directory: await this.store.workspaceDirectory(id, root, true),
-            epoch: this.configurationEpoch,
-          }
-        : undefined;
+    const useWorkspaceServices =
+      this.selectableProfiles && !nestedProtectedPaths;
     return {
       ...this.providerLimits(provider),
       imagePlacement:
         identity &&
         !nestedProtectedPaths &&
-        (provider.imageGeneration || workspaceConfiguration)
+        (provider.imageGeneration || useWorkspaceServices)
           ? this.imagePlacement?.({ workspaceId: id, root, identity })
           : undefined,
       reviewImageReference:
         identity &&
         !nestedProtectedPaths &&
-        (provider.imageGeneration || workspaceConfiguration)
+        (provider.imageGeneration || useWorkspaceServices)
           ? this.reviewImageReference?.({ id, root })
           : undefined,
       subagents: true as const,
       ...(this.chatTitles && { chatTitles: true as const }),
-      workspaceConfiguration,
       lookupPredictionRoute: this.predictionRouteLookup(
         id,
         workspace.requireDirectoryCurrent
       ),
-      ...(workspaceConfiguration && {
+      ...(useWorkspaceServices && {
         lookupProviderRoute: this.inputRouteLookup(workspace),
       }),
-      hooks: workspaceConfiguration
-        ? await NativeAgentHooks.open(this.store.hooksHome, root)
+      hooks: useWorkspaceServices
+        ? await NativeAgentHooks.open(this.store.configHome, root)
         : undefined,
       resourcesPath: this.resourcesPath,
       workspace: {

@@ -1621,7 +1621,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return windowRequest(
         event,
         "personalization settings denied",
-        (_signal, check) => personalization.setPersonalization(change, check),
+        (signal, check) =>
+          personalization.setPersonalization(change, check, signal),
         (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
       );
     }
@@ -1644,25 +1645,40 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return windowRequest(
         event,
         "composer predictions settings denied",
-        (_signal, check) => personalization.set(enabled, check),
+        (signal, check) => personalization.set(enabled, check, signal),
         (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
       );
     }
   );
-  guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, (event, ...args: unknown[]) =>
-    globalHooksOwner(event, args).configuration()
-  );
-  guarded(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD, (event, ...args: unknown[]) =>
-    globalHooksOwner(event, args).configuration()
-  );
+  const inspectGlobalHooks = (
+    event: IpcMainInvokeEvent,
+    ...args: unknown[]
+  ) => {
+    const owner = globalHooksOwner(event, args);
+    return windowRequest(
+      event,
+      "global config read denied",
+      () => owner.configuration(),
+      (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+    );
+  };
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, inspectGlobalHooks);
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD, inspectGlobalHooks);
   guarded(
     IPC_CHANNELS.GLOBAL_HOOKS_OPEN_CONFIG,
     async (event, ...args: unknown[]) => {
       const owner = globalHooksOwner(event, args);
-      const file = await owner.ensureConfig();
-      globalHooksOwner(event);
-      if (await shell.openPath(file))
-        throw new Error("native_hooks_open_config_failed");
+      return windowRequest(
+        event,
+        "global config open denied",
+        async (signal, check) => {
+          const file = await owner.ensureConfig(check, signal);
+          check();
+          if (await shell.openPath(file))
+            throw new Error("native_hooks_open_config_failed");
+        },
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
     }
   );
   guarded(
@@ -1692,8 +1708,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       globalHooksOwner(event);
       if (result.response !== 1) return null;
       await owner.trust(review);
-      globalHooksOwner(event);
-      return owner.configuration();
+      return inspectGlobalHooks(event);
     }
   );
 

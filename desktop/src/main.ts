@@ -60,6 +60,7 @@ import { NativeChatSelections } from "./main/native-chat-selections";
 import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeAgentProcess } from "./main/native-agent-process";
+import { configurationErrorMessage } from "./main/native-agent-config";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
@@ -972,10 +973,13 @@ app.on("ready", async () => {
           nativeDesktopAgent.documentIdentitiesDirectory,
           protectedPaths
         );
-      } catch {
+      } catch (error) {
+        const diagnostic =
+          error instanceof Error && configurationErrorMessage(error.message);
         dialog.showErrorBox(
           "Chat could not start",
-          "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
+          diagnostic ||
+            "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
         );
         app.quit();
         return;

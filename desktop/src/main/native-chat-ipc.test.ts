@@ -24,6 +24,8 @@ import {
 import { NativeChatSelections } from "./native-chat-selections";
 import { NativeAgentChat, type NativeChatSession } from "./native-agent-chat";
 import { DesktopPersonalization } from "./desktop-personalization";
+import { NativeAgentConfig } from "./native-agent-config";
+import { NativeAgentProcess } from "./native-agent-process";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -3288,6 +3290,11 @@ describe("native chat IPC", () => {
     ["native_chat_profile_changed", "native-provider-model-unavailable"],
     ["native_provider_model_unavailable", "native-provider-model-unavailable"],
     ["native_hooks_review_required", "native-hooks-review-required"],
+    ["config_toml_invalid", "native-configuration-invalid"],
+    [
+      "config_invalid_value_model_auto_compact_token_limit",
+      "native-configuration-invalid",
+    ],
     [
       "native_hooks_configuration_invalid",
       "native-hooks-configuration-invalid",
@@ -5655,8 +5662,13 @@ it
     const directory = await fs.promises.mkdtemp(
       path.join(await fs.promises.realpath(os.tmpdir()), "grida-prediction-")
     );
+    const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!;
+    const configHome = path.join(directory, "config");
     const preference = new DesktopPersonalization(
-      path.join(directory, "config.toml")
+      path.join(configHome, "config.toml"),
+      new NativeAgentConfig(configHome, () =>
+        NativeAgentProcess.executable(resourcesPath)
+      )
     );
     const waiting = Promise.withResolvers<void>();
     const resume = Promise.withResolvers<void>();
@@ -5687,7 +5699,8 @@ it
     try {
       await preference.set(true);
       chat = await NativeAgentChat.start({
-        resourcesPath: process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!,
+        resourcesPath,
+        configHome,
         stateDirectory: path.join(directory, "state"),
         cwd: directory,
         processCwd: directory,

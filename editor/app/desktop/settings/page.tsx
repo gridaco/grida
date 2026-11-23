@@ -74,6 +74,7 @@ import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry"
 import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import { PersonalizationSettings } from "./_components/personalization-settings";
+import { ConfigurationSettings } from "./_components/configuration-settings";
 import { HooksSettings } from "./_components/hooks-settings";
 import { AppearanceSettings } from "./_components/appearance-settings";
 import { BrowserSettings } from "./_components/browser-settings";
@@ -127,7 +128,7 @@ export default function DesktopSettingsPage() {
         className="min-h-0 flex-1 gap-0"
         data-testid="desktop-settings"
       >
-        <aside className="flex w-40 shrink-0 flex-col border-r bg-muted/20 px-2 py-5 sm:w-44">
+        <aside className="flex w-40 shrink-0 flex-col overflow-y-auto border-r bg-muted/20 px-2 py-5 sm:w-44">
           <header className="px-3 pb-5">
             <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
           </header>
@@ -195,6 +196,9 @@ export default function DesktopSettingsPage() {
           </TabsContent>
           <TabsContent value="voice" className="m-0">
             <VoiceSettings />
+          </TabsContent>
+          <TabsContent value="configuration" className="m-0">
+            <ConfigurationSettings />
           </TabsContent>
           <TabsContent value="hooks" className="m-0">
             <HooksSettings />

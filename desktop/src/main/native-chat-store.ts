@@ -31,7 +31,7 @@ type Ready = Readonly<{
   stateDirectory: string;
 }>;
 
-type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
+type Launch = Omit<NativeAgentChatLaunch, "stateDirectory" | "configHome">;
 
 /** Main-owned native chat state under the Desktop browser profile. */
 export class NativeChatStore {
@@ -41,7 +41,7 @@ export class NativeChatStore {
   private constructor(
     private readonly stateDirectory: string,
     readonly protectedPaths: readonly string[],
-    readonly hooksHome: string
+    readonly configHome: string
   ) {}
 
   get catalogRegistryDirectory() {
@@ -90,10 +90,18 @@ export class NativeChatStore {
     const desktop = await fs.realpath(paths.desktopUserDataPath);
     checkDirectory(await fs.lstat(desktop), false);
     const stateDirectory = path.join(desktop, STATE_DIRECTORY);
+    // Resolve ancestor aliases without accepting a symlink at the config home itself.
+    const configHome = path.join(
+      await intendedLocation(path.dirname(paths.configHome)),
+      path.basename(paths.configHome)
+    );
     const separate = await Promise.all(
-      [paths.userDataPath, paths.providerHome, paths.mediaRoot].map(
-        intendedLocation
-      )
+      [
+        paths.userDataPath,
+        paths.providerHome,
+        paths.mediaRoot,
+        ...(configHome !== paths.providerHome ? [configHome] : []),
+      ].map(intendedLocation)
     );
     if (separate.some((root) => overlaps(root, stateDirectory)))
       throw new Error("native_chat_store_state_overlap");
@@ -120,7 +128,7 @@ export class NativeChatStore {
     return new NativeChatStore(
       stateDirectory,
       Object.freeze([desktop, ...separate, ...(ordinaryProtectedPaths ?? [])]),
-      paths.providerHome
+      configHome
     );
   }
 
@@ -197,7 +205,6 @@ export class NativeChatStore {
       !DOCUMENT_KEY.test(key) ||
       !launch.providerNetwork ||
       launch.workspace ||
-      launch.workspaceConfiguration ||
       launch.mcp ||
       launch.processCwd ||
       launch.subagents
@@ -233,6 +240,7 @@ export class NativeChatStore {
     const chat = await NativeAgentChat.start({
       ...launch,
       stateDirectory,
+      configHome: this.configHome,
       protectedPaths: this.protectedPaths,
     });
     return { chat, stateDirectory };
@@ -347,7 +355,7 @@ async function syncDirectory(directory: string): Promise<void> {
 
 async function intendedLocation(value: string): Promise<string> {
   if (!path.isAbsolute(value)) throw unsafeState();
-  let current = path.resolve(value);
+  let current = value;
   const tail: string[] = [];
   for (;;) {
     try {

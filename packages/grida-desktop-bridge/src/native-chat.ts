@@ -167,6 +167,7 @@ export type NativeGlobalHookInspection = Readonly<{
   exists: boolean;
   hooks: readonly (NativeHookInfo & { trusted: boolean })[];
   diagnostics: readonly string[];
+  configDiagnostics?: readonly string[];
   activation: "new_connections";
 }>;
 
@@ -406,6 +407,7 @@ export type NativeChatReadiness =
   | "native-provider-model-unavailable"
   | "native-hooks-review-required"
   | "native-hooks-configuration-invalid"
+  | "native-configuration-invalid"
   | "native-provider-endpoint-https-required"
   | "native-provider-endpoint-approval-required"
   | "native-workspace-capacity";

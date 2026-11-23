@@ -260,9 +260,8 @@ process. That process-local binding cannot authorize opaque replay after restart
 Direct `gemini-3.8-flash` also checks that retained function-call history has
 the required thought signature before sending it to Gemini.
 
-Previously accepted work that captured a hard input limit retains that
-check. Exact counting is available through Responses and the original
-`--llama-cpp-input-count` connection on a supported numeric loopback endpoint.
+Older chats retain their history and provider selection. The host reads
+their saved input limits as historical data.
 
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
@@ -360,8 +359,8 @@ admitted may finish. An uncertain Goal turn retains its work reservation.
 Desktop users configure global hooks in `~/.grida/config.toml` (or
 `$GRIDA_HOME/config.toml`) and review them in Settings > Hooks. Desktop does not
 discover workspace hook files. See the [Desktop hooks guide](https://grida.co/docs/agent/hooks).
-The native host does not auto-load that Desktop source; the following is its
-trusted supervisor launch contract, not an alternative user configuration file.
+The following trusted supervisor launch contract supplies the reviewed hook
+profile that the native host executes.
 
 The launch-only permission profile can select up to eight ordered `hooks`.
 Each definition has this shape; `executable.sha256` is the canonical program's
@@ -646,7 +645,7 @@ with an underscore.
 | `co.grida/session/history`, `fork`, `revise`      | Read message anchors, branch a committed prefix, or revise an earlier user message. |
 | `co.grida/session/compact`                        | Summarize model context for future turns and retain the original transcript.        |
 | `co.grida/session/skills`                         | List available named skills and their versioned prompt references.                  |
-| `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                             |
+| `co.grida/config/inspect`, `reload`               | Inspect or reload the user-wide agent settings.                                     |
 | `co.grida/session/processes`                      | List or stop a chat's command processes and receive the list when it changes.       |
 
 Standard `session/prompt` streams its response. Durable submission and enqueue
@@ -678,18 +677,12 @@ retained waiting inputs proceed after a restart. Resume Task reuses the
 accepted model and limits and revalidates the captured provider authority.
 A changed provider credential blocks dispatch for that retained task.
 
-The host reads `config.toml` from its private state directory and retains an
-immutable defaults snapshot with each accepted input. The optional top-level
-`model_context_window` and `model_auto_compact_token_limit` values guide
-automatic context compaction. A setting change applies to later inputs.
-
-A private stdio supervisor can give workers with separate chat stores one
-workspace configuration. They share the workspace's existing `config.toml`
-and writer lock. Later input captures the same activated defaults from either
-worker. Manual edits stay pending until an explicit reload or the supervisor
-starts a new workspace generation. An interrupted activation can leave a
-newer source revision with the previous defaults still active. Inspect and
-reload that revision before relying on the change.
+The host reads `~/.grida/config.toml` or `$GRIDA_HOME/config.toml` when an
+absolute Grida home override is set. `--state-dir` selects runtime state.
+The optional top-level `model_context_window` and
+`model_auto_compact_token_limit` values guide automatic context compaction.
+Edit the file before startup or use explicit reload. Each accepted input
+keeps an immutable snapshot. [Host configuration](docs/rust-config.md)
 
 Use repeatable `--skill NAME` options with `run` to select guidance for that
 input. ACP clients can select a versioned reference from the skill catalog.

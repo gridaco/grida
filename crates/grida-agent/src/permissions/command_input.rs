@@ -28,22 +28,10 @@ impl TurnPermissions {
         source: &ScopedCommandInput,
         command: Fingerprint,
     ) -> Result<(Ready, AccessRule)> {
-        if self.command_file_input() == CommandFileInput::Settings
-            && source.directory.as_str() != SETTINGS_DIRECTORY
-        {
-            return Err(denied());
-        }
         if self.state()?.revoked.contains(&source.directory) {
             return Err(revoked());
         }
         let (root, scope, rule) = match source.directory.as_str() {
-            SETTINGS_DIRECTORY if source.path == Path::new(SETTINGS_PATH) => {
-                let settings = self.settings.as_ref().ok_or_else(denied)?;
-                let root = settings.directory().to_owned();
-                let scope = Fingerprint::of(&(self.profile.identity, SETTINGS_DIRECTORY, &root))?;
-                (root, scope, AccessRule::Allow)
-            }
-            SETTINGS_DIRECTORY => return Err(denied()),
             EXTERNAL_FILE_DIRECTORY if self.allow_external_file_read => {
                 let (_, scope) = self.open_external_file(&source.path)?;
                 (PathBuf::from("/"), scope, AccessRule::Ask)

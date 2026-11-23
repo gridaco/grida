@@ -81,9 +81,9 @@ outside-project approval binds the file identity and version. The source
 stays with the host. The invocation disallows a network request, terminal,
 background yield, workspace writes, `workdir`, and a command-level directory.
 
-Host configuration stays protected on new turns. Manually edit the source
-or use a trusted client's negotiated configuration operations. Accepted
-inputs with the earlier settings grant retain its original approval rules.
+Restricted tools keep the global config file protected. A person edits
+the file, and a trusted ACP client can inspect or reload it. Accepted
+inputs keep the defaults they captured at submission.
 
 Profiles without an unconditional primary read command grant may offer bounded
 file tools. Scoped reviews can use them, and observed-file verification profiles

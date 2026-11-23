@@ -67,7 +67,7 @@ export namespace SettingsHooks {
       const generation = ++this.generation;
       this.publish({
         supported: true,
-        loading: this.state.inspection === null,
+        loading: action === null || this.state.inspection === null,
         action,
         error: null,
       });
@@ -78,17 +78,28 @@ export namespace SettingsHooks {
       } catch {
         if (generation === this.generation)
           this.publish({
+            ...(action === null && { inspection: null }),
             error:
               action === "open"
                 ? "Couldn't open config.toml."
                 : action && action !== "reload"
                   ? "Couldn't review this hook. Reload the configuration and try again."
-                  : "Couldn't read the hook configuration.",
+                  : "Couldn't read config.toml.",
           });
       } finally {
+        // Creating the file and opening it are separate effects. The file
+        // can exist even when the system reports that opening it failed.
+        const inspection =
+          action === "open" && generation === this.generation
+            ? await api.inspect().catch(() => null)
+            : undefined;
         if (generation === this.generation) {
           this.pending = false;
-          this.publish({ loading: false, action: null });
+          this.publish({
+            ...(inspection !== undefined && { inspection }),
+            loading: false,
+            action: null,
+          });
         }
       }
     }

@@ -18,6 +18,7 @@ import { NativeAgentBackgroundProcesses } from "./native-agent-background-proces
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
+import { nativeAgentErrorCode } from "./native-agent-config";
 import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
@@ -120,7 +121,7 @@ export type NativeAgentLaunch = {
   configuredEndpointKey?: string;
   /** Main-owned settings identity, including anonymous configured endpoints. */
   configuredEndpointId?: string;
-  workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
+  configHome?: string;
   hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
   inputRouteConnectionId?: string | null;
@@ -289,8 +290,7 @@ export class NativeAgentProcess {
     private readonly onSessionUpdate?: (params: unknown) => void,
     permissions?: Readonly<{
       askRoots: ReadonlyMap<string, string>;
-      settingsRoot?: string;
-      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[3];
+      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[2];
     }>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
@@ -305,7 +305,6 @@ export class NativeAgentProcess {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
         permissions.askRoots,
-        permissions.settingsRoot,
         permissions.scopedAccess
       );
     }
@@ -313,9 +312,7 @@ export class NativeAgentProcess {
     this.exited = new Promise((resolve) => {
       child.once("close", (code, signal) => {
         this.observedExit = true;
-        const diagnostic = /^grida-agent: ([a-z0-9_]{1,96})$/m.exec(
-          diagnostics
-        )?.[1];
+        const diagnostic = nativeAgentErrorCode(diagnostics);
         this.fail(new Error(diagnostic ?? "native_agent_disconnected"));
         resolve({ code, signal });
       });
@@ -326,15 +323,14 @@ export class NativeAgentProcess {
       this.disconnect("native_agent_output_failed")
     );
     child.stdout.on("data", (chunk: Buffer) => this.receive(chunk));
-    // Capture only a bounded prefix and project fixed host error codes.
+    // Retain the last bounded diagnostics so fatal codes survive config warnings.
     child.stderr.on("error", () =>
       this.disconnect("native_agent_diagnostics_failed")
     );
     child.stderr.on("data", (chunk: Buffer) => {
-      if (diagnostics.length < 4096)
-        diagnostics += chunk
-          .subarray(0, 4096 - diagnostics.length)
-          .toString("utf8");
+      diagnostics = (
+        diagnostics + chunk.subarray(-4096).toString("utf8")
+      ).slice(-4096);
     });
   }
 
@@ -687,14 +683,13 @@ export class NativeAgentProcess {
       ...options,
       imageGeneration,
     });
-    if (options.workspaceConfiguration && !options.providerNetwork)
-      throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.providerNetwork)
       throw new Error("native_agent_subagent_transport_unavailable");
     for (const directory of [
       options.resourcesPath,
       options.stateDirectory,
       options.processCwd,
+      options.configHome,
     ]) {
       if (directory !== undefined && !path.isAbsolute(directory)) {
         throw new Error("native_agent_absolute_directory_required");
@@ -784,14 +779,6 @@ export class NativeAgentProcess {
     if (options.reasoning) args.push("--reasoning");
     if (imageGeneration)
       args.push("--desktop-image-generation", imageGeneration.binding);
-    if (options.workspaceConfiguration) {
-      args.push(
-        "--workspace-configuration",
-        options.workspaceConfiguration.directory,
-        "--workspace-configuration-epoch",
-        options.workspaceConfiguration.epoch
-      );
-    }
     if (options.configuredEndpointKey !== undefined)
       args.push(
         "--supervised-configured-endpoint-key",
@@ -824,6 +811,7 @@ export class NativeAgentProcess {
     if (scopedAccess?.commandEscalation)
       args.push("--allow-reviewed-command-retry");
     const environment = nativeEnvironment();
+    if (options.configHome) environment.GRIDA_HOME = options.configHome;
     if (options.mcp) {
       if (!options.workspace || !options.gatewayScope)
         throw new Error("native_desktop_mcp_gateway_workspace_required");
@@ -846,12 +834,6 @@ export class NativeAgentProcess {
       permissionProfile && {
         askRoots: permissionProfile.askRoots,
         scopedAccess,
-        // The host keeps the agent settings file in the workspace
-        // configuration folder, or in its own state folder.
-        settingsRoot: await fs.promises.realpath(
-          options.workspaceConfiguration?.directory ??
-            permissionProfile.stateDirectory
-        ),
       },
       providerEgress,
       imageGeneration,

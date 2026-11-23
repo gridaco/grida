@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
-    use agent_kit_core::{ChangeId, SessionId};
+    use agent_kit_core::{ChangeId, Envelope, Fingerprint, SessionId};
     use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore, Submission};
 
     let temporary = TempDir::new().unwrap();
@@ -12,6 +12,7 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
         Reply::Hold("Working."),
         Reply::Finished("Third first."),
         Reply::Finished("Replacement second."),
+        Reply::Hold("Later work is running."),
         Reply::Finished("Later work explicitly resumed."),
     ])
     .await;
@@ -160,8 +161,8 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     drop(socket);
     terminate_shared_server(child).await;
 
-    // Simulate a later accepted input whose worker had not claimed it when
-    // the previous host stopped. The original Resume must not release it.
+    // A pre-upgrade host accepted another input but stopped before claiming it.
+    // Its config snapshot predates automatic compaction and records a hard cap.
     let store =
         grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session).unwrap();
@@ -182,6 +183,22 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
         .unwrap()
         .input
         .payload;
+    let mut captured: Value = serde_json::from_slice(payload.bytes()).unwrap();
+    let source = b"schema_version = 1\n[context]\nmax_input_tokens = 1\n";
+    let revision = Fingerprint::of(source.as_slice()).unwrap();
+    let defaults = json!({ "context": { "max_input_tokens": 1 } });
+    captured["configuration"] = json!({
+        "identity": Fingerprint::of(&(revision, &defaults)).unwrap(),
+        "source_revision": revision,
+        "defaults": defaults,
+    });
+    captured.as_object_mut().unwrap().remove("context_limits");
+    let payload = Envelope::new(
+        payload.schema().clone(),
+        payload.version(),
+        serde_json::to_vec(&captured).unwrap(),
+    )
+    .unwrap();
     store
         .submit(
             session_id.clone(),
@@ -258,6 +275,33 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
             .unwrap()["content"],
         "c"
     );
+    // This historical input first ran after the upgrade. Its new checkpoint remains resumable.
+    let running = session_snapshot(&mut socket, session).await;
+    let pause = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/pause",
+        task_basis(&running, session, "pause-later"),
+    )
+    .await;
+    assert!(pause.get("result").is_some(), "{pause}");
+    let paused = wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let resume = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/resume",
+        json!({
+            "task":task_basis(&paused, session, "resume-later"),
+            "expectedEpoch":paused["current"]["epoch"],
+            "expectedJournalPosition":paused["current"]["journalPosition"],
+        }),
+    )
+    .await;
+    assert!(resume.get("result").is_some(), "{resume}");
+    endpoint.request().await;
     let later = wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"].is_null() && queue_ids(snapshot).is_empty()
     })

@@ -72,7 +72,10 @@ describe.runIf(process.platform !== "win32")(
             daemon.fetch(new Request(input, init))
           );
         vi.stubGlobal("fetch", fetch);
-        sidecar.selectNativeChat.mockReturnValue(source);
+        sidecar.selectNativeChat.mockReturnValue({
+          ...source,
+          configHome: source.providerHome,
+        });
         sidecar.getServicesSidecarInfo.mockReturnValue({
           port: 12345,
           password,

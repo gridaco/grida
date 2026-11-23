@@ -761,9 +761,22 @@ fn fixture_tool_body(name: &str, arguments: &str) -> String {
 }
 
 fn executable() -> Command {
+    static EMPTY_CONFIG_HOME: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
     let mut command = Command::new(env!("CARGO_BIN_EXE_grida-agent"));
     command.kill_on_drop(true);
+    // Reopened workers must use the same protected home to retain their
+    // permission identity. Config-writing fixtures select their own home.
+    command.env(
+        "GRIDA_HOME",
+        EMPTY_CONFIG_HOME.get_or_init(|| {
+            std::env::temp_dir().join(format!("grida-test-{}", uuid::Uuid::new_v4()))
+        }),
+    );
     command
+}
+
+fn fixture_config_home(state: &Path) -> std::path::PathBuf {
+    state.with_extension("grida-test-home")
 }
 
 fn configured(command: &mut Command, state: &Path, endpoint: &str) {
@@ -772,7 +785,8 @@ fn configured(command: &mut Command, state: &Path, endpoint: &str) {
         .arg(state)
         .args(["--endpoint", endpoint, "--model", "fixture-model"])
         .args(["--credential-env", "GRIDA_AGENT_PROCESS_TEST_KEY"])
-        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL)
+        .env("GRIDA_HOME", fixture_config_home(state));
 }
 
 fn spawn_serve(state: &Path, endpoint: &str) -> Child {
@@ -1753,11 +1767,19 @@ async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent(
     assert_eq!(running["result"]["current"]["paused"], false);
     assert_eq!(running["result"]["current"]["turnId"], turn);
     assert_eq!(running["result"]["queuedInputs"], 0);
+    let home = fixture_config_home(&state);
+    std::fs::create_dir(&home).unwrap();
+    std::fs::write(
+        home.join("config.toml"),
+        "schema_version = 1\nmodel_context_window = 1024\n",
+    )
+    .unwrap();
+    let inspected = ws_rpc(&mut second, 32, "_co.grida/config/inspect", json!({})).await;
     let configured = ws_rpc(
         &mut second,
         5,
-        "_co.grida/config/update",
-        json!({"expectedRevision":null,"change":{"operation":"set_model_context_window","value":1024}}),
+        "_co.grida/config/reload",
+        json!({"expectedRevision":inspected["result"]["file_revision"]}),
     )
     .await;
     assert_eq!(
@@ -2006,7 +2028,6 @@ fn extension_initialize() -> Value {
             "co.grida/session/fork":1,
             "co.grida/session/revise":1,
             "co.grida/config/inspect":1,
-            "co.grida/config/update":1,
             "co.grida/config/reload":1
         }}
     })

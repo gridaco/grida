@@ -293,7 +293,7 @@ extensions produce a defined fallback or unavailable outcome.
 | Capability family  | Additional semantics                                                                                                                                                                                                                                                                         |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Durable sessions   | Identified acceptance, retry reconciliation, snapshots/cursors, queue and steering controls, verified pause/resume/settlement, history derivation, child-session controls. Product-owned goal payloads and host timer operations use these mechanisms. Reuse equivalent standard operations. |
-| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration binding](./rust-config.md) owns the field semantics.                                                                                                                                         |
+| Host configuration | User-wide default inspection and revision-checked reload. The [configuration binding](./rust-config.md) owns the field semantics.                                                                                                                                                            |
 | Client surfaces    | Resource access or editor actions missing from standard ACP, plus optional structured view data. Each action has a capability schema and required authority. The adapter preserves call and endpoint correlation. Domain fields follow the capability. Pure styling requires no operation.   |
 
 These families group the extensions. None enables every listed action as one
@@ -886,6 +886,10 @@ A Resume retry resolves to the same claimed turn and its current view. A stale
 new control uses a refreshed snapshot and a fresh request identity. Late
 steering that loses the terminal race returns an explicit conflict, leaving the
 client free to keep its draft or submit another task.
+
+A conversation checkpoint created under a retired workspace input cap returns
+`retired_input_cap_requires_restart` before Resume claims the turn. Stop
+remains available, and the client can accept a fresh message afterward.
 
 Private stdio advertises `promptCapabilities.image` on declared image-capable
 native profiles on macOS and Linux, including the subscription composition.
@@ -2049,14 +2053,11 @@ Clients without this extension retain the single-provider launch contract.
 
 ### Configuration operations
 
-The `co.grida/config/*` operations are client features: a person's own tooling
-inspects, sets, resets and reloads defaults through them. Configuration
-inspection reports `exact_input_counting` for the selected provider profile.
-The flag describes a supported counting route. Each prepared request must
-still return an exact count before an explicit limit can be used. Clients can
-also reload a revision written by a person. Accepted inputs from earlier
-hosts may retain settings-file authority through recovery.
-[Agent configuration](./rust-config.md#agent-edits)
+Trusted clients can negotiate `co.grida/config/inspect` and
+`co.grida/config/reload` to inspect the active context settings or load a
+revision of the global configuration file. Already accepted inputs keep
+their captured settings.
+[Agent configuration](./rust-config.md#shared-host-operations)
 
 ## Compatibility acceptance
 

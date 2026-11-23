@@ -108,7 +108,6 @@ mod tests {
                     },
                     Arc::new(SqliteStore::open_in_memory().unwrap()),
                     true,
-                    None,
                 )
                 .unwrap()
         };

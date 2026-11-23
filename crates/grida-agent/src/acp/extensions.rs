@@ -45,7 +45,6 @@ use agent_kit_core::{BindingId, ChangeId, Fingerprint, ModelId, SessionId, TurnI
 use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
-use grida_agent_master::configuration::SettingChange;
 use routes::RequestRoutes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -68,16 +67,14 @@ const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
 const EFFORT: &str = "co.grida/session/effort";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
-const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
-const CAPABILITIES: [&str; 8] = [
+const CAPABILITIES: [&str; 7] = [
     SUBMIT,
     INITIAL_TITLE,
     SNAPSHOT,
     STOP,
     OPERATING_REGIME,
     CONFIG_INSPECT,
-    CONFIG_UPDATE,
     CONFIG_RELOAD,
 ];
 
@@ -641,14 +638,6 @@ fn turn_receipt(receipt: ControlReceipt, turn_id: TurnId) -> Result<TurnControlR
 struct ConfigInspect {}
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
-#[request(method = "_co.grida/config/update", response = Value)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ConfigUpdate {
-    expected_revision: Option<Fingerprint>,
-    change: SettingChange,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/config/reload", response = Value)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ConfigReload {
@@ -669,8 +658,6 @@ pub(super) fn handlers(
     let stop_sessions = sessions.clone();
     let inspect_host = host.clone();
     let inspect_sessions = sessions.clone();
-    let update_host = host.clone();
-    let update_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
     let embedded_context = reviewer && host.accepts_files();
 
@@ -888,21 +875,6 @@ pub(super) fn handlers(
                 let result = async {
                     require(&inspect_sessions, CONFIG_INSPECT, None)?;
                     encode_config(inspect_host.configuration_inspect().await)
-                }
-                .await;
-                responder.respond_with_result(result)
-            },
-            on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: ConfigUpdate, responder, _| {
-                let result = async {
-                    require(&update_sessions, CONFIG_UPDATE, None)?;
-                    encode_config(
-                        update_host
-                            .configuration_update(request.expected_revision, request.change)
-                            .await,
-                    )
                 }
                 .await;
                 responder.respond_with_result(result)

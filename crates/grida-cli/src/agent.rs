@@ -210,7 +210,22 @@ pub async fn dispatch_external(command: ExternalAgentCommand) -> Result<u8> {
 }
 
 fn failure(error: agent_kit_core::Error) -> Error {
+    if error.code.starts_with("config_")
+        && let Ok(directory) = grida_agent::configuration::global_directory()
+    {
+        return Error::new(
+            &error.code,
+            format!(
+                "Check the Grida agent configuration at {:?}.",
+                directory.join("config.toml")
+            ),
+        );
+    }
     let message = match error.code.as_str() {
+        "config_home_must_be_absolute" => "Set GRIDA_HOME to an absolute directory path.",
+        "config_home_unavailable" => {
+            "Set GRIDA_HOME to a directory for the Grida agent configuration."
+        }
         "empty_prompt" => "Provide a nonempty prompt with --prompt or stdin.",
         "prompt_too_large" => "The prompt is larger than the supported limit.",
         "gg_scope_changed" => "Use the Grida account and organization that opened this host.",

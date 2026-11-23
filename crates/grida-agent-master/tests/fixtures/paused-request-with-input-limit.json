@@ -1,0 +1,80 @@
+{
+  "configuration": "2df31dfa1020fd3b07e4a801fc8fe22ae2afbde34ccc16a7888fd46b7fc2c5c0",
+  "step": 0,
+  "request": {
+    "request": {
+      "model": "model",
+      "messages": [
+        {
+          "id": "grida-system",
+          "role": "system",
+          "phase": null,
+          "content": [
+            {
+              "kind": "text",
+              "value": "Be concise"
+            }
+          ],
+          "provenance": {
+            "source": "product-instructions",
+            "kind": "supplied",
+            "fingerprint": "032d5bf4e4159638284c7d7f9e8152d72785ae6f1fad4e6cf29264ca6a1a9da4"
+          }
+        },
+        {
+          "id": "input",
+          "role": "user",
+          "phase": null,
+          "content": [
+            {
+              "kind": "text",
+              "value": "Complete the task"
+            }
+          ],
+          "provenance": {
+            "source": "fixture",
+            "kind": "supplied",
+            "fingerprint": null
+          }
+        }
+      ],
+      "tools": [
+        {
+          "id": "echo",
+          "version": 1,
+          "description": "Returns a supplied value",
+          "input": {
+            "kind": "json",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "fingerprint": "7f0d3a4683243593518e452596f807f0b47ab5a5b7b83bd51d8d84b6a01d94bb"
+        }
+      ],
+      "max_output_tokens": 1024,
+      "extension": null
+    },
+    "binding": {
+      "provider": "script",
+      "authority": {
+        "principal": "test",
+        "binding": "local",
+        "scope": "test"
+      }
+    },
+    "capabilities": {
+      "revision": "script-v1",
+      "input_modalities": ["text"],
+      "json_tools": true,
+      "text_tools": true,
+      "max_output_tokens": 4096
+    },
+    "input_limit": 100,
+    "fingerprint": "5576783c7890e469da32388c0e484f9f18439b10cf0658c09d44927792686d5f"
+  },
+  "interrupted": true,
+  "outcome": null,
+  "request_history": 1,
+  "request_generation": 0
+}

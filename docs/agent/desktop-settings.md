@@ -21,9 +21,16 @@ Select a category in its sidebar:
 | Credits         | Your Grida AI credit information.                                                                            |
 | LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                                 |
 | Media Providers | Connections for image, video, audio and 3D generation.                                                       |
+| Configuration   | Create or open the global `config.toml` for agent settings and hooks.                                        |
 | Hooks           | Global hook definitions, configuration diagnostics and command trust review.                                 |
 | Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                            |
 | About           | Desktop version and platform information.                                                                    |
+
+## Configuration
+
+Open **Settings → Configuration** to create or open your global
+`config.toml`. Restart Grida after editing so new messages use the updated
+settings. [Set context size and compaction](./settings.md)
 
 ## Personalization
 

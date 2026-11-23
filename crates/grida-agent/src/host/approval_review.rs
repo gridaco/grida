@@ -19,7 +19,6 @@ use agent_kit_core::turn::{OperationInput, TurnState};
 use agent_kit_core::{MessageId, OperationId, WaitId};
 use agent_kit_runtime::{TurnOperations, TurnView, tool_result_message_id};
 use grida_agent_master::approval_review::{self, Decision, ReadProfile, ReadTarget};
-use std::num::NonZeroU64;
 use std::path::Path;
 
 pub(super) enum ReviewPolicy {
@@ -464,10 +463,6 @@ impl AutomaticReview {
                 approval_review::set_scoped_attempt(&mut request, attempt)?;
             }
             let prepared = self.provider.prepare(request.clone())?;
-            let prepared = match candidate.input_limit {
-                Some(limit) => prepared.with_input_limit(limit)?,
-                None => prepared,
-            };
             let key = if scoped {
                 investigation::operation_key(&prepared)?
             } else {
@@ -964,7 +959,6 @@ struct Candidate {
     wait: WaitId,
     approval: ApprovalRequest,
     request: InferenceRequest,
-    input_limit: Option<NonZeroU64>,
 }
 
 impl Candidate {
@@ -998,9 +992,7 @@ impl Candidate {
             return Ok(false);
         };
         refreshed.id.clone_from(&original.id);
-        Ok(self.approval == rebuilt.approval
-            && self.input_limit == rebuilt.input_limit
-            && self.request == rebuilt.request)
+        Ok(self.approval == rebuilt.approval && self.request == rebuilt.request)
     }
 
     async fn for_wait(
@@ -1238,7 +1230,6 @@ impl Candidate {
                 wait: id.clone(),
                 approval,
                 request,
-                input_limit: source.input_limit(),
             }));
         }
         Ok(None)

@@ -29,11 +29,10 @@ integration: it defaults to the public native Codex OAuth client identity,
 never starts Codex/ACP, and is still gated for stable release on a
 legal/support contract with OpenAI.
 
-Native agent hooks are configured only in the user's global
-`~/.grida/config.toml` (`GRIDA_HOME` overrides the home). Settings > Hooks
-inspects the source and reviews new or changed definitions. Workspace hook
-files and JSON import management are not used. See [Hooks](../docs/agent/hooks.md)
-for the minimal schema, supported events, trust and activation behavior.
+Native agent settings and hooks use `$GRIDA_HOME/config.toml`, defaulting to
+`~/.grida/config.toml`. Settings → Configuration creates or opens the file.
+Settings → Hooks inspects the source and reviews new or changed definitions.
+[Hooks](https://grida.co/docs/agent/hooks)
 
 ## Architecture
 
@@ -338,8 +337,8 @@ Desktop checks eligibility before replacing a worker or committing a model
 selection. A refusal identifies the retained work to resolve and preserves
 the previous selection and draft. Replacement must also preserve other chats
 owned by the worker, including temporary side chats and running commands.
-The workspace's active context-limit setting applies to new inputs across
-its connections. Up to eight native workers can be live per Desktop owner.
+The global context settings apply to new inputs across workspaces and
+connections. Up to eight native workers can be live per Desktop owner.
 Desktop closes those workers on quit or account change. The
 [model-transition interaction case](../test/desktop-agent-chat-model-transition.md)
 remains untested in the app.
@@ -347,7 +346,8 @@ remains untested in the app.
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
 browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
-under the same owner-only root in the system temporary directory. Chat uses a
+under the same owner-only root in the system temporary directory. The isolated
+launch keeps its own `config.toml` in that directory. Chat uses a
 separate native store for each registered workspace. Main owns the workspace
 catalog. On packaged macOS arm64 builds, directory listings, buffered editor
 reads and media Range reads use the confined read worker. A directory listing

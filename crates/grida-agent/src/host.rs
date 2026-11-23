@@ -84,9 +84,7 @@ pub use subagents::{
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::EffortPreset;
-use crate::configuration::{
-    Configuration, ConfigurationInspection, ConfigurationSnapshot, WorkspaceConfiguration,
-};
+use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::gg::{
     GatewayChildBilling, GatewayChildBillingPage, GatewayChildBillingRef, GgConnection,
 };
@@ -125,7 +123,6 @@ use agent_kit_sessions::{
 use agent_kit_store_sqlite::turn_links::TurnLinkCursor;
 use agent_kit_store_sqlite::{OperationPairReceipt, SqliteStore};
 pub use editor_observation::EditorObservation;
-use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::effort::Policy as EffortPolicy;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
@@ -774,7 +771,6 @@ struct PreparedInput {
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
     retained_file: Option<crate::scratch::WorkingCopyReceipt>,
-    limit: Option<NonZeroU64>,
     context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
@@ -869,7 +865,6 @@ impl Host {
             provider.map(|options| {
                 |retained_inputs| Execution::new(state_dir, options, None, retained_inputs)
             }),
-            None,
         )
     }
 
@@ -877,14 +872,12 @@ impl Host {
         state_dir: &Path,
         provider: ProviderOptions,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         Self::open_with(
             state_dir,
             Some(|retained_inputs| {
                 Execution::new(state_dir, provider, Some(supervisor), retained_inputs)
             }),
-            workspace_configuration,
         )
     }
 
@@ -895,7 +888,6 @@ impl Host {
         endpoint: &str,
         scope: &str,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         options.validate()?;
         let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
@@ -911,7 +903,6 @@ impl Host {
                     retained_inputs,
                 )
             }),
-            workspace_configuration,
         )
     }
 
@@ -922,7 +913,6 @@ impl Host {
         model: ModelId,
         scope: &str,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
             endpoint, &model, scope, supervisor,
@@ -930,7 +920,6 @@ impl Host {
         Self::open_with(
             state_dir,
             Some(|images| Execution::new_chatgpt(model, connection, images)),
-            workspace_configuration,
         )
     }
 
@@ -957,7 +946,6 @@ impl Host {
                     retained_inputs,
                 )
             }),
-            None,
         )?;
         host.gg_connection = Some(connection);
         Ok(host)
@@ -968,7 +956,6 @@ impl Host {
         execution: Option<
             impl FnOnce(Option<Arc<retained_inputs::RetainedInputs>>) -> Result<Execution>,
         >,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let database = state_dir.join(DATABASE_FILE);
         if execution.is_some() {
@@ -979,10 +966,7 @@ impl Host {
         let store = Arc::new(open_store(&database)?);
         let configuration = execution
             .as_ref()
-            .map(|_| match workspace_configuration {
-                Some(workspace) => workspace.open(state_dir),
-                None => Configuration::open(state_dir),
-            })
+            .map(|_| Configuration::open_global())
             .transpose()?
             .map(Arc::new);
         let execution = execution
@@ -1952,14 +1936,36 @@ impl Host {
                     }
                     _ => unreachable!("resume launch selected"),
                 };
-                let history = self
-                    .provider_history(session.clone(), Some(turn.clone()), side)
-                    .await?;
                 let inputs = self
                     .store
                     .turn_submissions(session.clone(), turn.clone())
                     .await?;
                 let input = subagents::assignment_input(&inputs, subagent.is_some())?;
+                #[derive(Deserialize)]
+                struct CapturedSettings {
+                    configuration: ConfigurationSnapshot,
+                }
+                if is_stored_input(&input.payload)
+                    && decode_input::<CapturedSettings>(input)?
+                        .configuration
+                        .captured_retired_input_cap()
+                    && self
+                        .store
+                        .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                            Ok(grida_agent_master::has_legacy_conversation_checkpoint(
+                                state,
+                            ))
+                        })
+                        .await?
+                {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "retired_input_cap_requires_restart",
+                    ));
+                }
+                let history = self
+                    .provider_history(session.clone(), Some(turn.clone()), side)
+                    .await?;
                 (
                     WorkerClaim::Select(request),
                     Some(input.clone()),
@@ -2530,7 +2536,6 @@ impl Host {
         prior.extend(prepared.guidance);
         let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
-            .with_input_limit(prepared.limit)
             .with_auto_compaction(prepared.context_limits.auto_compact.filter(|_| {
                 !prepared.subagent
                     && prepared.goal.is_none()
@@ -3160,7 +3165,6 @@ impl Host {
         let (
             messages,
             operating_regime,
-            limit,
             context_limits,
             questions,
             question_batches,
@@ -3614,7 +3618,6 @@ impl Host {
                 (
                     messages,
                     stored.operating_regime,
-                    stored.configuration.defaults.legacy_input_limit(),
                     if side {
                         Default::default()
                     } else {
@@ -3702,7 +3705,6 @@ impl Host {
             operating_regime,
             messages,
             retained_file,
-            limit,
             context_limits,
             questions,
             question_batches,
@@ -4088,27 +4090,7 @@ impl Host {
     }
 
     pub async fn configuration_inspect(&self) -> Result<ConfigurationInspection> {
-        let mut inspection = self.with_configuration(Configuration::inspect).await?;
-        inspection.exact_input_counting = self.execution.as_ref().is_some_and(|execution| {
-            matches!(&execution.authorization.credential, Credential::Http(transport) if transport.supports_exact_input_counting())
-        });
-        Ok(inspection)
-    }
-
-    pub async fn configuration_update(
-        &self,
-        expected: Option<Fingerprint>,
-        change: SettingChange,
-    ) -> Result<ConfigurationSnapshot> {
-        self.owned_control(move |host| async move {
-            let admission = host.configuration_admission.clone().lock_owned().await;
-            host.with_configuration(move |configuration| {
-                let _admission = admission;
-                configuration.update(expected, change)
-            })
-            .await
-        })
-        .await
+        self.with_configuration(Configuration::inspect).await
     }
 
     pub async fn configuration_reload(
@@ -4286,7 +4268,7 @@ impl Execution {
                     _ => None,
                 });
         grida_agent_master::compaction::ContextLimits::resolve(
-            &configuration.defaults,
+            &configuration.defaults(),
             model_window,
         )
     }
@@ -4439,9 +4421,7 @@ impl Execution {
                     PROVIDER_LIMITS,
                     image_resolver,
                 )?;
-                Arc::new(if options.llama_cpp_input_count {
-                    provider.with_llama_cpp_input_count()?
-                } else if compatible_tool_images {
+                Arc::new(if compatible_tool_images {
                     provider.with_retained_png_tool_results()
                 } else {
                     provider

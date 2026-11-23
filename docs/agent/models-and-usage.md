@@ -103,9 +103,8 @@ in place. Removing a key or changing an endpoint can make its saved selection
 unavailable. Restore the connection to continue its accepted work, or resolve
 that work before explicitly choosing another connection for future messages.
 
-A local llama.cpp endpoint can also appear as a separate **llama.cpp
-counting** connection. Restore it if earlier accepted work depends on that
-connection's request counting. [Earlier accepted work](../reference/agent-configuration.md#earlier-accepted-work)
+Previously saved llama.cpp connections appear as **legacy** in their workspace.
+They keep their saved endpoint and model identity.
 
 ## Use your ChatGPT subscription
 
