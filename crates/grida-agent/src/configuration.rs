@@ -3,7 +3,8 @@
 
 use agent_kit_core::{Error, ErrorKind, Fingerprint, Result};
 use grida_agent_master::configuration::{
-    CONTEXT_MAX_INPUT_TOKENS, FieldDefinition, SettingChange, UserDefaults,
+    FieldDefinition, MODEL_AUTO_COMPACT_TOKEN_LIMIT, MODEL_CONTEXT_WINDOW, SettingChange,
+    UserDefaults,
 };
 use serde::{Deserialize, Serialize};
 use std::fs::{File, Metadata, OpenOptions};
@@ -11,7 +12,7 @@ use std::io::{Read, Write};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use toml_edit::{DocumentMut, Item, Table, value};
+use toml_edit::{DocumentMut, Item, value};
 use uuid::Uuid;
 
 const MAX_FILE_BYTES: u64 = 64 * 1024;
@@ -27,7 +28,7 @@ pub struct ConfigurationSnapshot {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ConfigurationInspection {
-    pub field: FieldDefinition,
+    pub fields: [FieldDefinition; 2],
     pub file_revision: Option<Fingerprint>,
     pub file_diagnostic: Option<Error>,
     pub active: ConfigurationSnapshot,
@@ -161,7 +162,7 @@ impl Configuration {
         let file_revision = revision(bytes.as_deref())?;
         let file_diagnostic = parse(bytes.as_deref()).err();
         Ok(ConfigurationInspection {
-            field: CONTEXT_MAX_INPUT_TOKENS,
+            fields: [MODEL_CONTEXT_WINDOW, MODEL_AUTO_COMPACT_TOKEN_LIMIT],
             file_revision,
             file_diagnostic,
             active,
@@ -201,8 +202,8 @@ impl Configuration {
         Ok(active.clone())
     }
 
-    /// A managed change edits only the reviewed field. The cross-process lock
-    /// serializes managed writers. External editors use explicit reload.
+    /// Update one active field, clearing any retired setting on publication.
+    /// The cross-process lock serializes managed writers. External edits use explicit reload.
     pub fn update(
         &self,
         expected: Option<Fingerprint>,
@@ -226,16 +227,24 @@ impl Configuration {
         self.require_workspace_epoch()?;
         let mut source = read_source(&self.directory)?;
         check_revision(source.revision, expected)?;
-        let requested = match change {
-            SettingChange::SetContextMaxInputTokens { value } => {
-                if value.get() > CONTEXT_MAX_INPUT_TOKENS.maximum {
-                    return Err(invalid("config_value_out_of_range"));
-                }
-                Some(value)
+        let (field, requested) = match change {
+            SettingChange::SetModelContextWindow { value } => (MODEL_CONTEXT_WINDOW, Some(value)),
+            SettingChange::ResetModelContextWindow => (MODEL_CONTEXT_WINDOW, None),
+            SettingChange::SetModelAutoCompactTokenLimit { value } => {
+                (MODEL_AUTO_COMPACT_TOKEN_LIMIT, Some(value))
             }
-            SettingChange::ResetContextMaxInputTokens => None,
+            SettingChange::ResetModelAutoCompactTokenLimit => {
+                (MODEL_AUTO_COMPACT_TOKEN_LIMIT, None)
+            }
         };
-        if source.defaults.context.max_input_tokens == requested {
+        if requested.is_some_and(|value| value.get() > field.maximum) {
+            return Err(invalid("config_value_out_of_range"));
+        }
+        // A trusted change also removes the retired context table, including for a no-op reset.
+        let retired = source.document.remove("context").is_some();
+        let previous = source.document.get(field.key).and_then(Item::as_integer);
+        let requested = requested.map(|value| value.get() as i64);
+        if previous == requested && !retired {
             admission()?;
             *active = self.activate(&source, admission)?;
             return Ok(active.clone());
@@ -244,19 +253,12 @@ impl Configuration {
             source.document["schema_version"] = value(1);
         }
         if let Some(requested) = requested {
-            if !source.document.contains_key("context") {
-                source.document["context"] = Item::Table(Table::new());
-            }
-            source.document["context"]["max_input_tokens"] = value(requested.get() as i64);
-        } else if let Some(context) = source
-            .document
-            .get_mut("context")
-            .and_then(Item::as_table_like_mut)
-        {
-            context.remove("max_input_tokens");
+            source.document[field.key] = value(requested);
+        } else {
+            source.document.remove(field.key);
         }
         let bytes = source.document.to_string().into_bytes();
-        let defaults = parse(Some(&bytes))?;
+        let (_, defaults) = parse(Some(&bytes))?;
         self.validate_directory()?;
         write_atomic(&self.directory, SOURCE_FILE, &bytes, || {
             admission()?;
@@ -322,17 +324,13 @@ impl Configuration {
         self.require_workspace_epoch()?;
         let current = read_bytes(&self.directory.join(SOURCE_FILE))?;
         let expected = revision(current.as_deref())?;
+        // This path publishes the exact file action that was approved.
+        // Structured settings updates can clean retired keys on their next write.
         let bytes = edit(current.as_deref())?;
         let defaults = match parse(Some(&bytes)) {
-            Ok(defaults) => defaults,
+            Ok((_, defaults)) => defaults,
             Err(error) => return Ok(SettingsWrite::Invalid(error)),
         };
-        if bytes.len() as u64 > MAX_FILE_BYTES {
-            return Ok(SettingsWrite::Invalid(Error::new(
-                ErrorKind::LimitExceeded,
-                "config_file_too_large",
-            )));
-        }
         admission()?;
         write_atomic(&self.directory, SOURCE_FILE, &bytes, || {
             admission()?;
@@ -415,19 +413,26 @@ fn snapshot(source: &Source) -> Result<ConfigurationSnapshot> {
 fn read_workspace_active(directory: &Path) -> Result<Option<WorkspaceActive>> {
     read_bytes(&directory.join(WORKSPACE_ACTIVE_FILE))?
         .map(|bytes| {
-            let active: WorkspaceActive = serde_json::from_slice(&bytes)
+            let mut active: WorkspaceActive = serde_json::from_slice(&bytes)
                 .map_err(|_| invalid("workspace_configuration_receipt_invalid"))?;
-            let snapshot = &active.snapshot;
+            let snapshot = &mut active.snapshot;
             if active.epoch == [0; 16]
                 || snapshot.identity
                     != Fingerprint::of(&(snapshot.source_revision, &snapshot.defaults))?
-                || snapshot
-                    .defaults
-                    .context
-                    .max_input_tokens
-                    .is_some_and(|limit| limit.get() > CONTEXT_MAX_INPUT_TOKENS.maximum)
+                || [
+                    snapshot.defaults.model_context_window,
+                    snapshot.defaults.model_auto_compact_token_limit,
+                    snapshot.defaults.legacy_input_limit(),
+                ]
+                .into_iter()
+                .flatten()
+                .any(|limit| limit.get() > MODEL_CONTEXT_WINDOW.maximum)
             {
                 return Err(invalid("workspace_configuration_receipt_invalid"));
+            }
+            if snapshot.defaults.discard_legacy_context() {
+                snapshot.identity =
+                    Fingerprint::of(&(snapshot.source_revision, &snapshot.defaults))?;
             }
             Ok(active)
         })
@@ -466,14 +471,7 @@ fn revision(bytes: Option<&[u8]>) -> Result<Option<Fingerprint>> {
 
 fn read_source(directory: &Path) -> Result<Source> {
     let bytes = read_bytes(&directory.join(SOURCE_FILE))?;
-    let defaults = parse(bytes.as_deref())?;
-    let document = match &bytes {
-        Some(bytes) => std::str::from_utf8(bytes)
-            .map_err(|_| invalid("config_encoding_invalid"))?
-            .parse::<DocumentMut>()
-            .map_err(|_| invalid("config_toml_invalid"))?,
-        None => DocumentMut::new(),
-    };
+    let (document, defaults) = parse(bytes.as_deref())?;
     Ok(Source {
         revision: revision(bytes.as_deref())?,
         document,
@@ -481,18 +479,29 @@ fn read_source(directory: &Path) -> Result<Source> {
     })
 }
 
-fn parse(bytes: Option<&[u8]>) -> Result<UserDefaults> {
+fn parse(bytes: Option<&[u8]>) -> Result<(DocumentMut, UserDefaults)> {
     let Some(bytes) = bytes else {
-        return Ok(UserDefaults::default());
+        return Ok((DocumentMut::new(), UserDefaults::default()));
     };
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(Error::new(
+            ErrorKind::LimitExceeded,
+            "config_file_too_large",
+        ));
+    }
     let text = std::str::from_utf8(bytes).map_err(|_| invalid("config_encoding_invalid"))?;
     let document = text
         .parse::<DocumentMut>()
         .map_err(|_| invalid("config_toml_invalid"))?;
-    if document
-        .iter()
-        .any(|(key, _)| !matches!(key, "schema_version" | "context"))
-    {
+    if document.iter().any(|(key, _)| {
+        !matches!(
+            key,
+            "schema_version"
+                | "context"
+                | "model_context_window"
+                | "model_auto_compact_token_limit"
+        )
+    }) {
         return Err(invalid("config_unknown_field"));
     }
     if document.get("schema_version").and_then(Item::as_integer) != Some(1) {
@@ -501,7 +510,6 @@ fn parse(bytes: Option<&[u8]>) -> Result<UserDefaults> {
             "config_schema_unsupported",
         ));
     }
-    let mut defaults = UserDefaults::default();
     if let Some(context) = document.get("context") {
         let context = context
             .as_table_like()
@@ -509,15 +517,23 @@ fn parse(bytes: Option<&[u8]>) -> Result<UserDefaults> {
         if context.iter().any(|(key, _)| key != "max_input_tokens") {
             return Err(invalid("config_unknown_field"));
         }
-        if let Some(limit) = context.get("max_input_tokens") {
-            let limit = limit
-                .as_integer()
-                .filter(|value| *value > 0 && *value as u64 <= CONTEXT_MAX_INPUT_TOKENS.maximum)
-                .ok_or_else(|| invalid("config_value_out_of_range"))?;
-            defaults.context.max_input_tokens = NonZeroU64::new(limit as u64);
-        }
     }
-    Ok(defaults)
+    let read_limit = |field: FieldDefinition| -> Result<Option<NonZeroU64>> {
+        document
+            .get(field.key)
+            .map(|item| {
+                item.as_integer()
+                    .and_then(|n| u64::try_from(n).ok())
+                    .and_then(NonZeroU64::new)
+                    .filter(|value| value.get() <= field.maximum)
+                    .ok_or_else(|| invalid("config_value_out_of_range"))
+            })
+            .transpose()
+    };
+    let mut defaults = UserDefaults::default();
+    defaults.model_context_window = read_limit(MODEL_CONTEXT_WINDOW)?;
+    defaults.model_auto_compact_token_limit = read_limit(MODEL_AUTO_COMPACT_TOKEN_LIMIT)?;
+    Ok((document, defaults))
 }
 
 fn validate_directory(directory: &Path) -> Result<Metadata> {
@@ -709,7 +725,7 @@ mod tests {
         let error = first
             .update_guarded(
                 None,
-                SettingChange::SetContextMaxInputTokens {
+                SettingChange::SetModelContextWindow {
                     value: NonZeroU64::new(8000).unwrap(),
                 },
                 || {
@@ -728,10 +744,7 @@ mod tests {
         assert_eq!(pending.active, previous);
         assert_eq!(first.snapshot().unwrap(), previous);
         let reloaded = second.reload(pending.file_revision).unwrap();
-        assert_eq!(
-            reloaded.defaults.context.max_input_tokens.unwrap().get(),
-            8000
-        );
+        assert_eq!(reloaded.defaults.model_context_window.unwrap().get(), 8000);
         assert_eq!(first.snapshot().unwrap(), reloaded);
     }
 
@@ -741,7 +754,7 @@ mod tests {
         let directory = root.path().canonicalize().unwrap();
         let epoch = Uuid::new_v4();
         let first = Configuration::open_in(&directory, Some(epoch)).unwrap();
-        let source = b"schema_version = 1\n[context]\nmax_input_tokens = 9000\n";
+        let source = b"schema_version = 1\nmodel_context_window = 9000\n";
         write_atomic(&directory, SOURCE_FILE, source, || Ok(())).unwrap();
         let second = Configuration::open_in(&directory, Some(epoch)).unwrap();
         assert_eq!(second.snapshot().unwrap(), first.snapshot().unwrap());
@@ -750,8 +763,7 @@ mod tests {
                 .snapshot()
                 .unwrap()
                 .defaults
-                .context
-                .max_input_tokens
+                .model_context_window
                 .is_none()
         );
 
@@ -760,14 +772,57 @@ mod tests {
             next.snapshot()
                 .unwrap()
                 .defaults
-                .context
-                .max_input_tokens
+                .model_context_window
                 .unwrap()
                 .get(),
             9000
         );
         let error = first.snapshot().unwrap_err();
         assert_eq!(error.code, "workspace_configuration_epoch_changed");
+    }
+
+    #[test]
+    fn legacy_receipts_keep_accepted_policy_but_never_reactivate_it_for_new_inputs() {
+        let root = private_workspace();
+        let directory = root.path().canonicalize().unwrap();
+        let epoch = Uuid::new_v4();
+        let source = b"schema_version = 1\n[context]\nmax_input_tokens = 32\n";
+        write_atomic(&directory, SOURCE_FILE, source, || Ok(())).unwrap();
+        let source_revision = revision(Some(source)).unwrap();
+        let empty_legacy = serde_json::json!({"context": {"max_input_tokens": null}});
+        let empty: UserDefaults = serde_json::from_value(empty_legacy.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&empty).unwrap(), empty_legacy);
+        assert!(empty.legacy_input_limit().is_none());
+        let legacy = serde_json::json!({"context":{"max_input_tokens":32}});
+        let identity = Fingerprint::of(&(source_revision, &legacy)).unwrap();
+        let accepted = serde_json::json!({"identity":identity,"source_revision":source_revision,"defaults":legacy});
+        let old: ConfigurationSnapshot = serde_json::from_value(accepted.clone()).unwrap();
+        assert_eq!(old.defaults.legacy_input_limit(), NonZeroU64::new(32));
+        assert_eq!(serde_json::to_value(&old).unwrap(), accepted);
+        let mut receipt = serde_json::json!({"epoch":epoch.as_bytes(),"snapshot":accepted});
+        let save = |value: &serde_json::Value| {
+            write_atomic(
+                &directory,
+                WORKSPACE_ACTIVE_FILE,
+                &serde_json::to_vec(value).unwrap(),
+                || Ok(()),
+            )
+            .unwrap()
+        };
+        save(&receipt);
+        let config = Configuration::open_in(&directory, Some(epoch)).unwrap();
+        let current = config.snapshot().unwrap();
+        assert_eq!(current.defaults, UserDefaults::default());
+        assert_ne!(current.identity, identity);
+        assert_eq!(current.source_revision, source_revision);
+        assert_eq!(std::fs::read(directory.join(SOURCE_FILE)).unwrap(), source);
+
+        receipt["snapshot"]["defaults"]["context"]["max_input_tokens"] = 12.into();
+        save(&receipt);
+        assert_eq!(
+            config.snapshot().unwrap_err().code,
+            "workspace_configuration_receipt_invalid"
+        );
     }
 
     #[test]
@@ -790,7 +845,7 @@ mod tests {
         let root = private_workspace();
         let directory = root.path().canonicalize().unwrap();
         let configuration = Configuration::open(&directory).unwrap();
-        let source = b"schema_version = 1\n[context]\nmax_input_tokens = 0\n";
+        let source = b"schema_version = 1\nmodel_context_window = 0\n";
         write_atomic(&directory, SOURCE_FILE, source, || Ok(())).unwrap();
         let error = Configuration::open(&directory).err().unwrap();
         assert_eq!(error.code, "config_value_out_of_range");
@@ -806,8 +861,7 @@ mod tests {
                 .snapshot()
                 .unwrap()
                 .defaults
-                .context
-                .max_input_tokens
+                .model_context_window
                 .is_none()
         );
     }
@@ -819,20 +873,20 @@ mod tests {
         let before = configuration
             .update(
                 None,
-                SettingChange::SetContextMaxInputTokens {
+                SettingChange::SetModelContextWindow {
                     value: NonZeroU64::new(64).unwrap(),
                 },
             )
             .unwrap();
         let result = configuration.update_guarded(
             before.source_revision,
-            SettingChange::SetContextMaxInputTokens {
+            SettingChange::SetModelContextWindow {
                 value: NonZeroU64::new(128).unwrap(),
             },
             || {
                 std::fs::write(
                     directory.path().join("config.toml"),
-                    "schema_version = 1\n[context]\nmax_input_tokens = 256\n",
+                    "schema_version = 1\nmodel_context_window = 256\n",
                 )
                 .unwrap();
                 Ok(())
@@ -843,10 +897,7 @@ mod tests {
         assert_eq!(inspection.active, before);
         assert_ne!(inspection.file_revision, before.source_revision);
         let reloaded = configuration.reload(inspection.file_revision).unwrap();
-        assert_eq!(
-            reloaded.defaults.context.max_input_tokens.unwrap().get(),
-            256
-        );
+        assert_eq!(reloaded.defaults.model_context_window.unwrap().get(), 256);
     }
 
     #[test]
@@ -857,7 +908,7 @@ mod tests {
         let checks = std::sync::atomic::AtomicUsize::new(0);
         let result = configuration.update_guarded(
             None,
-            SettingChange::SetContextMaxInputTokens {
+            SettingChange::SetModelContextWindow {
                 value: NonZeroU64::new(64).unwrap(),
             },
             || {

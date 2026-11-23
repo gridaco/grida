@@ -21,7 +21,11 @@ pub(super) fn reported_usage_answer(
     input_tokens: u64,
     output_tokens: u64,
 ) -> Reply {
-    let mut body = fixture_body(Reply::Finished(text), ProviderProtocol::OpenAiCompatible);
+    reported_usage(Reply::Finished(text), input_tokens, output_tokens)
+}
+
+pub(super) fn reported_usage(reply: Reply, input_tokens: u64, output_tokens: u64) -> Reply {
+    let mut body = fixture_body(reply, ProviderProtocol::OpenAiCompatible);
     body.truncate(body.len() - "data: [DONE]\n\n".len());
     for prompt_tokens in [input_tokens / 2, input_tokens, input_tokens] {
         let usage = json!({

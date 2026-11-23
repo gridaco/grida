@@ -27,7 +27,7 @@ fn write(directory: &Path, text: &str) {
 }
 
 fn set(value: u64) -> SettingChange {
-    SettingChange::SetContextMaxInputTokens {
+    SettingChange::SetModelContextWindow {
         value: NonZeroU64::new(value).unwrap(),
     }
 }
@@ -38,17 +38,15 @@ fn missing_file_uses_automatic_defaults_without_creating_configuration() {
     let configuration = Configuration::open(directory.path()).unwrap();
     let inspection = configuration.inspect().unwrap();
     assert!(inspection.file_revision.is_none());
-    assert!(
-        inspection
-            .active
-            .defaults
-            .context
-            .max_input_tokens
-            .is_none()
+    assert_eq!(
+        inspection.fields.map(|field| field.key),
+        ["model_context_window", "model_auto_compact_token_limit"]
     );
+
+    assert!(inspection.active.defaults.model_context_window.is_none());
     assert!(inspection.file_diagnostic.is_none());
     configuration
-        .update(None, SettingChange::ResetContextMaxInputTokens)
+        .update(None, SettingChange::ResetModelContextWindow)
         .unwrap();
     assert!(!directory.path().join("config.toml").exists());
 }
@@ -59,11 +57,8 @@ fn changes_persist_and_captured_snapshots_stay_immutable() {
     let configuration = Configuration::open(directory.path()).unwrap();
     let captured = configuration.snapshot().unwrap();
     let changed = configuration.update(None, set(64000)).unwrap();
-    assert_eq!(
-        changed.defaults.context.max_input_tokens.unwrap().get(),
-        64000
-    );
-    assert!(captured.defaults.context.max_input_tokens.is_none());
+    assert_eq!(changed.defaults.model_context_window.unwrap().get(), 64000);
+    assert!(captured.defaults.model_context_window.is_none());
     assert_ne!(captured.identity, changed.identity);
     drop(configuration);
     let reopened = Configuration::open(directory.path()).unwrap();
@@ -71,10 +66,10 @@ fn changes_persist_and_captured_snapshots_stay_immutable() {
     let reset = reopened
         .update(
             changed.source_revision,
-            SettingChange::ResetContextMaxInputTokens,
+            SettingChange::ResetModelContextWindow,
         )
         .unwrap();
-    assert!(reset.defaults.context.max_input_tokens.is_none());
+    assert!(reset.defaults.model_context_window.is_none());
 }
 
 #[test]
@@ -82,7 +77,7 @@ fn managed_changes_preserve_unrelated_comments_and_tables() {
     let directory = state();
     write(
         directory.path(),
-        "# Personal defaults\nschema_version = 1\n\n# Context selection\n[context]\nmax_input_tokens = 32000\n",
+        "# Personal defaults\nschema_version = 1\n\n# Context selection\nmodel_auto_compact_token_limit = 28000\nmodel_context_window = 32000\n",
     );
     let configuration = Configuration::open(directory.path()).unwrap();
     let before = configuration.snapshot().unwrap();
@@ -92,29 +87,37 @@ fn managed_changes_preserve_unrelated_comments_and_tables() {
     let text = std::fs::read_to_string(directory.path().join("config.toml")).unwrap();
     assert!(text.contains("# Personal defaults"));
     assert!(text.contains("# Context selection"));
-    assert!(text.contains("max_input_tokens = 64000"));
+    assert!(text.contains("model_auto_compact_token_limit = 28000"));
+    assert!(text.contains("model_context_window = 64000"));
 }
 
 #[test]
-fn inline_context_tables_remain_editable() {
+fn accepting_a_legacy_inline_context_retains_the_independent_compaction_setting() {
     let directory = state();
     write(
         directory.path(),
-        "schema_version = 1\ncontext = { max_input_tokens = 100 }\n",
+        "schema_version = 1\ncontext = { max_input_tokens = 100 }\nmodel_auto_compact_token_limit = 170\n",
     );
     let configuration = Configuration::open(directory.path()).unwrap();
     let before = configuration.snapshot().unwrap();
     let changed = configuration
         .update(before.source_revision, set(200))
         .unwrap();
+    assert_eq!(changed.defaults.model_context_window.unwrap().get(), 200);
     assert_eq!(
-        changed.defaults.context.max_input_tokens.unwrap().get(),
-        200
+        changed
+            .defaults
+            .model_auto_compact_token_limit
+            .unwrap()
+            .get(),
+        170
     );
+    let saved = std::fs::read_to_string(directory.path().join("config.toml")).unwrap();
+    assert!(!saved.contains("max_input_tokens"));
     configuration
         .update(
             changed.source_revision,
-            SettingChange::ResetContextMaxInputTokens,
+            SettingChange::ResetModelContextWindow,
         )
         .unwrap();
     assert!(
@@ -122,9 +125,71 @@ fn inline_context_tables_remain_editable() {
             .snapshot()
             .unwrap()
             .defaults
-            .context
-            .max_input_tokens
+            .model_context_window
             .is_none()
+    );
+}
+
+#[test]
+fn context_window_and_compaction_threshold_are_independently_settable_and_resettable() {
+    let directory = state();
+    let config = Configuration::open(directory.path()).unwrap();
+    let window = config.update(None, set(32768)).unwrap();
+    let both = config
+        .update(
+            window.source_revision,
+            SettingChange::SetModelAutoCompactTokenLimit {
+                value: NonZeroU64::new(65536).unwrap(),
+            },
+        )
+        .unwrap();
+    assert_eq!(both.defaults.model_context_window, NonZeroU64::new(32768));
+    assert_eq!(
+        both.defaults.model_auto_compact_token_limit,
+        NonZeroU64::new(65536)
+    );
+    let cleared = config
+        .update(
+            both.source_revision,
+            SettingChange::ResetModelAutoCompactTokenLimit,
+        )
+        .unwrap();
+    assert_eq!(cleared.defaults, window.defaults);
+    assert!(
+        !std::fs::read_to_string(directory.path().join("config.toml"))
+            .unwrap()
+            .contains("model_auto_compact_token_limit")
+    );
+}
+
+#[test]
+fn a_trusted_reset_cleans_retired_source_without_reinterpreting_it_as_a_threshold() {
+    let directory = state();
+    let source = "# Personal settings\nschema_version = 1\nmodel_auto_compact_token_limit = 127\n[context]\nmax_input_tokens = 1\n";
+    write(directory.path(), source);
+    let config = Configuration::open(directory.path()).unwrap();
+    let before = config.snapshot().unwrap();
+    assert!(before.defaults.model_context_window.is_none());
+    assert!(before.defaults.legacy_input_limit().is_none());
+    assert_eq!(
+        before.defaults.model_auto_compact_token_limit,
+        NonZeroU64::new(127)
+    );
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("config.toml")).unwrap(),
+        source
+    );
+    let after = config
+        .update(
+            before.source_revision,
+            SettingChange::ResetModelContextWindow,
+        )
+        .unwrap();
+    assert_eq!(before.defaults, after.defaults);
+    assert_ne!(before.source_revision, after.source_revision);
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("config.toml")).unwrap(),
+        "# Personal settings\nschema_version = 1\nmodel_auto_compact_token_limit = 127\n"
     );
 }
 
@@ -136,10 +201,12 @@ fn invalid_startup_configuration_is_rejected_without_echoing_contents() {
         "schema_version = 1\nunknown = 'private-value'\n",
         "schema_version = 1\ncontext = 1\n",
         "schema_version = 1\n[context]\nother = true\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 0\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = -1\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 'private-value'\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 1.5\n",
+        "schema_version = 1\nmodel_context_window = 0\n",
+        "schema_version = 1\nmodel_context_window = -1\n",
+        "schema_version = 1\nmodel_context_window = 'private-value'\n",
+        "schema_version = 1\nmodel_context_window = 1.5\n",
+        "schema_version = 1\nmodel_auto_compact_token_limit = 0\n",
+        "schema_version = 1\nmodel_auto_compact_token_limit = 9007199254740992\n",
         "private-value {{{",
     ] {
         write(directory.path(), text);
@@ -152,12 +219,12 @@ fn invalid_startup_configuration_is_rejected_without_echoing_contents() {
 fn managed_and_manual_limits_remain_exact_in_javascript_clients() {
     let directory = state();
     let configuration = Configuration::open(directory.path()).unwrap();
-    let maximum = grida_agent_master::configuration::CONTEXT_MAX_INPUT_TOKENS.maximum;
+    let maximum = grida_agent_master::configuration::MODEL_CONTEXT_WINDOW.maximum;
     assert_eq!(maximum, 9_007_199_254_740_991);
     let accepted = configuration.update(None, set(maximum)).unwrap();
     let json = serde_json::to_value(&accepted).unwrap();
     assert_eq!(
-        json["defaults"]["context"]["max_input_tokens"].as_u64(),
+        json["defaults"]["model_context_window"].as_u64(),
         Some(maximum)
     );
     assert_eq!(
@@ -170,7 +237,7 @@ fn managed_and_manual_limits_remain_exact_in_javascript_clients() {
     write(
         directory.path(),
         &format!(
-            "schema_version = 1\n[context]\nmax_input_tokens = {}\n",
+            "schema_version = 1\nmodel_context_window = {}\n",
             maximum + 1
         ),
     );
@@ -191,7 +258,7 @@ fn rejected_reload_retains_the_active_snapshot_and_reports_the_file() {
     let before = configuration.snapshot().unwrap();
     write(
         directory.path(),
-        "schema_version = 1\n[context]\nmax_input_tokens = 0\n",
+        "schema_version = 1\nmodel_context_window = 0\n",
     );
     let inspection = configuration.inspect().unwrap();
     assert_ne!(inspection.file_revision, before.source_revision);
@@ -216,7 +283,7 @@ fn manual_edits_require_explicit_reload_and_stale_updates_preserve_them() {
     let before = configuration.snapshot().unwrap();
     write(
         directory.path(),
-        "schema_version = 1\n[context]\nmax_input_tokens = 4096\n",
+        "schema_version = 1\nmodel_context_window = 4096\n",
     );
     assert_eq!(configuration.snapshot().unwrap(), before);
     assert_eq!(
@@ -235,10 +302,7 @@ fn manual_edits_require_explicit_reload_and_stale_updates_preserve_them() {
     );
     let inspection = configuration.inspect().unwrap();
     let active = configuration.reload(inspection.file_revision).unwrap();
-    assert_eq!(
-        active.defaults.context.max_input_tokens.unwrap().get(),
-        4096
-    );
+    assert_eq!(active.defaults.model_context_window.unwrap().get(), 4096);
     assert_eq!(
         configuration.inspect().unwrap().file_revision,
         active.source_revision

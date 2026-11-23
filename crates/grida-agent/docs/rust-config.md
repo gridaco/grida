@@ -1,14 +1,8 @@
 # Agent host configuration
 
-The native host provides a small typed configuration surface shared by Desktop,
-headless clients, and agent tools. A person can ask the agent to explain a setting,
-change a supported default, or restore its inherited value. TOML is the editable
-backing format. Conversational changes use the same validated host operations as
-other clients.
-
-The native host implements the file, client operations and model-facing tools
-below. Existing model and mode selectors retain their separate settings
-contracts.
+The native host reads agent defaults from TOML. A trusted client can
+inspect, change or reset them through typed operations. Session model and
+mode selectors have their own settings contracts.
 
 ## Scope
 
@@ -23,52 +17,34 @@ storage, update serialization, and protocol exposure. Core components receive
 resolved limits and configuration identity through their existing contracts.
 No configuration crate or TOML dependency is required in the neutral core.
 
-The host's configuration module implements the service and constructs its
-capability-scoped tools from the master's field definitions. The master selects
-those tools through its ordinary inventory. This keeps the dependency from host
-to master and avoids a second settings path inside the agent loop.
+The host's configuration module uses the master's field definitions for
+validation and inspection. The host resolves the selected model's context
+capacity before capturing a new input.
 
 ## Field review
 
-| Field                              | Meaning                                                                                                    | Default and bounds                                                                                                                                                                                                                                                                       | Status                   |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `schema_version`                   | Version of this file's schema.                                                                             | Required version `1` when the file exists.                                                                                                                                                                                                                                               | Format metadata.         |
-| `context.max_input_tokens`         | Upper limit on the complete assembled model input, including instructions, history, and tool declarations. | Omitted means automatic product/model budgeting. Explicit values are integers from `1` through `9007199254740991`, preserving exact values across native and JavaScript clients. Effective input is also capped by provider capacity after output/headroom reservations and host limits. | Reviewed behavior field. |
-| Automatic-compaction threshold     | When the master should summarize or replace context.                                                       | Requires a separate definition of measured scope and interaction with the input budget.                                                                                                                                                                                                  | Not reviewed.            |
-| Provider context-window correction | Replace stale or missing model-capacity metadata for a specific provider/model binding.                    | Needs provenance, known-maximum handling, and explicit treatment of unverified capacity.                                                                                                                                                                                                 | Not reviewed.            |
+| Field                            | Meaning                                                   | Default and bounds                                                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                 | Version of this file's schema.                            | Required version `1` when the file exists.                                                                                                                                                                    |
+| `model_context_window`           | Context capacity used for usage and automatic compaction. | Optional positive safe integer. Omission uses the known model window. An explicit value supplies an unknown window or lowers a known one.                                                                     |
+| `model_auto_compact_token_limit` | Usage that triggers automatic compaction.                 | Optional positive safe integer. With a resolved window, the default and maximum are 90% of the window, rounded down with a minimum of one token. With an unknown window, an explicit threshold still applies. |
 
-The behavior field controls how much input the agent tries to use. Raising
-it can increase cost and admit more context, subject to available model capacity.
-It does not increase the model's actual capacity or grant more spending authority.
-If the capacity is unknown, inspection reports that uncertainty. A numeric local
-budget cannot establish provider compatibility.
-
-An explicit value replaces the preferred automatic budget. The effective
-ceiling is the smaller of that value and the available provider/host capacity.
-For example, a 64k cap remains valid when a selected model permits only 32k input.
-Inspection shows the requested 64k, effective 32k, and limiting constraint.
-
-Admission checks the complete input against the resolved ceiling. The accounting
-includes media, tool declarations, and provider framing, with the measurement
-bound to their captured representation. An estimate remains labeled as such.
-A requested hard bound requires exact counting or a conservative upper bound.
-When it
-cannot fit, the master compacts within policy, requests a change, or reports
-the unavailable request. A changed model is revalidated. The accepted requested
-cap and each operation's actual resolved limit remain attributable.
-
-Example file using an illustrative value that must fit the selected model.
+Each optional field accepts integers from `1` through `9007199254740991`.
+The native host captures the resolved values with accepted input. Reported
+foreground usage and estimates guide compaction before turns and during
+tool exchanges. Current user messages remain in context. Providers enforce
+their actual capacities independently.
 
 ```toml
 schema_version = 1
 
-[context]
-max_input_tokens = 64000
+model_context_window = 64000
+model_auto_compact_token_limit = 48000
 ```
 
-Removing `max_input_tokens` restores automatic budgeting. Zero has no special
-reset meaning. Credentials, access grants, sandbox rules, and spending limits
-have their existing owners and are excluded from this schema.
+Remove either key to restore its default. Older source files may still
+contain `[context].max_input_tokens`. Captured inputs from that policy keep
+their old limit. New inputs use the top-level keys.
 
 ## Hook definitions
 
@@ -115,8 +91,8 @@ the task already has the required read scope. A text-only child gains no scope
 merely to execute a check. Project and plugin discovery is deferred to a source
 adapter with review of new or changed executable content.
 
-The per-host configuration service keeps its scalar setting. Its model-editable
-file does not install global executable hooks. Desktop's global source uses
+The per-host configuration service owns context settings. Desktop's separate
+global source owns executable hooks and uses
 `timeout_ms` and an executable path plus literal `arguments`; it has no project
 discovery, regex matchers, async hooks, or plugin source. Headless supervisors
 retain their explicit low-level launch profiles; the host does not auto-load
@@ -144,23 +120,26 @@ persistent scopes require their own field and precedence review.
 Three operations establish the surface. Each requires its negotiated
 `co.grida/config/` capability, and unknown parameters are rejected.
 
-| Method                     | Parameters                                                | Result                                                                                                                                                     |
-| -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_co.grida/config/inspect` | None (`{}`).                                              | Reviewed field descriptions, stored override, requested and effective values, default and source, current file revision, active snapshot, and diagnostics. |
-| `_co.grida/config/update`  | `expectedRevision` and one typed `change` (set or reset). | The resulting file revision and active snapshot, persisted and effective values, and diagnostics.                                                          |
-| `_co.grida/config/reload`  | `expectedRevision`.                                       | Validates manually edited content and activates it for future requests, or returns diagnostics while retaining the active snapshot.                        |
+| Method                     | Parameters                                                | Result                                                                                                                              |
+| -------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `_co.grida/config/inspect` | None (`{}`).                                              | Field definitions, current file revision, active defaults, and file diagnostic.                                                     |
+| `_co.grida/config/update`  | `expectedRevision` and one typed `change` (set or reset). | The published active configuration snapshot.                                                                                        |
+| `_co.grida/config/reload`  | `expectedRevision`.                                       | Validates manually edited content and activates it for future requests, or returns diagnostics while retaining the active snapshot. |
 
 `expectedRevision` is the file revision from inspection, a fingerprint written
 as 64 lowercase hexadecimal characters. It is null exactly when no
 configuration file exists; any other mismatch fails with
-`config_revision_changed`. A `change` carries `operation`
-(`set_context_max_input_tokens` with a positive `value`, or
-`reset_context_max_input_tokens`).
+`config_revision_changed`. A `change` carries one of these operations.
 
-Each field descriptor provides its name, human label, meaning, type, units,
-default rule, supported scope, validation, activation rule, and whether the
-caller may change it. The inspection operation reports these descriptors to
-the trusted client.
+- `set_model_context_window` with a positive integer `value`.
+- `reset_model_context_window`.
+- `set_model_auto_compact_token_limit` with a positive integer `value`.
+- `reset_model_auto_compact_token_limit`.
+
+The inspection response reports each field's key, label, meaning, type,
+units, bounds, default rule, scope and activation timing. Its
+`exact_input_counting` value reports a provider compatibility capability for
+older work.
 
 Reset removes the selected override. It uses the same update operation and
 validation path. Unknown keys, unsupported schema versions, and invalid types
@@ -221,46 +200,23 @@ editing with every external writer. The manual workflow edits a stopped host or
 uses an explicit reload after editing. Detected external changes reject stale
 managed updates. Writes retain the normal host path and integrity checks.
 
-## Conversational behavior
-
-For “use at most 64k input tokens for future tasks,” the agent inspects the field,
-checks the value and scope, and applies a typed update. It reports the previous
-and resulting values, what the number controls, and that future accepted work
-uses the new default. It reports an error when the change is rejected.
-
-For “why did you use less context,” the agent inspects the configuration captured
-for that work and explains the effective limit, its source, and any provider or
-budget restriction. It distinguishes that past snapshot from current defaults.
-
-For “restore automatic context budgeting,” the agent resets the override and
-reports the inherited default rule. The person does not need to know the file
-path or field spelling for any of these operations.
-
-The agent learns this supported surface through field descriptors and tool
-definitions. It does not infer writable settings from repository code, invent
-keys, or rewrite configuration through an unrestricted shell tool.
-
 ## Acceptance obligations
 
-| Situation                                                 | Required observation                                                                                  |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Ask which context setting applies                         | Return the effective value or automatic rule, source, scope, and activation timing.                   |
-| Ask for a supported persistent change                     | Update through the normal configuration capability and confirm the actual resulting state.            |
-| Ask for a one-task change                                 | Use an explicit request/control override or explain its availability, preserving persistent defaults. |
-| Set an invalid value or unknown field                     | Report the error and preserve the valid configuration.                                                |
-| Two clients edit from the same revision                   | One managed update wins and the other receives a conflict.                                            |
-| Restart after a valid change                              | Load the same persisted override and expose its provenance.                                           |
-| Change defaults while work is queued                      | Accepted work retains its captured configuration.                                                     |
-| Select a model with less capacity than the configured cap | Show the smaller effective ceiling and its source before assembling the request.                      |
-| Reload a malformed manual edit                            | Keep the last valid running snapshot and report the rejected source.                                  |
+| Situation                                                    | Required observation                                                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Ask which context setting applies                            | Return the effective value or automatic rule, source, scope, and activation timing.                   |
+| Ask for a supported persistent change                        | Update through the normal configuration capability and confirm the actual resulting state.            |
+| Ask for a one-task change                                    | Use an explicit request/control override or explain its availability, preserving persistent defaults. |
+| Set an invalid value or unknown field                        | Report the error and preserve the valid configuration.                                                |
+| Two clients edit from the same revision                      | One managed update wins and the other receives a conflict.                                            |
+| Restart after a valid change                                 | Load the same persisted override and expose its provenance.                                           |
+| Change defaults while work is queued                         | Accepted work retains its captured configuration.                                                     |
+| Select a model with less capacity than the configured window | Use the model's smaller window and cap the automatic compaction threshold accordingly.                |
+| Reload a malformed manual edit                               | Keep the last valid running snapshot and report the rejected source.                                  |
 
 ## Design rationale
 
-The configuration surface is a working-input budget, not a model-capacity
-override. Model capacity is provider metadata with its own provenance; a local
-number cannot raise it. Keeping the budget a user default with explicit
-revisions lets a person, a client, and the agent change it through one
-validated path, inspect where an effective value came from, and see when a
-concurrent edit lost. Typed changes keep the agent from rewriting arbitrary
-configuration, and captured snapshots keep accepted work reproducible after a
-default changes.
+Context limits resolve against the model binding at input acceptance. A user
+can lower the working window, or supply one when the provider's metadata is
+unknown. Revision-checked writes keep one validated update path. Captured
+snapshots preserve the accepted context policy when later defaults change.

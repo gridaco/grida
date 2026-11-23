@@ -9,6 +9,7 @@ use grida_agent::{
     acp, mcp,
 };
 use serde_json::json;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -187,6 +188,14 @@ fn command() -> Command {
                         .long("supervised-image-input")
                         .requires("supervised-wire-model")
                         .action(ArgAction::SetTrue)
+                        .hide(true),
+                )
+                .arg(
+                    Arg::new("supervised-context-window-tokens")
+                        .long("supervised-context-window-tokens")
+                        .value_name("TOKENS")
+                        .value_parser(value_parser!(u64).range(1..=9_007_199_254_740_991))
+                        .requires("supervised-provider")
                         .hide(true),
                 )
                 .arg(
@@ -982,6 +991,14 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             workspace_configuration.as_ref(),
         )?,
         (None, _, _) => Host::open(state_dir, Some(provider))?,
+    };
+    let host = match supervisor.as_ref().and_then(|_| {
+        args.get_one::<u64>("supervised-context-window-tokens")
+            .copied()
+            .and_then(NonZeroU64::new)
+    }) {
+        Some(window) => host.with_supervised_context_window(window)?,
+        None => host,
     };
     let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;
     let host = host.with_operating_regime(regime);

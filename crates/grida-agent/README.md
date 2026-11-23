@@ -260,17 +260,9 @@ process. That process-local binding cannot authorize opaque replay after restart
 Direct `gemini-3.8-flash` also checks that retained function-call history has
 the required thought signature before sending it to Gemini.
 
-The Responses API adapter can count complete input before generation when an
-input-token cap is configured. Counting sends the captured input to the same
-provider under the same credential and deadline. Unsupported counting and
-over-limit input return a persisted failure before generation.
-
-For a local llama.cpp text server, add `--llama-cpp-input-count` with
-`--provider openai-compatible` and a direct numeric loopback `/v1` endpoint
-such as `http://127.0.0.1:8080/v1`. When a cap applies, the host sends the
-complete prepared text and tool request to the server's count route before
-generation. A missing or invalid count leaves the turn failed before
-generation. This launch option keeps its own saved connection identity.
+Previously accepted work that captured a hard input limit retains that
+check. Exact counting is available through Responses and the original
+`--llama-cpp-input-count` connection on a supported numeric loopback endpoint.
 
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
@@ -687,9 +679,9 @@ accepted model and limits and revalidates the captured provider authority.
 A changed provider credential blocks dispatch for that retained task.
 
 The host reads `config.toml` from its private state directory and retains an
-immutable defaults snapshot with each accepted input. A setting change applies
-to later inputs. A compatible connection without exact counting rejects an
-explicit input-token cap before generation.
+immutable defaults snapshot with each accepted input. The optional top-level
+`model_context_window` and `model_auto_compact_token_limit` values guide
+automatic context compaction. A setting change applies to later inputs.
 
 A private stdio supervisor can give workers with separate chat stores one
 workspace configuration. They share the workspace's existing `config.toml`

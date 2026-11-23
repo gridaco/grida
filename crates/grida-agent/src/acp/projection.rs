@@ -677,6 +677,9 @@ pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Va
     if let Some(tokens) = turn.context_tokens {
         facts["contextTokens"] = json!(tokens);
     }
+    if let Some(window) = inputs.context_windows.get(&turn.id) {
+        facts["contextWindowTokens"] = json!(window);
+    }
     // A compaction turn adds no transcript messages; its summary shows as a
     // note where earlier context was summarized.
     if let Some(summary) = turn
@@ -691,6 +694,8 @@ pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Va
             "summary": summary,
             "automatic": crate::host::compaction::is_automatic_turn(&turn.id),
         });
+    } else if let Some(summary) = inputs.compaction_summaries.get(&turn.id) {
+        facts["compaction"] = json!({"summary": summary, "automatic": true});
     }
     facts
 }

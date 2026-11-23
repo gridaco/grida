@@ -1795,23 +1795,18 @@ async fn missing_retained_png_after_restart_fails_before_provider_requests() {
     use agent_kit_sessions::InputDisposition;
     use std::fs;
 
-    for count in [false, true] {
+    for legacy_config in [false, true] {
         let directory = TempDir::new().unwrap();
         let state = directory.path().join("state");
         let workspace = TempDir::new().unwrap();
-        let mut replies = vec![];
-        if count {
-            super::responses::input_limit(&state, 1024);
-            replies.push(Reply::InputCount(16));
+        if legacy_config {
+            super::responses::legacy_input_limit(&state, 1);
         }
-        replies.push(Reply::Hold("Earlier work."));
-        // Keep the listener open so an unexpected attempt cannot hide behind
-        // connection refusal. Both paths must stop before their next request.
-        replies.push(if count {
-            Reply::InputCount(16)
-        } else {
-            Reply::Finished("The missing image must never reach the provider.")
-        });
+        // Keep listening to detect a provider dispatch after the image disappeared.
+        let replies = vec![
+            Reply::Hold("Earlier work."),
+            Reply::Finished("The missing image must never reach the provider."),
+        ];
         let mut endpoint =
             Endpoint::start_protocol(ProviderProtocol::Responses, replies, Some(TEST_CREDENTIAL))
                 .await;
@@ -1831,9 +1826,6 @@ async fn missing_retained_png_after_restart_fails_before_provider_requests() {
             )
             .await;
         assert_eq!(earlier["result"]["disposition"], "claimed", "{earlier}");
-        if count {
-            endpoint.request().await;
-        }
         endpoint.request().await;
         let data = STANDARD.encode(png([15, 255, 0]));
         let accepted = first

@@ -88,26 +88,27 @@ async fn supervised_workspace_workers_share_defaults_without_rewriting_queued_in
     // inference request is dispatched and subsequent input stays queued.
     let before = enqueue(&mut first, session, "before-change").await;
     assert_eq!(before["model"], "original");
-    assert!(before["maxInputTokens"].is_null());
+    assert!(before["modelContextWindow"].is_null());
     let applied = second
         .request(
             "_co.grida/config/update",
             json!({
                 "expectedRevision": null,
-                "change":{"operation":"set_context_max_input_tokens","value":64000},
+                "change":{"operation":"set_model_context_window","value":64000},
             }),
         )
         .await;
     assert!(applied.get("error").is_none(), "{applied}");
     let after = enqueue(&mut first, session, "after-change").await;
-    assert_eq!(after["maxInputTokens"], 64000);
+    assert_eq!(after["modelContextWindow"], 64000);
+    assert_eq!(after["modelAutoCompactTokenLimit"], 57600);
     let alternate_created = second
         .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
         .await;
     let alternate = alternate_created["result"]["sessionId"].as_str().unwrap();
     let alternate_capture = enqueue(&mut second, alternate, "alternate-capture").await;
     assert_eq!(alternate_capture["model"], "alternate");
-    assert_eq!(alternate_capture["maxInputTokens"], 64000);
+    assert_eq!(alternate_capture["modelContextWindow"], 64000);
     let observed = first
         .request(
             "_co.grida/session/input",
@@ -118,17 +119,14 @@ async fn supervised_workspace_workers_share_defaults_without_rewriting_queued_in
 
     std::fs::write(
         configuration.join("config.toml"),
-        "schema_version = 1\n[context]\nmax_input_tokens = 96000\n",
+        "schema_version = 1\nmodel_context_window = 96000\nmodel_auto_compact_token_limit = 71000\n",
     )
     .unwrap();
     second.close().await;
     let mut second = start(&alternate_state, &configuration, &epoch, "alternate").await;
     let pending = second.request("_co.grida/config/inspect", json!({})).await;
     let pending = &pending["result"];
-    assert_eq!(
-        pending["active"]["defaults"]["context"]["max_input_tokens"],
-        64000
-    );
+    assert_eq!(pending["active"]["defaults"]["model_context_window"], 64000);
     assert_ne!(
         pending["file_revision"],
         pending["active"]["source_revision"]
@@ -141,7 +139,8 @@ async fn supervised_workspace_workers_share_defaults_without_rewriting_queued_in
         .await;
     assert!(reloaded.get("error").is_none(), "{reloaded}");
     let after_reload = enqueue(&mut first, session, "after-reload").await;
-    assert_eq!(after_reload["maxInputTokens"], 96000);
+    assert_eq!(after_reload["modelContextWindow"], 96000);
+    assert_eq!(after_reload["modelAutoCompactTokenLimit"], 71000);
     let observed = first
         .request(
             "_co.grida/session/input",

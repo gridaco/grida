@@ -833,7 +833,10 @@ pub struct InputSettings {
     /// identity on retry; not published with its settings.
     #[serde(skip)]
     pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
-    pub max_input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_context_window: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_auto_compact_token_limit: Option<u64>,
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
     pub questions: bool,
@@ -905,12 +908,14 @@ impl InputSettings {
                     operating_regime: stored.operating_regime,
                     effort: stored.effort.map(|policy| policy.preset()),
                     reasoning: stored.reasoning,
-                    max_input_tokens: stored
-                        .configuration
-                        .defaults
-                        .context
-                        .max_input_tokens
-                        .map(|limit| limit.get()),
+                    model_context_window: stored
+                        .context_limits
+                        .and_then(|limits| limits.window)
+                        .map(NonZeroU64::get),
+                    model_auto_compact_token_limit: stored
+                        .context_limits
+                        .and_then(|limits| limits.auto_compact)
+                        .map(NonZeroU64::get),
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,

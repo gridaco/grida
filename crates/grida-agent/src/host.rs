@@ -258,6 +258,8 @@ pub struct Host {
 }
 
 struct Execution {
+    context_window_tokens: Option<NonZeroU64>,
+    provider_id: agent_kit_core::ProviderId,
     /// Private catalog selector captured with accepted inputs for exact replay.
     model_binding: Option<SupervisedModel>,
     /// The supervisor offers billing lookup for this Gateway route.
@@ -535,6 +537,8 @@ struct StoredPrompt {
     spending: Option<spending::Selection>,
     parts: Vec<PromptPart>,
     configuration: ConfigurationSnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    context_limits: Option<grida_agent_master::compaction::ContextLimits>,
     max_output_tokens: Option<u64>,
     max_steps: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -771,6 +775,7 @@ struct PreparedInput {
     messages: Vec<Message>,
     retained_file: Option<crate::scratch::WorkingCopyReceipt>,
     limit: Option<NonZeroU64>,
+    context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
     allow_wakeups: bool,
@@ -2511,7 +2516,13 @@ impl Host {
         prior.extend(prepared.guidance);
         let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
-            .with_input_limit(prepared.limit);
+            .with_input_limit(prepared.limit)
+            .with_auto_compaction(prepared.context_limits.auto_compact.filter(|_| {
+                !prepared.subagent
+                    && prepared.goal.is_none()
+                    && prepared.effort.is_none()
+                    && !self.inference_only
+            }));
         if let Some(catalog) = discovery {
             master = master.with_discovery(catalog);
         }
@@ -2844,6 +2855,7 @@ impl Host {
             selection_goal,
         )?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
+        let context_limits = execution.context_limits(&configuration);
         let child_work = subagent.is_some();
         let unavailable_library_selection_requested =
             allow_library_selection && !execution.tool_result_images;
@@ -3048,6 +3060,7 @@ impl Host {
                 spending,
                 parts,
                 configuration,
+                context_limits: Some(context_limits),
                 max_output_tokens: execution.config.max_output_tokens,
                 max_steps: Some(if child_work {
                     grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT
@@ -3134,6 +3147,7 @@ impl Host {
             messages,
             operating_regime,
             limit,
+            context_limits,
             questions,
             question_batches,
             allow_wakeups,
@@ -3586,7 +3600,12 @@ impl Host {
                 (
                     messages,
                     stored.operating_regime,
-                    stored.configuration.defaults.context.max_input_tokens,
+                    stored.configuration.defaults.legacy_input_limit(),
+                    if side {
+                        Default::default()
+                    } else {
+                        stored.context_limits.unwrap_or_default()
+                    },
                     stored.questions,
                     stored.question_batches,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
@@ -3670,6 +3689,7 @@ impl Host {
             messages,
             retained_file,
             limit,
+            context_limits,
             questions,
             question_batches,
             allow_wakeups,
@@ -4239,6 +4259,24 @@ impl From<TurnLinkCursor> for GatewayChildBillingRef {
 }
 
 impl Execution {
+    fn context_limits(
+        &self,
+        configuration: &ConfigurationSnapshot,
+    ) -> grida_agent_master::compaction::ContextLimits {
+        let model_window =
+            self.context_window_tokens
+                .or_else(|| match &self.authorization.credential {
+                    Credential::Http(transport) => {
+                        transport.verified_context_window(&self.config.model)
+                    }
+                    _ => None,
+                });
+        grida_agent_master::compaction::ContextLimits::resolve(
+            &configuration.defaults,
+            model_window,
+        )
+    }
+
     /// A retained receipt without a selector predates runtime model bindings.
     /// Compare it with the historical mapping of the same connection type.
     fn matches_model_binding(&self, captured: Option<&SupervisedModel>) -> bool {
@@ -4624,6 +4662,7 @@ impl Execution {
             }
         };
         let questions = Arc::new(questions::QuestionAccess::new()?);
+        let provider_id = binding.provider.clone();
         let authorization = Arc::new(ExecutionAuthority {
             inference: inference.clone(),
             questions: questions.clone(),
@@ -4648,6 +4687,8 @@ impl Execution {
         Ok(Self {
             configuration,
             model_binding: None,
+            context_window_tokens: None,
+            provider_id,
             owner,
             runtime,
             gateway_billing: true,

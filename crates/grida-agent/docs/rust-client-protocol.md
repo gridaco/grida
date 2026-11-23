@@ -474,6 +474,11 @@ model captured for the input the turn claimed, including inputs accepted into
 the queue. Later chat selections and auxiliary model calls have their own
 scope. The host omits `modelId` when a turn has no captured foreground model.
 
+Each transcript turn can also report `contextWindowTokens`, the resolved
+window captured for that turn, and `contextTokens`, the latest reported
+foreground context size. A summary call's usage is separate. Treat absent
+values as unknown.
+
 Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
 `plan` or `act` when submitting, enqueueing, starting a goal, or revising
 history. The host captures the effective choice with the input. Omission uses
@@ -1980,6 +1985,12 @@ the original connection and the native host checks the returned binding.
 
 Every successful ordinary selection response carries the same model and a supervisor-local
 `routeId` UUID. The `kind` determines the remaining fields.
+Provider descriptors can include `contextWindowTokens`, a positive safe
+integer for the resolved model binding. For a reused launch, the host
+already has the corresponding private `--supervised-context-window-tokens`
+value when supplied by the supervisor. This capacity affects compaction and
+usage reporting. The captured connection, credential and model continue to
+govern execution.
 
 Private supervisors can independently negotiate
 `co.grida/provider/prediction-route: 1`. A [composer prediction](#composer-predictions)

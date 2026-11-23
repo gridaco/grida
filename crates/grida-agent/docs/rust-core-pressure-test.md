@@ -795,6 +795,13 @@ installed summaries in the transcript without replaying settlements. The
 [notification routing test](../../../desktop/src/main/agent-notifications.test.ts)
 exercises an unfocused workspace. Automatic compaction stays silent on
 success and failure, while the following reply and manual compaction notify.
+The [context limits cases](../tests/process/compaction/limits.rs) exercise the
+exact threshold, the context window ceiling, a model downshift, and queued
+work accepted before a settings reload. When an earlier tool result puts
+the current turn over its threshold, a summary can replace that result in
+model context while the reopened transcript retains the original. If the
+summary fails, the next request still receives the original result. A
+same-turn summary produces no additional completion event.
 The [chat controller tests](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
 exercise a pending question whose review expires as independent work advances.
 One click renews the same question and retries after a definite revision

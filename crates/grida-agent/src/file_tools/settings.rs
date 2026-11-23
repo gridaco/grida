@@ -4,7 +4,7 @@
 use super::*;
 use crate::configuration::SettingsWrite;
 
-const SUPPORTED: &str = "Supported content: schema_version = 1, and an optional [context] table with max_input_tokens set to a positive integer.";
+const SUPPORTED: &str = "Use schema_version = 1. The optional top-level model_context_window and model_auto_compact_token_limit settings each take a positive integer number of tokens.";
 const APPLIES: &str = "The new settings apply to messages accepted from now on. This turn and work already accepted keep the settings they started with.";
 
 impl FileTools {

@@ -909,13 +909,12 @@ fn settings(directory: &Path) -> Arc<Configuration> {
     Arc::new(Configuration::open(directory).unwrap())
 }
 
-fn max_input_tokens(configuration: &Configuration) -> Option<u64> {
+fn model_context_window(configuration: &Configuration) -> Option<u64> {
     configuration
         .snapshot()
         .unwrap()
         .defaults
-        .context
-        .max_input_tokens
+        .model_context_window
         .map(|limit| limit.get())
 }
 
@@ -936,7 +935,7 @@ async fn settings_file_reads_run_and_every_write_asks_even_where_writes_are_allo
         )
         .await;
     let target = |content: &str| json!({"directory":"agent-settings","path":"config.toml","content":content});
-    let valid = "schema_version = 1\n[context]\nmax_input_tokens = 64000\n";
+    let valid = "schema_version = 1\nmodel_context_window = 64000\n";
 
     let absent = completed(
         run.invoke(
@@ -964,7 +963,7 @@ async fn settings_file_reads_run_and_every_write_asks_even_where_writes_are_allo
     let declined = completed(run.invoke("w1", "write_file", target(valid)).await);
     assert_eq!(declined.status, OutcomeStatus::Failed, "{declined:?}");
     assert!(!file.exists());
-    assert_eq!(max_input_tokens(&configuration), None);
+    assert_eq!(model_context_window(&configuration), None);
 
     let wait = deferred(run.invoke("w2", "write_file", target(valid)).await);
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
@@ -972,7 +971,7 @@ async fn settings_file_reads_run_and_every_write_asks_even_where_writes_are_allo
     assert_eq!(saved.status, OutcomeStatus::Succeeded, "{saved:?}");
     assert!(text(&saved).contains("messages accepted from now on"));
     assert_eq!(fs::read_to_string(&file).unwrap(), valid);
-    assert_eq!(max_input_tokens(&configuration), Some(64000));
+    assert_eq!(model_context_window(&configuration), Some(64000));
 
     // An earlier approval in the same session does not cover the next change.
     let edit = json!({
@@ -989,7 +988,7 @@ async fn settings_file_reads_run_and_every_write_asks_even_where_writes_are_allo
         "{invalid:?}"
     );
     assert_eq!(fs::read_to_string(&file).unwrap(), valid);
-    assert_eq!(max_input_tokens(&configuration), Some(64000));
+    assert_eq!(model_context_window(&configuration), Some(64000));
 
     // Only the one file is reachable, and only by read, write and edit.
     for (id, tool, arguments) in [

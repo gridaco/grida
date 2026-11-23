@@ -2,7 +2,7 @@ use crate::authority::GrantSelection;
 use crate::driver_state::{DriverStateChange, DriverStateRevision, DriverStateSnapshot};
 use crate::history::{History, HistoryRecord};
 use crate::inference::{InferenceOutcome, PreparedRequest};
-use crate::messages::OutcomeStatus;
+use crate::messages::{Message, OutcomeStatus};
 use crate::tools::{Invocation, ToolOutcome};
 use crate::{
     AttemptId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result,
@@ -476,6 +476,37 @@ impl TurnState {
     }
     pub fn operations(&self) -> &BTreeMap<OperationId, OperationState> {
         &self.operations
+    }
+    /// Latest inference that contributed to the supplied ordered messages.
+    /// Private inference results that were never published do not participate.
+    pub fn latest_published_inference<'a>(
+        &self,
+        messages: impl IntoIterator<Item = &'a Message>,
+    ) -> Option<(&PreparedRequest, &InferenceOutcome)> {
+        let positions: BTreeMap<_, _> = messages
+            .into_iter()
+            .enumerate()
+            .map(|(position, message)| (&message.id, position))
+            .collect();
+        self.operations
+            .values()
+            .filter_map(|operation| {
+                let (
+                    OperationInput::Inference(request),
+                    Some(OperationOutcome::Inference(outcome)),
+                ) = (&operation.record.input, operation.outcome())
+                else {
+                    return None;
+                };
+                let last = outcome
+                    .messages
+                    .iter()
+                    .filter_map(|message| positions.get(&message.id))
+                    .max()?;
+                Some((last, request, outcome))
+            })
+            .max_by_key(|(position, _, _)| **position)
+            .map(|(_, request, outcome)| (request, outcome))
     }
     pub fn waits(&self) -> &BTreeMap<WaitId, WaitRecord> {
         &self.waits

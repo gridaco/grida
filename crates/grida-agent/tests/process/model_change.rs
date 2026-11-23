@@ -4,7 +4,7 @@ use super::*;
 
 const TRANSCRIPT: &str = "co.grida/session/transcript-window";
 
-async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
+pub(super) async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
     let mut command = executable();
     command
         .args(["serve", "--stdio", "--state-dir"])

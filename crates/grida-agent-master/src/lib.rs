@@ -196,6 +196,7 @@ pub struct Master {
     authority: MasterAuthority,
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
+    auto_compact_token_limit: Option<NonZeroU64>,
     retained_file_check: Option<Box<dyn Fn() -> BoxFuture<'static, Result<()>> + Send + Sync>>,
     effort: Option<effort::Policy>,
     delegation: Option<delegation::Policy>,
@@ -232,6 +233,8 @@ struct ConfigurationIdentity<'a> {
     config: &'a MasterConfig,
     history: &'a [Message],
     input_limit: Option<NonZeroU64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    auto_compact_token_limit: Option<NonZeroU64>,
     completion_checks: Option<&'a hooks::CompletionChecks>,
     lifecycle_hooks: Option<&'a lifecycle_hooks::LifecycleHooks>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -259,6 +262,8 @@ struct Continuation {
     effort: Option<effort::Policy>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     discovered: BTreeSet<ToolId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    compacted: Option<compaction::InlineContext>,
 }
 
 impl Continuation {
@@ -318,6 +323,7 @@ impl Master {
             authority,
             history: Vec::new(),
             input_limit: None,
+            auto_compact_token_limit: None,
             retained_file_check: None,
             effort: None,
             delegation: None,
@@ -378,6 +384,12 @@ impl Master {
     /// Apply the accepted task's hard limit to the complete provider input.
     pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
         self.input_limit = limit;
+        self
+    }
+
+    /// Check captured context pressure before a continuation after tool use.
+    pub fn with_auto_compaction(mut self, limit: Option<NonZeroU64>) -> Self {
+        self.auto_compact_token_limit = limit;
         self
     }
 
@@ -726,6 +738,17 @@ impl Master {
                     continue;
                 }
             };
+            if continuation.request.is_none()
+                && retry.is_none()
+                && continuation.step > 0
+                && self
+                    .compact_after_tools(&mut turn, &mut continuation, &input_view, &request)
+                    .await?
+            {
+                // Prepare against the newly installed model context. The
+                // durable history and operation receipts still describe the original tool work.
+                continue;
+            }
             if continuation.request.is_none() {
                 continuation.request_history = Some(input_view.state.history().position());
                 // An earlier pause cannot have interrupted a request that was
@@ -1136,6 +1159,7 @@ impl Master {
             config: &self.config,
             history: &self.history,
             input_limit: self.input_limit,
+            auto_compact_token_limit: self.auto_compact_token_limit,
             completion_checks: self
                 .completion_checks
                 .as_ref()
@@ -1161,6 +1185,7 @@ impl Master {
                 retry: None,
                 effort: self.effort.clone(),
                 discovered: BTreeSet::new(),
+                compacted: None,
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;

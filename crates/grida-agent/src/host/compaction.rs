@@ -4,9 +4,7 @@
 use super::*;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, MeasurementKind,
-    PreparedRequest,
-    usage::{INPUT_TOKENS, TOKENS},
+    FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, PreparedRequest,
 };
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
@@ -16,7 +14,8 @@ use agent_kit_runtime::{
 use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed, RetainedHistory};
 use grida_agent_master::compaction::{
-    CompactionAccount, CompactionFailure, Coverage, SummaryRequest, summary_request,
+    CompactionAccount, CompactionFailure, Coverage, SummaryRequest, context_tokens,
+    same_context_scope, summary_request,
 };
 use grida_agent_master::read_account;
 use grida_agent_master::usage::InferenceUsage;
@@ -96,7 +95,7 @@ pub(super) struct AutomaticCompaction {
 enum CompactionTrigger {
     Manual,
     Automatic {
-        verified_pressure: bool,
+        token_pressure: Option<bool>,
         has_unprojected_suffix: bool,
     },
     /// A side chat's inherited history, summarized before its first turn so
@@ -291,12 +290,10 @@ impl Host {
             .context_prefix_with(session.clone(), grida_agent_master::history::project)
             .await?;
         let expected_revision = prefix.history.session_revision;
-        let defaults = self.with_configuration(Configuration::snapshot).await?;
         let mut plan = compaction_plan_for(
             self.selected_route.clone(),
             execution,
             &execution.config,
-            defaults.defaults.context.max_input_tokens,
             prefix.history,
             CompactionTrigger::Manual,
         )?
@@ -402,7 +399,10 @@ impl Host {
         )?;
         let prefix = self
             .store
-            .context_prefix_with(view.session.clone(), grida_agent_master::history::project)
+            .context_prefix_with(
+                view.session.clone(),
+                grida_agent_master::history::model_context,
+            )
             .await?;
         let has_unprojected_suffix = prefix.unprojected_suffix_after.is_some();
         let context = prefix.history;
@@ -419,7 +419,6 @@ impl Host {
                 self.selected_route.clone(),
                 execution,
                 &input.config,
-                input.limit,
                 context,
                 CompactionTrigger::Inherited,
             )?
@@ -435,24 +434,22 @@ impl Host {
                 },
             )));
         }
-        let verified_pressure = has_unprojected_suffix
-            || self
-                .verified_compaction_pressure(
-                    view,
-                    execution,
-                    &input,
-                    context.records.last().map(|entry| &entry.turn),
-                )
-                .await
-                .unwrap_or(false);
+        let token_pressure = if has_unprojected_suffix {
+            Some(true)
+        } else {
+            self.compaction_pressure(view, execution, &input, &context)
+                .await?
+        };
+        if token_pressure == Some(false) {
+            return Ok(None);
+        }
         let Some(plan) = compaction_plan_for(
             self.selected_route.clone(),
             execution,
             &input.config,
-            input.limit,
             context,
             CompactionTrigger::Automatic {
-                verified_pressure,
+                token_pressure,
                 has_unprojected_suffix,
             },
         )?
@@ -469,47 +466,51 @@ impl Host {
         )))
     }
 
-    async fn verified_compaction_pressure(
+    async fn compaction_pressure(
         &self,
         view: &SessionView,
         execution: &Execution,
         input: &PreparedInput,
-        retained_tail: Option<&TurnId>,
-    ) -> Result<bool> {
-        let Credential::Http(transport) = &execution.authorization.credential else {
-            return Ok(false);
-        };
-        let model = input.config.model.clone();
-        let threshold = transport
-            .verified_context_window(&model)
-            .zip(input.config.max_output_tokens)
-            .and_then(|(window, output)| window.get().checked_sub(output))
-            .and_then(NonZeroU64::new)
-            .map(|usable| input.limit.map_or(usable, |limit| usable.min(limit)));
-        let Some(latest) = view.latest.as_ref().filter(|turn| {
-            retained_tail == Some(&turn.binding.turn)
-                && turn
-                    .outcome
-                    .as_ref()
-                    .is_some_and(|outcome| match outcome.status {
-                        OutcomeStatus::Succeeded => threshold.is_some(),
-                        OutcomeStatus::Failed => true,
-                        _ => false,
-                    })
+        context: &RetainedHistory,
+    ) -> Result<Option<bool>> {
+        let (mut messages, _, _) = super::history::context_material(context.clone())?;
+        let history_len = messages.len();
+        messages.extend(input.guidance.iter().cloned());
+        messages.extend(input.messages.iter().cloned());
+        let limit = input.context_limits.auto_compact;
+        let estimated = || limit.map(|limit| context_tokens(&messages, None) >= limit.get());
+        let Some(latest) = view.latest.as_ref().filter(|latest| {
+            context
+                .records
+                .last()
+                .is_some_and(|record| record.turn == latest.binding.turn)
         }) else {
-            return Ok(false);
+            return Ok(estimated());
         };
-        let binding = transport.binding().clone();
+        let turn = &latest.binding.turn;
+        let tail_len = context
+            .records
+            .iter()
+            .rev()
+            .take_while(|record| &record.turn == turn)
+            .count();
+        let authority = execution.authority.inference.authority.clone();
+        let provider = execution.provider_id.clone();
+        let model = input.config.model.clone();
         self.store
-            .inspect_turn_with(
-                view.session.clone(),
-                latest.binding.turn.clone(),
-                move |state| {
-                    Ok(previous_context_pressure(
-                        state, &binding, &model, threshold,
-                    ))
-                },
-            )
+            .inspect_turn_with(view.session.clone(), turn.clone(), move |state| {
+                let compatible = |request: &PreparedRequest| {
+                    same_context_scope(request, &model, &provider, &authority)
+                };
+                if previous_context_rejection(state, compatible) {
+                    return Ok(Some(true));
+                }
+                let prior = state
+                    .latest_published_inference(&messages[history_len - tail_len..history_len])
+                    .filter(|(request, _)| compatible(request))
+                    .map(|(request, outcome)| (request.request(), outcome));
+                Ok(limit.map(|limit| context_tokens(&messages, prior) >= limit.get()))
+            })
             .await
     }
 
@@ -884,7 +885,6 @@ fn compaction_plan_for(
     route: Option<super::execution_routes::Selection>,
     execution: &Execution,
     configuration: &MasterConfig,
-    limit: Option<NonZeroU64>,
     mut context: RetainedHistory,
     trigger: CompactionTrigger,
 ) -> Result<Option<CompactionPlan>> {
@@ -938,22 +938,17 @@ fn compaction_plan_for(
     };
     let automatic_pressure = match trigger {
         CompactionTrigger::Manual => None,
-        CompactionTrigger::Automatic {
-            verified_pressure, ..
-        } => Some(verified_pressure),
-        CompactionTrigger::Inherited => Some(false),
+        CompactionTrigger::Automatic { token_pressure, .. } => Some(token_pressure),
+        CompactionTrigger::Inherited => Some(None),
     };
-    if let Some(verified_pressure) = automatic_pressure
-        && ((!verified_pressure && coverage.input_bytes < AUTOMATIC_SOURCE_BYTES)
+    if let Some(token_pressure) = automatic_pressure
+        && (!token_pressure.unwrap_or(coverage.input_bytes >= AUTOMATIC_SOURCE_BYTES)
             || coverage.omissions.media != 0
             || coverage.omissions.tool_results_with_media != 0)
     {
         return Ok(None);
     }
-    let mut request = execution.provider.prepare(inference)?;
-    if let Some(limit) = limit {
-        request = request.with_input_limit(limit)?;
-    }
+    let request = execution.provider.prepare(inference)?;
     Ok(Some(CompactionPlan {
         route,
         source,
@@ -963,30 +958,22 @@ fn compaction_plan_for(
     }))
 }
 
-fn previous_context_pressure(
+fn previous_context_rejection(
     state: &TurnState,
-    binding: &ProviderBinding,
-    model: &ModelId,
-    threshold: Option<NonZeroU64>,
+    compatible: impl Fn(&PreparedRequest) -> bool,
 ) -> bool {
-    let Some(terminal) = state.outcome() else {
-        return false;
-    };
-    let threshold = threshold.filter(|_| terminal.status == OutcomeStatus::Succeeded);
-    let rejection = terminal
-        .account
-        .as_ref()
-        .filter(|_| terminal.status == OutcomeStatus::Failed)
+    let Some(rejection) = state
+        .outcome()
+        .filter(|outcome| outcome.status == OutcomeStatus::Failed)
+        .and_then(|outcome| outcome.account.as_ref())
         .and_then(|account| read_account(account).ok())
         .and_then(|account| account.inference_failure)
         .filter(|failure| {
             failure.kind == FailureKind::ContextLimit && failure.code == "context_limit"
-        });
-    if threshold.is_none() && rejection.is_none() {
+        })
+    else {
         return false;
-    }
-    // Helper requests can quote conversation text, but only an ordinary
-    // request carries this turn's exact user message in its prepared input.
+    };
     let Some(user) = state.history().records().iter().rev().find_map(|record| {
         let HistoryRecord::Message(message) = record;
         (message.role == Role::User).then_some(message)
@@ -994,46 +981,14 @@ fn previous_context_pressure(
         return false;
     };
     state.operations().values().any(|operation| {
-        let OperationInput::Inference(request) = &operation.record.input else {
-            return false;
-        };
-        let previous = request.binding();
-        if previous.provider != binding.provider
-            || previous.authority.principal != binding.authority.principal
-            || previous.authority.scope != binding.authority.scope
-            || &request.request().model != model
-            || !request.request().messages.contains(user)
-        {
-            return false;
-        }
-        let Some(attempt) = operation.attempts.last() else {
-            return false;
-        };
-        let Some(OperationOutcome::Inference(outcome)) = &attempt.outcome else {
-            return false;
-        };
-        if let Some(rejection) = &rejection {
-            return outcome.status == InferenceStatus::Limited
-                && outcome.failure.as_ref() == Some(rejection);
-        }
-        outcome.status == InferenceStatus::Completed
-            && threshold.is_some_and(|threshold| {
-                outcome
-                    .usage
-                    .iter()
-                    .filter(|usage| {
-                        usage.attempt == attempt.id
-                            && usage.source == binding.provider.as_str()
-                            && usage.category == INPUT_TOKENS
-                            && usage.unit == TOKENS
-                    })
-                    .max_by_key(|usage| usage.revision)
-                    .is_some_and(|usage| {
-                        usage.final_value
-                            && usage.certainty == MeasurementKind::Exact
-                            && usage.quantity >= threshold.get()
-                    })
-            })
+        matches!(
+            (&operation.record.input, operation.outcome()),
+            (OperationInput::Inference(request), Some(OperationOutcome::Inference(outcome)))
+                if compatible(request)
+                    && request.request().messages.contains(user)
+                    && outcome.status == InferenceStatus::Limited
+                    && outcome.failure.as_ref() == Some(&rejection)
+        )
     })
 }
 

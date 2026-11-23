@@ -7,6 +7,9 @@ use agent_kit_core::history::HistoryRecord;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message;
 
+#[path = "compaction/limits.rs"]
+mod limits;
+
 async fn client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await

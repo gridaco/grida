@@ -158,7 +158,6 @@ enum Reply {
     Credential(&'static str, Box<Reply>),
     Finished(&'static str),
     InputCount(u64),
-    InvalidInputCount,
     RateLimited {
         code: &'static str,
         retry_after: &'static [&'static str],
@@ -454,7 +453,7 @@ async fn fixture_request(
         accept,
         request,
     } = head;
-    let count = matches!(&reply, Reply::InputCount(_) | Reply::InvalidInputCount);
+    let count = matches!(&reply, Reply::InputCount(_));
     let path = match (protocol, count) {
         (ProviderProtocol::OpenAiCompatible, true) => "/v1/chat/completions/input_tokens",
         (ProviderProtocol::OpenAiCompatible, false) => "/v1/chat/completions",
@@ -506,9 +505,7 @@ async fn fixture_request(
         Reply::InputCount(tokens) => {
             Some(json!({"object":"response.input_tokens","input_tokens":tokens}))
         }
-        Reply::InvalidInputCount => {
-            Some(json!({"object":"response.input_tokens","input_tokens":"unavailable"}))
-        }
+
         _ => None,
     };
     if let Some(body) = count_body {
@@ -601,7 +598,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
-        Reply::InputCount(_) | Reply::InvalidInputCount => {
+        Reply::InputCount(_) => {
             unreachable!("count responses use the JSON endpoint")
         }
         Reply::RateLimited { .. } => unreachable!("rate limits use an HTTP error response"),
@@ -805,97 +802,49 @@ fn records(bytes: &[u8]) -> Vec<Value> {
 }
 
 #[tokio::test]
-async fn local_compatible_count_admits_exact_limit_for_the_complete_chat_request() {
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("agent-state");
-    let workspace = TempDir::new().unwrap();
-    responses::input_limit(&state, 32);
-    let mut endpoint = Endpoint::start(vec![
-        Reply::InputCount(32),
-        Reply::Finished("Counted local reply."),
-    ])
-    .await;
-    let mut command = executable();
-    command.arg("run");
-    configured(&mut command, &state, &endpoint.url);
-    command.arg("--cwd").arg(workspace.path()).args([
-        "--llama-cpp-input-count",
-        "--questions",
-        "--prompt",
-        "Count this input",
-    ]);
-    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        records(&output.stdout)[1]["account"]["text"],
-        "Counted local reply."
-    );
-    let count = endpoint.request().await;
-    assert_eq!(count, endpoint.request().await);
-    assert_eq!(count["model"], "fixture-model");
-    assert!(
-        count["messages"].as_array().unwrap().iter().any(|message| {
-            message["role"] == "user" && message["content"] == "Count this input"
-        })
-    );
-    assert!(count["tools"].as_array().unwrap().iter().any(|tool| {
-        tool["function"]["name"] == "question" && tool["function"]["parameters"].is_object()
-    }));
-    endpoint.done().await;
-}
-
-#[tokio::test]
-async fn local_compatible_count_denies_unverified_or_excessive_input_before_generation() {
-    for (enabled, replies, code) in [
-        (false, vec![], "input_measurement_unavailable"),
-        (
-            true,
-            vec![Reply::InvalidInputCount],
-            "input_measurement_invalid",
-        ),
-        (true, vec![Reply::InputCount(33)], "input_token_limit"),
-    ] {
+async fn a_retired_workspace_input_cap_allows_compatible_generation_with_or_without_a_counter() {
+    for count_supported in [false, true] {
         let temporary = TempDir::new().unwrap();
         let state = temporary.path().join("agent-state");
         let workspace = TempDir::new().unwrap();
-        responses::input_limit(&state, 32);
-        let mut endpoint = Endpoint::start(replies).await;
+        responses::legacy_input_limit(&state, 1);
+        let mut endpoint = Endpoint::start(vec![Reply::Finished("Local reply.")]).await;
         let mut command = executable();
         command.arg("run");
         configured(&mut command, &state, &endpoint.url);
-        command
-            .arg("--cwd")
-            .arg(workspace.path())
-            .args(["--prompt", "Check input before generation"]);
-        if enabled {
+        command.arg("--cwd").arg(workspace.path()).args([
+            "--questions",
+            "--prompt",
+            "Use the complete chat request",
+        ]);
+        if count_supported {
             command.arg("--llama-cpp-input-count");
         }
         let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
-        assert_eq!(
-            output.status.code(),
-            Some(1),
+        assert!(
+            output.status.success(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let result = records(&output.stdout);
-        let account = &result[1]["account"];
-        assert_eq!(account["inference_failure"]["code"], code);
-        for field in ["observations", "unreported_attempts"] {
-            assert!(
-                account["inference_usage"][field]
-                    .as_array()
-                    .unwrap()
-                    .is_empty()
-            );
-        }
-        if enabled {
-            endpoint.request().await;
-        }
-        assert!(endpoint.requests.try_recv().is_err());
+        assert_eq!(
+            records(&output.stdout)[1]["account"]["text"],
+            "Local reply."
+        );
+        let generation = endpoint.request().await;
+        assert_eq!(generation["model"], "fixture-model");
+        assert!(
+            generation["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|message| {
+                    message["role"] == "user"
+                        && message["content"] == "Use the complete chat request"
+                })
+        );
+        assert!(generation["tools"].as_array().unwrap().iter().any(|tool| {
+            tool["function"]["name"] == "question" && tool["function"]["parameters"].is_object()
+        }));
         endpoint.done().await;
     }
 }
@@ -1699,7 +1648,11 @@ async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent(
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Hold("Working.")]).await;
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Working."),
+        Reply::Finished("Using the new context window."),
+    ])
+    .await;
     let (mut child, url) = shared_server(&state, &endpoint.url).await;
     for (token, origin, authority, status) in [
         (None, None, None, StatusCode::UNAUTHORIZED),
@@ -1804,11 +1757,11 @@ async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent(
         &mut second,
         5,
         "_co.grida/config/update",
-        json!({"expectedRevision":null,"change":{"operation":"set_context_max_input_tokens","value":1024}}),
+        json!({"expectedRevision":null,"change":{"operation":"set_model_context_window","value":1024}}),
     )
     .await;
     assert_eq!(
-        configured["result"]["defaults"]["context"]["max_input_tokens"],
+        configured["result"]["defaults"]["model_context_window"],
         1024
     );
     let retry = ws_rpc(&mut second, 6, "_co.grida/session/submit", submit.clone()).await;
@@ -1822,7 +1775,7 @@ async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent(
     });
     let stopped = ws_rpc(&mut second, 7, "_co.grida/session/stop", stop.clone()).await;
     assert_eq!(stopped["result"]["requestId"], "stop-a");
-    endpoint.done().await;
+
     let settled = timeout(WAIT, async {
         let mut id = 8;
         loop {
@@ -1871,10 +1824,16 @@ async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent(
         json!({"sessionId":new_session["result"]["sessionId"],"prompt":[{"type":"text","text":"Use the new default"}]}),
     )
     .await;
-    assert_eq!(
-        next["error"]["data"], "input_measurement_unavailable",
-        "{next}"
+    assert_eq!(next["result"]["stopReason"], "end_turn", "{next}");
+    let generation = endpoint.request().await;
+    assert!(
+        generation["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|message| message["content"] == "Use the new default")
     );
+    endpoint.done().await;
     drop(second);
 
     let mut plain = connect_shared(&url, Some(SERVER_TOKEN), None, None)

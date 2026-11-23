@@ -977,19 +977,17 @@ fn projection_limit() -> agent_kit_core::Error {
     error(ErrorKind::LimitExceeded, "history_projection_limit")
 }
 
-/// A turn's context size: within a turn the context only grows from call to
-/// call, so its largest reported model call is its final context.
+/// Context size from the last inference that contributed to published history.
+/// Internal calls and earlier, larger requests do not measure the active context.
 fn context_tokens(state: &TurnState) -> Option<u64> {
+    let published = state
+        .history()
+        .records()
+        .iter()
+        .map(|HistoryRecord::Message(message)| message);
     state
-        .operations()
-        .values()
-        .filter_map(|operation| match operation.outcome() {
-            Some(agent_kit_core::turn::OperationOutcome::Inference(outcome)) => {
-                outcome.context_tokens()
-            }
-            _ => None,
-        })
-        .max()
+        .latest_published_inference(published)
+        .and_then(|(_, outcome)| outcome.context_tokens())
 }
 
 /// A turn's stored size: its head, parts and distinct messages.

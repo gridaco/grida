@@ -94,6 +94,8 @@ pub(super) struct PriorContext {
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
     pub(crate) models: BTreeMap<TurnId, ModelId>,
+    pub(crate) context_windows: BTreeMap<TurnId, NonZeroU64>,
+    pub(crate) compaction_summaries: BTreeMap<TurnId, String>,
     pub(crate) authored_inputs: BTreeMap<MessageId, (TurnId, ChangeId)>,
     pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
@@ -180,6 +182,7 @@ impl Host {
         let mut facts = TranscriptInputFacts::default();
         for turn in turns {
             let mut automatic_review = false;
+            let mut inline_compaction = false;
             let inputs = self
                 .store
                 .turn_submissions(session.clone(), turn.clone())
@@ -198,6 +201,12 @@ impl Host {
                 }
                 if single_input && let Some(model) = stored.model {
                     facts.models.insert(turn.clone(), model);
+                }
+                if let Some(limits) = stored.context_limits {
+                    if single_input && let Some(window) = limits.window {
+                        facts.context_windows.insert(turn.clone(), window);
+                    }
+                    inline_compaction |= limits.auto_compact.is_some();
                 }
                 automatic_review |= stored.permission_capture.as_ref().is_some_and(|capture| {
                     capture.mode() == crate::permissions::PermissionMode::ApproveForMe
@@ -219,15 +228,24 @@ impl Host {
                         .insert(message, context.display_parts.clone());
                 }
             }
-            if automatic_review {
-                let mut reviews = self
+            if inline_compaction || automatic_review {
+                let (summary, mut reviews) = self
                     .store
-                    .inspect_turn_with(
-                        session.clone(),
-                        turn.clone(),
-                        super::permissions::approval_review_facts,
-                    )
+                    .inspect_turn_with(session.clone(), turn.clone(), move |state| {
+                        let summary = inline_compaction
+                            .then(|| grida_agent_master::compaction::inline_summary(state))
+                            .flatten();
+                        let reviews = if automatic_review {
+                            super::permissions::approval_review_facts(state)?
+                        } else {
+                            Vec::new()
+                        };
+                        Ok((summary, reviews))
+                    })
                     .await?;
+                if let Some(summary) = summary {
+                    facts.compaction_summaries.insert(turn.clone(), summary);
+                }
                 let with_ids = reviews
                     .iter_mut()
                     .filter_map(|review| {
