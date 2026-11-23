@@ -395,11 +395,14 @@ async fn serve_connection(
                     );
                     let text = reviewer && offered(live::CAPABILITY);
                     let lifecycle = reviewer && offered(live::LIFECYCLE);
+                    let compaction_items = sessions.negotiated.contains(extensions::compaction::ITEMS);
                     let processes = sessions
                         .negotiated
                         .contains(extensions::PROCESSES)
                         .then(|| initialized_host.process_sessions());
-                    if !sessions.live_started && (text || lifecycle || processes.is_some()) {
+                    if !sessions.live_started
+                        && (text || lifecycle || compaction_items || processes.is_some())
+                    {
                         sessions.live_started = true;
                         Some((initialized_host.observe_live(), text, lifecycle, processes))
                     } else {
@@ -519,6 +522,15 @@ async fn serve_connection(
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
                             let turn_ids = window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>();
+                            let compaction_items = load_sessions.lock().unwrap().negotiated
+                                .contains(extensions::compaction::ITEMS);
+                            let running_standalone = if compaction_items && window.turns.iter().any(|turn|
+                                turn.status.is_none() && crate::host::compaction::is_compaction_turn(&turn.id))
+                            {
+                                load_host.running_standalone_compaction(&id).await
+                            } else {
+                                None
+                            };
                             let mut input_facts = load_host
                                 .transcript_input_facts(id, &turn_ids)
                                 .await
@@ -537,7 +549,17 @@ async fn serve_connection(
                             let turns: Vec<_> = window
                                 .turns
                                 .iter()
-                                .map(|turn| projection::turn_facts(turn, &input_facts))
+                                .map(|turn| {
+                                    let mut facts = projection::turn_facts(turn, &input_facts);
+                                    if compaction_items
+                                        && let Some(items) = projection::compaction_item_facts(
+                                            turn, &input_facts, running_standalone.as_ref()
+                                        )
+                                    {
+                                        facts["compactions"] = items;
+                                    }
+                                    facts
+                                })
                                 .collect();
                             return Ok(LoadSessionResponse::new().meta(serde_json::Map::from_iter([(
                                 projection::TRANSCRIPT_WINDOW.into(),

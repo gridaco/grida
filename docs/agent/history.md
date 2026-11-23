@@ -171,10 +171,13 @@ clients can open side chats too.
 ## Continue a long conversation
 
 In an idle chat with nothing queued, send **`/compact`** on its own to
-summarize earlier material for future model requests. **Compacting context**
-appears in the transcript while it runs. Use the composer's main button to
-pause it. The transcript stays in the chat. Open **Conversation compacted**
-to read the summary. Grida can also compact earlier conversation before the
-next message or summarize earlier tool exchanges during a turn. The current
-user messages stay in context. Open **Conversation auto-compacted** to see
-what Grida summarized.
+summarize earlier material for future model requests. Grida can also compact
+automatically before a message or between tool exchanges during a turn.
+Current user messages stay in context.
+
+The chat shows **Compacting context** while it runs. When the summary is
+installed, **Context compacted** appears at that point in the transcript.
+After a turn finishes, expand its **Worked** section to see the markers
+from that turn. Compaction between turns has its own marker in the
+transcript. Open a marker to read the summary when available. Use the
+composer's main button to pause the work.

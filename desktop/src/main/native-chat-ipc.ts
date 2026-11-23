@@ -4221,7 +4221,8 @@ export class NativeChatIpc {
     event: IpcMainInvokeEvent,
     attachmentId: string,
     subscriptionId: string,
-    acceptsQuestionBatches?: unknown
+    acceptsQuestionBatches?: unknown,
+    acceptsCompactionItems?: unknown
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     if (
@@ -4243,12 +4244,17 @@ export class NativeChatIpc {
       const stop = owner.active.chat.subscribe(attachment.session, (update) => {
         if (
           !accepting ||
-          owner.subscriptions.get(subscriptionId) !== subscription
+          owner.subscriptions.get(subscriptionId) !== subscription ||
+          (update.kind === "compaction" && acceptsCompactionItems !== true)
         )
           return;
         const bytes =
-          update.kind === "text" ? Buffer.byteLength(update.text) : 0;
-        if (bytes > MAX_UPDATE_BYTES) return;
+          update.kind === "text"
+            ? Buffer.byteLength(update.text)
+            : update.kind === "compaction" && update.item.summary !== undefined
+              ? Buffer.byteLength(update.item.summary)
+              : 0;
+        if (update.kind === "text" && bytes > MAX_UPDATE_BYTES) return;
         delivered += bytes;
         const limited =
           ++chunks > MAX_DELIVERY_CHUNKS || delivered > MAX_DELIVERY_BYTES;

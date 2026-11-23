@@ -129,16 +129,18 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
 
     const LIFECYCLE: &str = "co.grida/session/lifecycle";
     const WINDOW: &str = "co.grida/session/transcript-window";
+    const ITEMS: &str = "co.grida/session/compaction-items";
     async fn observe(
         client: &mut PrivateStdio,
         method: &str,
         params: Value,
         settlements: usize,
-    ) -> (Value, Vec<Value>) {
+    ) -> (Value, Vec<Value>, Vec<Value>) {
         let id = client.send(method, params).await;
         timeout(WAIT, async {
             let mut reply = None;
             let mut events = Vec::new();
+            let mut compactions = Vec::new();
             loop {
                 let frame = client.read_frame().await;
                 if frame["id"] == id {
@@ -148,10 +150,13 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
                 if let Some(event) = frame["params"]["_meta"].get(LIFECYCLE) {
                     events.push(event.clone());
                 }
+                if let Some(item) = frame["params"]["_meta"].get(ITEMS) {
+                    compactions.push(item.clone());
+                }
                 if events.len() >= settlements
                     && let Some(reply) = reply
                 {
-                    return (reply, events);
+                    return (reply, events, compactions);
                 }
             }
         })
@@ -180,7 +185,7 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
         .await;
         let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
         let mut capabilities = extension_initialize();
-        for key in [LIFECYCLE, WINDOW, "co.grida/session/compact"] {
+        for key in [LIFECYCLE, WINDOW, ITEMS, "co.grida/session/compact"] {
             capabilities["clientCapabilities"]["_meta"][key] = json!(1);
         }
         let ready = client.request("initialize", capabilities.clone()).await;
@@ -196,7 +201,7 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
             "Earlier requirements. ".repeat(5_200),
             "Recent request.".into(),
         ] {
-            let (_, facts) = observe(
+            let (_, facts, items) = observe(
                 &mut client,
                 "session/prompt",
                 json!({
@@ -206,8 +211,9 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
             )
             .await;
             assert_eq!(facts[0]["kind"], "settled", "{facts:?}");
+            assert!(items.is_empty(), "{items:?}");
         }
-        let (_, facts) = observe(
+        let (_, facts, items) = observe(
             &mut client,
             "_co.grida/session/enqueue",
             prompt_request(session, "next-input", "Continue the chat."),
@@ -223,8 +229,14 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
         assert_eq!(facts[1]["kind"], "settled", "{facts:?}");
         assert_eq!(facts[1]["status"], "succeeded", "{facts:?}");
         assert_ne!(facts[0]["turnId"], facts[1]["turnId"]);
+        assert_eq!(items.len(), 2, "{items:?}");
+        assert_eq!(items[0]["item"]["status"], "running", "{items:?}");
+        assert_eq!(items[1]["item"]["status"], status, "{items:?}");
+        assert_eq!(items[0]["item"]["id"], items[1]["item"]["id"]);
+        assert_eq!(items[1]["item"]["automatic"], true);
+        assert_eq!(items[1]["turnId"], facts[0]["turnId"]);
 
-        let (manual, manual_facts) = observe(
+        let (manual, manual_facts, manual_items) = observe(
             &mut client,
             "_co.grida/session/compact",
             compact(session, "manual"),
@@ -232,6 +244,19 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
         )
         .await;
         assert_eq!(manual["status"], "installed", "{manual}");
+        assert_eq!(manual_items.len(), 2, "{manual_items:?}");
+        assert_eq!(
+            manual_items[0]["item"]["status"], "running",
+            "{manual_items:?}"
+        );
+        assert_eq!(
+            manual_items[1]["item"]["status"], "succeeded",
+            "{manual_items:?}"
+        );
+        assert_eq!(manual_items[0]["item"]["id"], manual_items[1]["item"]["id"]);
+        assert_eq!(manual_items[1]["item"]["automatic"], false);
+        assert_eq!(manual_items[1]["turnId"], manual["turnId"]);
+        assert_ne!(manual_items[1]["item"]["id"], items[1]["item"]["id"]);
         assert_eq!(
             manual_facts,
             [json!({"kind":"settled","turnId":manual["turnId"],"status":"succeeded"})]
@@ -244,14 +269,34 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
             "sessionId":session, "cwd":workspace.path(), "mcpServers":[],
             "_meta":{WINDOW:{"kind":"attach"}},
         });
-        let (_, attachment_facts) = observe(&mut client, "session/load", load.clone(), 0).await;
+        let (_, attachment_facts, attachment_items) =
+            observe(&mut client, "session/load", load.clone(), 0).await;
         assert!(attachment_facts.is_empty(), "{attachment_facts:?}");
+        assert!(attachment_items.is_empty(), "{attachment_items:?}");
         load["_meta"][WINDOW] = json!({"kind":"read","requestId":"after-compaction"});
-        let (page, replay_facts) = observe(&mut client, "session/load", load, 0).await;
+        let (page, replay_facts, replay_items) =
+            observe(&mut client, "session/load", load, 0).await;
         assert!(replay_facts.is_empty(), "{replay_facts:?}");
+        assert!(replay_items.is_empty(), "{replay_items:?}");
         let turns = page["_meta"][WINDOW]["turns"]
             .as_array()
             .expect("transcript turns");
+        for item in [&items[1], &manual_items[1]] {
+            let record = turns
+                .iter()
+                .find(|turn| turn["turnId"] == item["turnId"])
+                .unwrap();
+            let replayed = record["compactions"].as_array().unwrap();
+            assert_eq!(replayed.len(), 1, "{record}");
+            for field in ["id", "status", "automatic"] {
+                assert_eq!(replayed[0][field], item["item"][field], "{replayed:?}");
+            }
+            assert!(replayed[0].get("summary").is_none(), "{record}");
+            assert_eq!(
+                record["compaction"]["summary"], item["item"]["summary"],
+                "{record}"
+            );
+        }
         let automatic = turns
             .iter()
             .find(|turn| turn["turnId"] == facts[0]["turnId"])
@@ -279,7 +324,7 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
             }),
             "{turns:?}"
         );
-        let (submitted, fresh_facts) = observe(
+        let (submitted, fresh_facts, fresh_items) = observe(
             &mut client,
             "_co.grida/session/submit",
             prompt_request(session, "after-reopen", "Continue after reopening."),
@@ -287,6 +332,7 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
         )
         .await;
         assert!(submitted["turnId"].is_string(), "{submitted}");
+        assert!(fresh_items.is_empty(), "{fresh_items:?}");
         assert_eq!(
             fresh_facts,
             [json!({"kind":"settled","turnId":submitted["turnId"],"status":"succeeded"})]

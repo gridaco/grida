@@ -682,14 +682,7 @@ pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Va
     }
     // A compaction turn adds no transcript messages; its summary shows as a
     // note where earlier context was summarized.
-    if let Some(summary) = turn
-        .silent_account
-        .as_ref()
-        .and_then(|account| {
-            grida_agent_master::compaction::CompactionAccount::from_envelope(account).ok()
-        })
-        .and_then(|account| account.summary().map(str::to_owned))
-    {
+    if let Some(summary) = stored_compaction_summary(turn) {
         facts["compaction"] = json!({
             "summary": summary,
             "automatic": crate::host::compaction::is_automatic_turn(&turn.id),
@@ -698,6 +691,40 @@ pub(super) fn turn_facts(turn: &ReplayTurn, inputs: &TranscriptInputFacts) -> Va
         facts["compaction"] = json!({"summary": summary, "automatic": true});
     }
     facts
+}
+
+fn stored_compaction_summary(turn: &ReplayTurn) -> Option<String> {
+    let account = turn.silent_account.as_ref()?;
+    grida_agent_master::compaction::CompactionAccount::from_envelope(account)
+        .ok()?
+        .summary()
+        .map(str::to_owned)
+}
+
+pub(super) fn compaction_item_facts(
+    turn: &ReplayTurn,
+    inputs: &TranscriptInputFacts,
+    running_standalone: Option<&agent_kit_core::TurnId>,
+) -> Option<Value> {
+    use grida_agent_master::compaction::CompactionActivityStatus;
+    if let Some(items) = inputs.compaction_items.get(&turn.id) {
+        return Some(json!(items));
+    }
+    if !crate::host::compaction::is_compaction_turn(&turn.id) {
+        return None;
+    }
+    let status = match (turn.status, turn.context_replaced) {
+        (Some(OutcomeStatus::Succeeded), true) => CompactionActivityStatus::Succeeded,
+        (Some(_), _) => CompactionActivityStatus::Failed,
+        (None, _) if running_standalone == Some(&turn.id) => CompactionActivityStatus::Running,
+        (None, _) => return None,
+    };
+    let mut item = crate::host::live::CompactionItem::standalone(&turn.id, status);
+    item.started_at_ms = Some(turn.started_ms);
+    item.finished_at_ms = turn
+        .settled_ms
+        .map(|finished| finished.max(turn.started_ms));
+    Some(json!([item]))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1016,6 +1043,7 @@ mod compaction_fact_tests {
             settled_ms: Some(2),
             context_tokens: None,
             silent_account,
+            context_replaced: false,
             tail: true,
         }
     }

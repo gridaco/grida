@@ -10,6 +10,7 @@ import type {
   NativeChatCatalogEntry,
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatCompaction,
   NativeChatRevisionInput,
   NativeChatRevisionReceipt,
   NativeChatRevisionTarget,
@@ -99,6 +100,7 @@ import {
   type NativeSideChat,
 } from "./native-agent-side-chats";
 import {
+  COMPACTION_ITEMS,
   NativeAgentProcess,
   PREDICT_PROMPT,
   QUESTION_BATCHES,
@@ -2316,7 +2318,11 @@ export class NativeAgentChat {
       return {
         view: revision(page.view),
         messages: [...capture.messages.values()],
-        turns: turnRecords(page.turns, this.process.acceptsReconsideration),
+        turns: turnRecords(
+          page.turns,
+          this.process.acceptsReconsideration,
+          this.process.acceptsCompactionItems
+        ),
         older,
       };
     } finally {
@@ -2721,6 +2727,38 @@ export class NativeAgentChat {
         return;
       }
       const listeners = this.listeners.get(sessionId);
+      const compaction = metadata?.[COMPACTION_ITEMS];
+      if (compaction !== undefined) {
+        if (
+          !listeners ||
+          this.closed ||
+          !this.attached.has(sessionId) ||
+          !this.process.acceptsCompactionItems
+        )
+          return;
+        const update = object(notification.update);
+        const content = object(update.content);
+        if (
+          update.sessionUpdate !== "agent_message_chunk" ||
+          content.type !== "text" ||
+          content.text !== ""
+        )
+          return;
+        const { turnId, item } = object(compaction);
+        const projected: NativeChatStreamUpdate = Object.freeze({
+          kind: "compaction",
+          turnId: identity(turnId),
+          item: compactionItem(item),
+        });
+        for (const listener of listeners) {
+          try {
+            listener(projected);
+          } catch {
+            /* Observers have independent lifetimes. */
+          }
+        }
+        return;
+      }
       const processes = metadata?.[NativeAgentBackgroundProcesses.capability];
       if (processes !== undefined) {
         if (!listeners || this.closed || !this.acceptsBackgroundProcesses)
@@ -3570,7 +3608,8 @@ function messagePhase(
 
 function turnRecords(
   value: unknown,
-  acceptsReconsideration: boolean
+  acceptsReconsideration: boolean,
+  acceptsCompactionItems: boolean
 ): NativeChatTurnRecord[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > MAX_TRANSCRIPT_MESSAGES)
@@ -3592,6 +3631,9 @@ function turnRecords(
     const contextWindowTokens = time(record.contextWindowTokens);
     if (contextWindowTokens === 0) throw invalidResponse();
     const compaction = compactionFact(record.compaction);
+    const compactions = acceptsCompactionItems
+      ? compactionItems(record.compactions, compaction)
+      : undefined;
     const approvalReviews = approvalReviewFacts(
       record.approvalReviews,
       acceptsReconsideration
@@ -3607,6 +3649,7 @@ function turnRecords(
       ...(contextTokens !== undefined && { contextTokens }),
       ...(contextWindowTokens !== undefined && { contextWindowTokens }),
       ...(compaction && { compaction }),
+      ...(compactions && { compactions }),
       ...(approvalReviews && { approvalReviews }),
     });
   });
@@ -3691,6 +3734,70 @@ function compactionFact(value: unknown): NativeChatTurnRecord["compaction"] {
   )
     throw invalidResponse();
   return Object.freeze({ summary: fact.summary, automatic: fact.automatic });
+}
+
+const MAX_COMPACTION_ITEMS = 256;
+const MAX_COMPACTION_ITEM_SUMMARY_BYTES = 32 * 1024;
+
+function compactionItem(value: unknown): NativeChatCompaction {
+  const {
+    id,
+    status,
+    automatic,
+    startedAtMs,
+    finishedAtMs,
+    activityOrder,
+    summary,
+  } = object(value);
+  if (typeof automatic !== "boolean") throw invalidResponse();
+  const started = startedAtMs === undefined ? undefined : revision(startedAtMs);
+  const finished =
+    finishedAtMs === undefined ? undefined : revision(finishedAtMs);
+  const outcome = choice(status, ["running", "succeeded", "failed"] as const);
+  const order = NativeActivityOrder.coordinate(activityOrder);
+  if (
+    (finished !== undefined &&
+      (outcome === "running" ||
+        (started !== undefined && finished < started))) ||
+    (summary !== undefined &&
+      (outcome !== "succeeded" ||
+        typeof summary !== "string" ||
+        Buffer.byteLength(summary) > MAX_COMPACTION_ITEM_SUMMARY_BYTES))
+  )
+    throw invalidResponse();
+  return Object.freeze({
+    id: identity(id),
+    status: outcome,
+    automatic,
+    ...(started !== undefined && { startedAtMs: started }),
+    ...(finished !== undefined && { finishedAtMs: finished }),
+    ...(order !== undefined && { activityOrder: order }),
+    ...(summary !== undefined && { summary: summary as string }),
+  });
+}
+
+function compactionItems(
+  value: unknown,
+  latest: NativeChatTurnRecord["compaction"]
+): readonly NativeChatCompaction[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_COMPACTION_ITEMS)
+    throw invalidResponse();
+  const items = value.map(compactionItem);
+  if (new Set(items.map(({ id }) => id)).size !== items.length)
+    throw invalidResponse();
+  if (latest) {
+    // The page carries the latest summary once, in its existing turn field.
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index];
+      if (item.status !== "succeeded" || item.automatic !== latest.automatic)
+        continue;
+      if (item.summary === undefined)
+        items[index] = Object.freeze({ ...item, summary: latest.summary });
+      break;
+    }
+  }
+  return Object.freeze(items);
 }
 
 function acceptance(

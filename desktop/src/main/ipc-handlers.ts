@@ -1186,8 +1186,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       event,
       id: string,
       subscription: string,
-      acceptsQuestionBatches?: unknown
-    ) => nativeChat.subscribe(event, id, subscription, acceptsQuestionBatches)
+      acceptsQuestionBatches?: unknown,
+      acceptsCompactionItems?: unknown
+    ) =>
+      nativeChat.subscribe(
+        event,
+        id,
+        subscription,
+        acceptsQuestionBatches,
+        acceptsCompactionItems
+      )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, (event, subscription: string) =>
     nativeChat.unsubscribe(event, subscription)

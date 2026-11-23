@@ -1357,7 +1357,12 @@ const bridge: DesktopBridge = {
       ),
     control: (attachmentId, control) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CONTROL, attachmentId, control),
-    subscribe: async (attachmentId, onUpdate, acceptsQuestionBatches) => {
+    subscribe: async (
+      attachmentId,
+      onUpdate,
+      acceptsQuestionBatches,
+      acceptsCompactionItems
+    ) => {
       if (nativeChatHandlers.size >= 8)
         throw new Error("native_chat_subscription_limit");
       const id = crypto.randomUUID();
@@ -1367,7 +1372,11 @@ const bridge: DesktopBridge = {
           IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
           attachmentId,
           id,
-          ...(acceptsQuestionBatches === true ? [true] : [])
+          ...(acceptsCompactionItems === true
+            ? [acceptsQuestionBatches === true, true]
+            : acceptsQuestionBatches === true
+              ? [true]
+              : [])
         );
         return id;
       } catch (error) {

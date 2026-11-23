@@ -768,6 +768,11 @@ function NativeChatPane({
     !pausing &&
     !approval &&
     !questions.some((question) => question.style === "answer_dependent");
+  const compacting =
+    !state.connectionRecovery &&
+    !pausing &&
+    (state.commandRunning === "compact" ||
+      turn_activity.compacting(state.turnRecords, turn, state.pausing));
   const outputStarted = state.messages.some(
     (message) =>
       message.turnId === turn?.turnId &&
@@ -1038,6 +1043,7 @@ function NativeChatPane({
                   <NativeTurnActivity
                     key={block.turnId}
                     block={block}
+                    compactionDurations={state.liveCompactionDurations}
                     showModelChanges={!controller.fixedSession}
                     approvalReviews={records.get(block.turnId)?.approvalReviews}
                     onReconsider={
@@ -1060,9 +1066,11 @@ function NativeChatPane({
                   />
                 ) : block.kind === "compaction" ? (
                   <CompactionNotice
-                    key={block.turnId}
+                    key={block.compactionId}
                     summary={block.summary}
-                    auto={block.automatic}
+                    elapsedMs={state.liveCompactionDurations?.get(
+                      block.compactionId
+                    )}
                   />
                 ) : (
                   renderMessage(block.message)
@@ -1099,7 +1107,7 @@ function NativeChatPane({
                     More subagent activity is available in Subagents
                   </Button>
                 )}
-              {state.commandRunning === "compact" ? (
+              {compacting ? (
                 <CompactionProgress />
               ) : stillWorking ? (
                 <PendingTurnIndicator
@@ -1123,9 +1131,7 @@ function NativeChatPane({
                   />
                 )}
             </ConversationContent>
-            <ConversationScrollButton
-              working={stillWorking || state.commandRunning === "compact"}
-            />
+            <ConversationScrollButton working={stillWorking || compacting} />
           </Conversation>
         </workspace_links.Opener.Provider>
         {!state.revisionDraft && state.revisionSubmitting ? (

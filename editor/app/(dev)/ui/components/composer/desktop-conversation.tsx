@@ -75,9 +75,8 @@ export function DesktopConversation({
               />
             ) : block.kind === "compaction" ? (
               <CompactionNotice
-                key={block.turnId}
+                key={block.compactionId}
                 summary={block.summary}
-                auto={block.automatic}
               />
             ) : (
               renderMessage(block.message)

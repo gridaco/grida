@@ -799,9 +799,19 @@ The [context limits cases](../tests/process/compaction/limits.rs) exercise the
 exact threshold, the context window ceiling, a model downshift, and queued
 work accepted before a settings reload. When an earlier tool result puts
 the current turn over its threshold, a summary can replace that result in
-model context while the reopened transcript retains the original. If the
+model context while the reopened transcript retains the original. The
+compactor receives the active request and the tool call paired with its
+result. The active request also remains in foreground context. If the
 summary fails, the next request still receives the original result. A
-same-turn summary produces no additional completion event.
+same-turn summary produces no additional lifecycle settlement. The
+compaction item regression covers multiple starts and completions in the
+same foreground turn, clearing an unsuccessful attempt, and preserving
+item identity and position after settlement and reopen. When a turn resumes
+after a question, the activity-order audit uses the same visible operations
+as live publication. Resuming after an interrupted summary keeps one
+failed item and issues no new summary request. The headless transcript
+projection verifies that replay merges items by identity and preserves
+their interleaving with other work.
 The [chat controller tests](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
 exercise a pending question whose review expires as independent work advances.
 One click renews the same question and retries after a definite revision

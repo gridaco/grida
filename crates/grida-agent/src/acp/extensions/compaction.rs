@@ -12,6 +12,7 @@ use agent_client_protocol::v1::schema::{
 use tokio::sync::oneshot;
 
 pub(super) const COMPACT: &str = "co.grida/session/compact";
+pub(in crate::acp) const ITEMS: &str = "co.grida/session/compaction-items";
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/compact", response = CompactResponse)]

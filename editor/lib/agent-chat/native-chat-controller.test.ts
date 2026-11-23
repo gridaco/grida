@@ -6,6 +6,7 @@ import type {
   DesktopComposerPredictionSettings,
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatCompaction,
   NativeChatGatewayBillingAttempt,
   NativeChatCatalogEntry,
   NativeChatGoal,
@@ -1906,6 +1907,70 @@ it("streams turn activity live and adopts recorded turns from each page", async 
     "old",
     "work",
   ]);
+  controller.disconnect();
+});
+
+it("merges repeated live compactions with replay before the turn settles", async () => {
+  const { bridge, controller, running, updates } = fixture();
+  const turnId = "turn-chat-a";
+  running.add("chat-a");
+  let durable: readonly NativeChatCompaction[] = [];
+  bridge.transcriptPage = async () => ({
+    view: 1,
+    older: null,
+    messages: [],
+    turns: [{ turnId, status: null, startedAtMs: 1, compactions: durable }],
+  });
+
+  await controller.select("chat-a");
+  const live = updates.get("chat-a")!;
+  const items = () => controller.read().turnRecords[0]?.compactions;
+  const first = {
+    id: "first",
+    status: "running",
+    automatic: true,
+    activityOrder: 3,
+    startedAtMs: 1_000,
+  } as const;
+  const second = {
+    ...first,
+    id: "second",
+    activityOrder: 7,
+    startedAtMs: 4_000,
+  } as const;
+  const send = (item: NativeChatCompaction) =>
+    live({ kind: "compaction", turnId, item });
+  const completed = {
+    ...first,
+    status: "succeeded",
+    finishedAtMs: 3_000,
+  } as const;
+  const failed = { ...second, status: "failed", finishedAtMs: 4_500 } as const;
+  send(first);
+  expect(items()).toEqual([first]);
+  send(completed);
+  send(second);
+  expect(items()).toEqual([completed, second]);
+  send(failed);
+  expect(items()).toEqual([completed, failed]);
+  expect(controller.read().observation?.snapshot.current?.disposition).toBe(
+    "running"
+  );
+  expect(controller.read().liveCompactionDurations).toEqual(
+    new Map([["first", 2_000]])
+  );
+
+  durable = [{ ...completed, summary: "Installed summary" }, failed];
+  live({ kind: "resync" });
+  await vi.waitFor(() => expect(items()).toEqual(durable));
+  send(first);
+  expect(items()).toEqual(durable);
+  expect(controller.read().liveCompactionDurations?.get("first")).toBe(2_000);
+
+  await controller.select("chat-b");
+  await controller.select("chat-a");
+  expect(items()).toEqual(durable);
+  expect(controller.read().liveCompactionDurations).toBeUndefined();
   controller.disconnect();
 });
 
@@ -9721,6 +9786,7 @@ describe("a first message chosen before the chat opened", () => {
       expect(subscribe).toHaveBeenCalledExactlyOnceWith(
         "first",
         expect.any(Function),
+        true,
         true
       );
       expect(subscribe.mock.invocationCallOrder[0]).toBeLessThan(

@@ -81,6 +81,7 @@ const QUESTION_ADMISSION_METHODS = new Set([
   "_co.grida/goal/start",
 ]);
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
+export const COMPACTION_ITEMS = "co.grida/session/compaction-items";
 export const PREDICT_PROMPT = "co.grida/session/predict-prompt";
 const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
@@ -227,6 +228,7 @@ export class NativeAgentProcess {
   private historyRevision = false;
   private transcriptWindow = false;
   private activityOrder = false;
+  private compactionItems = false;
   private optionalQuestions = false;
   private questionBatches = false;
   private reconsiderDenials = false;
@@ -364,6 +366,10 @@ export class NativeAgentProcess {
 
   get acceptsActivityOrder(): boolean {
     return this.connected && this.activityOrder;
+  }
+
+  get acceptsCompactionItems(): boolean {
+    return this.connected && this.compactionItems;
   }
 
   get acceptsCatalogQuery(): boolean {
@@ -932,6 +938,7 @@ export class NativeAgentProcess {
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
+                [COMPACTION_ITEMS]: 1,
                 [CATALOG_QUERY]: 1,
                 [QUESTION_BATCHES.list]: 1,
                 [QUESTION_BATCHES.answer]: 1,
@@ -968,6 +975,7 @@ export class NativeAgentProcess {
         !!permissionProfile &&
         advertised?.[NativeAgentPermissions.reconsideration] === 1;
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.compactionItems = advertised?.[COMPACTION_ITEMS] === 1;
       processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
       processOwner.optionalQuestions =
         advertised?.["co.grida/session/optional-questions"] === 1;

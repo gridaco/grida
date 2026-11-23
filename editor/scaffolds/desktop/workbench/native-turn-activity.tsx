@@ -11,7 +11,11 @@ import type {
   NativeChatTurnRecord,
   NativeSubagentLifecycleEvent,
 } from "@grida/desktop-bridge";
-import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
+import {
+  ChatMessageView,
+  CompactionNotice,
+  ToolCallGroupView,
+} from "@/kits/agent-chat";
 import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -29,6 +33,7 @@ export function NativeTurnActivity({
   showModelChanges = false,
   subagentEvents = [],
   approvalReviews,
+  compactionDurations,
   onReconsider,
   onOpenSubagent,
   loadToolImage,
@@ -36,6 +41,7 @@ export function NativeTurnActivity({
   block: Extract<turn_activity.Block, { kind: "turn" }>;
   showModelChanges?: boolean;
   approvalReviews?: NativeChatTurnRecord["approvalReviews"];
+  compactionDurations?: ReadonlyMap<string, number>;
   onReconsider?: (reviewId: string) => void;
   renderMessage: (
     message: NativeChatMessage,
@@ -165,7 +171,13 @@ export function NativeTurnActivity({
       ))}
       {open &&
         timeline.work.map((item) =>
-          item.kind === "commentary" ? (
+          item.kind === "compaction" ? (
+            <CompactionNotice
+              key={item.compaction.id}
+              summary={item.compaction.summary}
+              elapsedMs={compactionDurations?.get(item.compaction.id)}
+            />
+          ) : item.kind === "commentary" ? (
             <ChatMessageView
               key={item.message.messageId}
               // A turn's actions sit under its final answer only.

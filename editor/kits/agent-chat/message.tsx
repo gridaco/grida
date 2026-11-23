@@ -221,9 +221,7 @@ export function ChatMessageView({
   // summary rather than an empty assistant bubble.
   const compaction = findCompactionSummary(message);
   if (compaction) {
-    return (
-      <CompactionNotice summary={compaction.summary} auto={compaction.auto} />
-    );
+    return <CompactionNotice summary={compaction.summary} />;
   }
 
   if (message.role === "user") {
@@ -861,14 +859,25 @@ export function CompactionProgress() {
   );
 }
 
-/** A transcript disclosure for the summary the model now reads. */
+/** A transcript marker and, when retained, the summary it installed. */
 export function CompactionNotice({
   summary,
-  auto,
+  elapsedMs,
 }: {
-  summary: string;
-  auto: boolean;
+  summary?: string;
+  elapsedMs?: number;
 }) {
+  const label =
+    elapsedMs === undefined
+      ? "Context compacted"
+      : `Context compacted · ${formatElapsed(Math.floor(elapsedMs / 1000))}`;
+  const marker = (
+    <>
+      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+      {label}
+    </>
+  );
+  if (!summary) return <div className={compactionRowClassName}>{marker}</div>;
   return (
     <details className="group/compaction w-full">
       <summary
@@ -877,8 +886,7 @@ export function CompactionNotice({
           "cursor-pointer list-none transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
         )}
       >
-        <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
-        {auto ? "Conversation auto-compacted" : "Conversation compacted"}
+        {marker}
         <ChevronRightIcon
           aria-hidden
           className="size-3 shrink-0 opacity-0 transition-[opacity,rotate] group-open/compaction:rotate-90 group-open/compaction:opacity-100 group-hover/compaction:opacity-100 group-focus-within/compaction:opacity-100"

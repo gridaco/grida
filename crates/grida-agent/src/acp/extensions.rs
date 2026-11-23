@@ -223,6 +223,7 @@ fn capability_keys(
         .chain(reviewer.then_some(MESSAGE_CONTEXT))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
         .chain(reviewer.then_some(super::projection::ACTIVITY_ORDER))
+        .chain(reviewer.then_some(compaction::ITEMS))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]

@@ -740,6 +740,20 @@ marks an action whose output goes to a filter. The shell's exit status then
 describes the pipeline and may reflect only the filter. Treat missing or
 unrecognized metadata as a generic command activity.
 
+Private stdio clients can negotiate `co.grida/session/compaction-items`
+version 1 for transcript presentation. Live `session/update` notifications
+carry an empty assistant chunk with
+`_meta["co.grida/session/compaction-items"] = {turnId, item}`. Paginated
+transcript turn records expose the same items in `compactions`. An item has
+an `id` unique within the session, an `automatic` flag, and a `status` of
+`running`, `succeeded`, or `failed`. It can include `startedAtMs`,
+`finishedAtMs`, and the first-publication `activityOrder` within the owning
+turn. A live completion can carry a summary. A page carries the latest summary
+in the turn's existing `compaction` field for the most recent matching
+successful item. Merge live updates and replay by item identity. Show a
+successful marker once per installed summary. An unsuccessful item clears
+the running status.
+
 Negotiated private stdio lifecycle updates use
 `_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
 `turnId` and `waitId` of a registered question on this attached session. Both

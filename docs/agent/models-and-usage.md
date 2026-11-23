@@ -218,8 +218,8 @@ after compaction, the provider total is shown as **Other**.
 
 Grida can summarize earlier conversation before the next message or earlier
 tool exchanges while a turn runs. The current user messages and full
-transcript stay visible. Open **Conversation auto-compacted** to read the
-summary. To compact an idle chat with nothing queued, send `/compact` on
+transcript stay visible. Open **Context compacted** to read the summary
+when available. To compact an idle chat with nothing queued, send `/compact` on
 its own. [Continue a long conversation](./history.md#continue-a-long-conversation)
 
 ## Usage and charges

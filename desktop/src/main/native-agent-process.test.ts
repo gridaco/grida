@@ -7,6 +7,7 @@ import { NativeAgentChat } from "./native-agent-chat";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
+  COMPACTION_ITEMS,
   NativeAgentProcess,
   PREDICT_PROMPT,
   QUESTION_BATCHES,
@@ -709,6 +710,97 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           "native_chat_activity_order_invalid"
         );
         expect(live).toEqual([{ kind: "resync" }]);
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it.each([null, 1, 2])(
+    "preserves individual compactions in live and retained history when negotiated (%s)",
+    async (version) => {
+      const first = {
+        id: "compact/1",
+        status: "running",
+        automatic: true,
+        activityOrder: 2,
+        startedAtMs: 50,
+      };
+      const completed = { ...first, status: "succeeded", finishedAtMs: 60 };
+      const next = {
+        id: "compact/2",
+        status: "failed",
+        automatic: true,
+        activityOrder: 4,
+        startedAtMs: 80,
+        finishedAtMs: 90,
+      };
+      const legacy = { summary: "Earlier context", automatic: false };
+      const latest = { summary: "Retained context", automatic: true };
+      const test = fixture(
+        `
+        if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+        if (request.method !== 'session/load') throw Error('unexpected fixture method');
+        const window='${TRANSCRIPT_WINDOW}',compactions='${COMPACTION_ITEMS}', read=request.params._meta[window];
+        if (requested[compactions] !== 1) throw Error('missing optional capability');
+        const item=${JSON.stringify(first)},completed=${JSON.stringify(completed)},next=${JSON.stringify(next)};
+        const update=(item,sessionId='chat',text='')=>send({
+          method:'session/update',params:{sessionId,_meta:{[compactions]:{turnId:'turn',item}},
+          update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}
+        });
+        update(item,'other');
+        update(item,'chat','text does not carry compaction metadata');
+        update({...item,id: 'invalid id'});
+        update({...item,finishedAtMs:60});
+        update({...next,summary:'A failed operation did not install a summary'});
+        update(item);
+        update(completed);
+        update(next);
+        const turn={turnId:'turn',status:null,startedAtMs:40,compaction:${JSON.stringify(latest)},compactions:[completed,next]};
+        const historical={turnId:'historical',status:'succeeded',startedAtMs:1,compaction:${JSON.stringify(legacy)}};
+        send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[historical,turn]}}}});
+        `,
+        1,
+        { [TRANSCRIPT_WINDOW]: 1, [COMPACTION_ITEMS]: version }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const live: unknown[] = [];
+        chat.subscribe(session, (update) => live.push(update));
+        const page = await chat.transcriptPage(session);
+        expect(page.messages).toEqual([]);
+        expect(page.turns).toEqual([
+          {
+            turnId: "historical",
+            status: "succeeded",
+            startedAtMs: 1,
+            compaction: legacy,
+          },
+          {
+            turnId: "turn",
+            status: null,
+            startedAtMs: 40,
+            compaction: latest,
+            ...(version === 1 && {
+              compactions: [{ ...completed, summary: latest.summary }, next],
+            }),
+          },
+        ]);
+        expect(live).toEqual(
+          version === 1
+            ? [first, completed, next].map((item) => ({
+                kind: "compaction",
+                turnId: "turn",
+                item,
+              }))
+            : []
+        );
       } finally {
         await chat?.close();
         test.close();

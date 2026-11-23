@@ -168,6 +168,8 @@ pub struct ReplayTurn {
     /// records, such as context compaction, so a client can still show it.
     /// Absent for turns with records.
     pub silent_account: Option<Envelope>,
+    /// This turn installed an actual replacement of earlier model context.
+    pub context_replaced: bool,
     /// The window includes the turn's newest record. False when a newer
     /// window holds the rest of the turn.
     pub tail: bool,
@@ -240,8 +242,9 @@ impl SqliteStore {
                 };
                 let mut query = connection
                     .prepare(
-                        "SELECT ordinal,id,head,started_ms,settled_ms,stored_bytes FROM turns
-                         WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+                        "SELECT ordinal,id,head,started_ms,settled_ms,stored_bytes,
+                                EXISTS(SELECT 1 FROM context_replacements WHERE turn_ordinal=turns.ordinal)
+                         FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
                          ORDER BY ordinal DESC LIMIT ?4",
                     )
                     .map_err(database_error)?;
@@ -297,6 +300,7 @@ impl SqliteStore {
                         settled_ms,
                         context_tokens: context_tokens(&state),
                         silent_account,
+                        context_replaced: row.get(6).map_err(database_error)?,
                         tail: before.is_none(),
                     };
                     if let Some(before) = window.collect(Some(facts), records, before, measure)? {

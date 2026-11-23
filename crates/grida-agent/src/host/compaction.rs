@@ -14,8 +14,8 @@ use agent_kit_runtime::{
 use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed, RetainedHistory};
 use grida_agent_master::compaction::{
-    CompactionAccount, CompactionFailure, Coverage, SummaryRequest, context_tokens,
-    same_context_scope, summary_request,
+    CompactionAccount, CompactionActivityStatus, CompactionFailure, Coverage, SummaryRequest,
+    context_tokens, same_context_scope, summary_request,
 };
 use grida_agent_master::read_account;
 use grida_agent_master::usage::InferenceUsage;
@@ -28,6 +28,10 @@ const AUTOMATIC_SOURCE_BYTES: usize = 96 * 1024;
 /// Automatic compaction has a host-owned turn identity that survives recovery.
 pub(crate) fn is_automatic_turn(turn: &TurnId) -> bool {
     turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX)
+}
+
+pub(crate) fn is_compaction_turn(turn: &TurnId) -> bool {
+    turn.as_str().starts_with("compact/") || is_automatic_turn(turn)
 }
 
 #[derive(Clone)]
@@ -105,6 +109,27 @@ enum CompactionTrigger {
 }
 
 impl Host {
+    pub(crate) async fn running_standalone_compaction(
+        &self,
+        session: &SessionId,
+    ) -> Option<TurnId> {
+        if !self
+            .work
+            .lock()
+            .await
+            .active
+            .get(session)
+            .is_some_and(|active| active.admitted)
+        {
+            return None;
+        }
+        let current = self.store.inspect(session.clone()).await.ok()?.current?;
+        (is_compaction_turn(&current.binding.turn)
+            && current.disposition == agent_kit_sessions::TurnDisposition::Running
+            && current.controls.admits_work())
+        .then_some(current.binding.turn)
+    }
+
     pub async fn compact(&self, request: CompactRequest) -> Result<CompactionReport> {
         self.compact_observed(request, None).await
     }
@@ -639,6 +664,7 @@ impl Host {
         let binding = turn.view().state.binding().clone();
         let key = OperationKey::new(format!("compact/summary/{}", binding.epoch))?;
         let current_operation = operations.operation_id(&key)?;
+        let mut started_at = None;
         for (id, operation) in turn.view().state.operations() {
             if operation.is_running() {
                 operations.record_interruption(id.clone()).await?;
@@ -715,6 +741,15 @@ impl Host {
                 let account = match self.current_compaction_request(&plan) {
                     Ok(Some(prepared)) => {
                         let grant = self.execution()?.authority.inference.clone();
+                        if started_at.is_none() {
+                            started_at = grida_agent_master::compaction::now_ms();
+                            let mut item = live::CompactionItem::standalone(
+                                &binding.turn,
+                                CompactionActivityStatus::Running,
+                            );
+                            item.started_at_ms = started_at;
+                            live::publish_compaction(&self.live_updates, &binding, item);
+                        }
                         match operations.infer(key.clone(), prepared, grant).await {
                             Ok(_) => continue,
                             Err(error) if error.code == "admission_closed" => continue,
@@ -767,8 +802,28 @@ impl Host {
             {
                 FinishOutcome::Settled(receipt) => {
                     self.store.verify(CommitReceipt::Settled(*receipt)).await?;
-                    self.report_compaction(&binding.session, &binding.turn, &plan, &outcome)
+                    let report = self
+                        .report_compaction(&binding.session, &binding.turn, &plan, &outcome)
                         .await?;
+                    let mut item = live::CompactionItem::standalone(
+                        &binding.turn,
+                        if report.status == CompactionStatus::Installed {
+                            CompactionActivityStatus::Succeeded
+                        } else {
+                            CompactionActivityStatus::Failed
+                        },
+                    );
+                    item.started_at_ms = started_at;
+                    item.finished_at_ms = grida_agent_master::compaction::now_ms()
+                        .map(|time| time.max(started_at.unwrap_or(0)));
+                    if item.status == CompactionActivityStatus::Succeeded {
+                        item.summary = outcome
+                            .account
+                            .as_ref()
+                            .and_then(|account| CompactionAccount::from_envelope(account).ok())
+                            .and_then(|account| account.summary().map(str::to_owned));
+                    }
+                    live::publish_compaction(&self.live_updates, &binding, item);
                     return Ok(RunResult::Settled(outcome));
                 }
                 FinishOutcome::Continue(error) if error.code == "stale_completion_basis" => {

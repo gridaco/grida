@@ -1660,7 +1660,21 @@ impl Host {
                         result
                     }
                 }
-                TurnWork::Compaction(plan) => host.drive_compaction(admitted.opened, *plan).await,
+                TurnWork::Compaction(plan) => {
+                    let binding = admitted.opened.turn.view().state.binding().clone();
+                    let result = host.drive_compaction(admitted.opened, *plan).await;
+                    if result.is_err() {
+                        live::publish_compaction(
+                            &host.live_updates,
+                            &binding,
+                            live::CompactionItem::standalone(
+                                &binding.turn,
+                                grida_agent_master::compaction::CompactionActivityStatus::Failed,
+                            ),
+                        );
+                    }
+                    result
+                }
             };
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
             if settled || result.is_err() {
@@ -4789,16 +4803,16 @@ async fn drive(
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let initial = observer.snapshot();
     let binding = initial.state.binding().clone();
+    let activity_order = ordering.clone();
     let mut ordering =
         activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
     let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
     drop(initial);
     let mut publish = |update, observer: &agent_kit_runtime::TurnObserver| {
-        if let TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. } = &update
+        if let TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. } =
+            &update
             && !observer.inspect_operation(operation, |record| {
-                !matches!(&record.record.input, agent_kit_core::turn::OperationInput::Inference(request)
-                    if request.request().messages.first().is_some_and(|message|
-                        message.role == Role::System && message.provenance.source == "approval-review"))
+                live::publishes_operation(&record.record.input)
             })
         {
             return;
@@ -4807,6 +4821,9 @@ async fn drive(
         ordering.update(&update);
         if let Some(live) = &mut live {
             live.update(&update);
+            if let TurnUpdate::Snapshot(view) = &update {
+                live.compactions(&view.state, &activity_order);
+            }
         }
         let _ = updates.send(update);
     };

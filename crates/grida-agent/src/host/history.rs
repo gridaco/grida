@@ -96,6 +96,7 @@ pub(crate) struct TranscriptInputFacts {
     pub(crate) models: BTreeMap<TurnId, ModelId>,
     pub(crate) context_windows: BTreeMap<TurnId, NonZeroU64>,
     pub(crate) compaction_summaries: BTreeMap<TurnId, String>,
+    pub(crate) compaction_items: BTreeMap<TurnId, Vec<super::live::CompactionItem>>,
     pub(crate) authored_inputs: BTreeMap<MessageId, (TurnId, ChangeId)>,
     pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
@@ -229,7 +230,8 @@ impl Host {
                 }
             }
             if inline_compaction || automatic_review {
-                let (summary, mut reviews) = self
+                let ordering = self.activity_order.clone();
+                let (summary, mut reviews, items) = self
                     .store
                     .inspect_turn_with(session.clone(), turn.clone(), move |state| {
                         let summary = inline_compaction
@@ -240,11 +242,22 @@ impl Host {
                         } else {
                             Vec::new()
                         };
-                        Ok((summary, reviews))
+                        let items = if inline_compaction {
+                            let binding = state.binding();
+                            super::live::compaction_items(state, |id| {
+                                ordering.event(&binding.session, &binding.turn, id)
+                            })
+                        } else {
+                            Vec::new()
+                        };
+                        Ok((summary, reviews, items))
                     })
                     .await?;
                 if let Some(summary) = summary {
                     facts.compaction_summaries.insert(turn.clone(), summary);
+                }
+                if !items.is_empty() {
+                    facts.compaction_items.insert(turn.clone(), items);
                 }
                 let with_ids = reviews
                     .iter_mut()

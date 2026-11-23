@@ -715,6 +715,18 @@ export type NativeChatMessageAttachment = Readonly<{
   previewId?: string;
 }>;
 
+/** One native context compaction, identified across live delivery and replay. */
+export type NativeChatCompaction = Readonly<{
+  id: string;
+  status: "running" | "succeeded" | "failed";
+  automatic: boolean;
+  startedAtMs?: number;
+  finishedAtMs?: number;
+  /** Position within the owning turn, when the host retained it. */
+  activityOrder?: number;
+  summary?: string;
+}>;
+
 /** Recorded facts about a turn in a transcript page. */
 export type NativeChatTurnRecord = Readonly<{
   turnId: string;
@@ -746,7 +758,9 @@ export type NativeChatTurnRecord = Readonly<{
   contextTokens?: number;
   /** Captured context capacity for the turn, when known. */
   contextWindowTokens?: number;
-  /** Summary installed by standalone or inline context compaction. */
+  /** Individual compactions in this turn, including their settled outcome. */
+  compactions?: readonly NativeChatCompaction[];
+  /** Summary carried by an older host or recovered from a historical turn. */
   compaction?: Readonly<{ summary: string; automatic: boolean }>;
 }>;
 
@@ -1124,8 +1138,15 @@ export type NativeChatBackgroundProcessesUpdate = Readonly<{
   processes: readonly NativeChatBackgroundProcess[];
 }>;
 
+export type NativeChatCompactionUpdate = Readonly<{
+  kind: "compaction";
+  turnId: string;
+  item: NativeChatCompaction;
+}>;
+
 export type NativeChatStreamUpdate =
   | NativeChatTextUpdate
+  | NativeChatCompactionUpdate
   | NativeChatActivityUpdate
   | NativeChatBackgroundProcessesUpdate
   | Readonly<{ kind: "resync" }>;
@@ -1537,11 +1558,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     control: NativeChatControl
   ): Promise<NativeChatControlResult>;
-  /** Pass true when this attachment can render and settle a question batch. */
   subscribe(
     attachmentId: string,
     update: (update: NativeChatUpdate) => void,
-    acceptsQuestionBatches?: true
+    /** Pass true when this attachment can render and settle a question batch. */
+    acceptsQuestionBatches?: true,
+    /** Pass true to receive live per-item compaction updates. */
+    acceptsCompactionItems?: true
   ): Promise<string>;
   unsubscribe(subscriptionId: string): Promise<void>;
 };

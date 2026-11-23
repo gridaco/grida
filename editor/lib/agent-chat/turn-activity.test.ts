@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   NativeChatMessage,
+  NativeChatTurnRecord,
   NativeSubagentLifecycleEvent,
 } from "@grida/desktop-bridge";
 import { turn_activity } from "./turn-activity";
@@ -55,7 +56,9 @@ describe("turn_activity.merge", () => {
         ? item.message.messageId
         : item.kind === "subagent"
           ? item.event.eventId
-          : item.calls.map((call) => call.callId).join("+")
+          : item.kind === "compaction"
+            ? item.compaction.id
+            : item.calls.map((call) => call.callId).join("+")
     );
   const work = () =>
     turn_activity.items([
@@ -111,13 +114,15 @@ describe("turn_activity.merge", () => {
             ...item,
             message: { ...item.message, text: item.message.text + " grew" },
           }
-        : {
-            ...item,
-            calls: item.calls.map((call) => ({
-              ...call,
-              outcome: "succeeded" as const,
-            })),
-          }
+        : item.kind === "activity"
+          ? {
+              ...item,
+              calls: item.calls.map((call) => ({
+                ...call,
+                outcome: "succeeded" as const,
+              })),
+            }
+          : item
     );
     const result = turn_activity.merge(
       [...updated, updated[0]],
@@ -139,6 +144,38 @@ describe("turn_activity.merge", () => {
     );
     expect(turn_activity.merge(updated, events(), "parent")).toEqual(result);
   });
+
+  it.each([
+    { nextOrder: 4, expected: ["before", "compacted", "next", "tail"] },
+    { nextOrder: undefined, expected: ["before", "compacted", "next", "tail"] },
+    { nextOrder: 3, expected: ["before", "next", "tail", "compacted"] },
+  ])(
+    "anchors a compaction with incomplete replay order and a following coordinate of $nextOrder",
+    ({ nextOrder, expected }) => {
+      const result = turn_activity.merge(
+        [
+          ...turn_activity.items([
+            message("before", 2),
+            message("next", nextOrder),
+            { ...message("tail"), activityOrderIncomplete: true },
+          ]),
+          {
+            kind: "compaction",
+            compaction: {
+              id: "compacted",
+              status: "succeeded",
+              automatic: true,
+              activityOrder: 3,
+            },
+          },
+        ],
+        events(),
+        "parent"
+      );
+      expect(ids(result)).toEqual(expected);
+      expect(result.unplaced).toEqual(events());
+    }
+  );
 
   it.each([undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     "leaves parent order untouched and child facts explicitly unplaced when a parent coordinate is %s",
@@ -327,7 +364,7 @@ describe("turn_activity.group", () => {
     expect(block.answers).toEqual([]);
     expect(
       block.work.map((item) =>
-        item.kind === "commentary" ? item.message.messageId : item.key
+        item.kind === "commentary" ? item.message.messageId : item.kind
       )
     ).toEqual(["before-pause", "streaming"]);
   });
@@ -411,6 +448,185 @@ describe("turn_activity.group", () => {
 });
 
 describe("turn_activity compaction notes", () => {
+  it("keeps two inline markers between their tool rounds during work and on replay", () => {
+    const messages: NativeChatMessage[] = [
+      {
+        messageId: "ask",
+        turnId: "t",
+        role: "user",
+        text: "Check the cart.",
+      },
+      {
+        messageId: "first-tools",
+        turnId: "t",
+        role: "assistant",
+        text: "",
+        activity: [{ ...read, activityOrder: 1 }],
+      },
+      {
+        messageId: "next-tool",
+        turnId: "t",
+        role: "assistant",
+        text: "",
+        activity: [{ ...command, activityOrder: 3 }],
+      },
+      {
+        messageId: "final",
+        turnId: "t",
+        role: "assistant",
+        phase: "answer",
+        activityOrder: 6,
+        text: "The cart is ready.",
+      },
+    ];
+    const record: NativeChatTurnRecord = {
+      turnId: "t",
+      startedAtMs: 0,
+      status: null,
+      compaction: { summary: "Legacy duplicate", automatic: true },
+      compactions: [
+        { id: "one", status: "succeeded", activityOrder: 2, automatic: true },
+        { id: "two", status: "succeeded", activityOrder: 4, automatic: true },
+        { id: "failed", status: "failed", activityOrder: 5, automatic: true },
+      ],
+    };
+    const live = turn_activity.group(messages.slice(0, 3), [record], {
+      turnId: "t",
+    });
+    const replay = turn_activity.group(
+      messages,
+      [{ ...record, status: "succeeded", settledAtMs: 5000 }],
+      null
+    );
+    for (const blocks of [live, replay]) {
+      expect(blocks).toHaveLength(1);
+      const block = blocks[0];
+      if (block.kind !== "turn") throw new Error("Expected a foreground turn");
+      const timeline = turn_activity.merge(block.work, [], "t");
+      expect(
+        timeline.work.map((item) =>
+          item.kind === "compaction"
+            ? item.compaction.id
+            : item.kind === "activity"
+              ? item.calls[0].callId
+              : item.kind
+        )
+      ).toEqual(["call-1", "one", "call-2", "two"]);
+    }
+  });
+
+  it("keeps a legacy inline summary inside its turn's work", () => {
+    const blocks = turn_activity.group(
+      [
+        {
+          messageId: "ask",
+          role: "user",
+          text: "Check the cart.",
+          turnId: "t",
+        },
+      ],
+      [
+        {
+          turnId: "t",
+          status: "succeeded",
+          startedAtMs: 0,
+          compaction: { summary: "Earlier work on the cart.", automatic: true },
+        },
+      ],
+      null
+    );
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      kind: "turn",
+      work: [
+        {
+          kind: "compaction",
+          compaction: { id: "t", summary: "Earlier work on the cart." },
+        },
+      ],
+    });
+  });
+
+  it("shows a standalone start and hides stale starts after pause or failure", () => {
+    const record: NativeChatTurnRecord = {
+      turnId: "compact",
+      startedAtMs: 0,
+      status: null,
+      compactions: [{ id: "one", status: "running", automatic: true }],
+    };
+    const current = {
+      turnId: "compact",
+      disposition: "running",
+      paused: false,
+      cancelled: false,
+    } as const;
+    expect(turn_activity.compacting([record], null)).toBe(true);
+    expect(turn_activity.compacting([record], current)).toBe(true);
+    expect(turn_activity.compacting([record], current, current.turnId)).toBe(
+      false
+    );
+    expect(
+      turn_activity.compacting([record], { ...current, paused: true })
+    ).toBe(false);
+    expect(
+      turn_activity.compacting([record], { ...current, cancelled: true })
+    ).toBe(false);
+    expect(
+      turn_activity.compacting(
+        [
+          {
+            ...record,
+            compactions: [{ id: "one", status: "failed", automatic: true }],
+          },
+        ],
+        current
+      )
+    ).toBe(false);
+    const completed = turn_activity.group(
+      [],
+      [
+        {
+          ...record,
+          status: "succeeded",
+          compactions: [{ id: "one", status: "succeeded", automatic: true }],
+        },
+      ],
+      null
+    );
+    expect(completed).toMatchObject([
+      { kind: "compaction", turnId: "compact", compactionId: "one" },
+    ]);
+  });
+
+  it("places a standalone marker before the observed next turn's first streamed message", () => {
+    const records: NativeChatTurnRecord[] = [
+      { turnId: "a", status: "succeeded", startedAtMs: 1 },
+      {
+        turnId: "compact",
+        status: "succeeded",
+        startedAtMs: 2,
+        compactions: [{ id: "one", status: "succeeded", automatic: true }],
+      },
+    ];
+    const messages = [...turn("a"), turn("b")[0]];
+    const current = { turnId: "b", modelId: "model-b" };
+    const beforePage = turn_activity.group(messages, records, current);
+    const afterPage = turn_activity.group(
+      messages,
+      [...records, { turnId: "b", status: null, startedAtMs: 3 }],
+      current
+    );
+    for (const blocks of [beforePage, afterPage]) {
+      expect(blocks.map((block) => block.kind)).toEqual([
+        "turn",
+        "compaction",
+        "turn",
+      ]);
+      expect(blocks[1]).toMatchObject({ compactionId: "one" });
+      expect(blocks[2]).toMatchObject({ turnId: "b" });
+    }
+  });
+
   it("places a compaction note between the turns around it", () => {
     const message = (
       id: string,
@@ -450,7 +666,6 @@ describe("turn_activity compaction notes", () => {
     ]);
     expect(blocks[1]).toMatchObject({
       summary: "Earlier work on the cart.",
-      automatic: true,
     });
   });
 
@@ -471,7 +686,7 @@ describe("turn_activity compaction notes", () => {
     );
     expect(blocks.at(-1)).toMatchObject({
       kind: "compaction",
-      automatic: false,
+      summary: "Summary.",
     });
   });
 });

@@ -198,6 +198,26 @@ pub(super) async fn forward(
                     )
                     .await?;
                 }
+                Ok(LiveUpdate::Compaction(update)) => {
+                    if !sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::extensions::compaction::ITEMS)
+                    {
+                        continue;
+                    }
+                    send(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &update.session,
+                        ContentChunk::new("".to_owned().into()),
+                        super::extensions::compaction::ITEMS,
+                        json!({"turnId": update.turn, "item": update.item}),
+                    )
+                    .await?;
+                }
                 Ok(LiveUpdate::Lifecycle(update)) => {
                     if !lifecycle_enabled {
                         continue;

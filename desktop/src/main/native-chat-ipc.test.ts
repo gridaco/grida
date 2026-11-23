@@ -951,6 +951,55 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("delivers compaction updates to the attached frame within its byte budget", async () => {
+    const { ipc, first, second, emit } = setup();
+    const attached = await ipc.create(first.event);
+    const peer = await ipc.create(second.event);
+    const legacy = await ipc.load(second.event, attached.sessionId);
+    const subscriptionId = randomUUID();
+    ipc.subscribe(
+      first.event,
+      attached.attachmentId,
+      subscriptionId,
+      undefined,
+      true
+    );
+    ipc.subscribe(
+      second.event,
+      peer.attachmentId,
+      randomUUID(),
+      undefined,
+      true
+    );
+    ipc.subscribe(second.event, legacy.attachmentId, randomUUID());
+    const update = {
+      kind: "compaction",
+      turnId: "turn",
+      item: {
+        id: "compact",
+        status: "succeeded",
+        automatic: true,
+        summary: "x".repeat(32 * 1024),
+      },
+    } as const;
+    for (let index = 0; index < 33; index++) emit(attached.sessionId, update);
+    expect(first.frame.send).toHaveBeenNthCalledWith(
+      1,
+      IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+      { subscriptionId, attachmentId: attached.attachmentId, update }
+    );
+    expect(first.frame.send).toHaveBeenNthCalledWith(
+      33,
+      IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+      {
+        subscriptionId,
+        attachmentId: attached.attachmentId,
+        update: { kind: "closed", reason: "delivery_limit" },
+      }
+    );
+    expect(second.frame.send).not.toHaveBeenCalled();
+  });
+
   it("scopes richer child reads to the exact parent attachment and rejects late navigation", async () => {
     const { ipc, first, second, chat } = setup();
     const opened = await ipc.create(first.event);

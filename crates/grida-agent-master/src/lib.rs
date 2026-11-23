@@ -264,6 +264,8 @@ struct Continuation {
     discovered: BTreeSet<ToolId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     compacted: Option<compaction::InlineContext>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    compaction_activity: Vec<compaction::InlineCompaction>,
 }
 
 impl Continuation {
@@ -1186,6 +1188,7 @@ impl Master {
                 effort: self.effort.clone(),
                 discovered: BTreeSet::new(),
                 compacted: None,
+                compaction_activity: Vec::new(),
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;

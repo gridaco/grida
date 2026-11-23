@@ -6,6 +6,84 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 
 describe("NativeTurnActivity", () => {
+  it("keeps inline compactions with the rest of the turn's work", () => {
+    const work: turn_activity.Item[] = [
+      {
+        kind: "compaction",
+        compaction: {
+          id: "first",
+          status: "succeeded",
+          automatic: true,
+          activityOrder: 1,
+        },
+      },
+      {
+        kind: "commentary",
+        message: {
+          messageId: "middle",
+          role: "assistant",
+          text: "Checking the second file.",
+          turnId: "t",
+          activityOrder: 2,
+        },
+      },
+      {
+        kind: "compaction",
+        compaction: {
+          id: "second",
+          status: "succeeded",
+          automatic: true,
+          activityOrder: 3,
+        },
+      },
+    ];
+    const render = (
+      finished: boolean,
+      compactionDurations?: ReadonlyMap<string, number>,
+      visibleItems = work
+    ) =>
+      renderToStaticMarkup(
+        <NativeTurnActivity
+          block={{
+            kind: "turn",
+            turnId: "t",
+            requests: [],
+            finished,
+            outcome: finished ? "succeeded" : null,
+            durationMs: null,
+            work: visibleItems,
+            answers: finished
+              ? [
+                  {
+                    messageId: "final",
+                    role: "assistant",
+                    text: "Done.",
+                    turnId: "t",
+                  },
+                ]
+              : [],
+          }}
+          compactionDurations={compactionDurations}
+          renderMessage={(message) => (
+            <p key={message.messageId}>{message.text}</p>
+          )}
+        />
+      );
+    const live = render(false, new Map([["second", 2000]]));
+    const narration = live.indexOf("Checking the second file.");
+    expect(live.indexOf("Context compacted")).toBeLessThan(narration);
+    expect(live.indexOf("Context compacted · 2s")).toBeGreaterThan(narration);
+    const replay = render(true);
+    expect(replay).toContain('data-state="collapsed"');
+    expect(replay).not.toContain("Context compacted");
+    expect(replay).not.toContain("Checking the second file.");
+    expect(replay).toContain("Done.");
+
+    const compactionOnly = render(true, undefined, [work[0]]);
+    expect(compactionOnly).toContain('aria-expanded="false"');
+    expect(compactionOnly).not.toContain("Context compacted");
+  });
+
   it.each([
     {
       from: "openai/gpt-6.2-astra",

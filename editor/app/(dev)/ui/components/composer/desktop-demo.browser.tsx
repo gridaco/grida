@@ -222,7 +222,7 @@ it("offers dictation across the composer playground", async () => {
 it("shows both compaction states when the playground opens", async () => {
   await mountDemo(<ComposerPage />);
   const example = page.getByRole("region", { name: "Compaction", exact: true });
-  const saved = example.getByText("Conversation auto-compacted", {
+  const saved = example.getByText("Context compacted", {
     exact: true,
   });
   const progress = example.getByRole("status").getByText("Compacting context");
@@ -256,7 +256,7 @@ it("runs the optional compaction walkthrough through the Desktop composer", asyn
   await expect.element(progress).toBeVisible();
   await clickButton("Finish compaction");
   await expect
-    .element(log.getByText("Conversation compacted", { exact: true }))
+    .element(log.getByText("Context compacted", { exact: true }))
     .toBeVisible();
   await expect.element(progress).not.toBeInTheDocument();
 });

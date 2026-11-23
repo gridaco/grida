@@ -57,7 +57,7 @@ starting, and the error describes the problem.
 The example lowers the threshold for trying automatic compaction in a real
 chat. Complete two turns with enough text to reach the threshold, then send
 another message. Grida can summarize the older turn and keeps the most
-recent turn intact. The transcript shows **Conversation auto-compacted**.
+recent turn intact. The transcript shows **Context compacted**.
 
 ## Change it from a client
 

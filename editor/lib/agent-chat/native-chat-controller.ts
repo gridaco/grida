@@ -25,6 +25,7 @@ import type {
   NativeChatLibrarySelection,
   NativeChatLibrarySelectionAnswer,
   NativeChatActivityUpdate,
+  NativeChatCompaction,
   NativeChatMessage,
   NativeChatMessageContext,
   NativeChatObservation,
@@ -126,6 +127,7 @@ export type NativeChatEditorSurfaces = {
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_ACTIVITY = 64;
+const MAX_LIVE_COMPACTIONS = 256;
 const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
 /** The title of a chat the host has not titled yet. */
 export const NEW_CHAT_TITLE = "New chat";
@@ -261,6 +263,8 @@ export type NativeChatView = Readonly<{
   progressRevision: number;
   /** Recorded outcome and timing for turns in the displayed messages. */
   turnRecords: readonly NativeChatTurnRecord[];
+  /** Elapsed durations of compactions whose start and completion were seen live. */
+  liveCompactionDurations?: ReadonlyMap<string, number>;
   /** First message after an unconfirmed boundary between cached history pages. */
   transcriptGapBefore?: string;
   /** Older pages exist above the loaded messages. */
@@ -414,6 +418,8 @@ type Scope = {
   earlierBoundary?: { cursor: string; turnId?: string };
   earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
+  liveCompactions?: Map<string, { turnId: string; item: NativeChatCompaction }>;
+  liveCompactionDurations?: Map<string, number>;
   progressRevision: number;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
@@ -590,6 +596,7 @@ const EMPTY: NativeChatView = Object.freeze({
   outgoing: [],
   progressRevision: 0,
   turnRecords: [],
+  liveCompactionDurations: undefined,
   canReadEarlier: false,
   titleArrived: null,
   readingEarlier: false,
@@ -8371,6 +8378,10 @@ export class NativeChatController {
       scope.earlierPages = [];
       scope.earlierBoundary = undefined;
       scope.reconsiderations = undefined;
+      if (scope.recentWindow) {
+        scope.liveCompactions?.clear();
+        scope.liveCompactionDurations = undefined;
+      }
     }
     scope.recentWindow = page && {
       view: page.view,
@@ -8378,6 +8389,20 @@ export class NativeChatController {
       turns: page.turns,
     };
     scope.durable = messages;
+    const replayedTurns = new Map(
+      page?.turns?.map((turn) => [turn.turnId, turn])
+    );
+    for (const [id, { turnId, item }] of scope.liveCompactions ?? []) {
+      const record = replayedTurns.get(turnId);
+      if (
+        record?.compactions?.some(
+          (compaction) =>
+            compaction.id === id && compaction.status !== "running"
+        ) ||
+        (item.status === "running" && record?.status)
+      )
+        scope.liveCompactions?.delete(id);
+    }
     scope.historyLoaded = true;
     if (
       legacyAccepted.length &&
@@ -8731,8 +8756,13 @@ export class NativeChatController {
       scope.backgroundProcesses?.receive(update.processes);
       return;
     }
+    if (update.kind === "compaction") {
+      this.receiveCompaction(scope, update);
+      return;
+    }
     if (update.kind !== "text") {
       scope.live.clear();
+      scope.liveCompactions?.clear();
       scope.gaps.clear();
       scope.replay = true;
       this.publishMessages(scope, true);
@@ -8853,6 +8883,54 @@ export class NativeChatController {
     if (!known) void this.refresh(scope);
   }
 
+  private receiveCompaction(
+    scope: Scope,
+    update: Extract<NativeChatUpdate, { kind: "compaction" }>
+  ): void {
+    const { turnId, item } = update;
+    const replayed = scope.recentWindow?.turns
+      ?.find((turn) => turn.turnId === turnId)
+      ?.compactions?.find((compaction) => compaction.id === item.id);
+    const live = (scope.liveCompactions ??= new Map());
+    const previous = live.get(item.id);
+    if (
+      (previous && previous.turnId !== turnId) ||
+      (item.status === "running" &&
+        ((previous && previous.item.status !== "running") ||
+          (replayed && replayed.status !== "running"))) ||
+      (previous && activityPayloadEqual(previous.item, item))
+    )
+      return;
+
+    if (previous?.item.status === "running" && item.status === "succeeded") {
+      const start = previous.item.startedAtMs;
+      if (
+        start !== undefined &&
+        item.finishedAtMs !== undefined &&
+        item.finishedAtMs >= start
+      ) {
+        const durations = new Map(scope.liveCompactionDurations);
+        durations.set(item.id, item.finishedAtMs - start);
+        if (durations.size > MAX_LIVE_COMPACTIONS)
+          durations.delete(durations.keys().next().value!);
+        scope.liveCompactionDurations = durations;
+      }
+    }
+    live.set(item.id, {
+      turnId,
+      item: {
+        ...item,
+        activityOrder: previous?.item.activityOrder ?? item.activityOrder,
+      },
+    });
+    if (live.size > MAX_LIVE_COMPACTIONS)
+      live.delete(live.keys().next().value!);
+    scope.progressRevision++;
+    this.publishMessages(scope);
+    if (scope.observation?.snapshot.current?.turnId !== turnId)
+      void this.refresh(scope);
+  }
+
   private async renewSubscription(scope: Scope): Promise<void> {
     if (scope.subscription || !this.owns(scope)) return;
     const subscription: NonNullable<Scope["subscription"]> = {};
@@ -8866,6 +8944,7 @@ export class NativeChatController {
           if (update.kind === "closed") scope.subscription = undefined;
           this.receive(scope, update);
         },
+        true,
         true
       );
       if (scope.subscription === subscription) subscription.id = id;
@@ -8925,10 +9004,45 @@ export class NativeChatController {
         );
       }
     }
+    for (const { turnId, item } of scope.liveCompactions?.values() ?? []) {
+      const record = turns.get(turnId);
+      const compactions = record?.compactions ?? [];
+      const existing = compactions.find(
+        (compaction) => compaction.id === item.id
+      );
+      if (
+        (existing && existing.status !== "running") ||
+        (record?.status && item.status === "running")
+      )
+        continue;
+      const snapshot = scope.observation?.snapshot;
+      const observed =
+        snapshot?.current?.turnId === turnId
+          ? snapshot.current
+          : snapshot?.latest;
+      if (
+        item.status === "running" &&
+        observed?.turnId === turnId &&
+        (observed.paused || observed.disposition !== "running")
+      )
+        continue;
+      turns.set(turnId, {
+        turnId,
+        status: null,
+        startedAtMs: item.startedAtMs ?? 0,
+        ...record,
+        compactions: existing
+          ? compactions.map((compaction) =>
+              compaction.id === item.id ? item : compaction
+            )
+          : [...compactions, item],
+      });
+    }
     this.update({
       messages,
       progressRevision: scope.progressRevision,
       turnRecords: turns.size ? [...turns.values()] : EMPTY_TURNS,
+      liveCompactionDurations: scope.liveCompactionDurations,
       transcriptGapBefore,
       canReadEarlier: !!(pages[0] ?? scope.recentWindow)?.older,
       repairing,
