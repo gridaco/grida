@@ -645,9 +645,10 @@ describe("turn_activity.measuredContext", () => {
           status: "succeeded",
           startedAtMs: 0,
           contextTokens: 42_000,
+          contextWindowTokens: 128_000,
         },
       ])
-    ).toBe(42_000);
+    ).toEqual({ tokens: 42_000, window: 128_000 });
     expect(
       turn_activity.measuredContext([
         {
@@ -680,6 +681,19 @@ describe("turn_activity.measuredContext", () => {
           contextTokens: 18_000,
         },
       ])
-    ).toBe(18_000);
+    ).toEqual({ tokens: 18_000, window: undefined });
+    expect(
+      turn_activity.measuredContext([
+        {
+          turnId: "inline",
+          modelId: "fixture",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 12_000,
+          contextWindowTokens: 32_000,
+          compaction: { summary: "s", automatic: true },
+        },
+      ])
+    ).toEqual({ tokens: 12_000, window: 32_000 });
   });
 });

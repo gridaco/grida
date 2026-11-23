@@ -744,10 +744,9 @@ export type NativeChatTurnRecord = Readonly<{
    * plus the reply. Absent when no call reported usage.
    */
   contextTokens?: number;
-  /**
-   * The turn summarized earlier context into the summary the model now reads.
-   * It adds no messages; the transcript shows it as a note in its place.
-   */
+  /** Captured context capacity for the turn, when known. */
+  contextWindowTokens?: number;
+  /** Summary installed by standalone or inline context compaction. */
   compaction?: Readonly<{ summary: string; automatic: boolean }>;
 }>;
 

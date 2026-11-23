@@ -1062,7 +1062,15 @@ export class NativeDesktopAgent {
           requireScope(provider.gatewayScope);
           if (provider.gatewayScope)
             this.gatewayScopes.set(workspace.id, provider.gatewayScope);
-          return { launch: { ...provider, maxOutputTokens }, release };
+          return {
+            launch: {
+              ...provider,
+              contextWindowTokens:
+                NativeChatProfiles.gatewayContextWindow(model),
+              maxOutputTokens,
+            },
+            release,
+          };
         } catch (error) {
           release();
           throw error;
@@ -1269,6 +1277,7 @@ export class NativeDesktopAgent {
         speeds: binding.speeds,
       })),
       imageInput: binding.imageInput,
+      contextWindowTokens: binding.contextWindow,
       subscriptionSpeeds: binding.speeds,
     };
   }
@@ -1713,6 +1722,9 @@ export class NativeDesktopAgent {
     return {
       provider: {
         ...gateway.launch(model),
+        ...(model === DEFAULT_GATEWAY_MODEL && {
+          contextWindowTokens: NativeChatProfiles.contextWindow(model),
+        }),
         subagents: true as const,
       },
       release: () => gateway.close(),
@@ -1743,12 +1755,6 @@ function publicProfile({
   imageInput,
   reasoning,
 }: NativeChatProfiles.Saved) {
-  const window =
-    contextWindow ??
-    (providerId === CHATGPT_PROVIDER_ID ||
-    NativeProviderSelection.isBuiltInByok(providerId)
-      ? undefined
-      : NativeChatProfiles.contextWindow(modelId));
   return {
     id,
     connection,
@@ -1759,7 +1765,7 @@ function publicProfile({
         NativeChatProfiles.gatewayImageInput(modelId))) && {
       imageInput: true as const,
     }),
-    ...(window !== undefined && { contextWindow: window }),
+    ...(contextWindow !== undefined && { contextWindow }),
     ...((reasoning ||
       (providerId === GG_PROVIDER_ID &&
         NativeChatProfiles.reasons(providerId, modelId))) && {

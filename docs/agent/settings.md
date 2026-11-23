@@ -1,19 +1,19 @@
 ---
-title: Set the context input limit
-description: Set a workspace's context input limit in its configuration file.
-keywords: [agent settings, context limit, configuration, Grida Desktop]
+title: Set context size and compaction
+description: Set a workspace's model context window and automatic compaction threshold.
+keywords:
+  [agent settings, context window, compaction, configuration, Grida Desktop]
 format: md
 ---
 
-# Set the context input limit
+# Set context size and compaction
 
-The context input limit caps how much material the agent sends to the model
-in one request. Without it, the agent
-budgets input automatically, and the ring beside the model picker shows how
-full the context is.
+Grida uses a model's known context window to track context usage and decide
+when to summarize earlier work. You can set a smaller context window or ask
+Grida to summarize sooner. The context ring shows recent usage.
 [See how full the context is](./models-and-usage.md#see-how-full-the-context-is)
 
-The context budget lives in the workspace's `config.toml`. Edit the file
+The context settings live in the workspace's `config.toml`. Edit the file
 while Desktop is closed. The host loads it when you reopen the workspace.
 Changes apply to new messages. Previously accepted work keeps the settings
 it started with.
@@ -41,22 +41,27 @@ Global hooks use a separate user-wide `~/.grida/config.toml` and appear in
    ```toml
    schema_version = 1
 
-   [context]
-   max_input_tokens = 64000
+   model_auto_compact_token_limit = 4096
    ```
 
-4. Start Desktop and open the workspace. The new limit applies to messages
+4. Start Desktop and open the workspace. The settings apply to messages
    you send from then on.
 
-A hard limit needs a connection that can count its requests exactly. If it
-cannot, or a request is larger than the limit, the turn fails before the
-model starts answering. Remove `max_input_tokens` to return to automatic
-budgeting. An invalid file prevents the workspace's chat from starting, and
-the error names the problem.
+Both settings are optional. The model window limits the assumed capacity.
+The compaction threshold controls when Grida tries to summarize the context.
+For a known window, the default threshold is 90% of that window and a
+configured threshold is capped there. The provider still enforces its
+own limits. An invalid settings file prevents the workspace's chat from
+starting, and the error describes the problem.
+
+The example lowers the threshold for trying automatic compaction in a real
+chat. Complete two turns with enough text to reach the threshold, then send
+another message. Grida can summarize the older turn and keeps the most
+recent turn intact. The transcript shows **Conversation auto-compacted**.
 
 ## Change it from a client
 
 Source-built headless runs read the file from the state directory you choose.
 A trusted ACP client with the configuration capability can inspect, set,
-reset, and reload the limit.
+reset, and reload both settings.
 [Agent configuration reference](../reference/agent-configuration.md)

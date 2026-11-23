@@ -2,6 +2,7 @@
 import {
   allowsLlamaCppInputCounting,
   isValidEndpointProviderId,
+  resolveEndpointModel,
   type EndpointProviderConfig,
 } from "@grida/ai-host";
 import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
@@ -33,6 +34,7 @@ export namespace NativeProviderSelection {
       | "model"
       | "wireModel"
       | "imageInput"
+      | "contextWindowTokens"
       | "maxOutputTokens"
       | "reasoning"
       | "credentialHome"
@@ -131,6 +133,7 @@ export namespace NativeProviderSelection {
       model,
       wireModel: binding.wireModel,
       imageInput: binding.imageInput,
+      contextWindowTokens: binding.contextWindow,
       maxOutputTokens: binding.maxOutputTokens,
       credentialHome: home,
       subagents: true,
@@ -170,10 +173,8 @@ export namespace NativeProviderSelection {
     if (!config || !isValidEndpointProviderId(config.id))
       throw new Error("native_provider_endpoint_unavailable");
     const model = modelId ?? config.default_model_id ?? config.models[0]?.id;
-    if (
-      model === undefined ||
-      !config.models.some((entry) => entry.id === model)
-    )
+    const selected = config.models.find((entry) => entry.id === model);
+    if (model === undefined || !selected)
       throw new Error("native_provider_model_unavailable");
     const endpoint = config.base_url;
     const target = URL.parse(endpoint);
@@ -213,6 +214,7 @@ export namespace NativeProviderSelection {
       provider: "openai-compatible",
       endpoint,
       model,
+      contextWindowTokens: resolveEndpointModel(selected).contextWindow,
       configuredEndpointId: config.id,
       ...(llamaCppInputCount && { llamaCppInputCount }),
       ...(credentialHome && {

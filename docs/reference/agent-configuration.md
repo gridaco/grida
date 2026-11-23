@@ -29,66 +29,31 @@ call `_co.grida/config/reload`.
 ```toml
 schema_version = 1
 
-[context]
-max_input_tokens = 64000
+model_context_window = 64000
+model_auto_compact_token_limit = 48000
 ```
 
-| Field                      | Meaning                                   | Accepted values                                                                    |
-| -------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
-| `schema_version`           | Configuration-file format                 | `1`                                                                                |
-| `context.max_input_tokens` | Hard upper limit for complete model input | An integer from `1` through `9007199254740991`, or omitted for automatic budgeting |
+| Field                            | Meaning                                        | Accepted values                                      |
+| -------------------------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| `schema_version`                 | Configuration-file format                      | `1`                                                  |
+| `model_context_window`           | Context capacity used for usage and compaction | Optional integer from `1` through `9007199254740991` |
+| `model_auto_compact_token_limit` | Token usage that triggers automatic compaction | Optional integer from `1` through `9007199254740991` |
 
-The input limit covers instructions, conversation history, media representation,
-tool declarations, and provider framing. The provider must establish an exact
-count or conservative bound for its complete prepared request. Unsupported
-counting or an excessive request produces a recorded failure before generation.
-Remote counting sends the prepared input to the selected provider under the
-same authority and deadline as generation. An estimate cannot certify this
-hard limit.
+The effective window is the smaller of the known model window and the
+configured value when both exist. A configured window supplies the capacity
+when model metadata is unavailable. With a window, the automatic threshold
+defaults to 90% rounded down, with a minimum of one token. An explicit
+threshold can lower that value. With an unknown window, an explicit
+threshold can still trigger compaction.
 
-The native host can count requests on Responses connections and
-on a supported local llama.cpp text connection explicitly launched with
-`--llama-cpp-input-count`. The llama.cpp option requires a direct numeric
-loopback `/v1` endpoint. It does not discover or change the model's capacity.
-
-The limit remains subject to actual model capacity and host constraints. A larger
-value does not enlarge the model's context window. Remove `max_input_tokens` to
-restore automatic budgeting. Zero is invalid.
+The host uses reported foreground context use where available and estimates
+the rest. It may summarize older chat material before a turn and earlier
+tool exchanges during a turn. The current user messages and the visible
+transcript stay available. These settings govern when compaction is attempted.
+The provider enforces the request's actual capacity.
 
 An absent file selects the host's defaults. An existing file requires its schema
 version. Unknown fields, unsupported versions, and invalid values are rejected.
-
-## Configure local request counting
-
-In Grida Desktop on macOS and Linux, quit Desktop and set
-`"input_counting": "llama.cpp"` on the saved endpoint in Desktop's endpoint
-file, `~/.grida/agent/endpoints.json`.
-This private file holds an array of endpoint entries. An entry can look like
-this.
-
-```json
-{
-  "id": "llama",
-  "base_url": "http://127.0.0.1:8080/v1",
-  "models": [{ "id": "local-model" }],
-  "input_counting": "llama.cpp"
-}
-```
-
-Set the workspace's input limit in its `config.toml` as above. Start Desktop,
-approve the saved endpoint address, and choose its **llama.cpp counting**
-connection for a new chat. Use a numeric loopback
-address and the `/v1` base path on a server that supports
-`POST /v1/chat/completions/input_tokens`. Desktop uses that route only when
-the counted chat has an input limit. It sends the same prepared text and
-tools that the generation request would use. A failed count or a request
-over the limit ends before generation.
-[llama.cpp token counting API](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1chatcompletionsinput_tokens-token-counting)
-
-The ordinary endpoint choice keeps working as before. Removing the
-declaration makes chats saved on the counting connection unavailable until it
-is restored. For a headless host, launch with `--llama-cpp-input-count`
-instead.
 
 ## Scope and activation
 
@@ -106,6 +71,11 @@ snapshot. They can differ after a manual edit awaiting reload or a rejected
 reload.
 
 ## Earlier accepted work
+
+The old `[context]` table with `max_input_tokens` is accepted for file
+compatibility. New inputs use the top-level context settings described above.
+Inputs accepted under the old policy retain their captured hard limit.
+Restore the original **llama.cpp counting** connection if retained work used it.
 
 The host protects its settings file on new turns. A queued or paused turn
 that already captured access to `agent-settings/config.toml` keeps the

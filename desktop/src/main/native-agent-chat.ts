@@ -3589,6 +3589,8 @@ function turnRecords(
     if (record.goalStart !== undefined && record.goalStart !== true)
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
+    const contextWindowTokens = time(record.contextWindowTokens);
+    if (contextWindowTokens === 0) throw invalidResponse();
     const compaction = compactionFact(record.compaction);
     const approvalReviews = approvalReviewFacts(
       record.approvalReviews,
@@ -3603,6 +3605,7 @@ function turnRecords(
       ...(settledAtMs !== undefined && { settledAtMs }),
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),
+      ...(contextWindowTokens !== undefined && { contextWindowTokens }),
       ...(compaction && { compaction }),
       ...(approvalReviews && { approvalReviews }),
     });

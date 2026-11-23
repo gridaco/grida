@@ -14,6 +14,7 @@ export type NativeProviderRouteLaunch = Pick<
   | "imageInput"
   | "model"
   | "providerNetwork"
+  | "contextWindowTokens"
   | "maxOutputTokens"
   | "compatibleOutputLimitField"
   | "reasoning"
@@ -83,6 +84,12 @@ export class NativeProviderRoutes {
         options.maxOutputTokens > 65_536)
     )
       throw new Error("native_agent_output_limit_invalid");
+    if (
+      options.contextWindowTokens !== undefined &&
+      (!Number.isSafeInteger(options.contextWindowTokens) ||
+        options.contextWindowTokens < 1)
+    )
+      throw new Error("native_agent_context_window_invalid");
     if (
       options.compatibleOutputLimitField !== undefined &&
       (options.compatibleOutputLimitField !== "max-tokens" ||
@@ -350,6 +357,7 @@ export class NativeProviderRoutes {
           ? "chatgpt"
           : "http",
       scope: launch.gatewayScope ?? launch.subscriptionScope,
+      contextWindowTokens: launch.contextWindowTokens,
       maxOutputTokens: launch.maxOutputTokens,
       compatibleOutputLimitField: launch.compatibleOutputLimitField,
       reasoning: launch.reasoning,

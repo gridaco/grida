@@ -9,6 +9,7 @@ import {
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
   isValidEndpointProviderId,
+  resolveEndpointModel,
   type EndpointProviderConfig,
   type GGModelsView,
 } from "@grida/ai-host";
@@ -147,19 +148,25 @@ export namespace NativeChatProfiles {
           model.id !== defaultModel && gatewayOutputLimit(model) !== undefined
       )
       .slice(0, MAX_CHOICES)
-      .map((model) => ({
-        id: gatewayBinding(scope, model.id),
-        providerId: GG_PROVIDER_ID,
-        modelId: model.id,
-        connection: GG_PROVIDER_METADATA.label,
-        model: label(model.label, model.id),
-        ...(positive(model.limits.context_tokens) && {
-          contextWindow: model.limits.context_tokens,
-        }),
-      }));
+      .map((model) => {
+        const window = gatewayContextWindow(model);
+        return {
+          id: gatewayBinding(scope, model.id),
+          providerId: GG_PROVIDER_ID,
+          modelId: model.id,
+          connection: GG_PROVIDER_METADATA.label,
+          model: label(model.label, model.id),
+          ...(window !== undefined && { contextWindow: window }),
+        };
+      });
   }
 
-  /** The context window from the selected provider's model catalogue. */
+  export function gatewayContextWindow(model: GatewayModel | undefined) {
+    const window = model?.limits.context_tokens;
+    return positive(window) ? window : undefined;
+  }
+
+  /** The context window from the bundled model catalogue. */
   export function contextWindow(modelId: string): number | undefined {
     const window =
       catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
@@ -250,7 +257,7 @@ export namespace NativeChatProfiles {
         if (choices.length >= MAX_CHOICES) return choices;
         if (!modelId(model.id)) continue;
         const launch = { ...eligible, model: model.id };
-        const window = model.overrides?.contextWindow ?? model.contextWindow;
+        const window = resolveEndpointModel(model).contextWindow;
         const choice = {
           id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,

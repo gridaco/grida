@@ -84,8 +84,8 @@ export namespace turn_activity {
   ): Block[] {
     const known = new Map(records.map((record) => [record.turnId, record]));
     const order = new Map(records.map((record, at) => [record.turnId, at]));
-    // Compaction turns add no messages; each is placed before the first
-    // message of a later turn, in history order.
+    // Place summaries before the next turn in history order. An inline
+    // summary follows the visible turn that triggered it.
     const compactions = records.flatMap((record, at) =>
       record.compaction ? [{ at, record, compaction: record.compaction }] : []
     );
@@ -210,18 +210,23 @@ export namespace turn_activity {
   }
 
   /**
-   * The context size the provider reported for the latest turn, when known.
-   * A compaction's own model call summarizes the chat and says nothing about
-   * the context after it, so a later compaction leaves the size unknown until
-   * the next turn reports.
+   * The latest reported foreground context and the window captured with it.
+   * Old standalone compaction records can contain the summary model's usage.
    */
   export function measuredContext(
     records: readonly NativeChatTurnRecord[]
-  ): number | undefined {
+  ): { tokens: number; window?: number } | undefined {
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
+      if (
+        record.contextTokens !== undefined &&
+        (!record.compaction || record.modelId !== undefined)
+      )
+        return {
+          tokens: record.contextTokens,
+          window: record.contextWindowTokens,
+        };
       if (record.compaction) return undefined;
-      if (record.contextTokens !== undefined) return record.contextTokens;
     }
     return undefined;
   }

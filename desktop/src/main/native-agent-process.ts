@@ -108,6 +108,8 @@ export type NativeAgentLaunch = {
   model: string;
   wireModel?: string;
   imageInput?: boolean;
+  /** Total context capacity for this resolved model binding. */
+  contextWindowTokens?: number;
   maxOutputTokens?: number;
   compatibleOutputLimitField?: "max-tokens";
   llamaCppInputCount?: true;
@@ -759,6 +761,11 @@ export class NativeAgentProcess {
     }
     if (options.maxOutputTokens !== undefined)
       args.push("--max-output-tokens", String(options.maxOutputTokens));
+    if (providerEgress && options.contextWindowTokens !== undefined)
+      args.push(
+        "--supervised-context-window-tokens",
+        String(options.contextWindowTokens)
+      );
     if (options.compatibleOutputLimitField !== undefined)
       args.push(
         "--compatible-output-limit-field",

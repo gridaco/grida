@@ -883,7 +883,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "counts only the selected local profile and withholds a changed saved profile",
+  "uses local model context settings and withholds a changed saved profile",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-compatible-chat-")
@@ -898,14 +898,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const config = {
       id: "local",
       base_url: "http://127.0.0.1:11434/v1",
-      models: [{ id: "fixture" }],
+      models: [{ id: "fixture", contextWindow: 16_384 }],
     };
     const countedConfig = { ...config, input_counting: "llama.cpp" as const };
     let savedConfig: typeof config | typeof countedConfig = countedConfig;
     const requests: Record<string, unknown>[] = [];
     const generated: Buffer[] = [];
     const counts: Buffer[] = [];
-    let measuredTokens = 1000;
     const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
       expect(headers.get("authorization")).toBeNull();
       const counting =
@@ -918,7 +917,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           counts.push(body);
           return Response.json({
             object: "response.input_tokens",
-            input_tokens: measuredTokens,
+            input_tokens: 1000,
           });
         };
       }
@@ -1045,6 +1044,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         ])
       ).toEqual([[undefined, 4096]]);
       expect(counts).toEqual([]);
+      expect(
+        (await newChat.transcriptPage(session)).turns?.at(-1)
+      ).toMatchObject({ contextWindowTokens: 16_384 });
 
       // Harness effort also works on an anonymous compatible connection whose
       // model has no reasoning setting. It keeps that connection's wire form.
@@ -1070,8 +1072,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(requests[1]).not.toHaveProperty("reasoning_effort");
       expect(generated).toHaveLength(2);
 
-      // Set the workspace's input limit in its settings file. It applies once
-      // Desktop starts the workspace's agent again.
+      // The workspace can lower the model window for later inputs.
       const settings = path.join(
         await fs.realpath(source.desktopUserDataPath),
         "chats",
@@ -1083,7 +1084,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       await fs.writeFile(
         settings,
-        "schema_version = 1\n[context]\nmax_input_tokens = 1000\n",
+        "schema_version = 1\nmodel_context_window = 8192\nmodel_auto_compact_token_limit = 4000\n",
         { mode: 0o600 }
       );
       await agent.close();
@@ -1105,25 +1106,12 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           "succeeded"
         )
       );
-      expect(counts).toHaveLength(1);
+      expect(counts).toEqual([]);
       expect(generated).toHaveLength(3);
-      expect(counts[0]).toEqual(generated[2]);
       expect(requests[2]).toMatchObject({ model: "fixture", max_tokens: 4096 });
-
-      measuredTokens = 1001;
-      const tooLarge = await countedChat.create();
-      await countedChat.submit(
-        tooLarge,
-        "too-large",
-        "This exceeds the limit."
-      );
-      await vi.waitFor(async () =>
-        expect((await countedChat.observe(tooLarge)).latest?.status).toBe(
-          "failed"
-        )
-      );
-      expect(counts).toHaveLength(2);
-      expect(generated).toHaveLength(3);
+      expect(
+        (await countedChat.transcriptPage(countedSession)).turns?.at(-1)
+      ).toMatchObject({ contextWindowTokens: 8192 });
 
       await agent.close();
       savedConfig = config;
@@ -1144,7 +1132,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           () => {}
         )
       ).rejects.toThrow("native_chat_profile_changed");
-      expect(counts).toHaveLength(2);
+      expect(counts).toEqual([]);
       expect(generated).toHaveLength(3);
       expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
     } finally {

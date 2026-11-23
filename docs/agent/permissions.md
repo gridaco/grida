@@ -32,7 +32,7 @@ ask “Run the tests and fix what fails.” The composer shows the current mode.
   commands and ask questions. Each command finishes within its call, runs
   offline, and can write only to private temporary storage.
 - The workspace's agent settings file stays in protected storage. Edit the
-  file while Desktop is closed to change the context limit for future
+  file while Desktop is closed to change the context settings for future
   messages. [Change agent settings](./settings.md#edit-the-file-yourself)
 
 ## Choose who reviews extra access

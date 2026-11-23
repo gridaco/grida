@@ -662,13 +662,13 @@ crash left behind before it serves. A parent can have eight side chats open
 (`side_chat_scope_limit`); closing one makes room. Bringing an answer into the
 parent is up to the client.
 
-## Set the context input limit
+## Set context size and compaction
 
 In Grida Desktop, edit the workspace's `config.toml` while Desktop is closed.
-Reopen the workspace to load the new limit. [Change agent settings](./settings.md)
+Reopen the workspace to load the context settings. [Change agent settings](./settings.md)
 
 A trusted ACP client that negotiates the configuration operations can inspect,
-set, reset, and reload the limit. [Agent configuration](../reference/agent-configuration.md#managed-changes)
+set, reset, and reload the model window and compaction threshold. [Agent configuration](../reference/agent-configuration.md#managed-changes)
 
 ## Attach a PNG to a message
 
@@ -887,10 +887,8 @@ refresh the catalog and select it again. Skills guide the task within its
 existing permissions.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
-their captured defaults. An explicit hard context-input cap requires supported
-counting for the complete request. A remote counter receives the prepared input.
-If counting is unavailable or the input exceeds the cap, the turn records a
-failure before generation. [Agent configuration](../reference/agent-configuration.md).
+their captured defaults. The model window and automatic compaction threshold
+guide when the agent summarizes earlier context. [Agent configuration](../reference/agent-configuration.md).
 
 ### Use a chat command
 
@@ -937,13 +935,15 @@ identified submit. An identified submit reports the same accepted input as
 queued while the summary runs. The host keeps the most recent turn verbatim
 and preserves queue order and input settings. If the summary attempt fails,
 work can continue with the previous context. Standard ACP `session/prompt`
-still waits for its user turn to finish. Automatic compaction uses the size
-of earlier text. For supported direct OpenAI Responses models, it can also
-use a previous request's reported input count and the verified model window.
+still waits for its user turn to finish. Automatic compaction uses a
+compatible provider measurement and estimates the context that measurement
+didn't cover. During a turn it can also summarize earlier completed tool
+exchanges while retaining the current user messages and later exchanges.
 A provider's explicit context-limit result can also trigger compaction before
 the next eligible message on the same connection and model. The failed turn
 remains in the transcript and is not replayed. The provider can still report a
-context limit on a later request.
+context limit on a later request. Both forms of compaction preserve the
+visible transcript.
 
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,

@@ -1712,7 +1712,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
   it("retains an open launch exchange while the next model uses its own revocable network authority", async () => {
     const test = fixture(
       `
-      if (request.method === 'fixture/worker-request') {
+      if (request.method === 'fixture/argv') {
+        send({id:request.id,result:process.argv.slice(2)});
+      } else if (request.method === 'fixture/worker-request') {
         send({id: 'worker-' + request.id, ...request.params});
       } else if (String(request.id).startsWith('worker-')) {
         send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
@@ -1745,6 +1747,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       const endpoint = "http://127.0.0.1:2/v1";
       agent = await NativeAgentProcess.start({
         ...test.options,
+        contextWindowTokens: 131_072,
         providerNetwork: network("A"),
         lookupProviderRoute: async (id, model) => {
           const primary = id === null && model === test.options.model;
@@ -1756,6 +1759,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
                 provider: "openai-compatible",
                 model,
                 endpoint: primary ? test.options.endpoint : endpoint,
+                ...(primary ? {} : { contextWindowTokens: 65_536 }),
                 providerNetwork: network(primary ? "A" : "B"),
               },
             }),
@@ -1763,6 +1767,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         },
       });
       expect(agent.acceptsInputRoutes).toBe(true);
+      const args = (await agent.request("fixture/argv", {})) as string[];
+      expect(args[args.indexOf("--supervised-context-window-tokens") + 1]).toBe(
+        "131072"
+      );
       const worker = (method: string, params: Record<string, unknown>) =>
         agent!.request("fixture/worker-request", { method, params });
       const exchange = (params: Record<string, unknown>) =>
@@ -1800,6 +1808,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         protocol: "openai-compatible",
         model: "B",
         endpoint,
+        contextWindowTokens: 65_536,
       });
       expect(await open(next, test.options.endpoint, route.routeId)).toEqual({
         status: "unavailable",
