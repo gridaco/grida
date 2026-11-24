@@ -16,7 +16,7 @@ vi.mock("electron", () => ({
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-it("follows same-document navigation for catalog updates and read actions", async () => {
+it("scopes catalog actions and workspace cleanup to the current route", async () => {
   const location = new URL("https://example.test/desktop/welcome");
   const history = {
     pushState(_data: unknown, _unused: string, path: string) {
@@ -32,7 +32,10 @@ it("follows same-document navigation for catalog updates and read actions", asyn
   });
   ipc.invoke.mockResolvedValue(true);
   await import("./preload");
-  const chat = ipc.expose.mock.calls[0][1].nativeChat!;
+  const bridge = ipc.expose.mock.calls[0][1];
+  const chat = bridge.nativeChat!;
+  const browser = bridge.browser!;
+  const automation = bridge.workspaces.automation!;
   const canRead = chat.canSetReadState!;
   const observe = chat.observeCatalog!;
   const setRead = chat.setReadState!;
@@ -55,6 +58,29 @@ it("follows same-document navigation for catalog updates and read actions", asyn
     { kind: "markUnread" }
   );
   stop!();
+
+  const page = { attachmentId: "attachment", pageId: "page" };
+  const inactive = { ...page, active: false };
+  await browser.setActive(inactive);
+  await browser.utilities!.stopFind(page);
+  expect(await automation.retire!(1)).toBe(true);
+  expect(ipc.invoke).toHaveBeenCalledWith(
+    IPC_CHANNELS.BROWSER_SET_ACTIVE,
+    inactive
+  );
+  expect(ipc.invoke).toHaveBeenCalledWith(IPC_CHANNELS.BROWSER_STOP_FIND, page);
+  expect(ipc.invoke).toHaveBeenCalledWith(
+    IPC_CHANNELS.WORKSPACE_RETIRE_VIEW,
+    1
+  );
+
+  history.pushState(null, "", "/desktop/welcome");
+  ipc.invoke.mockClear();
+  await browser.setActive(inactive);
+  await browser.utilities!.stopFind(page);
+  expect(await automation.retire!(1)).toBe(false);
+  expect(ipc.invoke).not.toHaveBeenCalled();
+
   history.pushState(null, "", `/desktop/file?id=${id}`);
   expect(canRead()).toBe(false);
   expect(await observe(vi.fn<() => void>())).toBeNull();

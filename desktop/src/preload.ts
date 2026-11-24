@@ -180,11 +180,12 @@ async function observeChatCatalog(
 
 // Same-document navigation can commit before the outgoing React tree unmounts.
 // Main already owns retirement of the old attachments and guests.
+function workspaceRoute(): boolean {
+  return location.pathname === "/desktop/workspace";
+}
+
 function nativeChatRoute(): boolean {
-  return (
-    location.pathname === "/desktop/workspace" ||
-    location.pathname === "/desktop/file"
-  );
+  return workspaceRoute() || location.pathname === "/desktop/file";
 }
 
 function selectedDocumentRoute(): boolean {
@@ -592,8 +593,10 @@ const bridge: DesktopBridge = {
     utilities: {
       version: DesktopBrowser.Utilities.VERSION,
       find: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FIND, request),
-      stopFind: (request) =>
-        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP_FIND, request),
+      stopFind: async (request) => {
+        if (workspaceRoute())
+          await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP_FIND, request);
+      },
       getZoom: (request) =>
         ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_ZOOM, request),
       setZoom: (request) =>
@@ -662,7 +665,7 @@ const bridge: DesktopBridge = {
     snapshot: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
     detach: async (attachmentId) => {
-      if (location.pathname === "/desktop/workspace")
+      if (workspaceRoute())
         await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_DETACH, attachmentId);
     },
     create: (request) =>
@@ -678,8 +681,10 @@ const bridge: DesktopBridge = {
     focus: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS, request),
     reserveMount: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RESERVE_MOUNT, request),
-    setActive: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ACTIVE, request),
+    setActive: async (request) => {
+      if (request.active || workspaceRoute())
+        await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ACTIVE, request);
+    },
     close: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request),
     openExternal: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, request),
@@ -1604,8 +1609,10 @@ const bridge: DesktopBridge = {
           activePageId,
           viewId
         ),
-      retire: (viewId) =>
-        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, viewId),
+      retire: async (viewId) =>
+        workspaceRoute()
+          ? ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, viewId)
+          : false,
       onOpenFile: (handler) => {
         automationFileHandlers.add(handler);
         return () => {
