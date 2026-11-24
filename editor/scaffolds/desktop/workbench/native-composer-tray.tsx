@@ -74,13 +74,11 @@ const EMPTY_QUEUE: NativeChatQueuePage = {
 export function NativeComposerTray({
   controller,
   view,
-  prepareQueueRemoval,
   renderOutgoingStatus,
 }: {
   controller: NativeChatController;
   view: NativeChatView;
   renderOutgoingStatus: (item: NativeChatView["outgoing"][number]) => ReactNode;
-  prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
 }) {
   const queue = view.queue;
   const goal = view.goal?.goal;
@@ -143,7 +141,6 @@ export function NativeComposerTray({
           view={view}
           queue={queue ?? EMPTY_QUEUE}
           count={count}
-          prepareQueueRemoval={prepareQueueRemoval}
         >
           {outgoing.map((item) => (
             <div
@@ -183,7 +180,6 @@ export function NativeComposerQueue({
   view,
   queue,
   count,
-  prepareQueueRemoval,
   children,
 }: NativeComposerQueue.Props) {
   const ids = queue.items.map((item) => item.inputId);
@@ -256,7 +252,6 @@ export function NativeComposerQueue({
                   visible.length > 1 &&
                   view.queueDraft?.inputId !== inputId
                 }
-                prepareQueueRemoval={prepareQueueRemoval}
               />
             );
           })}
@@ -319,7 +314,6 @@ export namespace NativeComposerQueue {
     queue: NativeChatQueuePage;
     /** Size of the entire queue, including rows on other pages. */
     count: number;
-    prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
   }>;
 }
 
@@ -330,7 +324,6 @@ function QueueRow({
   position,
   queued,
   sortable,
-  prepareQueueRemoval,
 }: {
   controller: NativeComposerQueue.Controller;
   view: NativeComposerQueue.View;
@@ -338,7 +331,6 @@ function QueueRow({
   position: number;
   queued: number;
   sortable: boolean;
-  prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
 }) {
   const {
     attributes,
@@ -424,17 +416,12 @@ function QueueRow({
       <TrayIcon
         label="Remove from queue"
         disabled={rowLocked}
-        onClick={() => {
-          const onRemoved = prepareQueueRemoval?.(item.inputId);
-          void controller
-            .editQueue({
-              action: "withdraw",
-              inputId: item.inputId,
-            })
-            .then((removed) => {
-              if (removed) onRemoved?.();
-            });
-        }}
+        onClick={() =>
+          void controller.editQueue({
+            action: "withdraw",
+            inputId: item.inputId,
+          })
+        }
       >
         <Trash2Icon />
       </TrayIcon>

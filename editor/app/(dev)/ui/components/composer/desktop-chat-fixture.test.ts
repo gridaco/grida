@@ -7,11 +7,193 @@ import {
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { DesktopChatFixture } from "./desktop-chat-fixture";
 
+async function connect(
+  controller: NativeChatController,
+  server: DesktopChatFixture
+): Promise<void> {
+  controller.connect(server.sessionId);
+  await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+}
+
+it("streams a scripted reply, holds it during Pause, and keeps the same turn on Resume", async () => {
+  vi.useFakeTimers();
+  const fixture = new DesktopChatFixture("empty", false);
+  const { bridge, sessionId } = fixture;
+  const control = async (action: "pause" | "resume") =>
+    bridge.control!(sessionId, {
+      action,
+      observationId: (await bridge.observe(sessionId)).observationId,
+      requestId: action,
+    });
+  try {
+    const started = await bridge.submit(
+      sessionId,
+      "first",
+      "Review the handout."
+    );
+    expect(started).toMatchObject({
+      turnId: "first-turn",
+      disposition: "claimed",
+    });
+    await vi.advanceTimersByTimeAsync(400);
+    expect(await bridge.transcript(sessionId)).toMatchObject([
+      { role: "user", turnId: started.turnId },
+      { role: "assistant", turnId: started.turnId, phase: "progress" },
+    ]);
+
+    await control("pause");
+    await vi.advanceTimersByTimeAsync(3000);
+    expect((await bridge.observe(sessionId)).snapshot.current).toMatchObject({
+      turnId: started.turnId,
+      paused: true,
+      disposition: "suspended",
+    });
+
+    await expect(control("resume")).resolves.toMatchObject({
+      turn: { turnId: started.turnId, paused: false, disposition: "running" },
+    });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect((await bridge.observe(sessionId)).snapshot.latest).toMatchObject({
+      turnId: started.turnId,
+      status: "succeeded",
+    });
+    const { messages } = await bridge.transcriptPage!(sessionId);
+    expect(messages.slice(1).map(({ phase }) => phase)).toEqual([
+      "progress",
+      "answer",
+    ]);
+    await expect(
+      bridge.inputReceipt(sessionId, "first")
+    ).resolves.toMatchObject({
+      disposition: "completed",
+    });
+  } finally {
+    fixture.resetRequests();
+    vi.useRealTimers();
+  }
+});
+
+it("drains accepted queue entries in order, using the model and attachments captured on Send", async () => {
+  const server = new DesktopChatFixture("empty", false);
+  const controller = new NativeChatController(server.bridge);
+  const reopened = new NativeChatController(server.bridge);
+  server.setReplyHeld(true);
+  try {
+    await connect(controller, server);
+    const { scope } = controller.read();
+    await controller.submitFromComposer("Review the gallery handout.", scope);
+    const first = controller.read().observation!.snapshot.current!;
+    const image = new File([new Uint8Array([137, 80, 78, 71])], "study.png", {
+      type: "image/png",
+    });
+    await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+    await controller.pickFile(controller.read().scope, image);
+    expect(controller.read().batchAttachments?.[0].card.name).toBe("study.png");
+    await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+    await controller.submitFromComposer(
+      "Compare the image.",
+      controller.read().scope
+    );
+    const queued = controller.read().queue!.items[0];
+    expect(queued.attachments?.[0].name).toBe("study.png");
+
+    const target = { sessionId: server.sessionId };
+    const selection = (await server.bridge.selection!(target)).selection!;
+    expect(first.modelId).toBe(selection.modelId);
+    const profiles = (await server.bridge.profiles!())!;
+    const alternate = profiles.choices.find(
+      (choice) => choice.id !== selection.profileId
+    )!;
+    await server.bridge.updateSelection!(target, 0, "switch-model", {
+      profileId: alternate.id,
+      effort: "medium",
+    });
+
+    server.finishReply();
+    await vi.waitFor(() =>
+      expect(controller.read().observation?.snapshot.current).toMatchObject({
+        turnId: `${queued.inputId}-turn`,
+        modelId: first.modelId,
+      })
+    );
+    controller.disconnect();
+    await connect(reopened, server);
+    expect(reopened.read().messages).toContainEqual(
+      expect.objectContaining({
+        inputId: queued.inputId,
+        text: "Compare the image.",
+        attachments: [expect.objectContaining({ name: "study.png" })],
+      })
+    );
+    expect(reopened.read().turnRecords.at(-1)).toMatchObject({
+      modelId: first.modelId,
+    });
+    expect(reopened.read().queue?.items ?? []).toEqual([]);
+
+    server.finishReply();
+    await vi.waitFor(() =>
+      expect(reopened.read().observation?.snapshot.latest).toMatchObject({
+        turnId: `${queued.inputId}-turn`,
+        status: "succeeded",
+      })
+    );
+    await reopened.submitFromComposer("One more pass.", reopened.read().scope);
+    expect(reopened.read().observation?.snapshot.current?.modelId).toBe(
+      alternate.model
+    );
+  } finally {
+    server.resetRequests();
+    controller.disconnect();
+    reopened.disconnect();
+  }
+});
+
+it("Stop settles the current compaction as cancelled and keeps the queued input until Resume", async () => {
+  const server = new DesktopChatFixture("compaction", false);
+  const { bridge, sessionId } = server;
+  server.setReplyHeld(true);
+  try {
+    const outcome = bridge.runCommand!(sessionId, "compact", "compact");
+    const admitted = await bridge.startCompaction!(sessionId, "compact");
+    await bridge.enqueue!(sessionId, "follow-up", "Use the summary.");
+    await bridge.control!(sessionId, {
+      action: "stop",
+      observationId: (await bridge.observe(sessionId)).observationId,
+      requestId: "stop",
+    });
+    await expect(outcome).resolves.toMatchObject({
+      turnId: admitted.turnId,
+      status: "stopped",
+    });
+    const observed = await bridge.observe(sessionId);
+    expect(observed.snapshot).toMatchObject({
+      current: null,
+      latest: { turnId: admitted.turnId, status: "cancelled" },
+      queuedInputs: 1,
+      admissionPaused: true,
+    });
+    const transcript = await bridge.transcriptPage!(sessionId);
+    expect(transcript.turns?.at(-1)).toMatchObject({
+      compactions: [{ status: "failed", automatic: false }],
+    });
+    await bridge.editQueue!(sessionId, {
+      action: "resume",
+      observationId: observed.observationId,
+      requestId: "resume",
+    });
+    expect((await bridge.observe(sessionId)).snapshot.current).toMatchObject({
+      turnId: "follow-up-turn",
+    });
+  } finally {
+    server.resetRequests();
+  }
+});
+
 it("admits manual compaction and starts a queued follow-up when it settles", async () => {
   const server = new DesktopChatFixture("compaction", false);
   const controller = new NativeChatController(server.bridge);
   try {
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await expect(controller.dispatchCompaction()).resolves.toBe("accepted");
     expect(server.compaction.read().pending).toBe(true);
     expect(controller.canSubmit).toBe(true);
@@ -74,7 +256,7 @@ it.each([
     const nextDraft = "Start the next draft.";
     try {
       controller.keepDrafts(drafts, "standalone");
-      await controller.select(server.sessionId);
+      await connect(controller, server);
       const { scope } = controller.read();
       const { key } = controller.composerDraft()!;
       drafts.write(key, text || null);
@@ -116,7 +298,7 @@ it.each([
       controller.disconnect();
 
       reopened.keepDrafts(drafts, "standalone");
-      await reopened.select(server.sessionId);
+      await connect(reopened, server);
       const next = reopened.composerDraft()!;
       expect(next.store.read(next.key)).toBe(nextDraft);
       await vi.waitFor(() =>
@@ -156,41 +338,30 @@ describe("DesktopChatFixture queue", () => {
 
   afterEach(() => disconnect?.());
 
-  it("undoes a removal at its surviving queue position with the original attachment", async () => {
+  it("withdraws the selected input and leaves its neighbors runnable", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
-    const original = controller.read().queue?.items[1];
-    const apply = server.captureQueueRemoval("image")!;
+    server.setReplyHeld(true);
+    await connect(controller, server);
     await expect(
       controller.editQueue({ action: "withdraw", inputId: "image" })
     ).resolves.toBe(true);
-    apply(true);
     expect(
       controller.read().queue?.items.map(({ inputId }) => inputId)
     ).toEqual(["multiline", "file-only"]);
-
-    server.setRunning(false);
-    await vi.waitFor(() => expect(controller.canResumeQueue).toBe(true));
-    await controller.editQueue({ action: "resume" });
-    apply(false);
-    await vi.waitFor(() =>
-      expect(controller.read().queue?.items[0]).toEqual(original)
-    );
-    expect(
-      controller.read().queue?.items.map(({ inputId }) => inputId)
-    ).toEqual(["image", "file-only"]);
-
-    apply(true);
+    server.finishReply();
     await vi.waitFor(() =>
       expect(
         controller.read().queue?.items.map(({ inputId }) => inputId)
       ).toEqual(["file-only"])
     );
+    expect(
+      controller.read().messages.map(({ inputId }) => inputId)
+    ).not.toContain("image");
   });
 
   it("queues a normal composer submission with a newly picked file", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     const { scope } = controller.read();
     const file = new File(["Draft notes"], "notes.txt", { type: "text/plain" });
     expect(controller.canAttach("file")).toBe(true);
@@ -206,7 +377,7 @@ describe("DesktopChatFixture queue", () => {
     "keeps the staged file when Up targets a queued %s",
     async (target) => {
       const { server, controller } = fixture();
-      await controller.select(server.sessionId);
+      await connect(controller, server);
       if (target === "captioned image")
         await controller.editQueue({
           action: "move",
@@ -271,7 +442,7 @@ describe("DesktopChatFixture queue", () => {
 
   it("takes the message out of the queue and reinserts it with a staged image", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("multiline");
     expect(controller.read().queueDraft).toMatchObject({
       inputId: "multiline",
@@ -307,7 +478,7 @@ describe("DesktopChatFixture queue", () => {
 
   it("appends and removes individual cards in a send and in a queued edit", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     const { scope } = controller.read();
     const file = (name: string) => ({
       kind: "file" as const,
@@ -360,7 +531,7 @@ describe("DesktopChatFixture queue", () => {
 
   it("retains the original attachment on cancel and lets a refused save retry", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("image");
     controller.removeAttachmentEntry(
       controller.read().scope,
@@ -421,7 +592,7 @@ describe("DesktopChatFixture queue", () => {
         return checkout.reinsert(attachment, request);
       },
     };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("image");
     const { scope, queueDraft } = controller.read();
     controller.removeAttachmentEntry(
@@ -445,7 +616,7 @@ describe("DesktopChatFixture queue", () => {
     server.bridge.submitAttachments = async () => {
       throw new Error("native_chat_attachment_preparation_failed");
     };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     const { scope } = controller.read();
     await controller.pickTransferredAttachment(scope, [
       { kind: "file", file: new File(["1"], "first.txt") },
@@ -464,7 +635,7 @@ describe("DesktopChatFixture queue", () => {
 
   it("runs other queued work while the selected message is in the composer", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("image");
     server.setRunning(false);
     await vi.waitFor(() => expect(controller.canResumeQueue).toBe(true));
@@ -496,7 +667,7 @@ describe("DesktopChatFixture queue", () => {
       checkout.receipt!
     );
     server.bridge.queueCheckout = { ...checkout, checkout: read, receipt };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("image");
     expect(controller.read().queueEditRecovery).toBe("checkout");
     expect(controller.read().queueDraft).toBeNull();
@@ -526,7 +697,7 @@ describe("DesktopChatFixture queue", () => {
         return result;
       },
     };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     let isCurrent = true;
     const opening = controller.recallQueuedPrompt(() => isCurrent);
     isCurrent = false;
@@ -552,7 +723,7 @@ describe("DesktopChatFixture queue", () => {
       checkout.receipt!
     );
     server.bridge.queueCheckout = { ...checkout, reinsert, receipt };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     await controller.editQueuedText("image");
     const { scope } = controller.read();
     await expect(
@@ -581,7 +752,7 @@ describe("DesktopChatFixture queue", () => {
     "can %s an open checkout after switching away",
     async (action) => {
       const { server, controller } = fixture();
-      await controller.select(server.sessionId);
+      await connect(controller, server);
       await controller.editQueuedText("image");
       const original = controller.read().queueDraft;
       expect(original?.attachments?.[0].name).toBe("reference.jpg");
@@ -589,7 +760,7 @@ describe("DesktopChatFixture queue", () => {
 
       const reopened = new NativeChatController(server.bridge);
       try {
-        await reopened.select(server.sessionId);
+        await connect(reopened, server);
         expect(reopened.read().queueDraft).toBeNull();
         expect(reopened.read().observation?.snapshot.queueCheckout).toEqual({
           checkoutId: original?.checkoutId,
@@ -648,7 +819,7 @@ describe("DesktopChatFixture queue", () => {
       checkout.receipt!
     );
     server.bridge.queueCheckout = { ...checkout, receipt };
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     const turn = controller.read().observation?.snapshot.current?.turnId;
     await controller.steerQueued("image");
     expect(controller.read().queueEditRecovery).toBe("steer");
@@ -657,7 +828,7 @@ describe("DesktopChatFixture queue", () => {
     const reopened = new NativeChatController(server.bridge);
     reopened.keepDrafts(drafts, "fixture-workspace");
     try {
-      await reopened.select(server.sessionId);
+      await connect(reopened, server);
       expect(reopened.read().queueEditRecovery).toBe("steer");
       await reopened.retryQueueEdit();
       expect(steer).toHaveBeenCalledOnce();
@@ -692,7 +863,7 @@ describe("DesktopChatFixture queue", () => {
 
   it("moves a waiting input into the transcript through Resume queue", async () => {
     const { server, controller } = fixture();
-    await controller.select(server.sessionId);
+    await connect(controller, server);
     server.setRunning(false);
     await vi.waitFor(() => expect(controller.canResumeQueue).toBe(true));
 

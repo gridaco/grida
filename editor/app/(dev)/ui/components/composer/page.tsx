@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   CompactionNotice,
@@ -26,9 +27,14 @@ function ComposerExamples() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Composer playground</h1>
         <p className="text-sm text-muted-foreground">
-          Dictation uses your browser’s speech recognition, which may send audio
-          to its speech service. When recognition is unavailable, the playground
-          inserts a labeled sample transcript.
+          For complete chat scenarios, open the{" "}
+          <Link
+            href="/ui/components/native-chat"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Native Chat playground
+          </Link>
+          .
         </p>
       </header>
       <Example id="question-batch" title="Question batch">

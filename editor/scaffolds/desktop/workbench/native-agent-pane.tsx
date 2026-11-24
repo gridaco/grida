@@ -68,6 +68,7 @@ import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import { AgentComposer } from "../shared/agent-composer";
 import { OutgoingMessage, OutgoingMessageStatus } from "./outgoing-message";
+import type { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -337,10 +338,6 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
 };
 
-type CaptureQueueRemoval = (
-  inputId: string
-) => ((forward: boolean) => void) | undefined;
-
 type LibraryRequestSource = {
   loadPage: LibraryExplorerPageLoader;
   readPng(id: string, maxBytes: number): Promise<ArrayBuffer>;
@@ -355,13 +352,13 @@ export function NativeAgentPane({
   recovered,
   selectionKey,
   workspaceId,
+  readWorkspaceDirectory,
   workingDirectory,
   projectFolderId,
   initialSession,
   startupProfileId,
   editorSurfaces,
   libraryRequestSource,
-  captureQueueRemoval,
   sideChatPlacement,
   firstMessage,
   onProcessesChange,
@@ -377,12 +374,12 @@ export function NativeAgentPane({
   recovered?: NativeChatProfileSelection;
   selectionKey?: string;
   workspaceId?: string;
+  readWorkspaceDirectory?: WorkspaceArtifact.Readdir;
   initialSession: string | null;
   /** An untouched chat's recommended connection, selected before startup. */
   startupProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   libraryRequestSource?: LibraryRequestSource;
-  captureQueueRemoval?: CaptureQueueRemoval;
   /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
@@ -430,9 +427,17 @@ export function NativeAgentPane({
       SideChatPlacement.connect(controller, sideChatPlacement, {
         bridge,
         workspaceId,
+        readWorkspaceDirectory,
         editorSurfaces,
       }),
-    [controller, sideChatPlacement, bridge, workspaceId, editorSurfaces]
+    [
+      controller,
+      sideChatPlacement,
+      bridge,
+      workspaceId,
+      readWorkspaceDirectory,
+      editorSurfaces,
+    ]
   );
   useEffect(() => {
     const profile =
@@ -499,10 +504,10 @@ export function NativeAgentPane({
       autofocus={autofocus}
       initialSession={initialSession}
       workspaceId={workspaceId}
+      readWorkspaceDirectory={readWorkspaceDirectory}
       projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
       libraryRequestSource={libraryRequestSource}
-      captureQueueRemoval={captureQueueRemoval}
       recovery={recovery}
       firstMessage={initialSession ? undefined : firstMessage}
       draftRef={draft}
@@ -522,7 +527,7 @@ export function NativeAgentPane({
 
 /** The composer handle a chat pane lends its owner. */
 type NativeChatComposer = Pick<ComposerController, "appendText" | "focus"> &
-  Partial<Pick<ComposerController, "restoreDocument" | "recordHistoryEffect">>;
+  Partial<Pick<ComposerController, "restoreDocument">>;
 
 /**
  * A side chat, as a placement presents it: the ordinary chat pane bound to
@@ -545,6 +550,7 @@ export function NativeSideChatPane({
       controller={chat}
       bridge={host.bridge}
       workspaceId={host.workspaceId}
+      readWorkspaceDirectory={host.readWorkspaceDirectory}
       editorSurfaces={host.editorSurfaces}
       draftRef={draft}
       autofocus
@@ -586,10 +592,10 @@ function NativeChatPane({
   predictionPreferences,
   initialSession,
   workspaceId,
+  readWorkspaceDirectory,
   projectFolderId = workspaceId,
   editorSurfaces,
   libraryRequestSource,
-  captureQueueRemoval,
   recovery,
   firstMessage,
   draftRef: draft,
@@ -603,10 +609,10 @@ function NativeChatPane({
   predictionPreferences?: ComposerPredictionPreferences;
   initialSession?: string | null;
   workspaceId?: string;
+  readWorkspaceDirectory?: WorkspaceArtifact.Readdir;
   projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   libraryRequestSource?: LibraryRequestSource;
-  captureQueueRemoval?: CaptureQueueRemoval;
   /** No connection can run yet; the composer's model picker starts the chat. */
   recovery?: ConnectionRecovery;
   firstMessage?: NativeFirstMessage;
@@ -711,7 +717,10 @@ function NativeChatPane({
     () => (state.attachmentDraft ? controller.attachmentPreview() : null),
     [controller, state.attachmentDraft]
   );
-  const mentions = useWorkspaceFileMentions(workspaceId);
+  const mentions = useWorkspaceFileMentions(
+    workspaceId,
+    readWorkspaceDirectory
+  );
   const catalog = useMemo(
     () => ({ commands: NO_COMMANDS, mentions }),
     [mentions]
@@ -1494,18 +1503,6 @@ function NativeChatPane({
             controller={controller}
             view={state}
             renderOutgoingStatus={renderOutgoingStatus}
-            prepareQueueRemoval={
-              captureQueueRemoval &&
-              ((inputId) => {
-                const apply = captureQueueRemoval(inputId);
-                if (!apply) return;
-                return () => {
-                  if (controller.read().scope !== state.scope) return;
-                  const composer = draft.current;
-                  if (composer?.recordHistoryEffect?.(apply)) composer.focus();
-                };
-              })
-            }
           />
           {/* Draft binding and submissionScope handle chat changes. Keep the
             composer mounted so model reattachment preserves its popovers. */}

@@ -8,27 +8,34 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { workspaces as bridgeWorkspaces } from "@/lib/desktop/bridge";
+import type { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { ComposerMention } from "@/kits/composer";
 import { WorkspaceFileMentions } from "./workspace-file-mentions";
 
 const NO_MENTIONS: ComposerMention[] = [];
 
 export function useWorkspaceFileMentions(
-  workspaceId?: string
+  workspaceId?: string,
+  readDirectory?: WorkspaceArtifact.Readdir
 ): ComposerMention[] {
-  const request = useMemo(() => ({ workspaceId }), [workspaceId]);
+  const request = useMemo(
+    () => ({ workspaceId, readDirectory }),
+    [workspaceId, readDirectory]
+  );
   const [loaded, setLoaded] = useState<{
     request: typeof request;
     mentions: ComposerMention[];
   }>();
   useEffect(() => {
-    const { workspaceId } = request;
-    if (!workspaceId) return;
+    const { workspaceId, readDirectory } = request;
+    const readdir =
+      readDirectory ??
+      (workspaceId
+        ? (path: string) => bridgeWorkspaces.readdir(workspaceId, path)
+        : undefined);
+    if (!readdir) return;
     const owner = new AbortController();
-    void WorkspaceFileMentions.list(
-      (path) => bridgeWorkspaces.readdir(workspaceId, path),
-      owner.signal
-    ).then((mentions) => {
+    void WorkspaceFileMentions.list(readdir, owner.signal).then((mentions) => {
       if (!owner.signal.aborted) setLoaded({ request, mentions });
     });
     return () => owner.abort();

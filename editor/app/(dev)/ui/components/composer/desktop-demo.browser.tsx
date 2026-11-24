@@ -1852,7 +1852,7 @@ it("shows the slide text selection in the composer until it is cleared", async (
     )
   );
   await expect
-    .poll(() => transcript.textContent)
+    .poll(() => transcript.textContent, { timeout: 4000 })
     .toContain("This message has no selection.");
   expect(sentMarkers()).toBe(2);
   expect(
@@ -2114,6 +2114,13 @@ it("keeps the shared placeholder across modes and attachments with Ask for appro
       .click()
   );
 
+  await clickButton("Access: Auto");
+  await act(async () =>
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Ask for approval/ })
+      .click()
+  );
   const access = page.getByRole("button", { name: "Access: Ask for approval" });
   await expect.element(access).toBeEnabled();
   expect(access.element().querySelector("svg")).not.toBeNull();
@@ -2566,6 +2573,9 @@ it("edits and clears a file caption while keeping the file queued and steering d
     "Hold this ordinary draft while editing the file caption.";
   await act(async () => userEvent.fill(editor, ordinaryDraft));
   await editQueuedMessage(container, 3);
+  await expect
+    .poll(() => editor.textContent)
+    .toBe("Review these attached notes.");
   await act(async () =>
     userEvent.fill(editor, "Start with the composer section.")
   );
@@ -2576,6 +2586,9 @@ it("edits and clears a file caption while keeping the file queued and steering d
   expect(editor.textContent).toBe(ordinaryDraft);
 
   await editQueuedMessage(container, 3);
+  await expect
+    .poll(() => editor.textContent)
+    .toBe("Start with the composer section.");
   await act(async () => userEvent.fill(editor, ""));
   await expect
     .poll(() => editor.querySelector('[data-placeholder="Ask anything…"]'))

@@ -8,10 +8,10 @@ question placement, the composer, and its focus behavior. The fixture supplies
 chat data, events, and acknowledgements, so the page runs without Electron,
 an account, or a model.
 
-Dictation uses the microphone for the waveform and the browser’s speech
-recognition throughout the playground. The browser may send audio to its speech
-service. If recognition is unavailable, the playground inserts a labeled
-sample transcript.
+Open the [Native Chat playground](http://localhost:3000/ui/components/native-chat)
+for one Desktop chat scenario at a time, including scripted replies and chat
+switching. Dictation in both playgrounds uses a local audio sample and a fixed
+transcript.
 
 ## Examples
 
@@ -38,8 +38,8 @@ sample transcript.
   a same-day idle gap, and a new local calendar day.
 - **Suggested prompt** opens with a sample suggestion. Focus the composer,
   press **Tab**, then clear the draft to see it return.
-- **Dictate** uses the production Desktop composer with browser speech
-  recognition. Start with an empty or existing draft to see both recording
+- **Dictate** uses the production Desktop composer with simulated
+  speech recognition. Start with an empty or existing draft to see both recording
   layouts. **Cancel dictation** keeps the draft in place. **Stop dictation** or
   **Esc** inserts the transcript. **Send** while recording transcribes and
   submits the draft to the local preview.
@@ -75,8 +75,7 @@ sample transcript.
   composer used by Desktop. Press ↑ in the empty composer to take out the
   last queued message. Move the sample image to the first row and choose
   **Steer** to see it appear in the conversation. Turn off **Running turn**
-  and choose **Resume queue** to start the next waiting message. After using
-  **Remove from queue**, press **⌘Z** in the composer to restore the message.
+  and choose **Resume queue** to start the next waiting message.
 - **Attachments** shows image captions, image-only messages, file and folder
   cards, and an unavailable preview. The + menu and file drops stage local
   attachments. Use **Hold submission** to delay a send, then accept it or

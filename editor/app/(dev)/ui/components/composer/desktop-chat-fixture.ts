@@ -3,12 +3,12 @@ import type {
   NativeChatAcceptance,
   NativeChatAttachmentInput,
   NativeChatControlReceipt,
+  NativeChatControlResult,
   NativeChatEffort,
   NativeChatMessage,
   NativeChatMessageAttachment,
+  NativeChatMessageContext,
   NativeChatOperatingRegime,
-  NativeChatProfileCatalog,
-  NativeChatPermissionState,
   NativeChatQuestion,
   NativeChatQueueAction,
   NativeChatQueueActionReceipt,
@@ -25,12 +25,17 @@ import type { NativeChatEditorSurfaces } from "@/lib/agent-chat/native-chat-cont
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
 import { DesktopRequestFixture } from "./desktop-request-fixture";
+import { DesktopChatSettingsFixture } from "./desktop-chat-settings-fixture";
+import { DesktopChatGoalFixture } from "./desktop-chat-goal-fixture";
 
 const SELECTION_DECK = "/quiet-tide.canvas";
 const SELECTION_SLIDE = {
   kind: "svg",
   path: `${SELECTION_DECK}/slides/cover.svg`,
 } as const;
+const REPLY_PROGRESS_MS = 300;
+const REPLY_FINISH_MS = 2400;
+const COMPACTION_FINISH_MS = 750;
 
 type Input = {
   action: "submit" | "enqueue";
@@ -41,16 +46,20 @@ type Input = {
   attachments?: readonly NativeChatMessageAttachment[];
   svgSelection?: true;
   goalStart?: fixtures.Queued["goalStart"];
+  messageContext?: NativeChatMessageContext;
 };
 
-type QueuePosition = {
-  item: fixtures.Queued;
-  before: readonly string[];
-  after: readonly string[];
+type CapturedInput = Omit<fixtures.Queued, "effort"> & {
+  effort?: NativeChatEffort;
+  modelId?: string;
+  steerableAttachments?: readonly boolean[];
+  goalContinuation?: true;
+  svgSelection?: true;
+  displayParts?: NativeChatMessage["displayParts"];
 };
 
 type QueueCheckout = {
-  item: fixtures.Queued;
+  item: CapturedInput;
   checkoutId: string;
   position: number;
 };
@@ -63,10 +72,12 @@ export class DesktopChatFixture {
   readonly accessRead = new DesktopRequestFixture();
   readonly reconnect = new DesktopRequestFixture();
   readonly sessionId = crypto.randomUUID();
+  private readonly goal = new DesktopChatGoalFixture(this.sessionId);
+  private goalInput?: CapturedInput;
   private messages: readonly NativeChatMessage[];
   private records: NonNullable<conversations.Example["records"]>;
-  private waiting: readonly fixtures.Queued[];
-  private profiles: NativeChatProfileCatalog = fixtures.profiles;
+  private waiting: readonly CapturedInput[];
+  readonly settings: DesktopChatSettingsFixture;
   private readonly subscribers = new Map<
     string,
     (update: NativeChatUpdate) => void
@@ -78,7 +89,12 @@ export class DesktopChatFixture {
   private readonly queueReceipts = new Map<string, NativeChatQueueReceipt>();
   private readonly compactionRequests = new Map<
     string,
-    { turnId: string; outcome: Promise<"installed" | "failed"> }
+    { turnId: string; outcome: Promise<"installed" | "failed" | "stopped"> }
+  >();
+  private readonly controlReceipts = new Map<string, NativeChatControlResult>();
+  private readonly steerReceipts = new Map<
+    string,
+    { text: string; observationId: string; receipt: NativeChatControlReceipt }
   >();
   private readonly queueActionReceipts = new Map<
     string,
@@ -106,16 +122,43 @@ export class DesktopChatFixture {
   private running: boolean;
   private paused: boolean;
   private settled = false;
+  private admissionPaused = false;
   private revision = 0;
   private view = 0;
   private editMessageId?: string;
+  private replyHeld = false;
+  private activeReply?: CapturedInput;
+  private replyTimer?: ReturnType<typeof setTimeout>;
+  private compactionWork?: {
+    timer?: ReturnType<typeof setTimeout>;
+    resume?: () => void;
+    stop: () => void;
+  };
   private suggestionTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     readonly scenario: conversations.Scenario,
-    queued: boolean
+    queued: boolean,
+    options: { settings?: DesktopChatSettingsFixture } = {}
   ) {
     const example = conversations.get(scenario);
+    const loading = scenario === "loading";
+    if (loading) {
+      this.modelsRead.hold(true);
+      this.accessRead.hold(true);
+    }
+    this.settings =
+      options.settings ??
+      new DesktopChatSettingsFixture({
+        profiles: fixtures.profiles,
+        ...(loading && {
+          initialPermission: "full_access",
+          readModels: () => this.modelsRead.wait(),
+          readAccess: () => this.accessRead.wait(),
+        }),
+      });
+    Object.assign(this.bridge, this.settings.bridge);
+
     if (scenario === "compaction") this.compaction.hold(true);
     this.questions = example.questions ?? [];
     this.waitingFor =
@@ -185,48 +228,6 @@ export class DesktopChatFixture {
         stopSubagent: unavailable,
       } satisfies Partial<DesktopNativeChat>);
     }
-    if (scenario === "loading") {
-      this.modelsRead.hold(true);
-      this.accessRead.hold(true);
-      const readTranscript = this.bridge.transcriptPage!;
-      let opened = false;
-      let openingAccess: Promise<void> | undefined;
-      let permission: NativeChatPermissionState = {
-        sessionId: this.sessionId,
-        revision: 0,
-        mode: "full_access",
-        available: ["restricted", "full_access"],
-      };
-      Object.assign(this.bridge, {
-        acceptsPermissionMode: async () => true,
-        permissionMode: async () => {
-          // Attaching and loading the first transcript read the same policy.
-          // Give both reads the outcome chosen in the demo's opening controls.
-          await (opened
-            ? this.accessRead.wait()
-            : (openingAccess ??= this.accessRead.wait()));
-          return permission;
-        },
-        transcriptPage: async (attachmentId) => {
-          opened = true;
-          return readTranscript(attachmentId);
-        },
-        reviewPermissionMode: async () => ({
-          reviewId: "fixture-access",
-          chatTitle: "Gallery tour",
-          workspaceName: "Gallery project",
-        }),
-        setPermissionMode: async (_, __, ___, mode, review) => {
-          if (review?.confirmed === false) return null;
-          permission = {
-            ...permission,
-            revision: permission.revision + 1,
-            mode,
-          };
-          return permission;
-        },
-      } satisfies Partial<DesktopNativeChat>);
-    }
     if (scenario === "library-request") {
       Object.assign(this.bridge, {
         acceptsLibrarySelection: async () => true,
@@ -267,10 +268,29 @@ export class DesktopChatFixture {
 
   resetRequests() {
     this.submission.reset();
+    this.compactionWork?.stop();
     this.compaction.reset();
     this.modelsRead.reset();
     this.accessRead.reset();
     this.reconnect.reset();
+    this.clearReplyTimer();
+    clearTimeout(this.suggestionTimer);
+    this.suggestionTimer = undefined;
+  }
+
+  /** Copy settled history into a newly created development chat. */
+  seedHistoryFrom(source: DesktopChatFixture): void {
+    const live = source.running ? source.liveTurnId : undefined;
+    this.messages = source.messages.filter(
+      (message) => live === undefined || message.turnId !== live
+    );
+    this.records = source.records.filter(({ turnId }) => turnId !== live);
+    for (const [id, bytes] of source.imageBytes) this.imageBytes.set(id, bytes);
+    const latest = this.records.at(-1);
+    if (latest) {
+      this.liveTurnId = latest.turnId;
+      this.settled = true;
+    }
   }
 
   disconnect() {
@@ -282,11 +302,12 @@ export class DesktopChatFixture {
   expireQuestions() {
     if (!this.questions.some((question) => question.expiresWithTurn)) return;
     this.questions = [];
-    this.setRunning(false);
+    this.settleTurn("succeeded", true);
     this.submission.accept();
   }
 
   private finishRequest(requestId: string, text: string) {
+    const turnId = this.liveTurnId;
     this.waitingFor = null;
     this.messages = [
       ...this.messages,
@@ -298,8 +319,9 @@ export class DesktopChatFixture {
         text,
       },
     ];
-    this.setRunning(false);
-    return this.receipt(requestId);
+    if (this.paused || this.questions.length) this.changed();
+    else this.settleTurn("succeeded", true);
+    return this.receipt(requestId, turnId);
   }
 
   readonly readSvgSelected = () => this.selectedSvg;
@@ -334,21 +356,125 @@ export class DesktopChatFixture {
   }
 
   setRunning(running: boolean) {
-    if (running && !this.readRunning() && this.scenario !== "streaming")
+    if (!running) {
+      if (this.running) this.settleTurn("succeeded", false);
+      return;
+    }
+    if (!this.running && this.scenario !== "streaming") {
       this.liveTurnId = `${this.sessionId}-turn-${this.revision + 1}`;
-    this.running = running;
+      this.records = [
+        ...this.records,
+        { turnId: this.liveTurnId, status: null, startedAtMs: Date.now() },
+      ];
+    }
+    if (!this.running && this.scenario === "streaming") {
+      this.records = this.records.map((record) =>
+        record.turnId === this.liveTurnId
+          ? { ...record, status: null, settledAtMs: undefined }
+          : record
+      );
+    }
+    this.running = true;
     this.paused = false;
-    this.settled = !running;
+    this.settled = false;
+    this.scheduleReply();
+    this.changed();
+  }
+
+  readonly readReplyHeld = () => this.replyHeld;
+  readonly canFinishReply = () =>
+    this.readRunning() &&
+    !this.waitingFor &&
+    this.questions.length === 0 &&
+    !this.records
+      .at(-1)
+      ?.compactions?.some((item) => item.status === "running");
+
+  setReplyHeld(value: boolean): void {
+    if (this.replyHeld === value) return;
+    this.replyHeld = value;
+    if (value) this.clearReplyTimer();
+    else this.scheduleReply();
+    for (const listener of this.runningListeners) listener();
+  }
+
+  readonly finishReply = (): void => {
+    if (!this.canFinishReply()) return;
+    const answer =
+      this.activeReply?.operatingRegime === "plan"
+        ? "I’ll start by reviewing the requested changes and preparing a draft for confirmation."
+        : "I’ve finished reviewing the request and the material you supplied.";
+    this.publishReply("answer", answer);
+    this.settleTurn("succeeded", true);
+  };
+
+  readonly failReply = (): void => {
+    if (this.canFinishReply()) this.settleTurn("failed", true);
+  };
+
+  private clearReplyTimer(): void {
+    clearTimeout(this.replyTimer);
+    this.replyTimer = undefined;
+  }
+
+  private scheduleReply(): void {
+    if (
+      this.replyHeld ||
+      this.replyTimer !== undefined ||
+      !this.activeReply ||
+      !this.canFinishReply()
+    )
+      return;
+    const turnId = this.liveTurnId;
+    this.replyTimer = setTimeout(() => {
+      if (turnId !== this.liveTurnId) return;
+      this.publishReply("progress", "I’m reviewing your request.");
+      this.replyTimer = setTimeout(() => {
+        this.replyTimer = undefined;
+        if (turnId === this.liveTurnId) this.finishReply();
+      }, REPLY_FINISH_MS - REPLY_PROGRESS_MS);
+    }, REPLY_PROGRESS_MS);
+  }
+
+  private publishReply(phase: "progress" | "answer", text: string) {
+    this.publishText(`${this.liveTurnId}-${phase}`, phase, text);
+  }
+
+  private settleTurn(
+    status: NonNullable<NativeChatTurn["status"]>,
+    advance: boolean,
+    notify = true
+  ): void {
+    const turnId = this.liveTurnId;
+    this.clearReplyTimer();
+    this.compactionWork?.stop();
+    this.compaction.refuse();
+    this.questions = [];
+    this.waitingFor = null;
+    this.running = false;
+    this.paused = false;
+    this.settled = true;
+    if (this.activeReply && !this.activeReply.goalContinuation)
+      this.updateInputReceipt(this.activeReply.id, "completed", turnId);
+    this.activeReply = undefined;
+    this.goal.settle(turnId, status);
     this.records = this.records.map((record) =>
-      record.turnId === this.liveTurnId
+      record.turnId === turnId
         ? {
             ...record,
-            status: running ? null : "succeeded",
-            settledAtMs: running ? undefined : record.startedAtMs + 5200,
+            status,
+            settledAtMs: Math.max(Date.now(), record.startedAtMs),
+            compactions: record.compactions?.map((item) =>
+              item.status === "running"
+                ? { ...item, status: "failed", finishedAtMs: Date.now() }
+                : item
+            ),
           }
         : record
     );
-    this.changed();
+    if (advance && !this.admissionPaused && this.waiting.length)
+      this.startReply(this.removeQueued(0));
+    if (notify) this.changed();
   }
 
   readonly readRunning = () => this.running && !this.paused;
@@ -358,12 +484,19 @@ export class DesktopChatFixture {
   };
 
   publishProgress(text: string) {
-    const messageId = conversations.question.progressId;
+    this.publishText(conversations.question.progressId, "progress", text);
+  }
+
+  private publishText(
+    messageId: string,
+    phase: "progress" | "answer",
+    text: string
+  ) {
     const message: NativeChatMessage = {
       messageId,
       role: "assistant",
       turnId: this.liveTurnId,
-      phase: "progress",
+      phase,
       text,
     };
     const index = this.messages.findIndex(
@@ -397,34 +530,38 @@ export class DesktopChatFixture {
   }
 
   private turn(): NativeChatTurn {
+    const record = this.records.find(
+      ({ turnId }) => turnId === this.liveTurnId
+    );
     const blocked =
       !!this.waitingFor ||
       this.questions.some((question) => question.style === "answer_dependent");
     return {
       turnId: this.liveTurnId,
+      modelId: record?.modelId,
       epoch: 0,
       journalPosition: this.revision,
       historyPosition: this.messages.length,
       controlRevision: this.revision,
       paused: this.paused,
-      cancelled: false,
+      cancelled: record?.status === "cancelled",
       disposition: this.running
         ? this.paused || blocked
           ? "suspended"
           : "running"
         : "settled",
-      status: this.running
-        ? null
-        : (this.records.find(({ turnId }) => turnId === this.liveTurnId)
-            ?.status ?? "succeeded"),
+      status: this.running ? null : (record?.status ?? "succeeded"),
       inputNeeded: !!this.questions.length || !!this.waitingFor,
     };
   }
 
-  private receipt(requestId: string): NativeChatControlReceipt {
+  private receipt(
+    requestId: string,
+    turnId = this.liveTurnId
+  ): NativeChatControlReceipt {
     return {
       sessionId: this.sessionId,
-      turnId: this.liveTurnId,
+      turnId,
       requestId,
       sessionRevision: this.revision,
       journalPosition: this.revision,
@@ -432,11 +569,11 @@ export class DesktopChatFixture {
   }
 
   private startCompaction(requestId: string) {
-    if (this.scenario !== "compaction") return;
     const previous = this.compactionRequests.get(requestId);
     if (previous) return previous;
     if (this.running || this.waiting.length > 0)
       throw new Error("session_prompt_in_progress");
+    if (this.messages.length === 0) return;
     const turnId = `compaction-${requestId}`;
     const startedAtMs = Date.now();
     const item = {
@@ -457,6 +594,8 @@ export class DesktopChatFixture {
       },
     ];
     const settle = (succeeded: boolean) => {
+      if (!this.running || this.liveTurnId !== turnId)
+        return "stopped" as const;
       const finishedAtMs = Date.now();
       this.records = this.records.map((record) =>
         record.turnId === turnId
@@ -478,29 +617,63 @@ export class DesktopChatFixture {
             }
           : record
       );
-      this.running = false;
-      this.settled = true;
-      if (this.waiting.length) this.mutateQueue({ action: "resume" });
-      this.changed();
+      this.settleTurn(succeeded ? "succeeded" : "failed", true);
       return succeeded ? ("installed" as const) : ("failed" as const);
     };
-    const outcome = this.compaction.wait().then(
-      () => settle(true),
-      () => settle(false)
-    );
-    const started = { turnId, outcome };
+    const outcome = Promise.withResolvers<"installed" | "failed" | "stopped">();
+    const work: NonNullable<DesktopChatFixture["compactionWork"]> = {
+      stop: () => {
+        clearTimeout(work.timer);
+        this.compactionWork = undefined;
+        outcome.resolve("stopped");
+      },
+    };
+    this.compactionWork = work;
+    const complete = (succeeded: boolean) => {
+      if (this.compactionWork !== work) return;
+      if (this.paused) {
+        work.resume = () => complete(succeeded);
+        return;
+      }
+      this.compactionWork = undefined;
+      outcome.resolve(settle(succeeded));
+    };
+    if (this.compaction.read().hold) {
+      void this.compaction.wait().then(
+        () => complete(true),
+        () => complete(false)
+      );
+    } else {
+      work.timer = setTimeout(() => complete(true), COMPACTION_FINISH_MS);
+    }
+    const started = { turnId, outcome: outcome.promise };
     this.compactionRequests.set(requestId, started);
     this.changed();
     return started;
   }
 
-  private canSteerQueued(item: fixtures.Queued): boolean {
+  private canSteerQueued(item: CapturedInput): boolean {
     return (
       this.turn().disposition === "running" &&
+      !this.records
+        .at(-1)
+        ?.compactions?.some((item) => item.status === "running") &&
+      !this.questions.length &&
       !item.goalStart &&
+      !item.svgSelection &&
       item.operatingRegime !== "plan" &&
-      item.effort !== "ultra" &&
-      (item.attachments?.every((attachment) => !!attachment.previewId) ?? true)
+      item.effort === undefined &&
+      (item.attachments?.every((_, index) =>
+        this.canSteerAttachment(item, index)
+      ) ??
+        true)
+    );
+  }
+
+  private canSteerAttachment(item: CapturedInput, index: number): boolean {
+    return (
+      item.steerableAttachments?.[index] ??
+      !!item.attachments?.[index]?.previewId
     );
   }
 
@@ -517,7 +690,7 @@ export class DesktopChatFixture {
           preview: text || null,
           attachments,
           operatingRegime,
-          effort,
+          ...(effort === "ultra" && { effort }),
           goalStart,
           textOnly: !attachments?.length,
           attachmentIndexes: attachments?.map((_, index) => index) ?? [],
@@ -560,6 +733,7 @@ export class DesktopChatFixture {
         position: this.waiting.indexOf(item),
       };
       this.waiting = this.waiting.filter((row) => row !== item);
+      this.updateInputReceipt(inputId, "checked_out", null);
       const result = { checkoutId, message: this.describeQueued(item) };
       this.checkoutReceipts.set(requestId, { request, result });
       this.queueActionReceipts.set(requestId, {
@@ -612,6 +786,9 @@ export class DesktopChatFixture {
               attachments
             );
       this.restoreQueuePosition(checkout, item);
+      if (item.id !== checkout.item.id)
+        this.updateInputReceipt(checkout.item.id, "superseded", null, item.id);
+      this.updateInputReceipt(item.id, "queued", null);
       const receipt = {
         requestId,
         sessionId: this.sessionId,
@@ -651,12 +828,7 @@ export class DesktopChatFixture {
     },
   };
 
-  private describeQueued({
-    id,
-    text,
-    attachments,
-    goalStart,
-  }: fixtures.Queued) {
+  private describeQueued({ id, text, attachments, goalStart }: CapturedInput) {
     return {
       inputId: id,
       text,
@@ -669,7 +841,7 @@ export class DesktopChatFixture {
 
   private restoreQueuePosition(
     checkout: QueueCheckout,
-    item: fixtures.Queued
+    item: CapturedInput
   ): void {
     const next = [...this.waiting];
     next.splice(checkout.position, 0, item);
@@ -685,52 +857,6 @@ export class DesktopChatFixture {
       this.checkedOut.position--;
     return item;
   }
-
-  private queuePosition(item: fixtures.Queued): QueuePosition {
-    const index = this.waiting.indexOf(item);
-    return {
-      item,
-      before: this.waiting.slice(0, index).map((row) => row.id),
-      after: this.waiting.slice(index + 1).map((row) => row.id),
-    };
-  }
-
-  private insertAtQueuePosition(
-    position: QueuePosition,
-    item: fixtures.Queued
-  ): void {
-    const indexOf = (id: string) =>
-      this.waiting.findIndex((row) => row.id === id);
-    const successor = position.after.map(indexOf).find((index) => index >= 0);
-    const predecessor = position.before
-      .map(indexOf)
-      .findLast((index) => index >= 0);
-    const index = successor ?? (predecessor ?? -1) + 1;
-    this.waiting = [
-      ...this.waiting.slice(0, index),
-      item,
-      ...this.waiting.slice(index),
-    ];
-  }
-
-  /** Capture the original item before the confirmed withdrawal is recorded. */
-  readonly captureQueueRemoval = (inputId: string) => {
-    const item = this.waiting.find((row) => row.id === inputId);
-    if (!item) return;
-    const position = this.queuePosition(item);
-    let removed = true;
-    return (forward: boolean) => {
-      if (forward === removed) return;
-      if (forward) {
-        if (!this.waiting.includes(item)) return;
-        this.removeQueued(this.waiting.indexOf(item));
-      } else {
-        this.insertAtQueuePosition(position, item);
-      }
-      removed = forward;
-      this.changed();
-    };
-  };
 
   private attachmentCard(
     input: NativeChatAttachmentInput
@@ -757,16 +883,19 @@ export class DesktopChatFixture {
       ? {
           name: input.file.name,
           mimeType: input.mimeType,
-          size: input.file.size,
+          ...(input.mimeType !== "inode/directory" && {
+            size: input.file.size,
+          }),
+          preview: input.preview,
         }
       : { name: input.name, size: input.bytes.byteLength };
   }
 
   private revisedQueuedItem(
-    item: fixtures.Queued,
+    item: CapturedInput,
     text: string,
     edit?: NativeChatQueueReinsertRequest["attachments"]
-  ): fixtures.Queued {
+  ): CapturedInput {
     const attachments =
       edit === undefined
         ? item.attachments
@@ -779,39 +908,112 @@ export class DesktopChatFixture {
           });
     if (!text.trim() && !attachments?.length)
       throw new Error("fixture_empty_queued_message");
-    return { ...item, id: crypto.randomUUID(), text, attachments };
+    return {
+      ...item,
+      id: crypto.randomUUID(),
+      text,
+      attachments,
+      steerableAttachments:
+        edit?.map((entry) =>
+          entry.kind === "keep"
+            ? this.canSteerAttachment(item, entry.index)
+            : entry.kind !== "file"
+        ) ?? item.steerableAttachments,
+    };
+  }
+
+  private startReply(item: CapturedInput, turnId = `${item.id}-turn`) {
+    this.activeReply = item;
+    this.running = true;
+    this.paused = false;
+    this.settled = false;
+    this.liveTurnId = turnId;
+    const { id, text, attachments, displayParts, svgSelection, modelId } = item;
+    if (item.goalContinuation) {
+      this.goal.reserve(turnId);
+    } else {
+      if (item.goalStart) {
+        this.goalInput = item;
+        this.goal.start(id, turnId, item.goalStart);
+      }
+      this.messages = [
+        ...this.messages,
+        {
+          messageId: id,
+          inputId: id,
+          role: "user",
+          turnId,
+          text,
+          attachments,
+          displayParts,
+          svgSelection,
+        },
+      ];
+      this.updateInputReceipt(id, "claimed", turnId);
+    }
+    this.records = [
+      ...this.records,
+      {
+        turnId,
+        modelId,
+        status: null,
+        startedAtMs: Date.now(),
+        ...(item.goalStart && { goalStart: true }),
+      },
+    ];
+    this.scheduleReply();
+  }
+
+  private continueGoal() {
+    if (!this.goalInput || this.goal.read(this.revision).goal?.paused) return;
+    this.startReply({
+      ...this.goalInput,
+      id: `${this.goalInput.id}-followup-${this.revision + 1}`,
+      goalStart: undefined,
+      goalContinuation: true,
+    });
+  }
+
+  private setReplyPaused(paused: boolean) {
+    this.paused = paused;
+    if (paused) this.clearReplyTimer();
+    else {
+      this.scheduleReply();
+      const ready = this.compactionWork?.resume;
+      if (ready) queueMicrotask(ready);
+    }
+  }
+
+  private updateInputReceipt(
+    inputId: string,
+    disposition: NativeChatAcceptance["disposition"],
+    turnId: string | null,
+    replacementInputId?: string
+  ) {
+    const previous = this.receipts.get(inputId);
+    this.receipts.set(inputId, {
+      sessionId: this.sessionId,
+      inputId,
+      inputPosition: previous?.inputPosition ?? this.revision + 1,
+      turnId,
+      disposition,
+      ...(replacementInputId && { replacementInputId }),
+    });
   }
 
   private mutateQueue(action: NativeChatQueueAction) {
     if (action.action === "resume") {
-      if (this.running || !this.waiting.length)
+      if (this.running || (!this.admissionPaused && !this.waiting.length))
         throw new Error("fixture_queue_cannot_resume");
-      const item = this.removeQueued(0);
-      this.running = true;
-      this.paused = false;
-      this.settled = false;
-      this.liveTurnId = `${this.sessionId}-turn-${this.revision + 1}`;
-      this.messages = [
-        ...this.messages,
-        {
-          messageId: item.id,
-          inputId: item.id,
-          role: "user",
-          turnId: this.liveTurnId,
-          text: item.text,
-          attachments: item.attachments,
-        },
-      ];
-      this.records = [
-        ...this.records,
-        { turnId: this.liveTurnId, status: null, startedAtMs: Date.now() },
-      ];
+      this.admissionPaused = false;
+      if (this.waiting.length) this.startReply(this.removeQueued(0));
       return;
     }
     const index = this.waiting.findIndex((item) => item.id === action.inputId);
     if (index < 0) throw new Error("fixture_queued_input_unavailable");
     if (action.action === "withdraw") {
-      this.removeQueued(index);
+      const item = this.removeQueued(index);
+      this.updateInputReceipt(item.id, "withdrawn", null);
       return;
     }
     const [item] = this.waiting.slice(index, index + 1);
@@ -819,7 +1021,10 @@ export class DesktopChatFixture {
     if (action.action === "replace" || action.action === "replaceText") {
       if (item.attachments?.length && action.action === "replace")
         throw new Error("fixture_attachment_requires_text_replacement");
-      next[index] = this.revisedQueuedItem(item, action.text);
+      const replacement = this.revisedQueuedItem(item, action.text);
+      next[index] = replacement;
+      this.updateInputReceipt(item.id, "superseded", null, replacement.id);
+      this.updateInputReceipt(replacement.id, "queued", null);
     } else {
       const destination =
         action.action === "place"
@@ -837,6 +1042,7 @@ export class DesktopChatFixture {
   ): Promise<NativeChatAcceptance> {
     const prior = this.receipts.get(input.inputId);
     if (prior) return prior;
+    const modelId = this.settings.model(this.sessionId);
     try {
       await this.submission.wait();
     } catch (error) {
@@ -844,6 +1050,13 @@ export class DesktopChatFixture {
       throw new Error("native_chat_attachment_preparation_failed", {
         cause: error,
       });
+    }
+    const alreadyAccepted = this.receipts.get(input.inputId);
+    if (alreadyAccepted) return alreadyAccepted;
+    if (input.goalStart) {
+      if (this.waiting.some((item) => item.goalStart))
+        throw new Error("session_goal_queued");
+      if (!this.goal.canStart) throw new Error("session_goal_exists");
     }
     const {
       action,
@@ -854,53 +1067,35 @@ export class DesktopChatFixture {
       effort,
       goalStart,
     } = input;
-    const attachments =
-      selectedAttachments?.map((item) => this.attachmentCard(item)) ??
-      input.attachments;
-    const turnId = action === "submit" ? `${inputId}-turn` : null;
-    if (!turnId) {
-      this.waiting = [
-        ...this.waiting,
-        {
-          id: inputId,
-          text,
-          attachments,
-          operatingRegime,
-          effort: effort === "ultra" ? effort : undefined,
-          goalStart,
-        },
-      ];
+    const item: CapturedInput = {
+      id: inputId,
+      text,
+      attachments:
+        selectedAttachments?.map((entry) => this.attachmentCard(entry)) ??
+        input.attachments,
+      modelId,
+      steerableAttachments: selectedAttachments?.map(
+        (entry) => entry.kind !== "file"
+      ),
+      operatingRegime,
+      effort,
+      svgSelection,
+      goalStart,
+      displayParts: input.messageContext?.displayParts,
+    };
+    if (
+      action === "enqueue" ||
+      this.running ||
+      this.admissionPaused ||
+      this.waiting.length > 0
+    ) {
+      this.waiting = [...this.waiting, item];
+      this.updateInputReceipt(inputId, "queued", null);
     } else {
-      const now = Date.now();
-      this.liveTurnId = turnId;
-      this.settled = true;
-      this.messages = [
-        ...this.messages,
-        {
-          messageId: inputId,
-          inputId,
-          turnId,
-          role: "user",
-          text,
-          attachments,
-          svgSelection,
-        },
-      ];
-      this.records = [
-        ...this.records,
-        { turnId, status: "succeeded", startedAtMs: now, settledAtMs: now },
-      ];
+      this.startReply(item);
     }
-    this.revision++;
-    const receipt = {
-      sessionId: this.sessionId,
-      inputId,
-      inputPosition: this.revision,
-      turnId,
-      disposition: turnId ? "completed" : "queued",
-    } satisfies NativeChatAcceptance;
-    this.receipts.set(inputId, receipt);
-    return receipt;
+    this.changed();
+    return this.receipts.get(inputId)!;
   }
 
   private async imagePreview(previewId: string) {
@@ -918,22 +1113,14 @@ export class DesktopChatFixture {
       titles: [{ sessionId: this.sessionId, title: "Example chat" }],
       nextCursor: null,
     }),
-    profiles: async () => {
-      await this.modelsRead.wait();
-      return this.profiles;
-    },
-    selectProfile: async (profile) => {
-      this.profiles = {
-        ...fixtures.profiles,
-        active: profile.kind === "default" ? null : profile.id,
-      };
-    },
     acceptsEffort: async () => true,
     acceptsGoalEffort: async () => true,
     create: async () => ({
       sessionId: this.sessionId,
       attachmentId: this.sessionId,
     }),
+    createFromDraft: async (draftId, manualApproval) =>
+      this.settings.createFromDraft(draftId, this.sessionId, manualApproval),
     load: async (id) => ({ sessionId: id, attachmentId: id }),
     detach: async () => {},
     commands: async () => ["compact"],
@@ -959,11 +1146,25 @@ export class DesktopChatFixture {
     acceptsSelectedImage: async () => true,
     acceptsPng: async () => true,
     acceptsFile: async () => true,
+    acceptsFileReference: async () => true,
+    acceptsDirectoryReference: async () => true,
+    canReferenceFile: (file) => file.type === "inode/directory",
+    submitFileReference: async (_, input) =>
+      this.accept(input, [
+        {
+          kind: "reference",
+          file: input.file,
+          mimeType: input.mimeType,
+          preview: input.preview,
+        },
+      ]),
     acceptsQueuedTextReplacement: async () => true,
     submit: async (_, inputId, text) =>
       this.accept({ action: "submit", inputId, text }),
     enqueue: async (_, inputId, text) =>
       this.accept({ action: "enqueue", inputId, text }),
+    submitMessage: async (_, input) =>
+      this.accept({ ...input, action: input.action ?? "submit" }),
     submitInRegime: async (
       action,
       _,
@@ -1031,6 +1232,8 @@ export class DesktopChatFixture {
         current: this.running ? this.turn() : null,
         latest: this.settled ? this.turn() : null,
         queuedInputs: this.waiting.length,
+        pendingGoalId: this.waiting.find((item) => item.goalStart)?.id,
+        goalManualContinuationAvailable: true,
         attachmentBatches: true,
         compactionStart: true,
         queuePreview: this.queuePage(),
@@ -1040,7 +1243,7 @@ export class DesktopChatFixture {
             inputId: this.checkedOut.item.id,
           },
         }),
-        admissionPaused: false,
+        admissionPaused: this.admissionPaused,
         ...(!this.running &&
           this.waiting.length > 0 && {
             idleQueueResumeAvailable: true as const,
@@ -1073,14 +1276,26 @@ export class DesktopChatFixture {
       }
     },
     control: async (_, input) => {
-      if (input.action === "stop") this.setRunning(false);
-      else {
-        this.paused = input.action === "pause";
+      const prior = this.controlReceipts.get(input.requestId);
+      if (prior) return prior;
+      if (
+        !this.running ||
+        input.observationId !== `observation-${this.revision}`
+      )
+        throw new Error("stale_session_revision");
+      if (input.action === "stop") {
+        this.admissionPaused = true;
+        this.settleTurn("cancelled", false);
+      } else {
+        this.setReplyPaused(input.action === "pause");
         this.changed();
       }
-      return input.action === "resume"
-        ? { action: "resume", turn: this.turn() }
-        : { action: input.action, receipt: this.receipt(input.requestId) };
+      const result =
+        input.action === "resume"
+          ? ({ action: "resume", turn: this.turn() } as const)
+          : { action: input.action, receipt: this.receipt(input.requestId) };
+      this.controlReceipts.set(input.requestId, result);
+      return result;
     },
     queue: async () => this.queuePage(),
     queuedText: async (_, __, inputId) => this.queued(inputId).text,
@@ -1122,6 +1337,7 @@ export class DesktopChatFixture {
         throw new Error("queue_steer_target_unavailable");
       const turnId = this.liveTurnId;
       this.removeQueued(this.waiting.indexOf(item));
+      this.updateInputReceipt(inputId, "transferred", turnId);
       this.messages = [
         ...this.messages,
         {
@@ -1131,6 +1347,7 @@ export class DesktopChatFixture {
           turnId,
           text: item.text,
           attachments: item.attachments,
+          displayParts: item.displayParts,
         },
       ];
       const receipt = {
@@ -1146,6 +1363,19 @@ export class DesktopChatFixture {
       return receipt;
     },
     steer: async (_, input) => {
+      const previous = this.steerReceipts.get(input.requestId);
+      if (previous) {
+        if (
+          input.text !== previous.text ||
+          input.observationId !== previous.observationId
+        )
+          throw new Error("request_identity_reused");
+        return previous.receipt;
+      }
+      if (input.observationId !== `observation-${this.revision}`)
+        throw new Error("stale_session_revision");
+      if (!this.canFinishReply())
+        throw new Error("queue_steer_target_unavailable");
       this.messages = [
         ...this.messages,
         {
@@ -1155,15 +1385,43 @@ export class DesktopChatFixture {
           turnId: this.liveTurnId,
         },
       ];
-      this.revision++;
-      return this.receipt(input.requestId);
+      this.changed();
+      const receipt = this.receipt(input.requestId);
+      this.steerReceipts.set(input.requestId, {
+        text: input.text,
+        observationId: input.observationId,
+        receipt,
+      });
+      return receipt;
     },
-    goal: async () => ({ observationId: null, goal: null }),
+    goal: async (_, observationId) => {
+      if (observationId !== `observation-${this.revision}`)
+        throw new Error("native_chat_goal_changed");
+      return this.goal.read(this.revision);
+    },
+    controlGoal: async (_, change) =>
+      this.goal.control(
+        change,
+        this.revision,
+        this.running ? this.turn() : null,
+        (effect) => {
+          const turnId = this.running ? this.liveTurnId : null;
+          if (effect === "pause" || effect === "resume")
+            this.setReplyPaused(effect === "pause");
+          if (effect === "clear" || effect === "restart")
+            this.settleTurn("cancelled", effect === "clear", false);
+          if (effect === "restart" || effect === "continue")
+            this.continueGoal();
+          this.changed();
+          return { turnId, sessionRevision: this.revision };
+        }
+      ),
     startGoal: async (_, inputId, goalStart) =>
       this.accept({
         action: this.running ? "enqueue" : "submit",
         inputId,
         text: goalStart.objective,
+        messageContext: goalStart.messageContext,
         goalStart,
         effort: goalStart.effort,
         operatingRegime: goalStart.operatingRegime,
@@ -1188,19 +1446,27 @@ export class DesktopChatFixture {
       if (index < 0 || this.editMessageId !== input.reviewId)
         throw new Error("fixture_message_unavailable");
       await this.submission.wait();
-      this.messages = [
-        ...this.messages.slice(0, index),
-        {
-          ...this.messages[index],
-          text: input.text,
-          svgSelection: undefined,
-        },
-      ];
-      this.revision++;
+      const replacedTurnIds = new Set(
+        this.messages.slice(index).map(({ turnId }) => turnId)
+      );
+      this.messages = this.messages.slice(0, index);
+      this.records = this.records.filter(
+        ({ turnId }) => !replacedTurnIds.has(turnId)
+      );
+      const inputId = crypto.randomUUID();
+      this.startReply({
+        id: inputId,
+        text: input.text,
+        operatingRegime: input.operatingRegime,
+        effort: input.effort,
+        modelId: this.settings.model(this.sessionId),
+      });
+      this.view++;
+      this.changed();
       return {
         sessionId: this.sessionId,
-        view: ++this.view,
-        inputId: input.reviewId,
+        view: this.view,
+        inputId,
         inputPosition: this.revision,
       };
     },
