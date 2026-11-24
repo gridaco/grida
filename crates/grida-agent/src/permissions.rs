@@ -143,6 +143,8 @@ pub struct PermissionProfile {
     directories: BTreeMap<BindingId, DirectoryAccess>,
     protected: Arc<ProtectedRoots>,
     command_denials: Vec<ProtectedPath>,
+    #[cfg(target_os = "linux")]
+    _configuration_locks: Arc<[std::fs::File]>,
     command: Option<CommandProfile>,
     hooks_only: bool,
     bundled_skills: Vec<String>,
@@ -263,7 +265,11 @@ impl PermissionProfile {
         command: Option<CommandProfile>,
     ) -> Result<Self> {
         let protected = Arc::new(ProtectedRoots::new(
-            denials.iter().map(|entry| entry.path.clone()).collect(),
+            denials
+                .iter()
+                .filter(|entry| entry.access != DeniedAccess::ReadWritePrefix)
+                .map(|entry| entry.path.clone())
+                .collect(),
         )?);
         let mut command_denials = Vec::new();
         for access in [DeniedAccess::ReadWrite, DeniedAccess::Write] {
@@ -336,6 +342,23 @@ impl PermissionProfile {
                 .collect::<Vec<_>>(),
             command_identity,
         ))?;
+        let private_name_prefixes: Vec<_> = denials
+            .into_iter()
+            .filter(|entry| entry.access == DeniedAccess::ReadWritePrefix)
+            .collect();
+        let identity = if private_name_prefixes.is_empty() {
+            identity
+        } else {
+            Fingerprint::of(&(
+                identity,
+                "protected-name-prefixes",
+                private_name_prefixes
+                    .iter()
+                    .map(|entry| &entry.path)
+                    .collect::<Vec<_>>(),
+            ))?
+        };
+        command_denials.extend(private_name_prefixes);
         let directory_context = workspace
             .directories()
             .map(|directory| {
@@ -355,6 +378,8 @@ impl PermissionProfile {
             directories,
             protected,
             command_denials,
+            #[cfg(target_os = "linux")]
+            _configuration_locks: Arc::new([]),
             command,
             hooks_only: false,
             bundled_skills: Vec::new(),
@@ -374,6 +399,12 @@ impl PermissionProfile {
             initial_mode: PermissionMode::Restricted,
             unconfined: false,
         })
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn with_configuration_locks(mut self, locks: Vec<std::fs::File>) -> Self {
+        self._configuration_locks = locks.into();
+        self
     }
 
     pub(crate) fn with_bundled_skills(mut self, names: Vec<String>) -> Result<Self> {

@@ -141,6 +141,30 @@ fn protected_path(path: &Path) -> Result<PathBuf> {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn protected_prefix(path: &Path) -> Result<PathBuf> {
+    let invalid = || refused(ErrorKind::InvalidInput, "sandbox_protected_prefix_invalid");
+    if !valid_path(path) {
+        return Err(invalid());
+    }
+    let prefix = path.file_name().ok_or_else(invalid)?;
+    let parent = protected_path(path.parent().ok_or_else(invalid)?)?;
+    if fs::metadata(&parent).is_ok_and(|metadata| !metadata.is_dir()) {
+        return Err(invalid());
+    }
+    Ok(parent.join(prefix))
+}
+
+#[cfg(target_os = "macos")]
+fn matches_protected_prefix(path: &Path, prefix: &Path) -> bool {
+    let parent = prefix.parent().expect("validated protected prefix");
+    let prefix = prefix.file_name().expect("validated protected prefix");
+    path.strip_prefix(parent).is_ok_and(|relative| {
+        matches!(relative.components().next(), Some(std::path::Component::Normal(name))
+            if name.as_encoded_bytes().starts_with(prefix.as_encoded_bytes()))
+    })
+}
+
 struct Trusted {
     executable: TrustedExecutable,
     bound: Bound,
@@ -597,6 +621,35 @@ impl Installation {
         }
         let mut carved = Vec::new();
         for protected in &scope.protected {
+            if protected.access == DeniedAccess::ReadWritePrefix {
+                #[cfg(target_os = "linux")]
+                return Err(refused(
+                    ErrorKind::Unsupported,
+                    "sandbox_protected_prefix_unsupported",
+                ));
+                #[cfg(target_os = "macos")]
+                {
+                    // Bind the directory and preserve the basename as a literal
+                    // prefix, even if an entry with that exact name exists.
+                    let canonical = protected_prefix(&protected.path)?;
+                    if locations
+                        .iter()
+                        .map(|location| location.bound.path())
+                        .chain(launchers.iter().copied())
+                        .any(|path| {
+                            matches_protected_prefix(path, &canonical)
+                                || matches_protected_prefix(path, &protected.path)
+                        })
+                    {
+                        return Err(refused(ErrorKind::Unsupported, "sandbox_protected_overlap"));
+                    }
+                    if canonical != protected.path {
+                        carved.push((protected.path.clone(), protected.access));
+                    }
+                    carved.push((canonical, protected.access));
+                    continue;
+                }
+            }
             let path = protected_path(&protected.path)?;
             // A protected path inside a granted location is carved out of it.
             // A granted location at or inside a protected path conflicts only
@@ -894,6 +947,7 @@ impl Prepared {
                         match access {
                             DeniedAccess::ReadWrite => "read_write",
                             DeniedAccess::Write => "write",
+                            DeniedAccess::ReadWritePrefix => "read_write_prefix",
                         },
                     )
                 })
@@ -1263,6 +1317,9 @@ impl Prepared {
             .filter(|&(path, access)| match access {
                 DeniedAccess::Write => self.covering_mount(path) == Some(true),
                 DeniedAccess::ReadWrite => self.disk_read || self.covering_mount(path).is_some(),
+                DeniedAccess::ReadWritePrefix => {
+                    unreachable!("bubblewrap capture rejects prefixes")
+                }
             })
             .map(|(path, access)| (*path, *access))
             .collect()

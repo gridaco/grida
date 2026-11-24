@@ -157,7 +157,7 @@ it.skipIf(process.platform === "win32")(
             }),
         }),
         base,
-        [],
+        { workspace: [], launch: [] },
         { openExternal: async () => {} }
       );
       const document = "11111111-1111-4111-8111-111111111111";
@@ -438,11 +438,11 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       sidecar.findWorkspace.mockResolvedValue(workspace);
       const { NativeDesktopAgent } = await import("./native-desktop-agent");
       const { NativeDesktopProfile } = await import("./native-desktop-profile");
-      const protectedPaths = NativeDesktopProfile.ordinaryChatProtectedPaths(
+      const protection = NativeDesktopProfile.ordinaryChatProtection(
         { isPackaged: false, getPath },
         path.join(root, "node_modules", "electron", "Resources")
       );
-      expect(protectedPaths).toEqual(
+      expect(protection.workspace).toEqual(
         expect.arrayContaining([secret, path.join(home, ".aws")])
       );
       agent = await NativeDesktopAgent.prepareOrdinary(
@@ -457,7 +457,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
             }),
         }),
         runtime.resourcesPath,
-        protectedPaths,
+        protection,
         { openExternal: async () => {} }
       );
       sidecar.findWorkspace.mockResolvedValueOnce({
@@ -484,6 +484,31 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       );
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
       await agent.ensure(workspace.id);
+      const workspacesDirectory = path.join(
+        source.desktopUserDataPath,
+        "chats",
+        "workspaces"
+      );
+      const launchProfiles = (
+        await fs.readdir(workspacesDirectory, { recursive: true })
+      )
+        .filter((entry) => path.basename(entry).startsWith("permissions-"))
+        .map((entry) => path.join(workspacesDirectory, entry));
+      expect(launchProfiles).toHaveLength(1);
+      const { protectedPaths } = JSON.parse(
+        await fs.readFile(launchProfiles[0], "utf8")
+      );
+      expect(protectedPaths).toEqual(
+        expect.arrayContaining([
+          source.desktopUserDataPath,
+          source.userDataPath,
+          source.mediaRoot,
+          path.dirname(source.desktopUserDataPath),
+          secret,
+          path.join(home, ".grida"),
+        ])
+      );
+      expect(protectedPaths).not.toContain(source.providerHome);
       const captured = await fs.lstat(root, { bigint: true });
       expect(agent.current(workspace.id)?.directoryIdentity).toEqual({
         device: captured.dev.toString(),
@@ -576,7 +601,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
             }),
         }),
         resources!,
-        [source.userDataPath],
+        { workspace: [source.userDataPath], launch: [source.userDataPath] },
         { openExternal: async () => {} }
       );
       owner = agent;
@@ -715,7 +740,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
             }),
         }),
         resources!,
-        [source.userDataPath],
+        { workspace: [source.userDataPath], launch: [source.userDataPath] },
         { openExternal: async () => {} }
       );
       const parent = await agent.rootDeck(workspace.id);

@@ -103,7 +103,9 @@ privileges or inject host credentials into command environments. Automatic
 approval review is independent and is not required for Full access.
 
 Under a restricted level, the host protects its own state and credential
-stores from reads and writes. A workspace-write command also has write
+stores from reads and writes. When the host allows ordinary disk reads,
+commands can read ordinary files in the agent's home while the home stays
+write-protected. A workspace-write command also has write
 exclusions for agent configuration, cloud credentials and existing
 version-control metadata. The host applies these exclusions when the command
 starts. A command can initialize a new repository. Updating its existing

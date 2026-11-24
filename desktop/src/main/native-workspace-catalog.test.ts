@@ -76,11 +76,13 @@ it.runIf(process.platform !== "win32")(
     const nested = path.join(parent, "decks", "Launch.Canvas");
     const sibling = path.join(parent, "decks", "Sibling.canvas");
     const external = path.join(base, "outside.canvas");
+    const gridaHome = path.join(base, "grida-home");
     const marker = path.join(nested, ".canvas.json");
     const options = {
       browserData,
       projectsRoot: path.join(base, "projects"),
-      protectedPaths: [external],
+      protectedPaths: [external, gridaHome],
+      launchProtectedPaths: [external],
     };
     try {
       for (const directory of [browserData, nested, sibling, external])
@@ -93,6 +95,16 @@ it.runIf(process.platform !== "win32")(
         root: nested,
         parentWorkspaceId: selected.id,
       });
+      expect(original.protected).toContain(gridaHome);
+      expect(original.launchProtected).not.toContain(gridaHome);
+      expect(original.launchProtected).toEqual(
+        expect.arrayContaining([
+          external,
+          browserData,
+          path.dirname(catalog.directory),
+          path.join(base, ".grida-external-scratch"),
+        ])
+      );
       expect(original.workspaceId).not.toBe(selected.id);
       const firstSibling = await catalog.nestedDeck(
         selected.id,

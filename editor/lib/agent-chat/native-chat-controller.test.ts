@@ -9479,6 +9479,7 @@ describe("Native workspace chat controller", () => {
       "retired_input_cap_requires_restart",
       /Stop it, then send the message again/,
     ],
+    ["permission_profile_changed", /permissions for this work changed/],
     ["session_queued_route_changed", /Queued messages/],
     ["session_goal_route_changed", /active goal/],
     ["session_delegated_route_changed", /Delegated work/],

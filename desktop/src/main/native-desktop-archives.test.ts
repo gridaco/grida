@@ -133,7 +133,7 @@ describe.runIf(process.platform !== "win32")(
               ? await NativeDesktopAgent.prepareOrdinary(
                   account,
                   "/fixture/resources",
-                  [],
+                  { workspace: [], launch: [] },
                   { openExternal: async () => {} }
                 )
               : await NativeDesktopAgent.prepareFresh(

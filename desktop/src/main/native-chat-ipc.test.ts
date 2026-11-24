@@ -1681,6 +1681,7 @@ describe("native chat IPC", () => {
       identity,
       root: "/fixture/decks/A.canvas",
       protected: [],
+      launchProtected: [],
     };
     const deckB = {
       ...deckA,

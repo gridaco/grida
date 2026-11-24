@@ -1621,7 +1621,10 @@ async function subscriptionDesktop() {
         fetch: accountHttp,
       }),
       resources!,
-      [source.userDataPath, source.providerHome],
+      {
+        workspace: [source.userDataPath, source.providerHome],
+        launch: [source.userDataPath],
+      },
       { openExternal: browser, modelCatalogue }
     );
   };

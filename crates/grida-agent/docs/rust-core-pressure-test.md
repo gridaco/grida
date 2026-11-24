@@ -981,6 +981,14 @@ Qualify [automatic review](../../../docs/wg/ai/agent/permissions.md#automatic-re
 and manual review against the same workspace profile. Verify which requests
 need a decision, who can answer, and what access the executor enforces.
 
+In a disk-read profile, Plan and Act can read ordinary files in the default
+and custom Grida homes. Credentials, private agent state, and configuration
+stay inaccessible through aliases and confined retries. Act cannot write
+inside a Grida home even when a writable temporary root contains it.
+[Native confinement cases](../tests/process/approvals/confinement.rs) and
+[reviewed retry cases](../tests/process/approvals/escalation.rs) exercise the
+real command boundary.
+
 A command reviewer with a captured shell grant can inspect a project script
 or a permitted file outside the project. Exercise both a workspace-only and a
 disk-read profile, additional and revoked roots, protected paths, attempted

@@ -11306,6 +11306,8 @@ function describe(error: unknown, fallback: string): string {
     return "This unfinished turn needs the model connection that accepted it. Restore that connection, or stop the turn.";
   if (error.message.includes("retired_input_cap_requires_restart"))
     return "This turn was paused under an older configuration. Stop it, then send the message again.";
+  if (error.message.includes("permission_profile_changed"))
+    return "The permissions for this work changed. Stop the turn or remove the queued message, then send it again.";
   if (error.message.includes("session_queued_route_changed"))
     return "Queued messages need their original model connection. Restore it to run them, or remove those messages.";
   if (error.message.includes("session_goal_route_changed"))

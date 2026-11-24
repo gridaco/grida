@@ -28,6 +28,7 @@ vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
 const nativeResources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const supported = process.platform === "darwin" || process.platform === "linux";
 const roots: string[] = [];
+const fixtureProtection = { workspace: [], launch: [] };
 
 afterEach(() => {
   for (const root of roots.splice(0))
@@ -123,7 +124,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       const test = await fixture("ordinary");
       const start = async () => {
         const NativeChatStore = await test.loadStore();
-        const store = await NativeChatStore.prepareOrdinary([test.agentData]);
+        const store = await NativeChatStore.prepareOrdinary(fixtureProtection);
         expect(store.protectedPaths).toEqual(
           expect.arrayContaining([
             electron.userData,
@@ -168,12 +169,20 @@ describe.skipIf(!supported)("Native chat store", () => {
       const prepared =
         profile === "fresh"
           ? await test.NativeChatStore.prepareFresh()
-          : await test.NativeChatStore.prepareOrdinary([test.agentData]);
+          : await test.NativeChatStore.prepareOrdinary(fixtureProtection);
       const { NativeAgentChat } = await import("./native-agent-chat");
       const start = vi
         .spyOn(NativeAgentChat, "start")
         .mockResolvedValue({} as import("./native-agent-chat").NativeAgentChat);
       try {
+        expect(prepared.launchProtectedPaths).toEqual(
+          expect.arrayContaining([
+            electron.userData,
+            test.agentData,
+            electron.media,
+          ])
+        );
+        expect(prepared.launchProtectedPaths).not.toContain(test.configHome);
         await prepared.startWorkspace("work", {
           ...test.launch,
           protectedPaths: [],
@@ -250,7 +259,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       });
       const opened =
         mode === "ordinary"
-          ? await test.NativeChatStore.prepareOrdinary([])
+          ? await test.NativeChatStore.prepareOrdinary(fixtureProtection)
           : await test.NativeChatStore.prepareFresh();
       expect(opened.configHome).toBe(test.configHome);
     }
@@ -267,7 +276,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       test.agentData,
       `${alias}/../grida`
     );
-    const store = await configured.prepareOrdinary([]);
+    const store = await configured.prepareOrdinary(fixtureProtection);
     const configHome = path.join(configParent, "grida");
     expect(store.configHome).toBe(configHome);
     expect(store.protectedPaths).toContain(configHome);
@@ -279,7 +288,7 @@ describe.skipIf(!supported)("Native chat store", () => {
     const alias = path.join(path.dirname(test.configHome), "config-alias");
     fs.symlinkSync(test.configHome, alias);
     const configured = await test.loadStore(test.agentData, alias);
-    const store = await configured.prepareOrdinary([]);
+    const store = await configured.prepareOrdinary(fixtureProtection);
     expect(store.configHome).toBe(alias);
     expect(store.protectedPaths).toContain(test.configHome);
   });
@@ -316,7 +325,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       );
       const prepared =
         profile === "ordinary"
-          ? await test.NativeChatStore.prepareOrdinary([test.agentData])
+          ? await test.NativeChatStore.prepareOrdinary(fixtureProtection)
           : await test.NativeChatStore.prepareFresh();
       const selected = path.join(test.child("user-files"), "drawing.svg");
       const original = "<svg>Original</svg>";

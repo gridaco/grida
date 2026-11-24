@@ -2,6 +2,164 @@
 use super::*;
 use std::os::unix::fs::symlink;
 
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn broad_commands_read_ordinary_grida_home_files_without_writing_the_home() {
+    let shared = Path::new("/tmp").canonicalize().unwrap();
+    for (mode, custom_home) in [
+        ("plan", false),
+        ("act", false),
+        ("plan", true),
+        ("act", true),
+    ] {
+        let fixture = Fixture::new(true);
+        // Act normally writes to shared temporary storage. Placing both homes
+        // there makes the home write denial observable within a writable root.
+        let disk = tempfile::tempdir_in(&shared).unwrap();
+        let user_home = disk.path().join("home");
+        let default_home = user_home.join(".grida");
+        let custom = disk.path().join("custom");
+        let grida_home = if custom_home { &custom } else { &default_home };
+        let alias = disk.path().join("home-alias");
+        symlink(grida_home, &alias).unwrap();
+        let scratch = disk.path().join("scratch.txt");
+        let private_files = [
+            ("providers/credentials.toml", "private provider key"),
+            ("auth/account.json", "private account state"),
+            ("auth.json", "private legacy credential state"),
+            (
+                "credential-continuity/bindings.json",
+                "private credential binding",
+            ),
+            ("cli/auth.json", "private CLI state"),
+            ("agent/session.json", "private agent state"),
+            ("config.toml", HOST_SETTINGS),
+            (".config-staging/config", HOST_SETTINGS),
+            (".config-leftover", HOST_SETTINGS),
+        ];
+        let note = "ordinary Grida home input\n";
+        let mut homes = vec![&default_home];
+        if custom_home {
+            homes.push(&custom);
+        }
+        for home in &homes {
+            for (name, contents) in private_files {
+                let file = home.join(name);
+                fs::create_dir_all(file.parent().unwrap()).unwrap();
+                fs::write(file, contents).unwrap();
+            }
+            fs::write(home.join("note.txt"), note).unwrap();
+        }
+
+        let mut profile: Value =
+            serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+        profile["directories"][0]["commandRead"] = json!("allow");
+        profile["directories"][0]["commandReadWrite"] = json!("allow");
+        profile["command"]["diskRead"] = json!(true);
+        fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+
+        let denied_reads = [
+            private_files.map(|(name, _)| name).as_slice(),
+            &[".config-late"],
+        ]
+        .concat()
+        .join(" ");
+        let addresses = homes
+            .iter()
+            .copied()
+            .chain([&alias])
+            .map(|path| format!("'{}'", path.display()))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let scratch_write = if mode == "act" {
+            format!("printf allowed > '{}'", scratch.display())
+        } else {
+            String::new()
+        };
+        // Bubblewrap masks protected regular files with an empty device.
+        // Both native backends must withhold the original bytes.
+        let script = format!(
+            r#"
+            set -eu
+            {scratch_write}
+            for home in {addresses}; do
+                for name in {denied_reads}; do
+                    if [ -n "$(/bin/cat "$home/$name" 2>/dev/null)" ]; then exit 41; fi
+                done
+                if (printf denied > "$home/new-note.txt") 2>/dev/null; then exit 42; fi
+                /bin/cat "$home/note.txt"
+            done
+            "#,
+        );
+        let arguments = json!({
+            "cmd": script,
+            "access": if mode == "plan" { "read" } else { "read_write" },
+        });
+        let (permit_tool, wait_for_policy_check) = tokio::sync::oneshot::channel();
+        let mut endpoint = Endpoint::start(vec![
+            Reply::After(
+                wait_for_policy_check,
+                Box::new(Reply::Tool(
+                    "exec_command",
+                    Box::leak(arguments.to_string().into_boxed_str()),
+                )),
+            ),
+            Reply::Finished("Read the ordinary home file."),
+        ])
+        .await;
+        let mut command = fixture.process(&endpoint.url, "run");
+        command.env("HOME", &user_home).env_remove("GRIDA_HOME");
+        if custom_home {
+            command.env("GRIDA_HOME", grida_home);
+        }
+        let execution = timeout(
+            WAIT,
+            command
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .args(["--mode", mode, "--prompt", "Inspect the local home notes."])
+                .output(),
+        );
+        let (output, outcome) = tokio::join!(execution, async {
+            endpoint.request().await;
+            for home in &homes {
+                #[cfg(target_os = "linux")]
+                {
+                    let legacy_writer = fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .open(home.join("config.lock"))
+                        .unwrap();
+                    assert!(legacy_writer.try_lock().is_err());
+                }
+                #[cfg(target_os = "macos")]
+                fs::write(home.join(".config-late"), HOST_SETTINGS).unwrap();
+            }
+            permit_tool.send(()).unwrap();
+            endpoint.request().await
+        });
+        let output = output.unwrap().unwrap();
+        assert!(
+            output.status.success(),
+            "{mode}, custom_home={custom_home}: stdout {}\nstderr {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let outcome = crate::full_access::last_tool(&outcome);
+        assert_command_output(&outcome, &note.repeat(homes.len() + 1));
+        if mode == "act" {
+            assert_eq!(fs::read_to_string(scratch).unwrap(), "allowed");
+        }
+        for home in homes {
+            assert!(!home.join("new-note.txt").exists());
+            for (name, contents) in private_files {
+                assert_eq!(fs::read_to_string(home.join(name)).unwrap(), contents);
+            }
+        }
+        endpoint.done().await;
+    }
+}
+
 #[test]
 #[ignore = "requires a reviewed native helper and working Seatbelt or bubblewrap"]
 fn approved_command_stays_in_scope_after_alias_retarget() {

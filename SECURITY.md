@@ -675,12 +675,12 @@ native sandbox.
 A host profile can let programs read and execute anywhere except its protected
 paths (disk read) and start from the host's environment minus Grida's own
 `GRIDA_*` variables and the provider credential variable the host was launched
-with. The host's state, the profile file, the credential home,
-`GRIDA_HOME` and `~/.grida` stay read-and-write protected, so disk read never
-reaches them; the sandbox expresses each as an exclusion of every grant rather
-than relying on rule order. Under the default file scope, version-control
-and agent metadata (`.git`,
-`.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
+with. The host's state, the profile file, and private credential and
+configuration paths stay read-and-write protected. Grida homes stay protected
+from command writes, including under a writable parent. With disk read,
+their ordinary files remain readable. Under the default file scope,
+version-control and agent metadata (`.git`, `.agents`, `.grida`, `.codex`,
+`.aws`) directly under a writable root stay
 read-only once it exists when the command starts; agent configuration
 (`.grida`, `.codex`) is protected even before it exists. On Linux the sandbox
 holds an empty, read-only placeholder directory at such a missing path for the
@@ -720,11 +720,17 @@ Preparation refusals share one tool response regardless of path existence.
 can edit the file and use a trusted client's negotiated inspection and reload
 operations. Settings can request file creation or a specific personalization
 change through the native writer. The writer validates the source, checks for
-concurrent edits, and publishes the result atomically under its lock.
+concurrent edits, stages the complete document in a fixed private directory,
+and publishes the result atomically under its lock.
 
 Confined agent commands and file adapters protect the global config path,
-including when the user selects a custom Grida home. Full access has its
-explicit unconfined filesystem semantics. Earlier accepted inputs retain
+including when the user selects a custom Grida home. macOS confinement
+excludes the names used by earlier writers, including new files under those
+names. On Linux, a profile with broad reads holds a shared lock against those
+writers and excludes copies already on disk. The home stays read-denied if
+the lock or inventory is unavailable. The current writer shares that lock
+and serializes publication inside its private staging directory. Full access
+has its explicit unconfined filesystem semantics. Earlier accepted inputs retain
 their captured settings. A retained workspace-file request does not confer
 authority over the global file.
 
@@ -4373,7 +4379,13 @@ durable or discard unrelated OAuth records.
    renderer can configure or remove these protections.
    The [native launch profile](crates/grida-agent/src/launch_permissions.rs)
    is selected by the supervisor and read from a private canonical file. It
-   adds fixed denials for host state, the profile file, and credential homes.
+   adds fixed denials for host state and the profile file. In the default,
+   configured, and provider-selected Grida homes, it denies reads and writes
+   to provider and auth custody, private agent and CLI state, and the agent
+   configuration and its staging files. It denies writes throughout those
+   homes. Native file and workspace admission still reject overlap with the
+   protected homes. A profile that changes these denials gets a new identity,
+   so earlier accepted work cannot acquire the widened read scope on restart.
    File tools also deny installed executables, and confined commands cannot
    write them. A session working directory only selects an exact matching
    profile. Chat input and workspace content confer no grants. The protected

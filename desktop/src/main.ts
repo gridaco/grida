@@ -977,12 +977,11 @@ app.on("ready", async () => {
     nativeDocuments = ordinarySelectedSvgFiles(profile);
     if (ordinaryNativeChat) {
       try {
-        const protectedPaths =
-          NativeDesktopProfile.ordinaryChatProtectedPaths(app);
+        const protection = NativeDesktopProfile.ordinaryChatProtection(app);
         nativeDesktopAgent = await NativeDesktopAgent.prepareOrdinary(
           accountSession,
           profile.resourcesPath,
-          protectedPaths,
+          protection,
           {
             onLifecycle: onNativeLifecycle,
             openExternal: (url) => shell.openExternal(url),
@@ -993,7 +992,7 @@ app.on("ready", async () => {
         nativeDocuments = ordinarySelectedSvgFiles(
           profile,
           nativeDesktopAgent.documentIdentitiesDirectory,
-          protectedPaths
+          protection.workspace
         );
       } catch {
         dialog.showErrorBox(

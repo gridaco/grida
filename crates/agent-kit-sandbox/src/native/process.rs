@@ -282,6 +282,19 @@ const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
 "#;
 
 #[cfg(target_os = "macos")]
+fn protected_prefix_regex(path: &Path) -> String {
+    let mut pattern = String::from("^");
+    for character in path.to_str().expect("validated protected prefix").chars() {
+        if r#"\.^$*+?()[]{}|"#.contains(character) {
+            pattern.push('\\');
+        }
+        pattern.push(character);
+    }
+    pattern.push_str("[^/]*(/|$)");
+    pattern
+}
+
+#[cfg(target_os = "macos")]
 fn confined_command(prepared: &Prepared, status: i32) -> Command {
     use std::fmt::Write as _;
 
@@ -329,14 +342,35 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
     // Protected paths are excluded from every grant that contains them.
     let mut unreadable = String::new();
     let mut unwritable = String::new();
+    let mut prefix_denials = String::new();
     for (index, (path, access)) in prepared.protected.iter().enumerate() {
         let name = format!("P{index}");
-        let exclusion = format!(" (require-not (subpath (param \"{name}\")))");
-        if *access == crate::DeniedAccess::ReadWrite {
+        let matcher = if *access == DeniedAccess::ReadWritePrefix {
+            let parent = format!("A{index}");
+            command.arg("-D").arg(format!(
+                "{parent}={}",
+                path.parent().expect("validated protected prefix").display()
+            ));
+            let matcher = format!("(regex (param \"{name}\"))");
+            let _ = writeln!(
+                prefix_denials,
+                "(deny file-read* file-test-existence file-write* process-exec file-map-executable {matcher})\n\
+                 (deny file-write-unlink (require-all (vnode-type DIRECTORY)\n\
+                   (require-any (literal (param \"{parent}\")) (path-ancestors (param \"{parent}\")))))"
+            );
+            command
+                .arg("-D")
+                .arg(format!("{name}={}", protected_prefix_regex(path)));
+            matcher
+        } else {
+            command.arg("-D").arg(format!("{name}={}", path.display()));
+            format!("(subpath (param \"{name}\"))")
+        };
+        let exclusion = format!(" (require-not {matcher})");
+        if *access != DeniedAccess::Write {
             unreadable.push_str(&exclusion);
         }
         unwritable.push_str(&exclusion);
-        command.arg("-D").arg(format!("{name}={}", path.display()));
     }
     if prepared.disk_read {
         // Other launches' private temporary storage stays hidden. This
@@ -381,6 +415,9 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
             .arg("-D")
             .arg(format!("{name}={}", bound.path().display()));
     }
+    // Apply prefixes to platform-default reads too and keep a writable
+    // ancestor from being moved out of a pathname-based denial.
+    profile.push_str(&prefix_denials);
     command
         .arg("-p")
         .arg(profile)
@@ -464,6 +501,9 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
             }
             (crate::DeniedAccess::Write, _) => {
                 command.arg("--ro-bind").arg(path).arg(path);
+            }
+            (crate::DeniedAccess::ReadWritePrefix, _) => {
+                unreachable!("bubblewrap capture rejects prefixes");
             }
         }
     }

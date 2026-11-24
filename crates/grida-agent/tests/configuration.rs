@@ -236,6 +236,88 @@ fn contention_revocation_and_manual_edits_never_overwrite_another_value() {
 
 #[cfg(unix)]
 #[test]
+fn config_bytes_stay_in_private_staging_until_publication() {
+    use std::os::unix::fs::PermissionsExt;
+    let home = tempfile::tempdir().unwrap();
+    let path = home.path();
+    let original = "schema_version = 1\n# private-config-marker\n";
+    write(path, original);
+    let staging = path.join(".config-staging");
+    let rejected = edit_global_config(path, GlobalConfigEdit::WebSearch(true), || {
+        let listed = std::fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            listed,
+            ["config.toml", "config.lock", ".config-staging"]
+                .map(std::ffi::OsString::from)
+                .into()
+        );
+        assert_eq!(
+            std::fs::metadata(&staging).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let staged = std::fs::read_dir(&staging)
+            .unwrap()
+            .filter(|entry| entry.as_ref().unwrap().file_name() != "write.lock")
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(staged.len(), 1);
+        assert_eq!(
+            std::fs::metadata(&staged[0]).unwrap().permissions().mode() & 0o077,
+            0
+        );
+        let bytes = std::fs::read_to_string(&staged[0]).unwrap();
+        assert!(bytes.contains("private-config-marker"));
+        assert!(bytes.contains("web_search = \"automatic\""));
+        assert_eq!(
+            std::fs::read_to_string(path.join("config.toml")).unwrap(),
+            original
+        );
+        Err(Error::new(ErrorKind::Unavailable, "revoked"))
+    });
+    assert_eq!(rejected.unwrap_err().code, "revoked");
+    assert_eq!(
+        std::fs::read_to_string(path.join("config.toml")).unwrap(),
+        original
+    );
+    assert_eq!(
+        std::fs::read_dir(&staging)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        ["write.lock"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn managed_writes_refuse_untrusted_staging_directories() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let home = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let staging = home.path().join(".config-staging");
+    let edit = || {
+        edit_global_config(home.path(), GlobalConfigEdit::Create, || {
+            panic!("unsafe staging must fail before write admission")
+        })
+        .unwrap_err()
+        .code
+    };
+
+    symlink(outside.path(), &staging).unwrap();
+    assert_eq!(edit(), "config_directory_invalid");
+    assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
+    std::fs::remove_file(&staging).unwrap();
+    std::fs::create_dir(&staging).unwrap();
+    std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(edit(), "config_staging_directory_unsafe");
+    assert!(!home.path().join("config.toml").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn global_configuration_allows_owner_writable_files_and_rejects_aliases() {
     use std::os::unix::fs::{PermissionsExt, symlink};
     let home = tempfile::tempdir().unwrap();

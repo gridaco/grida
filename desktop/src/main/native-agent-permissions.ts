@@ -42,6 +42,8 @@ export type NativeWorkspaceSelection = Readonly<{
   allowScopedAccess?: true;
   /** Desktop-owned state, credentials, media, or other protected locations. */
   protectedPaths: readonly string[];
+  /** App-specific denials additional to the native host's built-in rules. */
+  launchProtectedPaths?: readonly string[];
 }>;
 
 type ApprovalBasis = Readonly<{
@@ -196,7 +198,14 @@ export class NativeAgentPermissions {
       throw invalidProfile();
 
     const protectedPaths = [...new Set(workspace.protectedPaths)].sort();
-    if (protectedPaths.some((entry) => !path.isAbsolute(entry)))
+    const launchProtectedPaths =
+      workspace.launchProtectedPaths === undefined
+        ? protectedPaths
+        : [...new Set(workspace.launchProtectedPaths)].sort();
+    if (
+      protectedPaths.some((entry) => !path.isAbsolute(entry)) ||
+      launchProtectedPaths.some((entry) => !protectedPaths.includes(entry))
+    )
       throw invalidProfile();
     const scopedAccess =
       command && workspace.allowScopedAccess
@@ -208,7 +217,7 @@ export class NativeAgentPermissions {
       revision: command ? "default-v1" : "ask-me-v1",
       primary: primary.id,
       directories,
-      protectedPaths,
+      protectedPaths: launchProtectedPaths,
       ...(command ? { allowFullAccess: true } : {}),
       ...(hooks ? { hooks: hooks.hooks } : {}),
       ...(command ? { command } : hooks ? { command: hooks.command } : {}),

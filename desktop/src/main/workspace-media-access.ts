@@ -67,16 +67,23 @@ export function nativeWorkspaceCatalog(profile: DesktopProfile) {
     user_data: agentData,
     home: profile.userHome,
   });
+  const appProtection = [
+    ...filesystem.deny_read,
+    agentData,
+    profile.temp,
+    profile.mediaRoot,
+    ...(profile.isPackaged ? [path.dirname(profile.resourcesPath)] : []),
+  ];
   return new NativeWorkspaceCatalog({
     browserData: profile.userData,
     projectsRoot: profile.projectsRoot,
     protectedPaths: [
-      ...filesystem.deny_read,
+      ...appProtection,
       ...NativeDesktopProfile.protectedRoots(app).metadataPaths(),
-      agentData,
-      profile.temp,
-      profile.mediaRoot,
-      ...(profile.isPackaged ? [path.dirname(profile.resourcesPath)] : []),
+    ],
+    launchProtectedPaths: [
+      ...appProtection,
+      ...NativeDesktopProfile.launchProtectedRoots(app).metadataPaths(),
     ],
   });
 }

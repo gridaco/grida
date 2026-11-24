@@ -13,7 +13,7 @@ use agent_kit_sandbox::{
 };
 use grida_agent_master::{approval_review::ReadProfile, hooks::CheckMode};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -260,16 +260,63 @@ pub fn load_launch_permission_profile(
 
     let mut read_write = profile.protected_paths;
     read_write.extend([profile_file.to_owned(), state_directory.to_owned()]);
-    if let Some(home) = credential_home {
-        read_write.push(home.to_owned());
-    }
-    if let Some(home) = std::env::var_os("GRIDA_HOME").filter(|path| !path.is_empty()) {
-        read_write.push(PathBuf::from(home));
-    }
-    if let Some(home) = std::env::home_dir() {
-        read_write.push(home.join(".grida"));
-    }
     let mut write = vec![std::env::current_exe().map_err(|_| unavailable())?];
+    #[cfg(target_os = "linux")]
+    let mut configuration_locks = Vec::new();
+    #[cfg(target_os = "macos")]
+    let mut private_name_prefixes = Vec::new();
+    let disk_read = profile
+        .command
+        .as_ref()
+        .is_some_and(|command| command.disk_read);
+    let homes: BTreeSet<_> = credential_home
+        .map(Path::to_owned)
+        .into_iter()
+        .chain(
+            std::env::var_os("GRIDA_HOME")
+                .filter(|path| !path.is_empty())
+                .map(PathBuf::from),
+        )
+        .chain(std::env::home_dir().map(|home| home.join(".grida")))
+        .collect();
+    for home in homes {
+        validate_absolute(&home)?;
+        if !disk_read {
+            read_write.push(home);
+            continue;
+        }
+        #[cfg(target_os = "linux")]
+        let Ok(configuration_lock) = crate::configuration::hold_legacy_writer_lock(&home) else {
+            read_write.push(home);
+            continue;
+        };
+        if let Some(stages) = legacy_config_stages(&home) {
+            #[cfg(target_os = "linux")]
+            configuration_locks.push(configuration_lock);
+            #[cfg(target_os = "macos")]
+            private_name_prefixes
+                .push(home.join(crate::configuration::LEGACY_WRITE_STAGING_PREFIX));
+            read_write.extend(stages);
+            read_write.extend(
+                [
+                    "providers",
+                    "auth",
+                    "auth.json",
+                    "agent",
+                    "cli",
+                    "credential-continuity",
+                    crate::configuration::SOURCE_FILE,
+                    crate::configuration::LEGACY_WRITER_LOCK,
+                    crate::configuration::WRITE_STAGING_DIRECTORY,
+                ]
+                .into_iter()
+                .map(|name| home.join(name)),
+            );
+            write.push(home);
+        } else {
+            read_write.push(home);
+        }
+    }
     let completion = profile
         .before_completion
         .map(|hook| hook.reviewed(profile.command.as_ref()))
@@ -361,6 +408,14 @@ pub fn load_launch_permission_profile(
         }))
         .collect();
     let protected = ProtectedRoots::new(denials.iter().map(|entry| entry.path.clone()).collect())?;
+    #[cfg(target_os = "macos")]
+    let denials = denials
+        .into_iter()
+        .chain(private_name_prefixes.into_iter().map(|path| ProtectedPath {
+            path,
+            access: DeniedAccess::ReadWritePrefix,
+        }))
+        .collect();
     let mut directories = Vec::new();
     let mut rules = std::collections::BTreeMap::new();
     for directory in profile.directories {
@@ -395,6 +450,8 @@ pub fn load_launch_permission_profile(
         denials,
         command,
     )?;
+    #[cfg(target_os = "linux")]
+    let profile = profile.with_configuration_locks(configuration_locks);
     let profile = match completion {
         Some(hook) => profile.with_completion_hook(hook, hooks_only)?,
         None => profile,
@@ -418,6 +475,38 @@ pub fn load_launch_permission_profile(
             .with_approve_for_me(allow_approve_for_me)
             .with_full_access(allow_full_access, initial_permission_mode)?,
     ))
+}
+
+/// Older Settings writers staged private bytes directly in the home. Retain
+/// exclusions for any copies left at launch. An unreadable or unusually large
+/// directory keeps its whole-home exclusion.
+fn legacy_config_stages(home: &Path) -> Option<Vec<PathBuf>> {
+    const MAX_HOME_ENTRIES: usize = 4096;
+    const MAX_STAGES: usize = 8;
+    let entries = match std::fs::read_dir(home) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Some(Vec::new()),
+        Err(_) => return None,
+    };
+    let mut stages = Vec::new();
+    for (index, entry) in entries.enumerate() {
+        if index >= MAX_HOME_ENTRIES {
+            return None;
+        }
+        let entry = entry.ok()?;
+        let name = entry.file_name();
+        if name
+            .as_encoded_bytes()
+            .starts_with(crate::configuration::LEGACY_WRITE_STAGING_PREFIX.as_bytes())
+            && name != crate::configuration::WRITE_STAGING_DIRECTORY
+        {
+            if stages.len() == MAX_STAGES {
+                return None;
+            }
+            stages.push(entry.path());
+        }
+    }
+    Some(stages)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]

@@ -226,14 +226,14 @@ export class NativeDesktopAgent {
   static async prepareOrdinary(
     account: DesktopAccountSession,
     resourcesPath: string,
-    protectedPaths: readonly string[],
+    protection: NativeDesktopProfile.ChatProtection,
     options: Pick<
       LaunchOptions,
       "openExternal" | "onLifecycle" | "chatTitles" | "modelCatalogue"
     >
   ) {
     return this.compose(
-      await NativeChatStore.prepareOrdinary(protectedPaths),
+      await NativeChatStore.prepareOrdinary(protection),
       account,
       resourcesPath,
       { ...options, provider: "gateway", selectableProfiles: true },
@@ -492,7 +492,8 @@ export class NativeDesktopAgent {
             identity: workspace.identity,
             protected: this.store.protectedPaths,
           },
-          relativePath
+          relativePath,
+          this.store.launchProtectedPaths
         );
         requireCurrent();
         return grant;
@@ -531,7 +532,10 @@ export class NativeDesktopAgent {
           identity: grant.identity,
           nestedDeck: {
             parentWorkspaceId: grant.parentWorkspaceId,
-            protectedPaths: grant.protected,
+            protection: {
+              workspace: grant.protected,
+              launch: grant.launchProtected,
+            },
             requireCurrent,
           },
         });
@@ -1534,7 +1538,7 @@ export class NativeDesktopAgent {
               ...(await this.workspaceLaunch(
                 workspace,
                 provider,
-                workspace.nestedDeck?.protectedPaths
+                workspace.nestedDeck?.protection
               )),
               mcp: workspace.nestedDeck
                 ? undefined
@@ -1591,22 +1595,24 @@ export class NativeDesktopAgent {
   private async workspaceLaunch(
     workspace: SelectedWorkspace,
     provider: NativeProviderRouteLaunch,
-    nestedProtectedPaths?: readonly string[]
+    nestedProtection?: NativeDesktopProfile.ChatProtection
   ) {
     const { id, root, identity } = workspace;
-    const useWorkspaceServices =
-      this.selectableProfiles && !nestedProtectedPaths;
+    const useWorkspaceServices = this.selectableProfiles && !nestedProtection;
+    const catalogProtection = this.workspaceCatalogRoot
+      ? [this.workspaceCatalogRoot]
+      : [];
     return {
       ...this.providerLimits(provider),
       imagePlacement:
         identity &&
-        !nestedProtectedPaths &&
+        !nestedProtection &&
         (provider.imageGeneration || useWorkspaceServices)
           ? this.imagePlacement?.({ workspaceId: id, root, identity })
           : undefined,
       reviewImageReference:
         identity &&
-        !nestedProtectedPaths &&
+        !nestedProtection &&
         (provider.imageGeneration || useWorkspaceServices)
           ? this.reviewImageReference?.({ id, root })
           : undefined,
@@ -1632,11 +1638,16 @@ export class NativeDesktopAgent {
           ...(identity && { identity }),
         },
         additionalReadRoots: [],
-        ...(!nestedProtectedPaths && { allowScopedAccess: true as const }),
+        ...(!nestedProtection && { allowScopedAccess: true as const }),
         protectedPaths: [
           ...this.store.protectedPaths,
-          ...(this.workspaceCatalogRoot ? [this.workspaceCatalogRoot] : []),
-          ...(nestedProtectedPaths ?? []),
+          ...catalogProtection,
+          ...(nestedProtection?.workspace ?? []),
+        ],
+        launchProtectedPaths: [
+          ...this.store.launchProtectedPaths,
+          ...catalogProtection,
+          ...(nestedProtection?.launch ?? []),
         ],
       },
     };

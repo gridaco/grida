@@ -219,9 +219,14 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
         diskRead: true as const,
         environment: { PATH: "/usr/bin:/bin" },
       };
-      const { profile } = await NativeAgentPermissions.stage(
+      const { profile, scopedAccess } = await NativeAgentPermissions.stage(
         test.stateDirectory,
-        test.workspace,
+        {
+          ...test.workspace,
+          allowScopedAccess: true,
+          protectedPaths: [...test.workspace.protectedPaths, test.configHome],
+          launchProtectedPaths: test.workspace.protectedPaths,
+        },
         undefined,
         command
       );
@@ -242,6 +247,13 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       );
       expect(selected.directories[1].write).toBeUndefined();
       expect(selected.command).toEqual(command);
+      expect(selected.protectedPaths).toEqual(test.workspace.protectedPaths);
+      expect(scopedAccess?.protectedPaths).toEqual(
+        expect.arrayContaining([
+          ...test.workspace.protectedPaths,
+          test.configHome,
+        ])
+      );
     } finally {
       test.close();
     }

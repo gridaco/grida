@@ -35,7 +35,8 @@ export class FxExtension {
           profile.nativeChat === "preview"
             ? NativeDesktopProfile.protectedRoots(desktopApp())
             : new ProtectedRoots(
-                NativeDesktopProfile.ordinaryChatProtectedPaths(desktopApp())
+                NativeDesktopProfile.ordinaryChatProtection(desktopApp())
+                  .workspace
               );
         return protectedRoots.overlaps(registered.root)
           ? undefined

@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — isolated Desktop profiles for native chat.
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import type { App } from "electron";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
@@ -25,25 +26,40 @@ export namespace NativeDesktopProfile {
   };
   const admitted = new WeakMap<
     Pick<App, "getPath">,
-    { installed: ProtectedRoots; all: ProtectedRoots }
+    { installed: ProtectedRoots; all: ProtectedRoots; launch: ProtectedRoots }
   >();
 
-  export function ordinaryChatProtectedPaths(
+  export type ChatProtection = Readonly<{
+    workspace: readonly string[];
+    launch: readonly string[];
+  }>;
+
+  export function ordinaryChatProtection(
     app: Pick<App, "getPath" | "isPackaged">,
     resourcesPath = process.resourcesPath
-  ): readonly string[] {
+  ): ChatProtection {
     const userHome = app.getPath("home");
     const { filesystem } = buildDaemonSandboxPolicy({
       user_data: path.join(home.dir({ home: userHome }), "agent"),
       home: userHome,
     });
-    return [
+    const launch = [
       ...filesystem.deny_read,
-      ...new ProtectedRoots(installRoots(app)).metadataPaths(),
+      ...new ProtectedRoots([
+        ...installedAppData(app),
+        ...additionalDesktopHome(userHome),
+      ]).metadataPaths(),
       // Source runs use Electron from the checkout's dependencies. Only a
       // packaged launch has an installed application to exclude from grants.
       ...(app.isPackaged && resourcesPath ? [path.dirname(resourcesPath)] : []),
     ];
+    return {
+      workspace: [
+        ...new ProtectedRoots(gridaHomes(app)).metadataPaths(),
+        ...launch,
+      ],
+      launch,
+    };
   }
 
   /** Installed state and the preview config, outside workspace authority. */
@@ -51,6 +67,15 @@ export namespace NativeDesktopProfile {
     const roots = admitted.get(app);
     if (!roots) throw invalidProfile();
     return roots.all;
+  }
+
+  /** App-specific native profile denials alongside host-owned home rules. */
+  export function launchProtectedRoots(
+    app: Pick<App, "getPath">
+  ): ProtectedRoots {
+    const roots = admitted.get(app);
+    if (!roots) throw invalidProfile();
+    return roots.launch;
   }
 
   /** Recheck isolation from existing installations before starting services. */
@@ -67,7 +92,7 @@ export namespace NativeDesktopProfile {
     profile: Pick<DesktopProfile, "isPackaged">
   ): ProtectedRoots | undefined {
     if (profile.isPackaged) return;
-    return new ProtectedRoots(packagedRoots(app));
+    return new ProtectedRoots([...gridaHomes(app), ...packagedAppData(app)]);
   }
 
   export async function configure(
@@ -114,7 +139,11 @@ export namespace NativeDesktopProfile {
       reserved.has(path.basename(configHome).toLowerCase())
     )
       throw invalidProfile();
-    const installedPaths = installRoots(app, configHome);
+    const installedAppPaths = installedAppData(app);
+    const installedPaths = [
+      ...gridaHomes(app, configHome),
+      ...installedAppPaths,
+    ];
     const installed = new ProtectedRoots(installedPaths);
     if (installed.overlaps(root)) throw invalidProfile();
     await checkDirectory(root);
@@ -142,6 +171,10 @@ export namespace NativeDesktopProfile {
     admitted.set(app, {
       installed,
       all: new ProtectedRoots([...installedPaths, configHome]),
+      launch: new ProtectedRoots([
+        ...installedAppPaths,
+        ...additionalDesktopHome(app.getPath("home")),
+      ]),
     });
     return provider;
   }
@@ -175,33 +208,52 @@ export namespace NativeDesktopProfile {
     return value;
   }
 
-  /** Grida homes and every Desktop edition's application data. */
-  function installRoots(
-    app: Pick<App, "getPath">,
-    previewConfigHome?: string
-  ): string[] {
+  function installedAppData(app: Pick<App, "getPath">): string[] {
     const appData = app.getPath("appData");
     return [
-      ...packagedRoots(app, previewConfigHome),
+      ...packagedAppData(app),
       path.join(appData, DesktopProfile.developmentName(false)),
       path.join(appData, DesktopProfile.developmentName(true)),
     ];
   }
 
-  function packagedRoots(
+  function gridaHomes(
     app: Pick<App, "getPath">,
     previewConfigHome?: string
   ): string[] {
     const userHome = app.getPath("home");
-    const appData = app.getPath("appData");
     const configured = home.dir({ home: userHome });
-    const roots = [
+    return [
       path.join(userHome, ".grida"),
       ...(path.normalize(configured) === previewConfigHome ? [] : [configured]),
-      ...["Grida", "Grida Insiders", "Grida (Insiders)", "desktop"].map(
-        (name) => path.join(appData, name)
-      ),
     ];
+  }
+
+  function additionalDesktopHome(userHome: string): string[] {
+    // The native child starts without HOME and resolves the account home.
+    // Preserve the Desktop home separately if that lookup cannot cover it.
+    try {
+      const accountHome = os.userInfo().homedir;
+      if (
+        path.isAbsolute(accountHome) &&
+        path.resolve(accountHome) === path.resolve(userHome)
+      )
+        return [];
+    } catch {
+      // An unavailable account lookup keeps the Desktop home protected.
+    }
+    return [path.join(userHome, home.DIRNAME)];
+  }
+
+  function packagedAppData(app: Pick<App, "getPath">): string[] {
+    const userHome = app.getPath("home");
+    const appData = app.getPath("appData");
+    const roots = [
+      "Grida",
+      "Grida Insiders",
+      "Grida (Insiders)",
+      "desktop",
+    ].map((name) => path.join(appData, name));
     if (process.platform === "linux") {
       const xdg = process.env.XDG_DATA_HOME?.trim();
       const data =

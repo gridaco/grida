@@ -41,6 +41,7 @@ export class NativeChatStore {
   private constructor(
     private readonly stateDirectory: string,
     readonly protectedPaths: readonly string[],
+    readonly launchProtectedPaths: readonly string[],
     readonly configHome: string
   ) {}
 
@@ -60,13 +61,16 @@ export class NativeChatStore {
 
   /** Open the store beside the ordinary browser profile. */
   static prepareOrdinary(
-    protectedPaths: readonly string[]
+    protection: NativeDesktopProfile.ChatProtection
   ): Promise<NativeChatStore> {
-    return this.claim([...protectedPaths]);
+    return this.claim({
+      workspace: [...protection.workspace],
+      launch: [...protection.launch],
+    });
   }
 
   private static async claim(
-    ordinaryProtectedPaths?: readonly string[]
+    ordinaryProtection?: NativeDesktopProfile.ChatProtection
   ): Promise<NativeChatStore> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_chat_store_platform_unsupported");
@@ -74,7 +78,7 @@ export class NativeChatStore {
     if (this.prepared) throw new Error("native_chat_store_already_prepared");
     this.preparing = true;
     try {
-      const prepared = await this.open(ordinaryProtectedPaths);
+      const prepared = await this.open(ordinaryProtection);
       this.prepared = true;
       return prepared;
     } finally {
@@ -83,9 +87,9 @@ export class NativeChatStore {
   }
 
   private static async open(
-    ordinaryProtectedPaths: readonly string[] | undefined
+    ordinaryProtection: NativeDesktopProfile.ChatProtection | undefined
   ): Promise<NativeChatStore> {
-    const ordinary = ordinaryProtectedPaths !== undefined;
+    const ordinary = ordinaryProtection !== undefined;
     const paths = selectNativeChat(ordinary);
     const desktop = await fs.realpath(paths.desktopUserDataPath);
     checkDirectory(await fs.lstat(desktop), false);
@@ -95,14 +99,12 @@ export class NativeChatStore {
       await intendedLocation(path.dirname(paths.configHome)),
       path.basename(paths.configHome)
     );
-    const separate = await Promise.all(
-      [
-        paths.userDataPath,
-        paths.providerHome,
-        paths.mediaRoot,
-        ...(configHome !== paths.providerHome ? [configHome] : []),
-      ].map(intendedLocation)
+    const [agentData, providerHome, mediaRoot, configRoot] = await Promise.all(
+      [paths.userDataPath, paths.providerHome, paths.mediaRoot, configHome].map(
+        intendedLocation
+      )
     );
+    const separate = [agentData, providerHome, mediaRoot, configRoot];
     if (separate.some((root) => overlaps(root, stateDirectory)))
       throw new Error("native_chat_store_state_overlap");
     const sourceKey = storeSourceKey(
@@ -127,7 +129,20 @@ export class NativeChatStore {
     }
     return new NativeChatStore(
       stateDirectory,
-      Object.freeze([desktop, ...separate, ...(ordinaryProtectedPaths ?? [])]),
+      Object.freeze([
+        desktop,
+        ...separate,
+        ...(ordinaryProtection?.workspace ?? []),
+      ]),
+      // Rust owns rules for the configured Grida home. A separate provider
+      // home is private application state, including when it shares agentData.
+      Object.freeze([
+        desktop,
+        agentData,
+        mediaRoot,
+        ...(providerHome === configRoot ? [] : [providerHome]),
+        ...(ordinaryProtection?.launch ?? []),
+      ]),
       configHome
     );
   }

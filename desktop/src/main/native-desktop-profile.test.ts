@@ -2,7 +2,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, onTestFinished, vi } from "vitest";
 import type { App } from "electron";
 import VitePlugin from "@electron-forge/plugin-vite";
 import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
@@ -19,6 +19,7 @@ import {
 it("excludes packaged application resources while allowing source checkouts as workspaces", () => {
   const base = path.join(os.tmpdir(), "grida-native-profile-test");
   const home = path.join(base, "home");
+  const configuredHome = path.join(base, "configured-home");
   const appData = path.join(home, "app-data");
   const checkout = path.join(home, "src", "grida");
   const resources = path.join(
@@ -29,18 +30,46 @@ it("excludes packaged application resources while allowing source checkouts as w
   );
   const getPath = (name: Parameters<App["getPath"]>[0]) =>
     name === "home" ? home : appData;
+  const account = os.userInfo();
+  const accountLookup = vi.spyOn(os, "userInfo").mockReturnValue({
+    ...account,
+    homedir: home,
+  });
+  vi.stubEnv("GRIDA_HOME", configuredHome);
+  onTestFinished(() => {
+    accountLookup.mockRestore();
+    vi.unstubAllEnvs();
+  });
 
   for (const isPackaged of [false, true]) {
-    const protectedPaths = new ProtectedRoots(
-      NativeDesktopProfile.ordinaryChatProtectedPaths(
-        { getPath, isPackaged },
-        resources
-      )
+    const protection = NativeDesktopProfile.ordinaryChatProtection(
+      { getPath, isPackaged },
+      resources
     );
-    expect(protectedPaths.overlaps(checkout)).toBe(isPackaged);
-    expect(protectedPaths.overlaps(path.join(home, ".aws"))).toBe(true);
-    expect(protectedPaths.overlaps(path.join(home, ".grida"))).toBe(true);
-    expect(protectedPaths.overlaps(path.join(appData, "Grida Dev"))).toBe(true);
+    const workspace = new ProtectedRoots(protection.workspace);
+    const launch = new ProtectedRoots(protection.launch);
+    for (const protection of [workspace, launch]) {
+      expect(protection.overlaps(checkout)).toBe(isPackaged);
+      expect(protection.overlaps(path.join(home, ".aws"))).toBe(true);
+      expect(protection.overlaps(path.join(appData, "Grida Dev"))).toBe(true);
+    }
+    expect(workspace.overlaps(path.join(home, ".grida"))).toBe(true);
+    expect(launch.overlaps(path.join(home, ".grida"))).toBe(false);
+    expect(workspace.overlaps(configuredHome)).toBe(true);
+    expect(launch.overlaps(configuredHome)).toBe(false);
+  }
+  accountLookup.mockReturnValueOnce({ ...account, homedir: configuredHome });
+  accountLookup.mockImplementationOnce(() => {
+    throw new Error("account lookup unavailable");
+  });
+  for (let i = 0; i < 2; i++) {
+    const protection = NativeDesktopProfile.ordinaryChatProtection({
+      getPath,
+      isPackaged: false,
+    });
+    const launch = new ProtectedRoots(protection.launch);
+    expect(launch.overlaps(path.join(home, ".grida", "auth"))).toBe(true);
+    expect(launch.overlaps(configuredHome)).toBe(false);
   }
 });
 
@@ -206,7 +235,10 @@ it.skipIf(process.platform === "win32")(
       await expect(configure()).resolves.toBe("gateway");
       expect(resolve().mediaRoot).toBe(path.join(root, "media"));
       const denials = NativeDesktopProfile.protectedRoots(app);
+      const launch = NativeDesktopProfile.launchProtectedRoots(app);
       expect(denials.overlaps(path.join(dotGrida, "agent"))).toBe(true);
+      expect(launch.overlaps(path.join(dotGrida, "agent"))).toBe(true);
+      expect(launch.overlaps(config)).toBe(false);
       expect(denials.overlaps(path.join(config, "config.toml"))).toBe(true);
       expect(denials.metadataPaths()).toContain(config);
       expect(denials.overlaps(root)).toBe(true);

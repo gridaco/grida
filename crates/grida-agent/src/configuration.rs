@@ -13,7 +13,11 @@ use std::sync::Mutex;
 use toml_edit::{DocumentMut, Item, Table, Value};
 
 const MAX_FILE_BYTES: u64 = 64 * 1024;
-const SOURCE_FILE: &str = "config.toml";
+pub(crate) const SOURCE_FILE: &str = "config.toml";
+pub(crate) const WRITE_STAGING_DIRECTORY: &str = ".config-staging";
+pub(crate) const LEGACY_WRITE_STAGING_PREFIX: &str = ".config-";
+pub(crate) const LEGACY_WRITER_LOCK: &str = "config.lock";
+const STAGING_WRITER_LOCK: &str = "write.lock";
 const PREDICTIONS: &str = "composer-predictions-enabled";
 const TEMPLATE: &str = r#"# Grida agent settings shared across projects.
 schema_version = 1
@@ -203,9 +207,15 @@ pub fn edit_global_config(
     if create && open_source(&source_path)?.is_some() {
         return check_directory_identity(directory, &metadata);
     }
-    let writer = open_writer(&directory.join("config.lock"))?;
+    let _legacy_writer = hold_legacy_writer_lock(directory)?;
+    let staging = directory.join(WRITE_STAGING_DIRECTORY);
+    let staging_identity = prepare_staging_directory(&staging)?;
+    let writer_path = staging.join(STAGING_WRITER_LOCK);
+    let writer = open_writer(&writer_path)?;
     let _guard = WriterGuard::acquire(&writer)?;
     check_directory_identity(directory, &metadata)?;
+    check_same_directory(&validate_staging_directory(&staging)?, &staging_identity)?;
+    check_writer_identity(&writer_path, &writer)?;
     let original = if create {
         if open_source(&source_path)?.is_some() {
             return check_directory_identity(directory, &metadata);
@@ -240,7 +250,8 @@ pub fn edit_global_config(
     }
     let bytes = render(existing, &document);
     let expected = revision(original.as_deref())?;
-    write_atomic(directory, original.is_none(), &bytes, || {
+    check_same_directory(&validate_staging_directory(&staging)?, &staging_identity)?;
+    write_atomic(directory, &staging, original.is_none(), &bytes, || {
         check_directory_identity(directory, &metadata)?;
         check_revision(
             revision(read_bytes(&directory.join(SOURCE_FILE))?.as_deref())?,
@@ -248,6 +259,8 @@ pub fn edit_global_config(
         )?;
         admit()?;
         check_directory_identity(directory, &metadata)?;
+        check_same_directory(&validate_staging_directory(&staging)?, &staging_identity)?;
+        check_writer_identity(&writer_path, &writer)?;
         check_revision(
             revision(read_bytes(&directory.join(SOURCE_FILE))?.as_deref())?,
             expected,
@@ -422,7 +435,10 @@ fn validate_acl(path: &Path) -> Result<()> {
 }
 
 fn check_directory_identity(directory: &Path, expected: &Metadata) -> Result<()> {
-    let current = validate_directory(directory)?;
+    check_same_directory(&validate_directory(directory)?, expected)
+}
+
+fn check_same_directory(current: &Metadata, expected: &Metadata) -> Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -431,7 +447,7 @@ fn check_directory_identity(directory: &Path, expected: &Metadata) -> Result<()>
         }
     }
     #[cfg(not(unix))]
-    let _ = (&current, expected);
+    let _ = (current, expected);
     Ok(())
 }
 
@@ -547,12 +563,39 @@ fn open_writer(path: &Path) -> Result<File> {
     let file = options
         .open(path)
         .map_err(|_| unavailable("config_lock_unavailable"))?;
-    validate_file(
-        &file
-            .metadata()
-            .map_err(|_| unavailable("config_lock_unavailable"))?,
-        true,
-    )?;
+    check_writer_identity(path, &file)?;
+    Ok(file)
+}
+
+fn check_writer_identity(path: &Path, file: &File) -> Result<()> {
+    let named =
+        std::fs::symlink_metadata(path).map_err(|_| unavailable("config_lock_unavailable"))?;
+    let opened = file
+        .metadata()
+        .map_err(|_| unavailable("config_lock_unavailable"))?;
+    validate_file(&named, true)?;
+    validate_file(&opened, true)?;
+    validate_acl(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if named.dev() != opened.dev() || named.ino() != opened.ino() {
+            return Err(unavailable("config_lock_changed"));
+        }
+    }
+    Ok(())
+}
+
+/// Keep earlier Settings writers from staging configuration in the readable
+/// part of the home. Keeping the file open keeps the shared lock held.
+pub(crate) fn hold_legacy_writer_lock(directory: &Path) -> Result<File> {
+    let identity = validate_directory(directory)?;
+    let path = directory.join(LEGACY_WRITER_LOCK);
+    let file = open_writer(&path)?;
+    file.try_lock_shared()
+        .map_err(|_| unavailable("config_writer_busy"))?;
+    check_directory_identity(directory, &identity)?;
+    check_writer_identity(&path, &file)?;
     Ok(file)
 }
 
@@ -572,8 +615,37 @@ impl Drop for WriterGuard<'_> {
     }
 }
 
+fn validate_staging_directory(path: &Path) -> Result<Metadata> {
+    let metadata = validate_directory(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if metadata.mode() & 0o077 != 0 {
+            return Err(invalid("config_staging_directory_unsafe"));
+        }
+    }
+    Ok(metadata)
+}
+
+fn prepare_staging_directory(staging: &Path) -> Result<Metadata> {
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    match builder.create(staging) {
+        Ok(()) => (),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
+        Err(_) => return Err(unavailable("config_write_failed")),
+    }
+    validate_staging_directory(staging)
+}
+
 fn write_atomic(
     directory: &Path,
+    staging: &Path,
     create: bool,
     bytes: &[u8],
     admission: impl FnOnce() -> Result<()>,
@@ -584,10 +656,10 @@ fn write_atomic(
             "config_file_too_large",
         ));
     }
-    let mut file = tempfile::Builder::new()
-        .prefix(".config-")
-        .tempfile_in(directory)
-        .map_err(|_| unavailable("config_write_failed"))?;
+    // The complete document can contain private hook arguments. Stage it
+    // inside the fixed directory that the native permission profile protects.
+    let mut file =
+        tempfile::NamedTempFile::new_in(staging).map_err(|_| unavailable("config_write_failed"))?;
     file.write_all(bytes)
         .map_err(|_| unavailable("config_write_failed"))?;
     file.as_file()
@@ -608,9 +680,11 @@ fn write_atomic(
             .map_err(|_| unavailable("config_write_failed"))?;
     }
     #[cfg(unix)]
-    File::open(directory)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|_| Error::new(ErrorKind::Uncertain, "config_sync_uncertain"))?;
+    for parent in [directory, staging] {
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|_| Error::new(ErrorKind::Uncertain, "config_sync_uncertain"))?;
+    }
     Ok(())
 }
 
@@ -625,6 +699,38 @@ fn unavailable(code: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_writers_are_excluded_without_blocking_private_staging() {
+        let home = tempfile::tempdir().unwrap();
+        let directory = home.path();
+        let path = directory.join(LEGACY_WRITER_LOCK);
+        let legacy = open_writer(&path).unwrap();
+        let held = hold_legacy_writer_lock(directory).unwrap();
+        assert!(legacy.try_lock().is_err());
+
+        edit_global_config(directory, GlobalConfigEdit::Create, || {
+            assert!(legacy.try_lock().is_err());
+            let competing = edit_global_config(directory, GlobalConfigEdit::Create, || {
+                panic!("a current writer must wait for the private staging lock")
+            });
+            assert_eq!(competing.unwrap_err().code, "config_writer_busy");
+            Ok(())
+        })
+        .unwrap();
+        assert!(directory.join(SOURCE_FILE).is_file());
+
+        drop(held);
+        let _old_writer = WriterGuard::acquire(&legacy).unwrap();
+        assert_eq!(
+            hold_legacy_writer_lock(directory).unwrap_err().code,
+            "config_writer_busy"
+        );
+        let edit = edit_global_config(directory, GlobalConfigEdit::WebSearch(false), || {
+            panic!("a current writer must wait for an already active legacy writer")
+        });
+        assert_eq!(edit.unwrap_err().code, "config_writer_busy");
+    }
 
     #[test]
     fn preserves_historical_accepted_payloads_without_exposing_a_runtime_limit() {
