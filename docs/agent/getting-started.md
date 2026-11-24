@@ -24,8 +24,8 @@ headless host. Windows Desktop has no agent chat.
 
 Describe what you want in the Welcome composer and press **Send**. The composer
 clears so you can start typing your next message while Grida opens the selected
-project. Your first message and its attachment appear in the project chat while
-it starts. Reloading during the handoff preserves the follow-up as a separate
+project. Your first message and its attachment appear in a new project chat
+with a fresh set of tabs. Reloading during the handoff preserves the follow-up as a separate
 draft. If that chat already has an unsent draft, the text you typed during
 opening stays on Home.
 
@@ -43,7 +43,8 @@ Grida models appear in the project's own picker once its chat is running.
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template
-into the project as its own deck and asks the agent to adapt that copy. The
+into the project as its own deck, opens it in the new chat, and asks the agent
+to adapt that copy. The
 chat shows the template as a separate chip beside your words. Add a description
 when starting a Goal or sending a non-image file or folder with the template.
 References you add from the gallery are sent as links in the first message.
@@ -61,7 +62,11 @@ guidance as context.
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. A new chat starts in
+Open a folder in Grida Desktop to return to its last selected chat and tabs.
+Switch chats from the chat list to return to the files and pages you had open
+in that conversation. Files are shared across chats in the same project.
+
+A new chat starts in
 **Auto** when available. The agent reads and edits files in the project and
 runs commands in a sandbox. The chat’s model reviews eligible requests for
 extra access. Choose **Ask for approval** in the access picker to review them

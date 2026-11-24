@@ -828,8 +828,8 @@ app.on("ready", async () => {
       event,
       {
         ...windowAdmission,
-        questionPresentation: (sender, session) =>
-          chatIpc?.questionPresentation(sender, session),
+        chatPresentation: (sender, session) =>
+          chatIpc?.chatPresentation(sender, session),
       },
       current,
       profileId
@@ -1115,8 +1115,11 @@ app.on("ready", async () => {
     document_files: nativeDocuments,
     native_external_agent: nativeExternalRuns,
     resolve_document_window: (id) => documentWindows.get(id),
-    publish_workspace_surfaces: (event, snapshot) =>
-      nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
+    publish_workspace_surfaces: (event, snapshot, viewId) =>
+      nativeEditorMcp?.publish(event, snapshot, viewId) ??
+      Promise.resolve(false),
+    retire_workspace_surfaces: (event, viewId) =>
+      nativeEditorMcp?.retireView(event, viewId),
     ...(native && {
       resolve_native_chat: (_window, workspaceId, profileId) =>
         native.currentForWindow(workspaceId, profileId),

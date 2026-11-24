@@ -20,6 +20,7 @@ const settled = (
   status: Extract<NativeChatLifecycle, { kind: "settled" }>["status"]
 ): NativeChatLifecycle => ({
   kind: "settled",
+  session: { id: "chat" },
   sessionId: "chat",
   turnId: "turn",
   status,

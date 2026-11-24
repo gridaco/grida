@@ -93,12 +93,11 @@ import { WorkspaceUtilities } from "./workspace-utilities";
 import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 import { WorkspaceChangesProvider } from "./workspace-changes";
-import { WorkspaceBrowserSession } from "./workspace-browser-session";
+import { WorkspaceChatWorkbench } from "./workspace-chat-workbench";
 import { WorkbenchTab } from "./workbench-tab";
 import { WorkbenchPanels } from "./workbench-panels";
 import { SideChatTabPlacement } from "./side-chat-tab-placement";
 import { SubagentTabPlacement } from "./subagent-tab-placement";
-import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import styles from "./workspace-workbench.module.css";
 import "./browser-guest-mounts.css";
@@ -178,22 +177,27 @@ export function WorkspaceWorkbench({
   initialActiveRelPath?: string;
 }) {
   const router = useRouter();
-  // The editor group (VSCode's tab model) owns all tab state + rules — open
-  // order, the active-tab-on-close neighbor rule, and reopen-closed history —
-  // as a plain, unit-tested class. React is a
-  // wire: `useSyncExternalStore` mirrors its snapshot, and the handlers below are
-  // one-line calls into it. `active === null` means no tabs open; otherwise it's
-  // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
-  // lives where it's testable, not smeared across effects + refs + nested
-  // setState updaters.)
-  const browserSession = useMemo(
+  const [workbench] = useState(
     () =>
-      WorkspaceBrowserSession.for(
+      new WorkspaceChatWorkbench(
+        workspace.id,
         typeof document === "undefined" ? null : document,
-        workspace.id
-      ),
-    [workspace.id]
+        {
+          getItem: (key) => window.localStorage.getItem(key),
+          setItem: (key, value) => window.localStorage.setItem(key, value),
+          removeItem: (key) => window.localStorage.removeItem(key),
+        },
+        (relPath) => workspacesNs.readdir(workspace.id, relPath),
+        initialActiveRelPath
+      )
   );
+  useEffect(() => workbench.mount(), [workbench]);
+  useLayoutEffect(
+    () => workbench.openRoutePath(initialActiveRelPath),
+    [workbench, initialActiveRelPath]
+  );
+  const { session: browserSession, ready: restoreSettled } =
+    useSyncExternalStore(workbench.subscribe, workbench.read, workbench.read);
   const { group, browsers } = browserSession;
   const openWeb = useMemo(
     () => Browser.opener(browsers.openOrFocus),
@@ -213,14 +217,7 @@ export function WorkspaceWorkbench({
     () => new SubagentTabPlacement(panels),
     [panels]
   );
-  const surfaceHost = useMemo(
-    () =>
-      new WorkspaceSurfaceHost(
-        (relPath) => workspacesNs.readdir(workspace.id, relPath),
-        group
-      ),
-    [group, workspace.id]
-  );
+  const surfaceHost = workbench.surfaces;
   const { tabs: openTabs, active: activeTab } = useSyncExternalStore(
     group.subscribe,
     group.getSnapshot,
@@ -229,44 +226,9 @@ export function WorkspaceWorkbench({
   // File rules (reveal, copy path, trash, tree selection) follow the active
   // tab only when it is a file.
   const activeRelPath = WorkbenchTab.relPath(activeTab);
-  const [restoreSettled, setRestoreSettled] = useState(false);
   const previews =
     restoreSettled && browsers.canLoadPreview() ? browsers.previews : null;
-
-  useEffect(() => {
-    if (restoreSettled)
-      return surfaceHost.publishEditorSurfaces(
-        workspacesNs.publishEditorSurfaces
-      );
-  }, [restoreSettled, surfaceHost]);
-
-  useEffect(() => {
-    const automation = getDesktopBridge()?.workspaces.automation;
-    if (restoreSettled && automation?.version === 1)
-      return surfaceHost.bindAutomation(
-        automation,
-        () => browsers.activeAutomationPageId(),
-        browsers.subscribe
-      );
-  }, [browsers, restoreSettled, surfaceHost]);
-
-  // File admission and native page attachment settle before the Start surface.
-  useEffect(() => {
-    let current = true;
-    setRestoreSettled(false);
-    void browserSession
-      .start(
-        window.localStorage,
-        (paths) => surfaceHost.resolveRelativePaths(paths),
-        initialActiveRelPath
-      )
-      .finally(() => {
-        if (current) setRestoreSettled(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [browserSession, initialActiveRelPath, surfaceHost]);
+  const retainedFilePaths = workbench.referencedFiles();
 
   // Do not flash Start while a remembered artifact is still being validated.
   // Once restoration settles, an actually-empty editor group owns the faux tab.
@@ -361,7 +323,7 @@ export function WorkspaceWorkbench({
       // subtree. The group focuses the nearest surviving tab and (being a trash,
       // not a close) never records them for reopen.
       const matches = WorkbenchTab.trashed(relPath, isDirectory);
-      group.closeMatching(matches);
+      workbench.removeTrashedTabs(matches);
       setDirtyPaths(
         (paths) =>
           new Set(
@@ -370,7 +332,7 @@ export function WorkspaceWorkbench({
       );
       bumpTreeRefresh();
     },
-    [group, bumpTreeRefresh]
+    [workbench, bumpTreeRefresh]
   );
 
   // Workspace shortcuts run on bubble so focused controls can claim a chord
@@ -499,7 +461,11 @@ export function WorkspaceWorkbench({
     async (tab: string): Promise<boolean> => {
       const target = WorkbenchTab.parse(tab);
       if (target.kind === "browser") return browsers.close(target.id);
-      if (target.kind === "file" && dirtyPaths.has(target.relPath)) {
+      if (
+        target.kind === "file" &&
+        dirtyPaths.has(target.relPath) &&
+        !retainedFilePaths.has(target.relPath)
+      ) {
         const name = target.relPath.split("/").pop() ?? target.relPath;
         if (!window.confirm(`"${name}" has unsaved changes. Close anyway?`))
           return false;
@@ -508,7 +474,7 @@ export function WorkspaceWorkbench({
       group.close(tab);
       return true;
     },
-    [group, browsers, dirtyPaths, onTabDirtyChange]
+    [group, browsers, dirtyPaths, retainedFilePaths, onTabDirtyChange]
   );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
@@ -576,7 +542,8 @@ export function WorkspaceWorkbench({
                   <BrowserPreview value={previews}>
                     <AgentPane
                       workspace={workspace}
-                      surfaceHost={surfaceHost}
+                      surfaceHost={workbench}
+                      onProjectOnly={workbench.openProjectView}
                       sideChatPlacement={sideChatPlacement}
                       subagentPlacement={subagentPlacement}
                       onProcessesChange={setProcesses}
@@ -624,6 +591,7 @@ export function WorkspaceWorkbench({
                             openTabs={openTabs}
                             activeTab={activeTab}
                             dirtyPaths={dirtyPaths}
+                            retainedFilePaths={retainedFilePaths}
                             onTabDirtyChange={onTabDirtyChange}
                             onSelectTab={activateTab}
                             onMoveTab={moveTab}

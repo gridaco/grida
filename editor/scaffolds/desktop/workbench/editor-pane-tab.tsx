@@ -1,7 +1,7 @@
 /**
  * A single open tab in the workspace's file viewer.
  *
- * One EditorPaneTab is mounted per open file. The active tab is visible;
+ * One EditorPaneTab is mounted per open or unsaved file. The active tab is visible;
  * the rest sit in the same position but `invisible + pointer-events-
  * none`, which keeps each tab's React subtree alive across switches
  * — switching tabs preserves the editor's content, dirty state,
@@ -79,6 +79,7 @@ export function EditorPaneTab({
         !active && "invisible pointer-events-none"
       )}
       aria-hidden={!active}
+      inert={!active}
     >
       {/* Per-tab error boundary — a crash inside the viewer subtree
           stays contained to this one tab. Without it, an exception

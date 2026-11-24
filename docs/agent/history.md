@@ -25,6 +25,9 @@ this workspace, whichever model it used; type to search, or choose **Older
 chats** to see more. Choose **New chat** (+) in the pane's header to open a
 blank draft; the chat is created when you send its first message. Each chat
 keeps its own draft when you switch, even while a send is being confirmed.
+Desktop also restores each chat's open tabs and their order. Unsaved document
+edits stay in the workspace window when you switch chats. Browser tabs reopen
+at their saved addresses, and a site can ask you to stay before leaving.
 You can read the transcript while Desktop loads any pending questions or
 permissions. Review them before continuing. [Guide and interrupt work](./controls.md)
 

@@ -2614,7 +2614,7 @@ export class NativeChatIpc {
   }
 
   /** Undefined for any surface that does not own this precise native session. */
-  questionPresentation(
+  chatPresentation(
     sender: WebContents,
     session: NativeChatSession
   ): boolean | undefined {

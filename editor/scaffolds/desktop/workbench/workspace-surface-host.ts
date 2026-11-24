@@ -227,19 +227,25 @@ export class WorkspaceSurfaceHost {
   bindAutomation(
     automation: NonNullable<DesktopBridge["workspaces"]["automation"]>,
     activePage: () => string | null,
-    subscribePages: (listener: () => void) => () => void
+    subscribePages: (listener: () => void) => () => void,
+    viewId?: number
   ): () => void {
     let current = true;
     let lastPublication: string | undefined;
-    const unlisten = automation.onOpenFile(({ path, expiresAtMs }) => {
-      void this.open(path, () => current && Date.now() < expiresAtMs);
-    });
+    const unlisten = automation.onOpenFile(
+      ({ path, expiresAtMs, viewId: requestViewId }) => {
+        if (viewId !== requestViewId) return;
+        void this.open(path, () => current && Date.now() < expiresAtMs);
+      }
+    );
     const unpublish = this.publishEditorSurfaces((snapshot) => {
       const pageId = activePage();
       const publication = JSON.stringify([snapshot, pageId]);
       if (publication === lastPublication) return Promise.resolve(true);
       lastPublication = publication;
-      return automation.publish(snapshot, pageId);
+      return viewId === undefined
+        ? automation.publish(snapshot, pageId)
+        : automation.publish(snapshot, pageId, viewId);
     }, subscribePages);
     return () => {
       current = false;

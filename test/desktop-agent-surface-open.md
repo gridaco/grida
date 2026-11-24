@@ -32,6 +32,10 @@ If the renderer disappears before observing the request, the daemon still
 completes the tool call and the artifact work remains valid. Reopening the app
 must not reveal a permanently pending presentation call.
 
+Switching to another chat restores its own workbench. An accepted turn in the
+previous chat can continue, and its delayed reveal must never open in the
+new chat's workbench.
+
 ## Steps
 
 1. Open a workspace in Grida Desktop and ask the agent to create a moderately

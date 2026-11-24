@@ -209,7 +209,9 @@ export namespace ipc_admission {
         }
         if (
           channel.startsWith("grida:native-external:") ||
-          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES ||
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES ||
+          channel === IPC_CHANNELS.WORKSPACE_RETIRE_VIEW
         ) {
           return pathname === "/desktop/workspace";
         }

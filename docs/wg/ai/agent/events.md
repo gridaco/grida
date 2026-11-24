@@ -238,10 +238,11 @@ The gate:
   it is not.
 
 Focus gating belongs to the consumer. Authorized attention facts can
-arrive for a chat whose view is closed. For a question in a known workspace
-chat, Desktop checks whether a focused window is actually displaying that
-chat. A different chat or a hidden side tab in the same window still gets a
-notification. A discarded side chat has no destination and stays silent.
+arrive for a chat whose view is closed. For a completed turn or a question
+in a known workspace chat, Desktop checks whether a focused window is
+actually displaying that chat. Viewing a different chat in the same window
+still allows a notification. Questions in hidden side tabs can notify while
+the side chat remains open.
 
 ### Click-to-attend
 

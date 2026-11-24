@@ -449,10 +449,17 @@ export type DesktopBridge = {
       readonly version: 1;
       publish(
         snapshot: NativeEditorSurfaceSnapshot,
-        activePageId: string | null
+        activePageId: string | null,
+        viewId?: number
       ): Promise<boolean>;
+      /** Retire this document's workbench publication before switching views. */
+      retire?(viewId: number): Promise<boolean>;
       onOpenFile(
-        handler: (request: { path: string; expiresAtMs: number }) => void
+        handler: (request: {
+          path: string;
+          expiresAtMs: number;
+          viewId?: number;
+        }) => void
       ): () => void;
     };
     /** User-authorized workbench intent. A viewer event alone grants no native file access. */

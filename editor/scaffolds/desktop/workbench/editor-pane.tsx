@@ -90,6 +90,8 @@ export type EditorPaneProps = {
   openTabs: readonly string[];
   activeTab: string | null;
   dirtyPaths: ReadonlySet<string>;
+  /** Files with live references in other chat views in this workspace window. */
+  retainedFilePaths?: ReadonlySet<string>;
   onTabDirtyChange: (relPath: string, dirty: boolean) => void;
   onSelectTab: (tab: string) => void;
   onMoveTab: (tab: string, target: string) => void;
@@ -122,6 +124,7 @@ export function EditorPane({
   openTabs,
   activeTab,
   dirtyPaths,
+  retainedFilePaths,
   onTabDirtyChange,
   onSelectTab,
   onMoveTab,
@@ -302,6 +305,15 @@ export function EditorPane({
     };
   }, [dispatchWorkspaceCommand, handleOpenStart, browsers, activeTab]);
 
+  // The workspace owns unsaved buffers. Keep them mounted at the same keys
+  // even when the selected chat's tab group has no reference to them.
+  const mountedTabs = new Set(openTabs);
+  if (retainedFilePaths)
+    for (const path of retainedFilePaths)
+      mountedTabs.add(WorkbenchTab.file(path));
+  for (const path of dirtyPaths) mountedTabs.add(WorkbenchTab.file(path));
+  const showContent = showStart || openTabs.length > 0;
+
   return (
     <div className={cn("flex h-full w-full flex-col", className)}>
       <EditorTitleBar
@@ -325,56 +337,56 @@ export function EditorPane({
         onFileTrashed={onFileTrashed}
       />
       <div className="min-h-0 flex-1">
-        {(showStart || openTabs.length > 0) && (
+        {(showStart || mountedTabs.size > 0) && (
           /* The resizable ancestors allow decorative overflow, while this
              surface remains clipped so only its shadow escapes. */
           <div
             className={cn(
               "h-full min-h-0 pr-3",
-              hasBottomPane ? "pb-1.5" : "pb-3"
+              hasBottomPane ? "pb-1.5" : "pb-3",
+              !showContent && "invisible"
             )}
           >
             <div
               tabIndex={-1}
               className="grida-content-frame relative h-full overflow-hidden border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]"
             >
-              {showStart ? (
+              {showStart && (
                 <StartTabContent
                   browsers={browsers}
                   onOpenFileExplorer={onOpenFileExplorer}
                   onCreateCanvas={onCreateCanvas}
                 />
-              ) : (
-                openTabs.map((tab) => {
-                  const target = WorkbenchTab.parse(tab);
-                  return target.kind === "file" ? (
-                    <EditorPaneTab
-                      key={`${workspace.id}:${tab}`}
-                      workspace={workspace}
-                      surfaceHost={surfaceHost}
-                      relPath={target.relPath}
-                      active={tab === activeTab}
-                      onDirtyChange={onTabDirtyChange}
-                      onSaved={onSaved}
-                    />
-                  ) : target.kind === "browser" ? (
-                    browsers && browserState.entries.get(target.id) ? (
-                      <BrowserPane
-                        key={tab}
-                        tabs={browsers}
-                        entry={browserState.entries.get(target.id)!}
-                        active={tab === activeTab}
-                      />
-                    ) : null
-                  ) : (
-                    <PanelTabContent
-                      key={tab}
-                      panel={shownPanels.get(target.id)}
-                      active={tab === activeTab}
-                    />
-                  );
-                })
               )}
+              {Array.from(mountedTabs, (tab) => {
+                const target = WorkbenchTab.parse(tab);
+                return target.kind === "file" ? (
+                  <EditorPaneTab
+                    key={`${workspace.id}:${tab}`}
+                    workspace={workspace}
+                    surfaceHost={surfaceHost}
+                    relPath={target.relPath}
+                    active={tab === activeTab}
+                    onDirtyChange={onTabDirtyChange}
+                    onSaved={onSaved}
+                  />
+                ) : target.kind === "browser" ? (
+                  browsers && browserState.entries.get(target.id) ? (
+                    <BrowserPane
+                      key={tab}
+                      tabs={browsers}
+                      entry={browserState.entries.get(target.id)!}
+                      active={tab === activeTab}
+                    />
+                  ) : null
+                ) : (
+                  <PanelTabContent
+                    key={tab}
+                    panel={shownPanels.get(target.id)}
+                    active={tab === activeTab}
+                  />
+                );
+              })}
             </div>
           </div>
         )}

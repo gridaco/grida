@@ -142,8 +142,13 @@ type RegisterIpcHandlersOptions = {
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
     event: IpcMainInvokeEvent,
-    snapshot: unknown
+    snapshot: unknown,
+    viewId?: number
   ) => Promise<boolean>;
+  retire_workspace_surfaces?: (
+    event: IpcMainInvokeEvent,
+    viewId: number
+  ) => void;
   native_chatgpt_oauth?: Pick<
     ChatGptOAuthCoordinator,
     "connect" | "cancel" | "status" | "signOut"
@@ -1283,10 +1288,29 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
-    (event, snapshot: unknown, activePageId: unknown) =>
-      admittedWindow(event.sender) !== null &&
-      browserTools.publish(event, snapshot, activePageId)
+    (event, snapshot: unknown, activePageId: unknown, viewId?: unknown) => {
+      if (
+        !admittedWindow(event.sender) ||
+        !browserTools.publish(event, snapshot, activePageId, viewId)
+      )
+        return false;
+      if (typeof viewId === "number")
+        void options
+          .publish_workspace_surfaces?.(event, snapshot, viewId)
+          .catch(() => false);
+      return true;
+    }
   );
+  guarded(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, (event, viewId: unknown) => {
+    if (
+      !admittedWindow(event.sender) ||
+      typeof viewId !== "number" ||
+      !browserTools.retire(event, viewId)
+    )
+      return false;
+    options.retire_workspace_surfaces?.(event, viewId);
+    return true;
+  });
   guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {
     if (typeof root !== "string" || !root || Buffer.byteLength(root) > 4096)

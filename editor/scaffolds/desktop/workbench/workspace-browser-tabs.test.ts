@@ -155,6 +155,61 @@ function setup(host: BrowserHost | null = new BrowserHost()) {
 }
 
 describe("WorkspaceBrowserTabs", () => {
+  it("honors a page's Stay when changing chats and preserves the tab strip", async () => {
+    const { group, tabs, storage, host } = setup();
+    await tabs.start(storage, async () => [], undefined, "chat-a");
+    tabs.open("https://a.example/");
+    tabs.open("https://b.example/");
+    await settle();
+    const original = group.getSnapshot();
+    const second = [...host.pages.values()].at(-1)!;
+    const close = host.close.bind(host);
+    const closePage = vi
+      .spyOn(host, "close")
+      .mockImplementation((target) =>
+        target.pageId === second.id ? Promise.resolve(false) : close(target)
+      );
+    await expect(tabs.prepareLeave(() => true)).resolves.toBe(false);
+    expect(closePage).toHaveBeenCalledExactlyOnceWith({
+      attachmentId: "owner",
+      pageId: second.id,
+    });
+    expect(group.getSnapshot()).toEqual(original);
+    expect(host.pages.has(second.id)).toBe(true);
+    expect(
+      WorkspaceViewState.read(storage, "chat-a")?.content?.open
+    ).toHaveLength(2);
+
+    closePage.mockImplementation(close);
+    await expect(tabs.prepareLeave(() => true)).resolves.toBe(true);
+    expect(host.pages.size).toBe(0);
+    expect(
+      WorkspaceViewState.read(storage, "chat-a")?.content?.open
+    ).toHaveLength(2);
+  });
+
+  it("reopens pages already closed when a later page refuses the switch", async () => {
+    const { group, tabs, storage, host } = setup();
+    await tabs.start(storage, async () => []);
+    tabs.open("https://a.example/");
+    tabs.open("https://b.example/");
+    await settle();
+    const original = group.getSnapshot();
+    const first = [...host.pages.values()][0]!;
+    const close = host.close.bind(host);
+    vi.spyOn(host, "close").mockImplementation((target) =>
+      target.pageId === first.id ? Promise.resolve(false) : close(target)
+    );
+    await expect(tabs.prepareLeave(() => true)).resolves.toBe(false);
+    await settle();
+    expect(group.getSnapshot()).toEqual(original);
+    expect(host.pages.get(first.id)).toBe(first);
+    expect([...host.pages.values()].map(({ url }) => url)).toEqual([
+      "https://a.example/",
+      "https://b.example/",
+    ]);
+  });
+
   it("accepts an open request only when its workbench is ready", async () => {
     const { group, tabs, storage } = setup();
     expect(tabs.open("http://localhost:4173/")).toBe(false);
@@ -907,7 +962,7 @@ describe("WorkspaceBrowserTabs", () => {
     expect(entry.error).toContain("closed");
     tabs.stop();
   });
-  it("preserves a user-opened tab and focus while asynchronous restore settles", async () => {
+  it("keeps remembered tabs and the user's new selection during a delayed restore", async () => {
     const { group, tabs, storage } = setup();
     WorkspaceViewState.remember(storage, "workspace", {
       tabs: { open: ["old.svg"], active: "old.svg" },
@@ -924,8 +979,12 @@ describe("WorkspaceBrowserTabs", () => {
     resolve(["old.svg"]);
     await started;
     expect(group.getSnapshot()).toEqual({
-      tabs: ["file:new.svg"],
+      tabs: ["file:new.svg", "file:old.svg"],
       active: "file:new.svg",
+    });
+    expect(WorkspaceViewState.read(storage, "workspace")?.tabs).toEqual({
+      open: ["new.svg", "old.svg"],
+      active: "new.svg",
     });
     tabs.stop();
   });

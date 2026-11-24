@@ -10,7 +10,11 @@ const nativeChat = allChannels.filter((channel) =>
 const nativeExternal = allChannels.filter((channel) =>
   channel.startsWith("grida:native-external:")
 );
-const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
+const workbenchPublication: readonly IpcChannel[] = [
+  IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+  IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
+  IPC_CHANNELS.WORKSPACE_RETIRE_VIEW,
+];
 const documentFiles = [IPC_CHANNELS.DOCUMENT_READ, IPC_CHANNELS.DOCUMENT_WRITE];
 
 describe("ipc_admission", () => {
@@ -80,7 +84,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
-          channel !== workspacePublish &&
+          !workbenchPublication.includes(channel) &&
           !channel.startsWith("grida:welcome:chat-") &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
@@ -432,19 +436,19 @@ describe("ipc_admission", () => {
   });
 
   it("admits independent workbench publication only from the main workspace route", () => {
-    expect(allowedFor("main", "/desktop/workspace")).toContain(
-      workspacePublish
-    );
-    for (const route of [
-      "/desktop/file",
-      "/desktop/settings",
-      "/desktop/workspace/extra",
-    ]) {
-      expect(allowedFor("main", route)).not.toContain(workspacePublish);
+    for (const channel of workbenchPublication) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/file",
+        "/desktop/settings",
+        "/desktop/workspace/extra",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
     }
-    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
-      workspacePublish
-    );
   });
 
   it("keeps durable media capabilities exclusive to the exact Tools route", () => {

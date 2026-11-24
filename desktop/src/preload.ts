@@ -518,23 +518,27 @@ ipcRenderer.on(IPC_CHANNELS.BROWSER_PRESENT_PAGE, (_event, raw: unknown) => {
     for (const handler of browserPresentationHandlers) handler(request);
 });
 const automationFileHandlers = new Set<
-  (request: { path: string; expiresAtMs: number }) => void
+  (request: { path: string; expiresAtMs: number; viewId?: number }) => void
 >();
 ipcRenderer.on(
   IPC_CHANNELS.WORKSPACE_OPEN_AUTOMATION_FILE,
   (_event, raw: unknown) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
-    const { path, expiresAtMs } = raw as Record<string, unknown>;
+    const { path, expiresAtMs, viewId } = raw as Record<string, unknown>;
     if (
-      Object.keys(raw).length !== 2 ||
+      Object.keys(raw).length !== (viewId === undefined ? 2 : 3) ||
       !NativeEditorSurfaces.isPath(path) ||
       typeof expiresAtMs !== "number" ||
       !Number.isSafeInteger(expiresAtMs) ||
-      expiresAtMs <= Date.now()
+      expiresAtMs <= Date.now() ||
+      (viewId !== undefined &&
+        (typeof viewId !== "number" ||
+          !Number.isSafeInteger(viewId) ||
+          viewId < 1))
     )
       return;
     for (const handler of automationFileHandlers)
-      handler({ path, expiresAtMs });
+      handler({ path, expiresAtMs, viewId });
   }
 );
 window.addEventListener("pagehide", () => {
@@ -1591,12 +1595,15 @@ const bridge: DesktopBridge = {
       ),
     automation: {
       version: 1,
-      publish: (snapshot, activePageId) =>
+      publish: (snapshot, activePageId, viewId) =>
         ipcRenderer.invoke(
           IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
           snapshot,
-          activePageId
+          activePageId,
+          viewId
         ),
+      retire: (viewId) =>
+        ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, viewId),
       onOpenFile: (handler) => {
         automationFileHandlers.add(handler);
         return () => {

@@ -847,6 +847,7 @@ describe("HomeComposer", () => {
         "chosen",
         expect.objectContaining({
           text,
+          initialWorkbenchPath: "pitch 2.canvas",
           messageContext: {
             modelText: expect.stringContaining(
               '"pitch 2.canvas". Edit that deck and keep its visual system.'

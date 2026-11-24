@@ -28,13 +28,21 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
-import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
+import {
+  NEW_CHAT_TITLE,
+  NativeChatController,
+  type NativeChatEditorSurfaces,
+} from "./native-chat-controller";
 import { chatActivity, type ChatActivity } from "./native-chat-activity";
 import { native_message_parts } from "./native-message-parts";
 import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
 import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
 import { AttachmentBatch } from "./attachment-batch";
+
+type ActivateWorkbench = NonNullable<
+  NativeChatEditorSurfaces["activateWorkbench"]
+>;
 
 function durableDrafts(
   blobs = new Map<string, ComposerDraftBlob>(),
@@ -2405,6 +2413,308 @@ it("publishes editor updates only while the selected chat attachment is owned", 
   expect(listeners.size).toBe(0);
 });
 
+it("binds each chat to its ready workbench and withdraws abandoned restores", async () => {
+  const { bridge } = fixture();
+  const middle = Promise.withResolvers<void>();
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  let open: string[] = [];
+  let middleCurrent: (() => boolean) | undefined;
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: (target, current) => {
+      if (target.id === "chat-b") {
+        middleCurrent = current;
+        return middle.promise.then(() => {
+          if (current()) open = ["/B.svg"];
+        });
+      }
+      open = ["/A.svg"];
+    },
+    readEditorSurfaces: () => ({
+      active: open[0],
+      open,
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  const detach = vi.spyOn(bridge, "detach");
+  try {
+    await controller.select("chat-a");
+    const abandoned = controller.select("chat-b");
+    expect(middleCurrent?.()).toBe(true);
+    expect(publish).toHaveBeenCalledOnce();
+
+    await controller.select("chat-a");
+    expect(middleCurrent?.()).toBe(false);
+    await abandoned;
+    middle.resolve();
+    expect(detach).toHaveBeenCalledExactlyOnceWith("chat-a");
+    expect(publish.mock.calls).toEqual([
+      ["chat-a", { active: "/A.svg", open: ["/A.svg"], truncated: false }],
+      ["chat-a", { active: "/A.svg", open: ["/A.svg"], truncated: false }],
+    ]);
+    expect(detach.mock.invocationCallOrder[0]).toBeLessThan(
+      publish.mock.invocationCallOrder[1]
+    );
+
+    await controller.select("chat-b");
+    expect(publish).toHaveBeenLastCalledWith("chat-b", {
+      active: "/B.svg",
+      open: ["/B.svg"],
+      truncated: false,
+    });
+  } finally {
+    middle.resolve();
+    controller.disconnect();
+  }
+});
+
+it("keeps the selected chat attached when its workbench refuses to leave", async () => {
+  const { bridge } = fixture();
+  const pending = Promise.withResolvers<boolean>();
+  const activate = vi.fn<ActivateWorkbench>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    beforeWorkbenchChange: () => pending.promise,
+    activateWorkbench: activate,
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  const detach = vi.spyOn(bridge, "detach");
+  try {
+    await controller.select("chat-a");
+    const change = controller.select("chat-b");
+    expect(controller.read().selected).toBe("chat-a");
+    pending.resolve(false);
+    await change;
+
+    expect(controller.read().selected).toBe("chat-a");
+    expect(activate).toHaveBeenCalledOnce();
+    expect(detach).not.toHaveBeenCalled();
+  } finally {
+    pending.resolve(false);
+    controller.disconnect();
+  }
+});
+
+it("asks before archiving the active chat and resumes its workbench if archiving fails", async () => {
+  const { bridge } = fixture();
+  const entry: NativeChatCatalogEntry = {
+    sessionId: "chat-a",
+    revision: 1,
+    title: "Saved chat",
+    archived: false,
+  };
+  bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
+  bridge.catalogEntry = async () => entry;
+  const organize = vi.fn<NonNullable<DesktopNativeChat["organize"]>>();
+  organize
+    .mockRejectedValueOnce(new Error("unavailable"))
+    .mockResolvedValue({ ...entry, archived: true });
+  bridge.organize = organize;
+  const before =
+    vi.fn<NonNullable<NativeChatEditorSurfaces["beforeWorkbenchChange"]>>();
+  before.mockReturnValueOnce(false).mockReturnValue(true);
+  const resume = vi.fn<() => void>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: () => {},
+    beforeWorkbenchChange: before,
+    cancelWorkbenchChange: resume,
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  try {
+    await controller.select("chat-a");
+    await expect(controller.setChatArchived(true)).resolves.toBeNull();
+    expect(organize).not.toHaveBeenCalled();
+    expect(controller.read().selected).toBe("chat-a");
+
+    await expect(controller.setChatArchived(true)).resolves.toBeNull();
+    expect(resume).toHaveBeenCalledOnce();
+    expect(controller.read().selected).toBe("chat-a");
+
+    await expect(controller.setChatArchived(true)).resolves.toMatchObject({
+      sessionId: "chat-a",
+      archived: true,
+    });
+    expect(before).toHaveBeenCalledTimes(3);
+    expect(organize).toHaveBeenCalledTimes(2);
+    expect(resume).toHaveBeenCalledOnce();
+    expect(controller.read().selected).toBeNull();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("checks the workbench before a legacy notification focus changes the model connection", async () => {
+  const { bridge } = fixture();
+  const selectProfile = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+    async () => {}
+  );
+  bridge.selectProfile = selectProfile;
+  const activate = vi.fn<ActivateWorkbench>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: activate,
+    beforeWorkbenchChange: () => false,
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  try {
+    controller.connect("chat-a");
+    await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+    await controller.focusChat("chat-b", "b".repeat(64));
+    expect(controller.read().selected).toBe("chat-a");
+    expect(selectProfile).not.toHaveBeenCalled();
+    expect(activate).toHaveBeenCalledOnce();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("promotes the fresh Home workbench in place before publishing and sending", async () => {
+  const { bridge } = fixture();
+  const activation = Promise.withResolvers<void>();
+  const activate = vi.fn<ActivateWorkbench>(() => activation.promise);
+  const promote =
+    vi.fn<NonNullable<NativeChatEditorSurfaces["promoteWorkbench"]>>();
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  const submit = vi.spyOn(bridge, "submit");
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: activate,
+    promoteWorkbench: promote,
+    readEditorSurfaces: () => ({
+      active: "/template.canvas",
+      open: ["/template.canvas"],
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  const starting = controller.startChat(
+    null,
+    () => ({ text: "Work on my template" }),
+    { initialWorkbenchPath: "template.canvas" }
+  );
+  try {
+    await vi.waitFor(() => expect(activate).toHaveBeenCalledOnce());
+    expect(activate).toHaveBeenCalledWith(
+      { kind: "draft", id: expect.any(String) },
+      expect.any(Function),
+      "template.canvas"
+    );
+    expect(publish).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    activation.resolve();
+    await starting;
+    expect(promote).toHaveBeenCalledExactlyOnceWith(
+      activate.mock.calls[0][0].id,
+      "new"
+    );
+    expect(publish).toHaveBeenCalledExactlyOnceWith("new", {
+      active: "/template.canvas",
+      open: ["/template.canvas"],
+      truncated: false,
+    });
+    expect(submit).toHaveBeenCalledOnce();
+    expect(promote.mock.invocationCallOrder[0]).toBeLessThan(
+      publish.mock.invocationCallOrder[0]
+    );
+    expect(publish.mock.invocationCallOrder[0]).toBeLessThan(
+      submit.mock.invocationCallOrder[0]
+    );
+    expect(activate.mock.calls[0][1]()).toBe(true);
+  } finally {
+    activation.resolve();
+    await starting;
+    controller.disconnect();
+  }
+});
+
+it.each(["archived", "missing", "deleted"] as const)(
+  "opens a fresh workbench when the remembered chat is %s",
+  async (state) => {
+    const { bridge } = fixture();
+    let remembered = JSON.stringify({
+      selected: "chat-a",
+      sessions: ["chat-a"],
+    });
+    const memory = {
+      getItem: () => remembered,
+      setItem: (_key: string, value: string) => {
+        remembered = value;
+      },
+    };
+    const active = vi.fn<ActivateWorkbench>();
+    if (state === "archived") {
+      bridge.catalogEntry = async () => ({
+        sessionId: "chat-a",
+        revision: 1,
+        title: "Archived",
+        archived: true,
+      });
+    } else {
+      bridge.load = async () => {
+        throw new Error(
+          state === "missing"
+            ? "session_missing"
+            : "native_chat_session_deleted"
+        );
+      };
+    }
+    const controller = new NativeChatController(bridge, memory, "chat", {
+      activateWorkbench: active,
+      readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+      subscribeToEditorSurfaces: () => () => {},
+    });
+    try {
+      controller.connect(null);
+      await vi.waitFor(() => {
+        expect(active).toHaveBeenCalledOnce();
+        expect(active).toHaveBeenCalledWith(
+          { kind: "draft", id: expect.any(String) },
+          expect.any(Function),
+          undefined
+        );
+        expect(controller.read().selected).toBeNull();
+        expect(controller.canSubmit).toBe(true);
+      });
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("opens an explicitly requested archived chat and its workbench", async () => {
+  const { bridge } = fixture();
+  bridge.catalogEntry = async () => ({
+    sessionId: "chat-a",
+    revision: 1,
+    title: "Archived",
+    archived: true,
+  });
+  const active = vi.fn<ActivateWorkbench>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: active,
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
+  try {
+    controller.connect("chat-a");
+    await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+    expect(active).toHaveBeenCalledExactlyOnceWith(
+      { kind: "chat", id: "chat-a" },
+      expect.any(Function),
+      undefined
+    );
+    expect(controller.read().selected).toBe("chat-a");
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("fences presentation by the current attachment, tab revision, and delivery lifetime", async () => {
   const { bridge } = fixture();
   const publish = vi.fn<
@@ -3238,7 +3548,17 @@ it("runs only exact slash commands, preserves a lost fork identity and keeps the
 });
 
 it("keeps a cancelled deletion open and ignores replay after a confirmed retirement", async () => {
-  const { bridge, controller, updates, transcripts } = fixture();
+  const { bridge, updates, transcripts } = fixture();
+  const resume = vi.fn<() => void>();
+  const forget = vi.fn<(sessionId: string) => void>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    activateWorkbench: () => {},
+    beforeWorkbenchChange: () => true,
+    cancelWorkbenchChange: resume,
+    forgetWorkbench: forget,
+    readEditorSurfaces: () => ({ active: null, open: [], truncated: false }),
+    subscribeToEditorSurfaces: () => () => {},
+  });
   const entries = new Set(["chat-a", "chat-b"]);
   bridge.list = async () => ({ sessionIds: [...entries], nextCursor: null });
   bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
@@ -3272,9 +3592,13 @@ it("keeps a cancelled deletion open and ignores replay after a confirmed retirem
   await vi.waitFor(() => expect(controller.canDeleteSavedChat).toBe(true));
   const late = updates.get("chat-a")!;
   await expect(controller.deleteSavedChat()).resolves.toBe(false);
+  expect(resume).toHaveBeenCalledOnce();
+  expect(forget).not.toHaveBeenCalled();
   expect(controller.read().messages[0]?.text).toBe("Old transcript");
   expect(controller.read().selected).toBe("chat-a");
   await expect(controller.deleteSavedChat()).resolves.toBe(true);
+  expect(resume).toHaveBeenCalledOnce();
+  expect(forget).toHaveBeenCalledWith("chat-a");
   expect(remove.mock.calls).toEqual([
     ["chat-a", "observation-chat-a", 4],
     ["chat-a", "observation-chat-a", 4],

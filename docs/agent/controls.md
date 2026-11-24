@@ -221,8 +221,9 @@ controls live separately in the workspace's **Processes** tab.
 ## Return to background work
 
 With system notifications turned on, Desktop tells you when a workspace chat
-finishes, fails or ends with an uncertain result while its window is out of
-focus. When a turn succeeds, the notification shows the chat title and a short
+finishes, fails or ends with an uncertain result while you’re away from that
+chat. This includes viewing another chat in the same project. When a turn
+succeeds, the notification shows the chat title and a short
 excerpt from the final reply. If the chat has no title, it shows **Grida
 Agent**. If the reply has no preview text, it shows **Turn completed**.
 

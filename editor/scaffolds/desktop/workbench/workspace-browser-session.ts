@@ -59,7 +59,8 @@ export class WorkspaceBrowserSession {
   start(
     storage: WorkspaceBrowserTabs.Storage,
     resolveFiles: (paths: readonly string[]) => Promise<readonly string[]>,
-    initialPath?: string
+    initialPath?: string,
+    storageId: string | null = this.workspaceId
   ): Promise<void> {
     if (this.disposed) return Promise.resolve();
     if (!this.started) {
@@ -85,7 +86,7 @@ export class WorkspaceBrowserSession {
         });
       this.initialPath = initialPath;
       this.started = this.browsers
-        .start(storage, resolveFiles, initialPath)
+        .start(storage, resolveFiles, initialPath, storageId)
         .catch((error: unknown) => {
           this.releaseSubscriptions();
           this.started = null;
@@ -125,6 +126,10 @@ export class WorkspaceBrowserSession {
     this.unsubscribeNavigation?.();
     this.unsubscribeNavigation = undefined;
     this.document?.defaultView?.removeEventListener("pagehide", this.dispose);
+  }
+
+  isDisposed(): boolean {
+    return this.disposed;
   }
 
   dispose = (): void => {

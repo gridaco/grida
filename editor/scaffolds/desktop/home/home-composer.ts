@@ -1079,6 +1079,7 @@ export class HomeComposer {
               }),
             }),
             ...(messageContext && { messageContext }),
+            ...(template && { initialWorkbenchPath: template.path }),
             profileId: prepared ? prepared.profileId : input.profileId,
             ...(prepared
               ? {

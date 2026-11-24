@@ -49,6 +49,7 @@ export class WorkspaceBrowserTabs {
   private revision = 0;
   private epoch = 0;
   private storage: WorkspaceBrowserTabs.Storage | null = null;
+  private storageId: string | null = null;
   private pages = new Map<string, DesktopBrowser.Page>();
   private entries = new Map<string, WorkspaceBrowserTabs.Entry>();
   private pending = new Set<string>();
@@ -74,6 +75,9 @@ export class WorkspaceBrowserTabs {
   };
   private resyncing = false;
   private clearing = false;
+  private leaving = false;
+  private leaveTask?: Promise<boolean>;
+  private leaveCurrent?: () => boolean;
   private imageEpoch = 0;
   private imageRevisions = new Map<string, number>();
   private buffered: DesktopBrowser.Event[] = [];
@@ -140,11 +144,13 @@ export class WorkspaceBrowserTabs {
   async start(
     storage: WorkspaceBrowserTabs.Storage,
     resolveFiles: (paths: readonly string[]) => Promise<readonly string[]>,
-    legacyActivePath?: string
+    initialPath?: string,
+    storageId: string | null = this.workspaceId
   ): Promise<void> {
     this.stop();
     const epoch = this.epoch;
     this.storage = storage;
+    this.storageId = storageId;
     this.bridge = this.getBridge();
     this.entries = new Map();
     this.pages = new Map();
@@ -166,12 +172,12 @@ export class WorkspaceBrowserTabs {
     };
     this.publish();
     const expectedGroup = this.group.getSnapshot();
-    const saved = WorkspaceViewState.read(storage, this.workspaceId);
-    const files = WorkspaceViewState.initialTabs(
-      storage,
-      this.workspaceId,
-      legacyActivePath
-    );
+    const saved =
+      storageId === null ? null : WorkspaceViewState.read(storage, storageId);
+    const files = saved?.tabs ?? {
+      open: initialPath ? [initialPath] : [],
+      active: initialPath ?? null,
+    };
     const content: WorkspaceViewState.Content = saved?.content ?? {
       open: files.open.map((relPath) => ({ kind: "file" as const, relPath })),
       active: files.active === null ? null : files.open.indexOf(files.active),
@@ -257,11 +263,7 @@ export class WorkspaceBrowserTabs {
         ? tabs
         : [
             ...currentGroup.tabs,
-            ...tabs.filter(
-              (key) =>
-                WorkbenchTab.parse(key).kind === "browser" &&
-                !currentGroup.tabs.includes(key)
-            ),
+            ...tabs.filter((key) => !currentGroup.tabs.includes(key)),
           ];
     this.group.restore({
       tabs: restoredTabs,
@@ -286,6 +288,10 @@ export class WorkspaceBrowserTabs {
     this.attachment = null;
     this.bridge = null;
     this.storage = null;
+    this.storageId = null;
+    this.leaving = false;
+    this.leaveTask = undefined;
+    this.leaveCurrent = undefined;
     this.revision = 0;
     this.resyncing = false;
     this.buffered = [];
@@ -294,6 +300,84 @@ export class WorkspaceBrowserTabs {
     this.pageControls.clear();
     if (bridge && attachmentId)
       void bridge.detach(attachmentId).catch(() => {});
+  }
+
+  /** A draft becomes a chat without reopening the browser or changing tabs. */
+  rememberAs(storageId: string | null): void {
+    this.storageId = storageId;
+    this.remember();
+  }
+
+  /**
+   * Use the ordinary native close path before switching workbenches. Keep tab
+   * descriptors through the close so a refused switch can reopen any pages
+   * that already closed, and a successful switch saves the original tab set.
+   */
+  prepareLeave(isCurrent: () => boolean): boolean | Promise<boolean> {
+    if (!this.attachment || !this.bridge) return true;
+    this.leaveCurrent = isCurrent;
+    if (this.leaveTask) return this.leaveTask;
+    if (!this.pages.size && !this.creationTasks.size) return true;
+    const task = this.closeForLeave().finally(() => {
+      if (this.leaveTask === task) {
+        this.leaveTask = undefined;
+        this.leaveCurrent = undefined;
+      }
+    });
+    this.leaveTask = task;
+    return task;
+  }
+
+  private async closeForLeave(): Promise<boolean> {
+    const attachmentId = this.attachment;
+    const bridge = this.bridge;
+    if (!bridge || !attachmentId) return false;
+    this.leaving = true;
+    const current = () =>
+      this.attachment === attachmentId && this.leaveCurrent?.() === true;
+    let left = false;
+    try {
+      await Promise.all([
+        ...this.creationTasks.values(),
+        ...this.closeTasks.values(),
+      ]);
+      const pageIds = [...this.pages.keys()];
+      const activePageId = this.activeAutomationPageId();
+      if (activePageId && pageIds.includes(activePageId)) {
+        pageIds.splice(pageIds.indexOf(activePageId), 1);
+        pageIds.unshift(activePageId);
+      }
+      for (const pageId of pageIds) {
+        if (!this.pages.has(pageId)) continue;
+        if (
+          !current() ||
+          (await bridge.close({ attachmentId, pageId })) !== true
+        )
+          return false;
+        if (!current()) return false;
+        this.finishClosed(pageId);
+      }
+      left = current() && this.pages.size === 0;
+      return left;
+    } catch {
+      return false;
+    } finally {
+      if (this.attachment === attachmentId) {
+        if (!left) this.resumeAfterLeave();
+        this.remember();
+      }
+    }
+  }
+
+  resumeAfterLeave(): void {
+    if (!this.leaving) return;
+    this.leaving = false;
+    this.adoptPages();
+    this.publish();
+    for (const tab of this.group.getSnapshot().tabs) {
+      const entry = WorkbenchTab.parse(tab);
+      if (entry.kind === "browser") void this.ensurePage(entry.id);
+    }
   }
 
   canLoadPreview(): boolean {
@@ -373,7 +457,8 @@ export class WorkspaceBrowserTabs {
 
   /** Open a fresh tab, optionally replacing a workbench tab in place. */
   open = (url?: string, replaceTab?: string): boolean => {
-    if (!this.bridge || !this.attachment || !this.state.ready) return false;
+    if (!this.bridge || !this.attachment || !this.state.ready || this.leaving)
+      return false;
     const id = this.newId();
     this.entries.set(id, {
       id,
@@ -713,6 +798,7 @@ export class WorkspaceBrowserTabs {
       !entry ||
       entry.page ||
       this.pending.has(id) ||
+      this.leaving ||
       !this.bridge ||
       !this.attachment
     )
@@ -879,7 +965,7 @@ export class WorkspaceBrowserTabs {
     this.nativeCreations.delete(pageId);
     for (const [id, entry] of this.entries) {
       if (entry.page?.id !== pageId) continue;
-      const live = entry.page.url;
+      const live = entry.page.url ?? (this.leaving ? entry.url : null);
       const transient =
         live !== null && DesktopBrowser.normalizeUrl(live) === null;
       this.entries.set(id, {
@@ -889,6 +975,7 @@ export class WorkspaceBrowserTabs {
         favicon: null,
       });
       this.faviconReads.delete(id);
+      if (this.leaving && !transient && !this.closing.has(id)) continue;
       const key = WorkbenchTab.browser(id);
       if (this.closing.has(id) && !transient) this.group.close(key);
       else this.group.closeMatching((candidate) => candidate === key);
@@ -897,7 +984,7 @@ export class WorkspaceBrowserTabs {
   }
 
   private adoptPages(): void {
-    if (!this.state.ready || this.pending.size) return;
+    if (!this.state.ready || this.pending.size || this.leaving) return;
     const owned = new Set(
       [...this.entries.values()].flatMap((entry) =>
         entry.page ? [entry.page.id] : []
@@ -1094,7 +1181,7 @@ export class WorkspaceBrowserTabs {
   }
 
   private remember(): void {
-    if (!this.storage || !this.state.ready) return;
+    if (!this.storage || this.storageId === null || !this.state.ready) return;
     const { tabs, active } = this.group.getSnapshot();
     const open: WorkspaceViewState.ContentTab[] = [];
     let activeIndex: number | null = null;
@@ -1121,7 +1208,7 @@ export class WorkspaceBrowserTabs {
       entry.kind === "file" ? [entry.relPath] : []
     );
     const activePath = active ? WorkbenchTab.relPath(active) : null;
-    WorkspaceViewState.remember(this.storage, this.workspaceId, {
+    WorkspaceViewState.remember(this.storage, this.storageId, {
       tabs: { open: files, active: activePath ?? files.at(-1) ?? null },
       content: { open, active: activeIndex },
     });

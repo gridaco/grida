@@ -271,6 +271,7 @@ export type NativeChatLifecycle = Readonly<
   { sessionId: string; turnId: string } & (
     | {
         kind: "settled";
+        session: NativeChatSession;
         status: NativeChatTurnSummary["status"];
         readPreview?: () => Promise<NativeChatCompletionPreview>;
       }
@@ -3454,16 +3455,19 @@ export class NativeAgentChat {
         status === "cancelled" ||
         status === "uncertain")
     ) {
-      event = {
-        kind,
-        sessionId,
-        turnId,
-        status,
-        ...(kind === "settled" &&
-          status === "succeeded" && {
-            readPreview: () => this.completionPreview(session, turnId),
-          }),
-      };
+      event =
+        kind === "settled"
+          ? {
+              kind,
+              session,
+              sessionId,
+              turnId,
+              status,
+              ...(status === "succeeded" && {
+                readPreview: () => this.completionPreview(session, turnId),
+              }),
+            }
+          : { kind, sessionId, turnId, status };
     } else return;
     const detail = "status" in event ? event.status : event.waitId;
     if (this.rememberLifecycle([sessionId, turnId, kind, detail]))

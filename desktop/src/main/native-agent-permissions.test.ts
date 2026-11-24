@@ -860,6 +860,7 @@ it.runIf(Boolean(packaged) && supported)(
       await vi.waitFor(() =>
         expect(notices.at(-1)).toEqual({
           kind: "settled",
+          session: { id: sessionId },
           sessionId,
           turnId: accepted.turnId,
           status: "succeeded",

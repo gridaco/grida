@@ -389,7 +389,7 @@ function Surface({
       )}
       <SaveConflictDialog
         relPath={relPath}
-        open={conflict !== null}
+        open={active && conflict !== null}
         onKeepEditing={() => setConflict(null)}
         onReload={reloadFromDisk}
         onOverwrite={overwriteAnyway}

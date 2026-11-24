@@ -86,6 +86,8 @@ import { AttachmentBatch } from "./attachment-batch";
 export type NativeChatInitialComposer = Readonly<{
   /** Stable Home identity for the new draft, including across renderer reloads. */
   requestId?: string;
+  /** Workspace-relative artifact explicitly chosen before starting this chat. */
+  initialWorkbenchPath?: string;
   /** The exact session prepared with the selected permissions by Desktop Main. */
   preparedSessionId?: string;
   /** Absent on legacy Full access handoffs. Always verify against native state. */
@@ -121,7 +123,24 @@ export type NativeChatFirstInput = Readonly<{
   release?: () => void;
 }>;
 
+export type NativeChatWorkbenchTarget = Readonly<{
+  kind: "draft" | "chat";
+  id: string;
+}>;
+
 export type NativeChatEditorSurfaces = {
+  beforeWorkbenchChange?(
+    isCurrent: () => boolean,
+    target?: NativeChatWorkbenchTarget
+  ): boolean | Promise<boolean>;
+  cancelWorkbenchChange?(): void;
+  activateWorkbench?(
+    target: NativeChatWorkbenchTarget,
+    isCurrent: () => boolean,
+    initialPath?: string
+  ): void | Promise<void>;
+  promoteWorkbench?(draftId: string, sessionId: string): void;
+  forgetWorkbench?(sessionId: string): void;
   readEditorSurfaces(): NativeEditorSurfaceSnapshot;
   subscribeToEditorSurfaces(listener: () => void): () => void;
   open?(path: string, requireCurrent: () => boolean): Promise<void>;
@@ -408,6 +427,17 @@ type QueueActionIntent =
       turnId: string;
     };
 
+type EditorWorkbench = {
+  target: NativeChatWorkbenchTarget;
+  ready: Promise<boolean>;
+  retire(): void;
+};
+
+type WorkbenchStart = {
+  initialWorkbenchPath?: string;
+  remembered?: boolean;
+};
+
 type Scope = {
   queuedComposerInputs?: readonly NativeChatAcceptance[];
   attachmentGestureRevision?: number;
@@ -450,6 +480,8 @@ type Scope = {
   subscription?: { id?: string };
   observationUnavailable?: true;
   recovery?: "queued" | "running" | "exhausted";
+  workbench?: EditorWorkbench;
+  remembered?: true;
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
   stopEditorSelection?: () => void;
@@ -773,6 +805,7 @@ export class NativeChatController {
   /** A new chat is opening to send a message chosen before it opened. */
   private startingChat = false;
   private restoredDraftId?: string;
+  private workbenchChange?: object;
 
   private get remembersSelection(): boolean {
     return (
@@ -1351,40 +1384,52 @@ export class NativeChatController {
     recovered?: NativeChatProfileSelection
   ): void {
     if (this.fixed) {
-      this.binding ??= this.bind(null);
+      this.binding ??= this.bind(null).then(() => undefined);
       return;
     }
     const saved = this.beginConnection();
+    const target = initial ?? saved.selected;
+    const workbench = {
+      remembered:
+        initial === null &&
+        target !== null &&
+        !!this.editorSurfaces?.activateWorkbench,
+    };
     if (this.remembersSelection) {
       this.restoredDraftId = saved.draftId;
       void this.listChats();
-      const opening = this.select(initial ?? saved.selected);
-      const scope = this.scope;
-      if (recovered && scope)
-        void opening.then(() =>
-          this.saveSelection(
-            scope,
-            recovered.kind === "default" ? null : recovered.id,
-            this.view.effort
-          )
-        );
+      const opening = this.bind(target, workbench);
+      if (recovered)
+        void opening.then((scope) => {
+          if (scope)
+            return this.saveSelection(
+              scope,
+              recovered.kind === "default" ? null : recovered.id,
+              this.view.effort
+            );
+        });
       return;
     }
     if (recovered) {
-      void this.selectProfile(recovered, initial ?? saved.selected);
+      void this.selectProfile(recovered, target, workbench);
       return;
     }
     if (profileId !== null && profileId !== undefined) {
       if (initial) void this.focusChat(initial, profileId);
-      else void this.selectProfile({ kind: "saved", id: profileId });
+      else
+        void this.selectProfile(
+          { kind: "saved", id: profileId },
+          undefined,
+          workbench
+        );
       return;
     }
     if (saved.profileId) {
-      void this.restoreProfile(saved.profileId, initial ?? saved.selected);
+      void this.restoreProfile(saved.profileId, target, workbench);
       return;
     }
     void this.listChats();
-    void this.select(initial ?? saved.selected);
+    void this.bind(target, workbench);
   }
 
   /**
@@ -1423,11 +1468,10 @@ export class NativeChatController {
       this.startingChat = true;
       let scope: Scope | undefined;
       try {
-        const opening = this.bind(null, {
+        scope = await this.bind(null, {
           manualApproval: composer?.manualApproval,
+          initialWorkbenchPath: composer?.initialWorkbenchPath,
         });
-        scope = this.scope;
-        await opening;
       } finally {
         this.startingChat = false;
       }
@@ -1455,15 +1499,20 @@ export class NativeChatController {
       }
     }
     this.beginConnection();
+    this.restoredDraftId = composer?.requestId;
     const run = {};
     this.chatStart = run;
     this.startingChat = true;
     try {
       if (chosen !== null)
-        await this.selectProfile({ kind: "new", id: chosen }, null);
+        await this.selectProfile({ kind: "new", id: chosen }, null, {
+          initialWorkbenchPath: composer?.initialWorkbenchPath,
+        });
       else {
         void this.listChats();
-        await this.select(null);
+        await this.bind(null, {
+          initialWorkbenchPath: composer?.initialWorkbenchPath,
+        });
       }
     } finally {
       this.startingChat = false;
@@ -1508,9 +1557,10 @@ export class NativeChatController {
     this.beginConnection();
     const run = {};
     this.chatStart = run;
-    const opening = this.bind(sessionId, { prepared: { profileId } });
-    const scope = this.scope;
-    await opening;
+    const scope = await this.bind(sessionId, {
+      prepared: { profileId },
+      initialWorkbenchPath: composer.initialWorkbenchPath,
+    });
     if (this.chatStart !== run || !scope || !this.owns(scope)) return null;
     const openError = this.view.error;
     await this.prepareFirstMessage(
@@ -1910,15 +1960,20 @@ export class NativeChatController {
    */
   private async restoreProfile(
     id: string,
-    sessionId: string | null
+    sessionId: string | null,
+    workbench: WorkbenchStart
   ): Promise<void> {
     const connection = this.catalogConnection;
-    await this.selectProfile({ kind: "saved", id }, sessionId ?? undefined);
+    await this.selectProfile(
+      { kind: "saved", id },
+      sessionId ?? undefined,
+      workbench
+    );
     if (this.profileId === id || this.catalogConnection !== connection) return;
     this.update({ profileError: null });
     this.save();
     void this.listChats();
-    void this.select(sessionId);
+    void this.bind(sessionId, workbench);
   }
 
   disconnect(): void {
@@ -1928,6 +1983,8 @@ export class NativeChatController {
     this.catalogConnection = undefined;
     this.profileRead = undefined;
     this.pendingFocus = undefined;
+    this.workbenchChange = undefined;
+    previous?.workbench?.retire();
     this.queueRelease(previous);
     // Retired observers must leave the published view before reconnect can
     // wait on a saved connection. The retained transcript remains readable.
@@ -2233,12 +2290,10 @@ export class NativeChatController {
 
   private async restoreSelection(
     scope: Scope,
-    sessionId: string | null
+    target: NativeChatWorkbenchTarget
   ): Promise<void> {
-    const draftId = this.restoredDraftId ?? crypto.randomUUID();
-    this.restoredDraftId = undefined;
     const state = await this.bridge.selection!(
-      sessionId ? { sessionId } : { draftId }
+      target.kind === "chat" ? { sessionId: target.id } : { draftId: target.id }
     );
     if (!this.owns(scope)) return;
     this.presentSelection(scope, state);
@@ -2429,6 +2484,7 @@ export class NativeChatController {
       replay: true,
       selection: previous.selection,
       selectionReady: Promise.resolve(),
+      workbench: previous.workbench,
       manualApproval: previous.manualApproval,
       firstInputId: previous.firstInputId,
       selectedAttachment: previous.selectedAttachment,
@@ -2532,7 +2588,8 @@ export class NativeChatController {
    */
   async selectProfile(
     selection: NativeChatProfileSelection,
-    initialSession?: string | null
+    initialSession?: string | null,
+    workbench?: WorkbenchStart
   ): Promise<void> {
     if (this.remembersSelection && this.scope) {
       await this.saveSelection(
@@ -2584,9 +2641,30 @@ export class NativeChatController {
       return;
     }
     this.update({ profileBusy: true, profileError: null });
+    const previous = this.scope;
+    let leaving = false;
     try {
+      const current =
+        previous?.workbench &&
+        initialSession !== undefined &&
+        initialSession !== previous.requested
+          ? this.beginWorkbenchChange(previous)
+          : undefined;
+      if (current) {
+        const allowed = this.permitWorkbenchChange(
+          current,
+          initialSession ? { kind: "chat", id: initialSession } : undefined
+        );
+        if (
+          !(typeof allowed === "boolean" ? allowed : await allowed) ||
+          !current()
+        )
+          return;
+        leaving = true;
+      }
       if (!(await this.commitProfile(selection, connection))) return;
-      if (this.catalogConnection !== connection) return;
+      if (this.catalogConnection !== connection || (current && !current()))
+        return;
       this.profileId = selection.kind === "default" ? null : selection.id;
       this.save();
       this.catalogConnection = {};
@@ -2613,10 +2691,14 @@ export class NativeChatController {
       // The open chat continues with the selected model on its next turn.
       const continuing =
         initialSession === undefined ? this.view.selected : initialSession;
-      await this.select(
+      await this.bind(
         initialSession === null ? null : (continuing ?? saved.selected),
         {
-          reattach: !!continuing,
+          reattach:
+            !!continuing ||
+            (initialSession === undefined && this.scope?.requested === null),
+          ...workbench,
+          skipWorkbenchGuard: leaving,
         }
       );
     } catch (error) {
@@ -2644,6 +2726,8 @@ export class NativeChatController {
         });
       }
     } finally {
+      if (leaving && this.scope?.workbench === previous?.workbench)
+        this.editorSurfaces?.cancelWorkbenchChange?.();
       if (this.catalogConnection === connection)
         this.update({ profileBusy: false });
     }
@@ -2655,7 +2739,7 @@ export class NativeChatController {
     options: { reattach?: boolean } = {}
   ): Promise<void> {
     if (this.fixed) return;
-    return this.bind(sessionId, options);
+    await this.bind(sessionId, options);
   }
 
   private async bind(
@@ -2664,12 +2748,43 @@ export class NativeChatController {
       reattach = false,
       prepared,
       manualApproval,
+      initialWorkbenchPath,
+      remembered,
+      skipWorkbenchGuard = false,
     }: {
       reattach?: boolean;
       prepared?: { profileId: string | null };
       manualApproval?: true;
-    } = {}
-  ): Promise<void> {
+      skipWorkbenchGuard?: boolean;
+    } & WorkbenchStart = {}
+  ): Promise<Scope | undefined> {
+    const previous = this.scope;
+    const current = this.beginWorkbenchChange(previous);
+    const sameView =
+      previous &&
+      (reattach || sessionId !== null) &&
+      (previous.attachment?.sessionId ?? previous.requested) === sessionId;
+    if (
+      !reattach &&
+      !prepared &&
+      sameView &&
+      (previous.opening || previous.attachment)
+    )
+      return previous;
+    const target: NativeChatWorkbenchTarget =
+      sessionId !== null
+        ? { kind: "chat", id: sessionId }
+        : sameView && previous.workbench
+          ? previous.workbench.target
+          : { kind: "draft", id: this.restoredDraftId ?? crypto.randomUUID() };
+    if (previous?.workbench && !sameView && !skipWorkbenchGuard) {
+      const allowed = this.permitWorkbenchChange(current, target);
+      if (
+        !(typeof allowed === "boolean" ? allowed : await allowed) ||
+        !current()
+      )
+        return;
+    }
     const retained =
       reattach && sessionId !== null && this.view.selected === sessionId
         ? {
@@ -2678,16 +2793,9 @@ export class NativeChatController {
             transcriptGapBefore: this.view.transcriptGapBefore,
           }
         : undefined;
-    if (
-      !reattach &&
-      !prepared &&
-      this.scope &&
-      (this.scope.opening || this.scope.attachment) &&
-      sessionId !== null &&
-      (this.scope.attachment?.sessionId ?? this.scope.requested) === sessionId
-    )
-      return;
-    this.queueRelease(this.scope);
+    this.restoredDraftId = undefined;
+    if (!sameView) previous?.workbench?.retire();
+    this.queueRelease(previous);
     const scope: Scope = {
       id: ++this.generation,
       requested: sessionId,
@@ -2702,9 +2810,11 @@ export class NativeChatController {
       manualApproval,
       startupComposer:
         this.startupComposer ??
-        (this.scope?.requested === sessionId
-          ? this.scope.startupComposer
+        (previous?.requested === sessionId
+          ? previous.startupComposer
           : undefined),
+      workbench: sameView ? previous.workbench : undefined,
+      ...(remembered && sessionId !== null && { remembered: true as const }),
       ...((this.startingChat || prepared) && {
         startsWithMessage: true as const,
       }),
@@ -2712,6 +2822,8 @@ export class NativeChatController {
     };
     this.startupComposer = undefined;
     this.scope = scope;
+    if (!scope.workbench && !scope.remembered && !this.fixed)
+      this.activateWorkbench(scope, target, initialWorkbenchPath);
     // Every per-chat field starts empty; only what belongs to the workspace
     // carries over to the next chat.
     this.update({
@@ -2733,20 +2845,24 @@ export class NativeChatController {
         ? this.restoreDraft(scope, attachmentReady.promise)
         : undefined;
     if (this.remembersSelection) {
-      const read = this.restoreSelection(scope, sessionId);
+      const read = this.restoreSelection(scope, target);
       scope.selectionReady = read;
       try {
         await read;
-      } catch {
+      } catch (error) {
+        attachmentReady.resolve();
+        if (this.owns(scope) && scope.remembered && missingChat(error)) {
+          this.forgetDeletedChat(scope);
+          return;
+        }
         if (this.owns(scope))
           this.update({
             loading: false,
             permissionModeLoading: false,
             profileError: "Couldn't read this chat's saved model and effort.",
           });
-        attachmentReady.resolve();
         await savedDraft;
-        return;
+        return scope;
       }
       if (!this.owns(scope)) {
         attachmentReady.resolve();
@@ -2760,7 +2876,7 @@ export class NativeChatController {
       this.update({ loading: false });
       await Promise.all([inputs, draft]);
       if (this.owns(scope)) this.save();
-      return;
+      return scope;
     }
     try {
       if (prepared) {
@@ -2806,7 +2922,11 @@ export class NativeChatController {
       ]);
     } catch (error) {
       if (this.owns(scope)) {
-        if (deletedAttachment(error)) this.forgetDeletedChat(scope);
+        if (
+          deletedAttachment(error) ||
+          (scope.remembered && missingChat(error))
+        )
+          this.forgetDeletedChat(scope);
         else if (!prepared && !this.fixed && observationTransportFailure(error))
           this.requestObservationRecovery(scope, error);
         else
@@ -2827,6 +2947,56 @@ export class NativeChatController {
       scope.initialInputCapabilities = undefined;
       attachmentReady.resolve();
       await savedDraft;
+    }
+    return scope;
+  }
+
+  private beginWorkbenchChange(scope: Scope | undefined): () => boolean {
+    const change = {};
+    this.workbenchChange = change;
+    return () => this.workbenchChange === change && this.scope === scope;
+  }
+
+  private permitWorkbenchChange(
+    isCurrent: () => boolean,
+    target?: NativeChatWorkbenchTarget
+  ): boolean | Promise<boolean> {
+    try {
+      const allowed =
+        this.editorSurfaces?.beforeWorkbenchChange?.(isCurrent, target) ?? true;
+      return typeof allowed === "boolean"
+        ? allowed
+        : allowed.catch(() => false);
+    } catch {
+      return false;
+    }
+  }
+
+  private activateWorkbench(
+    scope: Scope,
+    target: NativeChatWorkbenchTarget,
+    initialPath?: string
+  ): void {
+    const source = this.editorSurfaces;
+    if (!source?.activateWorkbench) return;
+    const readiness = Promise.withResolvers<boolean>();
+    const workbench: EditorWorkbench = {
+      target,
+      ready: readiness.promise,
+      retire: () => readiness.resolve(false),
+    };
+    scope.workbench = workbench;
+    try {
+      const ready = source.activateWorkbench(
+        target,
+        () => this.scope?.workbench === workbench,
+        initialPath
+      );
+      if (ready)
+        void ready.then(() => readiness.resolve(true), workbench.retire);
+      else readiness.resolve(true);
+    } catch {
+      workbench.retire();
     }
   }
 
@@ -4262,20 +4432,35 @@ export class NativeChatController {
       !scope ||
       !entry ||
       this.view.catalogDraft ||
+      this.view.catalogChanging ||
       entry.archived === archived
     )
       return null;
+    const replacesSelection =
+      archived && this.view.selected === entry.sessionId;
+    if (replacesSelection && scope.workbench) {
+      const current = this.beginWorkbenchChange(scope);
+      const allowed = this.permitWorkbenchChange(current);
+      if (
+        !(typeof allowed === "boolean" ? allowed : await allowed) ||
+        !current()
+      )
+        return null;
+    }
     const saved = await this.organize({
       revision: entry.revision,
       title: entry.title,
       archived,
     });
     // A late reply must not replace another chat the person already opened.
-    if (!saved || !this.owns(scope)) return null;
-    const replacesSelection =
-      archived && this.view.selected === saved.sessionId;
+    if (!this.owns(scope)) return null;
+    if (!saved) {
+      if (replacesSelection && scope.workbench)
+        this.editorSurfaces?.cancelWorkbenchChange?.();
+      return null;
+    }
     // Selection changes immediately. Its draft reads can finish after confirmation is shown.
-    if (replacesSelection) void this.select(null);
+    if (replacesSelection) void this.bind(null, { skipWorkbenchGuard: true });
     const replacement = replacesSelection ? this.scope : undefined;
 
     const receipt = saved.archiveUndo;
@@ -4341,18 +4526,35 @@ export class NativeChatController {
     )
       return false;
     this.update({ catalogChanging: true, catalogEntryError: null });
+    let leaving = false;
     try {
+      if (scope.workbench) {
+        const current = this.beginWorkbenchChange(scope);
+        const allowed = this.permitWorkbenchChange(current);
+        if (
+          !(typeof allowed === "boolean" ? allowed : await allowed) ||
+          !current()
+        )
+          return false;
+        leaving = true;
+      }
       const deleted = await this.bridge.deleteSavedChat(
         attachment.attachmentId,
         observation.observationId,
         entry.revision
       );
-      if (deleted && this.catalogConnection === connection)
+      if (
+        deleted &&
+        (this.catalogConnection === connection || this.owns(scope))
+      ) {
+        leaving = false;
         this.forgetDeletedChat(scope);
+      }
       return deleted;
     } catch (error) {
       if (!this.owns(scope)) return false;
       if (deletedAttachment(error)) {
+        leaving = false;
         this.forgetDeletedChat(scope);
         return false;
       }
@@ -4368,7 +4570,10 @@ export class NativeChatController {
       this.update({ catalogEntryError: deletionError(reason) });
       return false;
     } finally {
-      if (this.owns(scope)) this.update({ catalogChanging: false });
+      if (this.owns(scope)) {
+        if (leaving) this.editorSurfaces?.cancelWorkbenchChange?.();
+        this.update({ catalogChanging: false });
+      }
     }
   }
 
@@ -9064,8 +9269,8 @@ export class NativeChatController {
     scope: Scope,
     { deferOptionalSetup = false } = {}
   ): Promise<void> {
-    if (scope.attachment) return this.promoteDraft(scope);
     if (scope.opening) return scope.opening;
+    if (scope.attachment) return this.promoteDraft(scope);
     const opening = this.attachments.then(async () => {
       if (!this.owns(scope)) return;
       const newDraft =
@@ -9119,7 +9324,46 @@ export class NativeChatController {
       scope.attachment = attachment;
       scope.requested = attachment.sessionId;
       if (!this.owns(scope)) return;
-      if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
+      if (scope.remembered) {
+        const entry = await this.bridge
+          .catalogEntry?.(attachment.attachmentId)
+          .catch((error: unknown) => {
+            if (missingChat(error)) throw error;
+            return null;
+          });
+        if (!this.owns(scope)) return;
+        if (entry?.sessionId === attachment.sessionId && entry.archived) {
+          void this.bind(null, { skipWorkbenchGuard: true });
+          return;
+        }
+        scope.remembered = undefined;
+        if (!scope.workbench)
+          this.activateWorkbench(scope, {
+            kind: "chat",
+            id: attachment.sessionId,
+          });
+      }
+      const workbench = scope.workbench;
+      let workbenchReady = !workbench || (await workbench.ready);
+      if (!this.owns(scope)) return;
+      if (workbench?.target.kind === "draft") {
+        if (workbenchReady) {
+          try {
+            this.editorSurfaces?.promoteWorkbench?.(
+              workbench.target.id,
+              attachment.sessionId
+            );
+          } catch {
+            workbenchReady = false;
+          }
+        }
+        workbench.target = { kind: "chat", id: attachment.sessionId };
+      }
+      if (
+        workbenchReady &&
+        this.editorSurfaces &&
+        this.bridge.publishEditorSurfaces
+      ) {
         this.subscribeToEditorPresentation(scope, attachment);
         const selection = this.editorSurfaces.editorSelection;
         if (selection && this.bridge.onEditorSvgSelection) {
@@ -10473,6 +10717,7 @@ export class NativeChatController {
     }
     const session = scope.attachment?.sessionId ?? scope.requested;
     if (!session) return;
+    this.editorSurfaces?.forgetWorkbench?.(session);
     const selected = this.owns(scope);
     if (
       !selected &&
@@ -10493,7 +10738,7 @@ export class NativeChatController {
     if (selected) {
       if (scope.preparedStart)
         this.update({ error: PREPARED_MESSAGE_NOT_SENT });
-      else void this.select(null);
+      else void this.bind(null, { skipWorkbenchGuard: true });
     }
     this.update({ sessions: this.sessionChoices() });
     this.save();
@@ -10654,6 +10899,13 @@ function deletedAttachment(error: unknown): boolean {
   return (
     error instanceof Error &&
     error.message.includes("native_chat_session_deleted")
+  );
+}
+
+function missingChat(error: unknown): boolean {
+  return (
+    deletedAttachment(error) ||
+    (error instanceof Error && /\bsession_missing\b/.test(error.message))
   );
 }
 

@@ -272,6 +272,7 @@ export const IPC_CHANNELS = {
   WORKSPACE_PUBLISH_EDITOR_SURFACES: "grida:workspace:publish-editor-surfaces",
   WORKSPACE_PUBLISH_AUTOMATION_SURFACES:
     "grida:workspace:publish-automation-surfaces",
+  WORKSPACE_RETIRE_VIEW: "grida:workspace:retire-view",
   WORKSPACE_OPEN_AUTOMATION_FILE: "grida:workspace:open-automation-file",
   WORKSPACE_CHOOSE: "grida:workspace:choose",
   WORKSPACE_REOPEN: "grida:workspace:reopen",

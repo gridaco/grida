@@ -160,6 +160,7 @@ export function NativeAgentPaneGate({
   editorSurfaces,
   sideChatPlacement,
   firstMessage,
+  onProjectOnly,
   onProcessesChange,
   subagentPlacement,
 }: {
@@ -172,6 +173,7 @@ export function NativeAgentPaneGate({
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn when the chat is ready. */
   firstMessage?: NativeFirstMessage;
+  onProjectOnly?: () => void;
 } & NativeChatPresentation) {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<{
@@ -239,6 +241,9 @@ export function NativeAgentPaneGate({
     !!bridge.selectProfile;
   const unavailable =
     !starting && readiness !== "native-ready" && !connectionRequired;
+  useEffect(() => {
+    if (unavailable || connectionRequired) onProjectOnly?.();
+  }, [unavailable, connectionRequired, onProjectOnly]);
   if (unavailable) {
     const pending = firstMessage?.peek?.();
     return (

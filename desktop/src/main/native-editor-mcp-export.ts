@@ -33,6 +33,7 @@ type Frame = Readonly<{
   workspaceId: string;
 }>;
 type Publication = Frame & {
+  viewId?: number;
   snapshot: NativeEditorSurfaceSnapshot;
   unwatch(): void;
 };
@@ -49,7 +50,7 @@ type Admission = Readonly<{
 
 export class NativeEditorMcpExport {
   private publication: Publication | undefined;
-  private readonly attaching = new WeakSet<WebContents>();
+  private readonly attaching = new WeakMap<WebContents, Publication>();
   private revoked = false;
   private buffer = Buffer.alloc(0);
   private responding = false;
@@ -165,32 +166,40 @@ export class NativeEditorMcpExport {
     }
   }
 
-  async publish(event: IpcMainInvokeEvent, value: unknown): Promise<boolean> {
+  async publish(
+    event: IpcMainInvokeEvent,
+    value: unknown,
+    viewId?: number
+  ): Promise<boolean> {
     const snapshot = NativeEditorSurfaces.parse(value);
     const frame = this.basis(event);
     if (!snapshot || !frame || this.revoked) return false;
-    if (this.publication) {
+    const existing = this.publication ?? this.attaching.get(frame.sender);
+    if (existing) {
       if (
-        this.publication.sender !== frame.sender ||
-        this.publication.frame !== frame.frame ||
-        this.publication.href !== frame.href ||
-        !this.isCurrent(this.publication)
+        existing.sender !== frame.sender ||
+        existing.frame !== frame.frame ||
+        existing.href !== frame.href
       )
         return false;
-      this.publication.snapshot = snapshot;
+      if (existing.viewId !== viewId) {
+        this.revoke();
+        return false;
+      }
+      existing.snapshot = snapshot;
       return true;
     }
-    if (this.attaching.has(frame.sender)) return false;
-    this.attaching.add(frame.sender);
     let navigated = false;
     const candidate: Publication = {
       ...frame,
+      viewId,
       snapshot,
       unwatch: ipc_sender.watchNavigation(frame.sender, () => {
         navigated = true;
         if (this.publication === candidate) this.revoke();
       }),
     };
+    this.attaching.set(frame.sender, candidate);
     try {
       if (
         !(await this.matches(frame)) ||
@@ -205,6 +214,19 @@ export class NativeEditorMcpExport {
       this.attaching.delete(frame.sender);
       if (this.publication !== candidate) candidate.unwatch();
     }
+  }
+
+  retireView(event: IpcMainInvokeEvent, viewId: number): void {
+    const frame = this.basis(event);
+    const publication = this.publication ?? this.attaching.get(event.sender);
+    if (
+      frame &&
+      publication?.sender === frame.sender &&
+      publication.frame === frame.frame &&
+      publication.href === frame.href &&
+      (publication.viewId ?? 0) <= viewId
+    )
+      this.revoke();
   }
 
   revoke(): void {
@@ -439,7 +461,12 @@ export class NativeEditorMcpExport {
     ));
     if (!lease || signal.aborted) return denied;
     const result = await lease.invoke(operation, args, signal);
-    if (this.revoked || this.publication !== owner || !this.isCurrent(owner)) {
+    if (
+      this.revoked ||
+      this.publication !== owner ||
+      !this.isCurrent(owner) ||
+      !lease.ready()
+    ) {
       this.revoke();
       return result.disposition === "not_dispatched"
         ? denied

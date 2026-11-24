@@ -27,6 +27,7 @@ import type {
   NativeChatInitialComposer,
   NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
+import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 
 type Attachment = NonNullable<NativeChatInitialComposer["attachment"]>;
 type AttachmentDescription = Readonly<{
@@ -431,10 +432,15 @@ function parse(
     profileId,
     requestId,
     homeDraftKey,
+    initialWorkbenchPath,
     messageContext: rawContext,
   } = value as Record<string, unknown>;
   const messageContext =
     rawContext === undefined ? null : parseNativeChatMessageContext(rawContext);
+  const workbenchPath =
+    typeof initialWorkbenchPath === "string"
+      ? WorkspaceArtifact.normalizeRelativePath(initialWorkbenchPath)
+      : null;
   if (typeof text !== "string" || (rawContext !== undefined && !messageContext))
     return null;
   if (
@@ -562,6 +568,7 @@ function parse(
     ...(includeRequestId &&
       typeof homeDraftKey === "string" && { homeDraftKey }),
     ...(messageContext && { messageContext }),
+    ...(workbenchPath && { initialWorkbenchPath: workbenchPath }),
     profileId,
     ...(effort !== undefined && {
       effort: effort as NativeChatInitialComposer["effort"],
