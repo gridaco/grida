@@ -373,7 +373,10 @@ fn append_message_context(
     Ok(())
 }
 
-fn display_parts(parts: &[PromptPart], sessions: &Mutex<ConnectionSessions>) -> Vec<DisplayPart> {
+fn display_parts(
+    parts: Vec<DisplayPart>,
+    sessions: &Mutex<ConnectionSessions>,
+) -> Vec<DisplayPart> {
     if !sessions
         .lock()
         .unwrap()
@@ -382,9 +385,7 @@ fn display_parts(parts: &[PromptPart], sessions: &Mutex<ConnectionSessions>) -> 
     {
         return Vec::new();
     }
-    crate::host::message_context::context(parts)
-        .map(|context| context.display_parts.clone())
-        .unwrap_or_default()
+    parts
 }
 
 /// The file references among a prompt's blocks, aligned with the blocks. Only a

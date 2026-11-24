@@ -51,6 +51,13 @@ replaces the entire list in order; an empty list clears it, and omitting both
 text and attachments restores the accepted message. On uncertain delivery use
 the original input or checkout action receipt before preparing sources again.
 
+`nativeChat.skills(workspaceId?)` lists source-labeled skill metadata in Home
+and workspace composers. A workspace composer can omit the ID to use its
+current workspace. A Home composer without a destination sees personal and
+bundled skills. Send the exact selected references alongside the authored
+text. Only the host publishes accepted skill display parts through the live
+and replayed transcript.
+
 `browser.preview()` and `browser.previewPublicLink()` return the same
 `WebPreview.Metadata` shape to a live workspace attachment. Fields are
 optional and can include a title, description, favicon, Open Graph image, and

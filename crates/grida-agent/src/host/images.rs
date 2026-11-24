@@ -35,7 +35,11 @@ impl Host {
         session: &SessionId,
         input: &ChangeId,
         basis: QueueReadBasis<'_>,
-    ) -> Result<(Vec<PromptPart>, bool)> {
+    ) -> Result<(
+        Vec<PromptPart>,
+        bool,
+        Vec<super::message_context::DisplayPart>,
+    )> {
         let view = self
             .inspect(session.clone())
             .await
@@ -54,7 +58,15 @@ impl Host {
         .ok_or_else(queued_image_unavailable)?;
         let editable = super::queued_text::text_editable(&selected.input);
         decode_input::<StoredPrompt>(&selected.input)
-            .map(|prompt| (prompt.parts, editable))
+            .map(|prompt| {
+                let skills = prompt
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                let display = super::message_context::display_parts(&prompt.parts, &skills);
+                (prompt.parts, editable, display)
+            })
             .map_err(|_| queued_image_unavailable())
     }
 
@@ -116,7 +128,7 @@ impl Host {
         basis: QueueReadBasis<'_>,
         attachment: &ArtifactId,
     ) -> Result<MediaRef> {
-        let (parts, _) = self.queued_message_parts(session, input, basis).await?;
+        let (parts, _, _) = self.queued_message_parts(session, input, basis).await?;
         let mut selected = None;
         for part in parts {
             let media = match part {

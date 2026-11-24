@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — observation-bound queued input display, with no dispatch authority.
 import { randomUUID } from "node:crypto";
+import { NativeChatSkills } from "@grida/desktop-bridge";
 import type {
   NativeChatMessageAttachment,
   NativeChatQueuedMessage,
@@ -66,6 +67,13 @@ export class NativeQueuedMessages {
         if (textBytes > 512 * 1024) throw unavailable();
         texts.push(part.text);
       } else if (part?.type === "resource_link") {
+        // The independent accepted display projection carries the skill chip.
+        // A retained skill reference is never a file attachment or preview.
+        if (
+          typeof part.uri === "string" &&
+          part.uri.startsWith(NativeChatSkills.uriPrefix)
+        )
+          continue;
         if (
           attachments.length >= 64 ||
           typeof part.name !== "string" ||

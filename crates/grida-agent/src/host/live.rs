@@ -8,7 +8,7 @@ use agent_kit_core::messages::{
     ToolResult, UrlCitation,
 };
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnBinding, TurnState};
-use agent_kit_core::{Envelope, MessageId, SessionId, ToolCallId, TurnId, WaitId};
+use agent_kit_core::{ChangeId, Envelope, MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
 use grida_agent_master::compaction::{self, CompactionActivityStatus};
 use grida_agent_master::questions::QuestionReply;
@@ -183,6 +183,10 @@ pub(super) fn publish_lifecycle(
 pub(crate) enum LiveTextKind {
     Assistant(Vec<UrlCitation>),
     QuestionReply(Vec<QuestionReply>),
+    SkillInput {
+        input: ChangeId,
+        display_parts: Vec<super::message_context::DisplayPart>,
+    },
 }
 
 #[derive(Clone)]
@@ -194,6 +198,35 @@ pub(crate) struct LiveText {
     pub replace: bool,
     pub text: Arc<str>,
     pub kind: LiveTextKind,
+}
+
+pub(super) struct SkillInput {
+    pub input: ChangeId,
+    pub message: MessageId,
+    pub text: String,
+    pub display_parts: Vec<super::message_context::DisplayPart>,
+}
+
+impl SkillInput {
+    pub(super) fn publish(
+        self,
+        sender: &broadcast::Sender<LiveUpdate>,
+        session: &SessionId,
+        turn: &TurnId,
+    ) {
+        let _ = sender.send(LiveUpdate::Text(LiveText {
+            session: session.clone(),
+            turn: turn.clone(),
+            message: self.message,
+            offset: 0,
+            replace: true,
+            text: self.text.into(),
+            kind: LiveTextKind::SkillInput {
+                input: self.input,
+                display_parts: self.display_parts,
+            },
+        }));
+    }
 }
 
 pub(super) struct Publisher {

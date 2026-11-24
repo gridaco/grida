@@ -69,6 +69,8 @@ import { AgentPermissionConfirmation } from "../shared/agent-permission-confirma
 import { AgentComposer } from "../shared/agent-composer";
 import { OutgoingMessage, OutgoingMessageStatus } from "./outgoing-message";
 import type { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
+import { useSkillMentions } from "../shared/use-skill-mentions";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -251,7 +253,10 @@ export function NativeAgentPaneGate({
         {pending && (
           <OutgoingMessage
             text={pending.text}
-            displayParts={pending.messageContext?.displayParts}
+            displayParts={SkillMentions.display(
+              pending.skills,
+              pending.messageContext?.displayParts
+            )}
             attachmentName={
               firstMessage?.composer?.attachment?.file.name ??
               firstMessage?.composer?.missingAttachment?.name
@@ -726,9 +731,23 @@ function NativeChatPane({
     workspaceId,
     readWorkspaceDirectory
   );
+  const skillMenu = useSkillMentions(
+    controller.fixedSession ||
+      (!workspaceId && !readWorkspaceDirectory) ||
+      !!queueEdit ||
+      state.steering ||
+      state.goalIntent
+      ? undefined
+      : bridge.skills,
+    workspaceId
+  );
   const catalog = useMemo(
-    () => ({ commands: NO_COMMANDS, mentions }),
-    [mentions]
+    () => ({
+      commands: NO_COMMANDS,
+      mentions,
+      skillMentions: skillMenu.mentions,
+    }),
+    [mentions, skillMenu.mentions]
   );
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
@@ -1123,7 +1142,10 @@ function NativeChatPane({
               {homeInput && (
                 <OutgoingMessage
                   text={homeInput.text}
-                  displayParts={homeInput.messageContext?.displayParts}
+                  displayParts={SkillMentions.display(
+                    homeInput.skills,
+                    homeInput.messageContext?.displayParts
+                  )}
                   attachmentName={homeAttachmentName}
                   attachmentNames={
                     firstMessage?.composer?.attachments?.map(
@@ -1580,6 +1602,7 @@ function NativeChatPane({
             }
             autofocus={autofocus}
             catalog={catalog}
+            onSkillMenuOpen={skillMenu.refresh}
             commands={
               queueEdit
                 ? []
@@ -1704,9 +1727,14 @@ function NativeChatPane({
             onClearSelection={controller.clearComposerEditorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
-            onCapture={(text, document) =>
-              controller.canSubmitOptimistically(text)
-                ? controller.submitOptimistically(text, state.scope, document)
+            onCapture={(text, document, skills) =>
+              controller.canSubmitOptimistically(text, skills)
+                ? controller.submitOptimistically(
+                    text,
+                    state.scope,
+                    document,
+                    skills
+                  )
                 : undefined
             }
             canSubmit={
@@ -1752,13 +1780,14 @@ function NativeChatPane({
             activeTurnId={turn?.turnId}
             submissionScope={state.scope}
             draftRef={draft}
-            onSubmit={(text, document) =>
+            onSubmit={(text, document, skills) =>
               controller.submitFromComposer(
                 text,
                 state.scope,
                 queuedInputId,
                 queuedEditHasContent,
-                document
+                document,
+                skills
               )
             }
             onStop={() => void controller.control("stop")}

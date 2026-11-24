@@ -44,22 +44,41 @@ project folder. Desktop workspace chats and source-built hosts follow it
 automatically. A message keeps the instructions it started with, and edits
 apply to later messages.
 
-You don't have to pick a skill. In a chat that can use project files, such
-as a Desktop workspace chat, the agent sees each available skill's name and
-description. When you name a skill or ask for work a skill describes, for
+In a chat that can use project files, such as a Desktop workspace chat,
+the agent sees names and descriptions for project and bundled skills.
+When you name a listed skill or ask for work a skill describes, for
 example "make a short deck about tides", the agent reads that skill's full
 instructions and follows them. It says which skill it is using. The bundled
 skills include `dotcanvas`, `slides` and `svg`. Workspace chats with bundled
 FX also offer a skill for planning workflows and inspecting saved runs. A
 Desktop turn with Browser access can discover guidance for inspecting pages.
 
-For an ordinary skill name, Grida looks in `.agents/skills/<name>/SKILL.md`
-first, then `.claude/skills/<name>/SKILL.md`. To select a particular
-extension's skill, use the name shown by discovery, such as
-`desktop-fx/desktop-fx`. This also works when another extension or your project
-uses the same local name. If several extensions match a bare name, choose one
-by its full name. Each message keeps the skill selection it accepted. All
-skills use the chat's existing permissions.
+In the Home or workspace composer, type `$` and choose a skill by name,
+description, and source. Grida discovers skills installed as
+`.agents/skills/<name>/SKILL.md` in your project and under your home directory.
+Home shows your personal skills and bundled skills before you choose a
+destination. Choosing a project also shows the skills in that project.
+Project skills rank ahead of personal skills with the same name, followed by
+bundled skills. Projects can also share skills under `.claude/skills/`.
+
+A selection stays in the draft as a removable mention with a book icon and
+the skill name. You can choose the personal copy of a skill even when the
+project has one with the same name. Ordinary dollar text such as `$100`
+stays in your message. After sending, the mention appears inline where you
+placed it, including when you reopen the chat. Hover over it to see the
+source the host accepted.
+If the skill changed or was removed before sending, refresh the selection or
+remove it and send again. Each accepted message keeps the skill version it
+selected. All skills use the chat's existing permissions.
+
+You can also send a plain `$skill-name` from Desktop or the terminal chat.
+Grida loads the instructions when the name matches one available skill.
+When several skills share the name, use the Desktop picker to choose a source.
+Use a mention to invoke a personal skill.
+
+A qualified name, such as `desktop-fx/desktop-fx`, chooses an eligible
+extension's skill. Use the qualified name when multiple extensions offer the
+same skill name.
 
 To choose a skill yourself from a source-built host, add `--skill svg` to
 `grida-agent run`, and repeat the flag for more skills. A selected skill's

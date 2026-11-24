@@ -10,6 +10,8 @@ import type {
   NativeChatMessageContext,
   NativeChatOperatingRegime,
   NativeChatQuestion,
+  NativeChatSkill,
+  NativeChatSkillReference,
   NativeChatQueueAction,
   NativeChatQueueActionReceipt,
   NativeChatQueueCheckout,
@@ -47,6 +49,7 @@ type Input = {
   svgSelection?: true;
   goalStart?: fixtures.Queued["goalStart"];
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 };
 
 type CapturedInput = Omit<fixtures.Queued, "effort"> & {
@@ -66,7 +69,35 @@ type QueueCheckout = {
 
 /** Local implementation of the fragment of Desktop IPC used by the examples. */
 export class DesktopChatFixture {
+  private projectSkillVersion = 1;
   readonly submission = new DesktopRequestFixture();
+
+  updateProjectSkill(): void {
+    this.projectSkillVersion++;
+  }
+
+  private skillCatalog(): readonly NativeChatSkill[] {
+    const projectRevision = this.projectSkillVersion
+      .toString(16)
+      .padStart(64, "0");
+    const personalRevision = "f".repeat(64);
+    return [
+      {
+        name: "slides",
+        description: "Make slides with the gallery project's layout.",
+        source: "project_agents",
+        uri: `grida-skill:slides@${projectRevision}`,
+        revision: projectRevision,
+      },
+      {
+        name: "slides",
+        description: "Make slides with your personal layout.",
+        source: "personal",
+        uri: `grida-skill:slides@${personalRevision}`,
+        revision: personalRevision,
+      },
+    ];
+  }
   readonly compaction = new DesktopRequestFixture();
   readonly modelsRead = new DesktopRequestFixture();
   readonly accessRead = new DesktopRequestFixture();
@@ -661,6 +692,7 @@ export class DesktopChatFixture {
       !this.questions.length &&
       !item.goalStart &&
       !item.svgSelection &&
+      !item.displayParts?.some(({ kind }) => kind === "skill") &&
       item.operatingRegime !== "plan" &&
       item.effort === undefined &&
       (item.attachments?.every((_, index) =>
@@ -1053,6 +1085,19 @@ export class DesktopChatFixture {
     }
     const alreadyAccepted = this.receipts.get(input.inputId);
     if (alreadyAccepted) return alreadyAccepted;
+    const displayParts = [...(input.messageContext?.displayParts ?? [])];
+    for (const reference of input.skills ?? []) {
+      const skill = this.skillCatalog().find(
+        ({ uri }) => uri === reference.uri
+      );
+      if (!skill) throw new Error("selected_skill_changed");
+      const { name, source, uri } = skill;
+      displayParts.push({
+        kind: "skill",
+        version: 1,
+        data: { name, source, uri },
+      });
+    }
     if (input.goalStart) {
       if (this.waiting.some((item) => item.goalStart))
         throw new Error("session_goal_queued");
@@ -1081,7 +1126,7 @@ export class DesktopChatFixture {
       effort,
       svgSelection,
       goalStart,
-      displayParts: input.messageContext?.displayParts,
+      ...(displayParts.length && { displayParts }),
     };
     if (
       action === "enqueue" ||
@@ -1113,6 +1158,7 @@ export class DesktopChatFixture {
       titles: [{ sessionId: this.sessionId, title: "Example chat" }],
       nextCursor: null,
     }),
+    skills: async () => this.skillCatalog(),
     acceptsEffort: async () => true,
     acceptsGoalEffort: async () => true,
     create: async () => ({
@@ -1175,7 +1221,9 @@ export class DesktopChatFixture {
       _svgTextTarget,
       _selectionRevision,
       _editorContextId,
-      target
+      target,
+      _webSearch,
+      skills
     ) =>
       this.accept({
         action,
@@ -1184,6 +1232,7 @@ export class DesktopChatFixture {
         operatingRegime,
         effort,
         ...(target && { svgSelection: true }),
+        ...(skills?.length && { skills }),
       }),
     submitImage: async (_, input) => {
       this.imageBytes.set(input.inputId, input.png);

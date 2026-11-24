@@ -6,6 +6,8 @@ import type { NativeChatDisplayPart } from "@grida/desktop-bridge";
 import { Message, MessageContent } from "@app/ui/ai-elements/message";
 import { Button } from "@app/ui/components/button";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
+import { UserMessageText } from "@/kits/agent-chat/message";
+import { projectUserMessageSkills } from "@/kits/agent-chat/user-message-markdown";
 
 /** The workspace transcript entry until the host confirms the send. */
 export function OutgoingMessage({
@@ -21,11 +23,12 @@ export function OutgoingMessage({
   displayParts?: readonly NativeChatDisplayPart[];
   children?: ReactNode;
 }) {
+  const authored = projectUserMessageSkills(text, displayParts);
   return (
     <Message from="user">
-      {displayParts?.length ? (
-        <MessageContextParts parts={displayParts} className="justify-end" />
-      ) : null}
+      {authored.context.length > 0 && (
+        <MessageContextParts parts={authored.context} className="justify-end" />
+      )}
       {(attachmentNames ?? (attachmentName ? [attachmentName] : [])).map(
         (name, index) => (
           <span
@@ -39,7 +42,11 @@ export function OutgoingMessage({
       )}
       {text && (
         <MessageContent className="text-[14px] leading-[23px] whitespace-pre-wrap">
-          {text}
+          {authored.links.size ? (
+            <UserMessageText text={authored.text} skillLinks={authored.links} />
+          ) : (
+            text
+          )}
         </MessageContent>
       )}
       {children ?? <OutgoingMessageStatus status="sending" />}

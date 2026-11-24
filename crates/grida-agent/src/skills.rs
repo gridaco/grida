@@ -1,5 +1,5 @@
-//! Named task guidance from the selected workspace and the built-in catalog.
-//! GRIDA-SEC-007 keeps selected sources inside their declared workspace.
+//! Named task guidance from the selected workspace, personal skills, and the bundled catalog.
+//! GRIDA-SEC-007 keeps discovery and capture inside their declared sources.
 
 mod catalog;
 mod extensions;
@@ -7,24 +7,26 @@ mod extensions;
 mod native;
 use catalog::Catalog;
 #[cfg(unix)]
-pub(crate) use native::Root as ProjectRoot;
+pub(crate) use native::{PersonalSkills, Root as ProjectRoot};
 #[cfg(not(unix))]
 pub(crate) enum ProjectRoot {}
+#[cfg(not(unix))]
+pub(crate) enum PersonalSkills {}
 
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::{ChangeId, Error, ErrorKind, Fingerprint, MessageId, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 const URI_PREFIX: &str = "grida-skill:";
 const MAX_NAME: usize = 64;
 pub(crate) const MAX_SELECTOR_BYTES: usize = 2 * MAX_NAME + 1;
-const MAX_DESCRIPTION: usize = 512;
+const MAX_DESCRIPTION: usize = 1024;
 const MAX_CATALOG: usize = 128;
 const MAX_SELECTED: usize = 4;
 #[cfg(unix)]
 const MAX_SOURCE_BYTES: usize = 32 * 1024;
-const MAX_MANIFEST_BYTES: usize = 4 * 1024;
+const MAX_MANIFEST_BYTES: usize = 8 * 1024;
 
 const BUILTIN: [(&str, &str); 3] = [
     (
@@ -113,6 +115,7 @@ impl SkillReference {
 pub enum SkillSource {
     ProjectAgents,
     ProjectClaude,
+    Personal,
     Bundled,
 }
 
@@ -134,6 +137,19 @@ struct CapturedSkill {
     /// Accepted guidance, including any explicit host annotation before the
     /// verbatim authored text. The descriptor revision identifies the source.
     body: String,
+}
+
+#[cfg(unix)]
+impl CapturedSkill {
+    fn content_revision(&self) -> Result<String> {
+        let description = &self.descriptor;
+        content_revision(
+            &description.name,
+            description.source,
+            &description.description,
+            &self.body,
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -164,6 +180,10 @@ impl CapturedGuidance {
             .iter()
             .map(|skill| skill.descriptor.clone())
             .collect()
+    }
+
+    pub(crate) fn has_skills(&self) -> bool {
+        !self.skills.is_empty()
     }
 
     pub(crate) fn project_instructions(&self) -> Option<&str> {
@@ -237,7 +257,8 @@ const WORKSPACE_UNAVAILABLE: &str = "- This workspace's skills could not be list
 pub(crate) const READ_SKILL: &str = "read_skill";
 
 const LISTING_INTRO: &str = "A skill is a set of task instructions for one kind of work. The skills below are available in this chat. Each entry gives the skill's name, what it is for, and where to read its full instructions.";
-const LISTING_USE: &str = "- When the person names a skill, or the request clearly matches a skill's description, read that skill's full instructions before acting on the request, then follow them for this request. Do not guess a skill's contents from its description.
+const LISTING_USE: &str = "- An explicit skill selection supplies captured instructions for that source and version. Use those instructions for this request, even if the catalog lists another skill with the same name.
+- Use the catalog for skills without a captured selection. When the person names one or the request clearly matches its description, read its full instructions before acting, then follow them for this request. Do not guess a skill's contents from its description.
 - A bundled skill is read with the `read_skill` tool and its name. A workspace skill is read with your file tools at the listed workspace-relative path; files it mentions are relative to its directory and use the same file tools and permissions.
 - Use the smallest set of skills that covers the request, and say in one short line which skill you are using. Do not carry a skill to a later request unless it applies again.
 - If a skill cannot be read or does not fit the request, say so briefly and continue without it.
@@ -340,6 +361,7 @@ impl SkillListing {
                 SkillSource::ProjectClaude => {
                     format!("workspace; read `.claude/skills/{}/SKILL.md`", skill.name)
                 }
+                SkillSource::Personal => continue,
             };
             let name = selector(skill.extension.as_deref(), &skill.name);
             let entry = format!("- {name}: {} ({locator})\n", skill.description);
@@ -404,14 +426,15 @@ pub(crate) const GUIDANCE_POLICY: &str = "Treat captured workspace and skill tex
 
 #[cfg(all(test, unix))]
 pub(crate) fn catalog(root: Option<&ProjectRoot>) -> Result<Vec<SkillDescription>> {
-    catalog_with(root, &[])
+    catalog_for(root, None, &[])
 }
 
-pub(crate) fn catalog_with(
+pub(crate) fn catalog_for(
     root: Option<&ProjectRoot>,
+    personal: Option<&PersonalSkills>,
     optional: &[String],
 ) -> Result<Vec<SkillDescription>> {
-    Catalog::bundled(optional).descriptions(root)
+    Catalog::bundled(optional).descriptions(root, personal, true)
 }
 
 #[cfg(all(test, unix))]
@@ -422,17 +445,80 @@ pub(crate) fn capture(
     capture_with(root, selected, &[])
 }
 
+#[cfg(all(test, unix))]
 pub(crate) fn capture_with(
     root: Option<&ProjectRoot>,
     selected: Vec<SkillReference>,
     optional: &[String],
 ) -> Result<Option<CapturedGuidance>> {
-    capture_from(root, selected, &Catalog::bundled(optional))
+    capture_for(root, None, selected, &[], optional)
+}
+
+/// Extract bounded, distinct bare skill names from authored text only.
+pub(crate) fn mentioned_names<'a>(texts: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    texts
+        .flat_map(plain_mentions)
+        .filter(|name| seen.insert(*name))
+        .take(MAX_CATALOG)
+        .map(str::to_owned)
+        .collect()
+}
+
+fn plain_mentions(text: &str) -> impl Iterator<Item = &str> {
+    text.match_indices('$').filter_map(move |(index, _)| {
+        let before = &text[..index];
+        if before.ends_with(|c: char| c.is_alphanumeric() || matches!(c, '_' | '-' | '$' | '\\')) {
+            return None;
+        }
+        let tail = &text[index + 1..];
+        let end = tail
+            .find(|c: char| !(c.is_alphanumeric() || matches!(c, '_' | '-' | ':')))
+            .unwrap_or(tail.len());
+        let (name, after) = tail.split_at(end);
+        let linked = before.ends_with('[')
+            && after
+                .strip_prefix(']')
+                .is_some_and(|rest| rest.trim_start().starts_with('('));
+        if linked
+            || after.starts_with(['/', '\\', '@'])
+            || !valid_name(name)
+            || name.bytes().all(|byte| byte.is_ascii_digit())
+            || matches!(
+                name,
+                "path"
+                    | "home"
+                    | "user"
+                    | "shell"
+                    | "pwd"
+                    | "tmpdir"
+                    | "temp"
+                    | "tmp"
+                    | "lang"
+                    | "term"
+            )
+        {
+            return None;
+        }
+        Some(name)
+    })
+}
+
+pub(crate) fn capture_for(
+    root: Option<&ProjectRoot>,
+    personal: Option<&PersonalSkills>,
+    selected: Vec<SkillReference>,
+    plain: &[String],
+    optional: &[String],
+) -> Result<Option<CapturedGuidance>> {
+    capture_from(root, personal, selected, plain, &Catalog::bundled(optional))
 }
 
 fn capture_from(
     root: Option<&ProjectRoot>,
+    personal: Option<&PersonalSkills>,
     selected: Vec<SkillReference>,
+    plain: &[String],
     catalog: &Catalog<'_>,
 ) -> Result<Option<CapturedGuidance>> {
     if selected.len() > MAX_SELECTED {
@@ -442,91 +528,79 @@ fn capture_from(
         reference.validate()?;
     }
     #[cfg(unix)]
-    let (project, layers) = if let Some(root) = root {
-        let project = root
-            .project_guidance()?
-            .map(|body| {
-                Ok(ProjectGuidance {
-                    source: "AGENTS.md".into(),
-                    revision: Fingerprint::of(&("AGENTS.md", &body))?.to_hex(),
-                    body,
-                })
+    let project = root
+        .map(ProjectRoot::project_guidance)
+        .transpose()?
+        .flatten()
+        .map(|body| {
+            Ok(ProjectGuidance {
+                source: "AGENTS.md".into(),
+                revision: Fingerprint::of(&("AGENTS.md", &body))?.to_hex(),
+                body,
             })
-            .transpose()?;
-        let layers = if selected
+        })
+        .transpose()?;
+    #[cfg(unix)]
+    let layers = if !plain.is_empty()
+        || selected
             .iter()
-            .all(|r| split_selector(r.name()).0.is_some())
-        {
-            Vec::new()
-        } else {
-            root.layers()?
-        };
-        (project, layers)
+            .any(|r| split_selector(r.name()).0.is_none())
+    {
+        native::layers(root, personal)
     } else {
-        (None, Vec::new())
+        Vec::new()
     };
     #[cfg(not(unix))]
     let project = {
-        let _ = root;
+        let _ = (root, personal);
         None
     };
     let mut skills = Vec::new();
     let mut identities = BTreeSet::new();
     for reference in selected {
-        let (owner, local) = split_selector(reference.name());
-        #[cfg(not(unix))]
-        let skill = None;
-        #[cfg(unix)]
-        let mut skill = None;
-        #[cfg(unix)]
-        if owner.is_none() {
-            for (directory, source) in &layers {
-                if let Some(found) = directory.skill(local, *source)? {
-                    skill = Some(found);
-                    break;
-                }
-            }
-        }
-        let mut skill = match skill {
-            Some(project) => project,
-            None => {
-                // A pre-package catalog URI may pin one of the original bundled
-                // skills by bare name. Even identical text from a different
-                // package cannot satisfy that previously issued reference.
-                let owner = owner.or_else(|| reference.revision.as_ref().and(legacy_owner(local)));
-                catalog
-                    .resolve(owner, local)?
-                    .ok_or_else(|| problem(ErrorKind::Unavailable, "selected_skill_unavailable"))?
-            }
-        };
-        if !identities.insert((
-            skill.descriptor.extension.clone(),
-            skill.descriptor.name.clone(),
-        )) {
+        let skill = catalog.select(
+            &reference,
+            #[cfg(unix)]
+            &layers,
+        )?;
+        if !identities.insert(skill.descriptor.uri.clone()) {
             return Err(problem(
                 ErrorKind::InvalidInput,
                 "duplicate_skill_selection",
             ));
         }
-        if reference
-            .revision
-            .as_ref()
-            .is_some_and(|revision| revision != &skill.descriptor.revision)
-        {
-            return Err(problem(ErrorKind::Conflict, "selected_skill_changed"));
+        skills.push(skill);
+    }
+    // Preserve explicit input order for inspection. Plain mentions supplement
+    // the selection only where the author did not already choose a source.
+    for name in plain {
+        if skills.len() == MAX_SELECTED {
+            break;
         }
-        let layer = match skill.descriptor.source {
-            SkillSource::ProjectAgents => Some(".agents"),
-            SkillSource::ProjectClaude => Some(".claude"),
+        if skills.iter().any(|skill| &skill.descriptor.name == name) {
+            continue;
+        }
+        if let Some(skill) = catalog.unambiguous(
+            name,
+            #[cfg(unix)]
+            &layers,
+        ) {
+            skills.push(skill);
+        }
+    }
+    for skill in &mut skills {
+        let directory = match skill.descriptor.source {
+            SkillSource::ProjectAgents => Some(("workspace-relative", ".agents/skills")),
+            SkillSource::ProjectClaude => Some(("workspace-relative", ".claude/skills")),
+            SkillSource::Personal => Some(("personal", "$HOME/.agents/skills")),
             SkillSource::Bundled => None,
         };
-        if let Some(layer) = layer {
+        if let Some((source, directory)) = directory {
             skill.body = format!(
-                "Host-supplied workspace-relative skill directory\n{layer}/skills/{}\n\nAuthored skill text\n{}",
+                "Host-supplied {source} skill directory\n{directory}/{}\n\nAuthored skill text\n{}",
                 skill.descriptor.name, skill.body,
             );
         }
-        skills.push(skill);
     }
     Ok((project.is_some() || !skills.is_empty()).then_some(CapturedGuidance { project, skills }))
 }
@@ -541,10 +615,10 @@ fn parse(name: &str, source: SkillSource, document: &str) -> Result<Option<Captu
     let Some((declared, description)) = manifest_fields(manifest) else {
         return Ok(None);
     };
-    if declared != name || description.is_empty() || description.len() > MAX_DESCRIPTION {
+    if declared != name || description.is_empty() || description.chars().count() > MAX_DESCRIPTION {
         return Ok(None);
     }
-    let revision = Fingerprint::of(&(name, source, &description, body))?.to_hex();
+    let revision = content_revision(name, source, &description, body)?;
     Ok(Some(CapturedSkill {
         descriptor: SkillDescription {
             name: name.to_owned(),
@@ -556,6 +630,15 @@ fn parse(name: &str, source: SkillSource, document: &str) -> Result<Option<Captu
         },
         body: body.to_owned(),
     }))
+}
+
+fn content_revision(
+    name: &str,
+    source: SkillSource,
+    description: &str,
+    body: &str,
+) -> Result<String> {
+    Ok(Fingerprint::of(&(name, source, description, body))?.to_hex())
 }
 
 fn split_document(document: &str) -> Option<(&str, &str)> {
@@ -639,7 +722,7 @@ fn validate_name(name: &str) -> Result<()> {
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
-        && name.as_bytes()[0].is_ascii_lowercase()
+        && name.as_bytes()[0].is_ascii_alphanumeric()
         && name
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
@@ -659,6 +742,14 @@ mod tests {
     use std::os::unix::fs::symlink;
     use std::path::Path;
 
+    #[test]
+    fn plain_mentions_keep_literal_dollar_text_out_of_selection() {
+        let texts = [
+            r"Use ($slides), then $3d-models. Keep $100, $PATH, $home, and \${HOME} literal.",
+            r"$slides a$svg \$svg $svg_other $svg:other $svg/path [$svg](somewhere) 한국어$svg",
+        ];
+        assert_eq!(mentioned_names(texts.into_iter()), ["slides", "3d-models"]);
+    }
     fn skill(root: &Path, layer: &str, name: &str, body: &str) -> std::path::PathBuf {
         let directory = root.join(layer).join("skills").join(name);
         fs::create_dir_all(&directory).unwrap();
@@ -775,6 +866,332 @@ mod tests {
     }
 
     #[test]
+    fn catalog_retains_a_bundle_choice_shadowed_by_the_destination_project() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        skill(&root, ".agents", "slides", "Project slides");
+        let project = ProjectRoot::open(&root).unwrap();
+        let home = catalog(None).unwrap();
+        let bundled = home.iter().find(|entry| entry.name == "slides").unwrap();
+        let destination = catalog(Some(&project)).unwrap();
+        assert!(destination.iter().any(|entry| entry == bundled));
+        let selected = capture(
+            Some(&project),
+            vec![SkillReference::from_uri(&bundled.uri).unwrap().unwrap()],
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(selected.selected(), std::slice::from_ref(bundled));
+    }
+
+    #[test]
+    fn identical_project_documents_bind_to_the_project_that_issued_the_reference() {
+        let temporary = tempfile::tempdir().unwrap();
+        let first = temporary.path().canonicalize().unwrap().join("first");
+        let second = first.with_file_name("second");
+        skill(&first, ".agents", "slides", "Same instructions");
+        skill(&second, ".agents", "slides", "Same instructions");
+        let first = ProjectRoot::open(&first).unwrap();
+        let second = ProjectRoot::open(&second).unwrap();
+        let uri = |root| {
+            catalog(Some(root))
+                .unwrap()
+                .into_iter()
+                .find(|entry| entry.name == "slides" && entry.source == SkillSource::ProjectAgents)
+                .unwrap()
+                .uri
+        };
+        let first_uri = uri(&first);
+        assert_ne!(first_uri, uri(&second));
+        let selected = SkillReference::from_uri(&first_uri).unwrap().unwrap();
+        assert_eq!(
+            capture(Some(&second), vec![selected]).unwrap_err().code,
+            "selected_skill_changed"
+        );
+    }
+
+    #[test]
+    fn valid_skill_names_can_start_with_a_digit_and_descriptions_allow_1024_characters() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let path = skill(&root, ".agents", "3d-tools", "Prepare a 3D scene");
+        let description = "🤖".repeat(1024);
+        fs::write(
+            path,
+            format!("---\nname: 3d-tools\ndescription: {description}\n---\nPrepare a 3D scene"),
+        )
+        .unwrap();
+        let project = ProjectRoot::open(&root).unwrap();
+        let entries = catalog(Some(&project)).unwrap();
+        let tools = entries
+            .iter()
+            .find(|entry| entry.name == "3d-tools")
+            .unwrap();
+        assert_eq!(tools.description, description);
+        assert!(SkillReference::from_uri(&tools.uri).unwrap().is_some());
+    }
+
+    #[test]
+    fn a_personal_choice_survives_a_destination_with_the_same_name() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let home = root.join("home");
+        let destination = root.join("destination");
+        fs::create_dir(&home).unwrap();
+        let personal = PersonalSkills::open(&home).unwrap();
+        assert_eq!(
+            catalog_for(None, Some(&personal), &[]).unwrap(),
+            catalog(None).unwrap()
+        );
+
+        let personal_file = skill(&home, ".agents", "slides", "Use the personal workflow.");
+        skill(
+            &home,
+            ".claude",
+            "ignored",
+            "Do not load personal Claude skills.",
+        );
+        skill(
+            &destination,
+            ".agents",
+            "slides",
+            "Use the project workflow.",
+        );
+        skill(
+            &destination,
+            ".claude",
+            "slides",
+            "Use the other project workflow.",
+        );
+        let project = ProjectRoot::open(&destination).unwrap();
+        let home_catalog = catalog_for(None, Some(&personal), &[]).unwrap();
+        assert!(!home_catalog.iter().any(|entry| entry.name == "ignored"));
+        let chosen = home_catalog
+            .iter()
+            .find(|entry| entry.name == "slides" && entry.source == SkillSource::Personal)
+            .unwrap();
+        assert!(!chosen.uri.contains(home.to_str().unwrap()));
+        let destination_catalog = catalog_for(Some(&project), Some(&personal), &[]).unwrap();
+        let same_name = destination_catalog
+            .iter()
+            .filter(|entry| entry.name == "slides")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            same_name
+                .iter()
+                .map(|entry| entry.source)
+                .collect::<Vec<_>>(),
+            [
+                SkillSource::ProjectAgents,
+                SkillSource::ProjectClaude,
+                SkillSource::Personal,
+                SkillSource::Bundled
+            ]
+        );
+        let refs = same_name
+            .iter()
+            .map(|entry| SkillReference::from_uri(&entry.uri).unwrap().unwrap())
+            .collect();
+        let all_selected = capture_for(Some(&project), Some(&personal), refs, &[], &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            all_selected.selected().iter().collect::<Vec<_>>(),
+            same_name
+        );
+        let name = || SkillReference::named("slides".into()).unwrap();
+        let project_choice = capture_for(Some(&project), Some(&personal), vec![name()], &[], &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            project_choice.selected()[0].source,
+            SkillSource::ProjectAgents
+        );
+        let home_choice = capture_for(None, Some(&personal), vec![name()], &[], &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(home_choice.selected(), std::slice::from_ref(chosen));
+        let reference = SkillReference::from_uri(&chosen.uri).unwrap().unwrap();
+        let captured = capture_for(
+            Some(&project),
+            Some(&personal),
+            vec![reference.clone()],
+            &[],
+            &[],
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(captured.selected(), std::slice::from_ref(chosen));
+        assert_eq!(
+            captured.skills[0].body,
+            "Host-supplied personal skill directory\n$HOME/.agents/skills/slides\n\nAuthored skill text\nUse the personal workflow."
+        );
+        assert!(!captured.skills[0].body.contains(home.to_str().unwrap()));
+
+        let another_home = root.join("another-home");
+        skill(
+            &another_home,
+            ".agents",
+            "slides",
+            "Use the personal workflow.",
+        );
+        let another_personal = PersonalSkills::open(&another_home).unwrap();
+        assert_eq!(
+            capture_for(
+                Some(&project),
+                Some(&another_personal),
+                vec![reference.clone()],
+                &[],
+                &[],
+            )
+            .unwrap_err()
+            .code,
+            "selected_skill_changed"
+        );
+        skill(&home, ".agents", "slides", "Changed personal skill.");
+        assert_eq!(
+            capture_for(
+                Some(&project),
+                Some(&personal),
+                vec![reference.clone()],
+                &[],
+                &[],
+            )
+            .unwrap_err()
+            .code,
+            "selected_skill_changed"
+        );
+        fs::remove_file(personal_file).unwrap();
+        assert_eq!(
+            capture_for(Some(&project), Some(&personal), vec![reference], &[], &[])
+                .unwrap_err()
+                .code,
+            "selected_skill_changed"
+        );
+        let retained: CapturedGuidance =
+            serde_json::from_slice(&serde_json::to_vec(&captured).unwrap()).unwrap();
+        assert_eq!(retained, captured);
+    }
+
+    #[test]
+    fn unreadable_project_skills_do_not_mask_exact_personal_or_bundled_choices() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let home = root.join("home");
+        let destination = root.join("destination");
+        skill(&home, ".agents", "slides", "Use personal.");
+        skill(&destination, ".agents", "slides", "Use project.");
+        let lower_priority = skill(&destination, ".claude", "slides", "Use other project.");
+        let project = ProjectRoot::open(&destination).unwrap();
+        let personal = PersonalSkills::open(&home).unwrap();
+        let home_catalog = catalog_for(None, Some(&personal), &[]).unwrap();
+        let slides = home_catalog
+            .iter()
+            .filter(|skill| skill.name == "slides")
+            .collect::<Vec<_>>();
+        let refs = slides
+            .iter()
+            .map(|entry| SkillReference::from_uri(&entry.uri).unwrap().unwrap())
+            .collect::<Vec<_>>();
+        let legacy = parse(
+            "slides",
+            SkillSource::ProjectClaude,
+            &fs::read_to_string(lower_priority).unwrap(),
+        )
+        .unwrap()
+        .unwrap()
+        .descriptor
+        .uri;
+        let legacy = SkillReference::from_uri(&legacy).unwrap().unwrap();
+
+        for locked in [
+            destination.join(".agents/skills/slides"),
+            destination.join(".agents"),
+        ] {
+            fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+            // File permissions do not block an owning process with elevated privileges.
+            if fs::read_dir(&locked).is_ok() {
+                fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+                continue;
+            }
+            let entries = catalog_for(Some(&project), Some(&personal), &[]);
+            let exact = capture_for(Some(&project), Some(&personal), refs.clone(), &[], &[]);
+            let bare = capture_for(
+                Some(&project),
+                Some(&personal),
+                vec![SkillReference::named("slides".into()).unwrap()],
+                &[],
+                &[],
+            );
+            let legacy_selection = capture_for(
+                Some(&project),
+                Some(&personal),
+                vec![legacy.clone()],
+                &[],
+                &[],
+            );
+            fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+
+            let entries = entries.unwrap();
+            assert!(
+                !entries
+                    .iter()
+                    .any(|entry| entry.source == SkillSource::ProjectAgents)
+            );
+            assert!(slides.iter().all(|entry| entries.contains(entry)));
+            let capture = exact.unwrap().unwrap();
+            assert_eq!(capture.selected().iter().collect::<Vec<_>>(), slides);
+            assert_eq!(bare.unwrap_err().code, "skill_source_unavailable");
+            assert_eq!(legacy_selection.unwrap_err().code, "selected_skill_changed");
+        }
+    }
+
+    #[test]
+    fn personal_discovery_refuses_linked_directories_and_documents() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let home = root.join("home");
+        fs::create_dir(&home).unwrap();
+        let personal = PersonalSkills::open(&home).unwrap();
+        let outside = root.join("outside");
+        let soft_document = skill(&outside, ".agents", "linked-doc", "Never read this.");
+        let hard_document = skill(&outside, ".agents", "hard-doc", "Never read this.");
+        skill(&outside, ".agents", "linked-dir", "Never read this.");
+        let outside_skill_root = outside.join(".agents/skills");
+        symlink(outside.join(".agents"), home.join(".agents")).unwrap();
+        let catalog = || catalog_for(None, Some(&personal), &[]).unwrap();
+        let bundled = catalog_for(None, None, &[]).unwrap();
+        assert_eq!(catalog(), bundled);
+        fs::remove_file(home.join(".agents")).unwrap();
+        fs::create_dir(home.join(".agents")).unwrap();
+        symlink(&outside_skill_root, home.join(".agents/skills")).unwrap();
+        assert_eq!(catalog(), bundled);
+        fs::remove_file(home.join(".agents/skills")).unwrap();
+        let skill_root = home.join(".agents/skills");
+        fs::create_dir_all(skill_root.join("linked-doc")).unwrap();
+        fs::create_dir_all(skill_root.join("hard-doc")).unwrap();
+        symlink(
+            outside_skill_root.join("linked-dir"),
+            skill_root.join("linked-dir"),
+        )
+        .unwrap();
+        symlink(soft_document, skill_root.join("linked-doc/SKILL.md")).unwrap();
+        fs::hard_link(hard_document, skill_root.join("hard-doc/SKILL.md")).unwrap();
+        assert_eq!(catalog(), bundled);
+        for name in ["linked-dir", "linked-doc", "hard-doc"] {
+            let selected = vec![SkillReference::named(name.into()).unwrap()];
+            assert_eq!(
+                capture_for(None, Some(&personal), selected, &[], &[])
+                    .unwrap_err()
+                    .code,
+                "selected_skill_unavailable"
+            );
+        }
+    }
+
+    #[test]
     fn only_new_project_captures_annotate_the_selected_relative_directory() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().canonicalize().unwrap();
@@ -795,7 +1212,10 @@ mod tests {
                 fs::read_to_string(root.join(layer).join("skills").join(&name).join("SKILL.md"))
                     .unwrap();
             let original = parse(&name, source, &document).unwrap().unwrap();
-            assert_eq!(description, original.descriptor);
+            assert_ne!(description.revision, original.descriptor.revision);
+            let old_reference = SkillReference::from_uri(&original.descriptor.uri)
+                .unwrap()
+                .unwrap();
             let captured = capture(
                 Some(&project),
                 vec![SkillReference::from_uri(&description.uri).unwrap().unwrap()],
@@ -803,6 +1223,12 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(captured.selected(), vec![description]);
+            assert_eq!(
+                capture(Some(&project), vec![old_reference])
+                    .unwrap()
+                    .unwrap(),
+                captured
+            );
             assert_eq!(
                 captured.skills[0].body,
                 format!(
@@ -944,8 +1370,18 @@ mod tests {
         }
         for (workspace, code) in cases {
             let project = ProjectRoot::open(&workspace).unwrap();
-            // The picker's catalog and an explicit selection stay strict.
-            assert_eq!(catalog(Some(&project)).unwrap_err().code, code);
+            if code == "skill_source_unavailable" {
+                assert_eq!(
+                    catalog(Some(&project))
+                        .unwrap()
+                        .iter()
+                        .filter(|skill| skill.source == SkillSource::ProjectClaude)
+                        .count(),
+                    1
+                );
+            } else {
+                assert_eq!(catalog(Some(&project)).unwrap_err().code, code);
+            }
             let listing = SkillListing::capture(Some(&project)).unwrap();
             assert_eq!(listing.bundled().collect::<Vec<_>>(), bundled);
             assert_eq!(listing.skills.len(), bundled.len(), "{code}");
@@ -985,7 +1421,7 @@ mod tests {
             "three--d/inspect",
             "-pages/inspect",
             "pages-/inspect",
-            "pages/3d",
+            "pages/-3d",
         ] {
             assert!(SkillReference::named(invalid.into()).is_err());
         }

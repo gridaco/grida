@@ -314,6 +314,17 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("allows querying skills only from the Home and workspace composers", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_SKILLS;
+    expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    expect(allowedFor("main", "/desktop/file")).not.toContain(channel);
+    expect(allowedFor("main", "/desktop/settings")).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+  });
+
   it("admits requested Library selection only in the main workspace", () => {
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION,
@@ -359,7 +370,10 @@ describe("ipc_admission", () => {
       allowedFor("main", "/desktop/welcome").filter((allowed) =>
         nativeChat.includes(allowed)
       )
-    ).toEqual([IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW]);
+    ).toEqual([
+      IPC_CHANNELS.NATIVE_CHAT_SKILLS,
+      IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW,
+    ]);
   });
 
   it("admits notification focus consumption only in the main workspace", () => {

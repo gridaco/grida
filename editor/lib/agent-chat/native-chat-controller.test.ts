@@ -1017,6 +1017,99 @@ it("requires the original reference to be replaced or removed even after editing
   }
 });
 
+it("keeps a stale Home skill recoverable, preserves the next draft, and refuses a blind retry", async () => {
+  const { bridge, controller } = fixture();
+  const drafts = durableDrafts();
+  const skills = [
+    { name: "slides", uri: `grida-skill:slides@${"f".repeat(64)}` },
+  ];
+  const text = "Please [$slides](" + skills[0].uri + ") make the deck.";
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Please " },
+          {
+            type: "composerMention",
+            attrs: {
+              id: skills[0].uri,
+              label: "slides",
+              sigil: "$",
+              payload: JSON.stringify(skills[0]),
+            },
+          },
+          { type: "text", text: " make the deck." },
+        ],
+      },
+    ],
+  };
+  const pending =
+    Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    () => pending.promise
+  );
+  bridge.submitInRegime = send;
+  bridge.skills = async () => [];
+  bridge.create = async () => ({
+    attachmentId: "first",
+    sessionId: "first",
+    firstInputId: "reserved-input",
+  });
+  const commit = vi.fn<() => void>();
+  const nextDraft = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "Next draft" }] },
+    ],
+  };
+  controller.keepDrafts(drafts, "workspace");
+  const home = controller.startChat(null, () => ({
+    requestId: "welcome-skill",
+    text,
+    skills,
+    document,
+    commit,
+  }));
+  try {
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+    expect(send.mock.calls[0]?.slice(1, 5)).toEqual([
+      "first",
+      "reserved-input",
+      text,
+      "act",
+    ]);
+    expect(send.mock.calls[0]?.at(-1)).toEqual(skills);
+    drafts.write("workspace:first", nextDraft);
+    pending.reject(new Error("selected_skill_changed"));
+    await home;
+    const outgoing = controller.read().outgoing[0];
+    expect(outgoing).toMatchObject({
+      status: "failed",
+      retryable: false,
+      error: expect.stringContaining("changed"),
+      displayParts: [{ kind: "skill", data: { name: "slides" } }],
+    });
+    expect(commit).toHaveBeenCalledOnce();
+    controller.retryOutgoing(outgoing.id);
+    expect(send).toHaveBeenCalledOnce();
+    expect(drafts.read("workspace:first")).toEqual(nextDraft);
+    const restore = vi.fn<(document: unknown) => boolean>(() => true);
+    await expect(controller.editOutgoing(outgoing.id, restore)).resolves.toBe(
+      false
+    );
+    expect(restore).not.toHaveBeenCalled();
+    drafts.write("workspace:first", null);
+    await expect(controller.editOutgoing(outgoing.id, restore)).resolves.toBe(
+      true
+    );
+    expect(restore).toHaveBeenCalledExactlyOnceWith(document);
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("commits a Home handoff after staging and sends with the reserved first input", async () => {
   const { bridge, controller } = fixture();
   const drafts = durableDrafts();
@@ -9797,10 +9890,84 @@ describe("Native workspace chat controller", () => {
       const publish = updates.get("a")!;
       const chunk = { ...text("a", "Hello", 0), role: "user" } as const;
       publish(chunk);
-      publish({ ...chunk, inputId: "submitted" });
+      const displayParts = [
+        {
+          kind: "skill",
+          version: 1,
+          data: {
+            name: "slides",
+            source: "personal",
+            uri: `grida-skill:slides@${"a".repeat(64)}`,
+          },
+        },
+      ];
+      publish({ ...chunk, inputId: "submitted", displayParts });
       publish({ ...chunk, replace: true });
       expect(controller.read().messages).toMatchObject([
-        { text: "Hello", inputId: "submitted" },
+        { text: "Hello", inputId: "submitted", displayParts },
+      ]);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("recalls an accepted skill and its exact source from a reopened transcript", async () => {
+    const { controller, transcripts } = fixture();
+    controller.keepDrafts(durableDrafts(), "workspace");
+    const uri = "grida-skill:slides@" + "a".repeat(64);
+    const text = `Use **this** [$slides](${uri}) and type $slides literally.`;
+    transcripts.set("a", [
+      { messageId: "plain", role: "user", text: "Ordinary prompt" },
+      {
+        messageId: "selected",
+        role: "user",
+        text,
+        displayParts: [
+          {
+            kind: "skill",
+            version: 1,
+            data: { name: "slides", uri, source: "project_agents" },
+          },
+        ],
+      },
+    ]);
+    try {
+      await controller.select("a");
+      expect(controller.previousComposerPrompts()).toMatchObject([
+        {
+          id: "selected",
+          text,
+          draft: {
+            attachment: null,
+            document: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    { type: "text", text: "Use " },
+                    { type: "text", text: "this", marks: [{ type: "bold" }] },
+                    { type: "text", text: " " },
+                    {
+                      type: "composerMention",
+                      attrs: {
+                        id: uri,
+                        sigil: "$",
+                        payload: JSON.stringify({
+                          name: "slides",
+                          uri,
+                          workspaceId: "workspace",
+                        }),
+                      },
+                    },
+                    { type: "text", text: " and type $slides literally." },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        { id: "plain", text: "Ordinary prompt" },
       ]);
     } finally {
       controller.disconnect();

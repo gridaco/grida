@@ -1288,6 +1288,22 @@ sources. The [native skill cases](../src/skills/extension_tests.rs) and
 these claims. The [FX process cases](../tests/process/desktop_fx_discovery.rs)
 inspect the submitted model requests.
 
+A personal skill selected before choosing a destination keeps its identity when
+the destination has a same-named skill. Pre-chat catalog reads reflect additions,
+edits and removals under the two convention roots. They return metadata only.
+The first request uses the selected instructions, a changed or missing selection
+refuses before inference, and transcript windows preserve the accepted selection
+through reopen. The [native skill process cases](../tests/process/skills.rs)
+check those outcomes with a local model fixture. Headless composer and draft
+cases check selection removal and recovery through the Home handoff.
+
+A pasted bare skill mention in an ACP prompt loads a uniquely named skill
+before inference, including when the input waits in the queue. Repetition
+captures one copy, ambiguous or unknown names leave the message usable,
+and a structured selection controls which source is used for its name. The
+[native skill process cases](../tests/process/skills.rs) check the first
+model request, accepted revision after a file edit, and unchanged authored text.
+
 The authenticated export and actual guest interaction have separate
 [loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
 [Electron](../../../desktop/src/main/browser-automation.electron.test.ts)

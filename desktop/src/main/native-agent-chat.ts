@@ -33,6 +33,7 @@ import type {
   NativeChatUrlCitation,
   NativeChatMessage,
   NativeChatMessageContext,
+  NativeChatSkillReference,
   NativeChatMessageAttachment,
   NativeChatTranscriptPage,
   NativeChatTurnRecord,
@@ -68,7 +69,8 @@ import type {
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import {
-  parseNativeChatDisplayParts,
+  NativeChatSkills,
+  parseNativeChatHostDisplayParts,
   parseNativeChatMessageContext,
 } from "@grida/desktop-bridge";
 import { NativeAgentPermissionModes } from "./native-agent-permission-mode";
@@ -198,6 +200,7 @@ const ATTACHMENT_INPUT_FIELDS = new Set([
   "selectionRevision",
   "webSearch",
   "messageContext",
+  "skills",
 ]);
 type NativeChatQueueReinsertIpc = Omit<
   NativeChatQueueReinsertRequest,
@@ -567,7 +570,8 @@ export class NativeAgentChat {
     private readonly hookRegistry?: NativeAgentHooks,
     private readonly referenceDenials?: readonly string[],
     readonly modelId?: string,
-    private readonly selectedImages?: NativeSelectedImages
+    private readonly selectedImages?: NativeSelectedImages,
+    private readonly workspaceId?: string
   ) {}
 
   private readonly lifecycleSeen = new Set<string>();
@@ -610,7 +614,8 @@ export class NativeAgentChat {
             path.join(launch.stateDirectory, "desktop-image-custody"),
             [...custodyDenials, launch.stateDirectory]
           )
-        : undefined
+        : undefined,
+      launch.workspace?.id
     );
     return client;
   }
@@ -1118,7 +1123,8 @@ export class NativeAgentChat {
     effort?: NativeChatEffort,
     selectionRevision?: number,
     editorContext?: NativeEditorObservation,
-    webSearch?: true
+    webSearch?: true,
+    skills?: unknown
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
@@ -1126,6 +1132,7 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       webSearch,
+      skills: this.skillSelections(skills),
     });
   }
 
@@ -1138,7 +1145,8 @@ export class NativeAgentChat {
     effort?: NativeChatEffort,
     selectionRevision?: number,
     editorContext?: NativeEditorObservation,
-    webSearch?: true
+    webSearch?: true,
+    skills?: unknown
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
       editorSurfaces,
@@ -1146,6 +1154,7 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       webSearch,
+      skills: this.skillSelections(skills),
     });
   }
 
@@ -1181,7 +1190,8 @@ export class NativeAgentChat {
     effort?: NativeChatEffort,
     selectionRevision?: number,
     editorContext?: NativeEditorObservation,
-    webSearch?: true
+    webSearch?: true,
+    skills?: unknown
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsLibrarySelection)
       return Promise.reject(
@@ -1194,6 +1204,7 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       webSearch,
+      skills: this.skillSelections(skills),
     });
   }
 
@@ -1206,6 +1217,22 @@ export class NativeAgentChat {
     const context = parseNativeChatMessageContext(value);
     if (!context) throw new Error("native_chat_message_context_invalid");
     return context;
+  }
+
+  private skillSelections(
+    value: unknown
+  ): readonly NativeChatSkillReference[] | undefined {
+    if (value === undefined) return undefined;
+    const selections = NativeChatSkills.references(value);
+    if (!selections) throw new Error("native_chat_skills_invalid");
+    if (
+      selections.some(
+        ({ workspaceId }) =>
+          workspaceId !== undefined && workspaceId !== this.workspaceId
+      )
+    )
+      throw new Error("selected_skill_unavailable");
+    return selections;
   }
 
   async submitMessage(
@@ -1224,6 +1251,7 @@ export class NativeAgentChat {
       "selectionRevision",
       "webSearch",
       "messageContext",
+      "skills",
     ]);
     if (
       Object.keys(input).some((key) => !known.has(key)) ||
@@ -1249,6 +1277,7 @@ export class NativeAgentChat {
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
         webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
+        skills: this.skillSelections(input.skills),
       }
     );
   }
@@ -1281,7 +1310,8 @@ export class NativeAgentChat {
         (effort ? 6 : 5) +
           Number(input.selectionRevision !== undefined) +
           Number(input.webSearch !== undefined) +
-          Number(input.messageContext !== undefined) ||
+          Number(input.messageContext !== undefined) +
+          Number(input.skills !== undefined) ||
       typeof input.text !== "string"
     )
       throw invalidResponse();
@@ -1297,6 +1327,7 @@ export class NativeAgentChat {
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
         webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
+        skills: this.skillSelections(input.skills),
       }
     );
   }
@@ -1329,6 +1360,7 @@ export class NativeAgentChat {
       "size",
       "lastModified",
       "messageContext",
+      "skills",
     ]);
     if (
       Object.keys(input).some((key) => !known.has(key)) ||
@@ -1350,7 +1382,8 @@ export class NativeAgentChat {
     if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
     const messageContext = this.parseMessageContext(input.messageContext);
-    textPrompt(input.text, messageContext !== undefined);
+    const skills = this.skillSelections(input.skills);
+    textPrompt(input.text, messageContext !== undefined || !!skills?.length);
     const selectedImage = await this.selectedImages.capture(
       sessionId,
       inputId,
@@ -1377,6 +1410,7 @@ export class NativeAgentChat {
           effort,
           selectionRevision,
           messageContext,
+          skills,
         }
       );
       // Cleanup failures must not turn a known accepted input into uncertainty.
@@ -1385,7 +1419,7 @@ export class NativeAgentChat {
     } catch (error) {
       if (
         error instanceof Error &&
-        /^(?:selected_image_(?:changed|symlink|protected|size_limit|unavailable|identity_invalid|snapshot_unavailable)|image_(?:source_size_limit|decode_limit|preparation_limit|input_unavailable)|invalid_raster_image|unsupported_image_format|protected_root_overlap|unsupported_input_modality)$/.test(
+        /^(?:selected_image_(?:changed|symlink|protected|size_limit|unavailable|identity_invalid|snapshot_unavailable)|image_(?:source_size_limit|decode_limit|preparation_limit|input_unavailable)|invalid_raster_image|unsupported_image_format|selected_skill_(?:changed|unavailable)|protected_root_overlap|unsupported_input_modality)$/.test(
           error.message
         )
       )
@@ -1410,7 +1444,8 @@ export class NativeAgentChat {
         (effort ? 7 : 6) +
           Number(input.selectionRevision !== undefined) +
           Number(input.webSearch !== undefined) +
-          Number(input.messageContext !== undefined) ||
+          Number(input.messageContext !== undefined) +
+          Number(input.skills !== undefined) ||
       typeof input.text !== "string"
     )
       throw invalidResponse();
@@ -1426,6 +1461,7 @@ export class NativeAgentChat {
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
         webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
+        skills: this.skillSelections(input.skills),
       }
     );
   }
@@ -1456,6 +1492,7 @@ export class NativeAgentChat {
       "selectionRevision",
       "webSearch",
       "messageContext",
+      "skills",
     ]);
     if (
       Object.keys(input).some((key) => !known.has(key)) ||
@@ -1473,6 +1510,7 @@ export class NativeAgentChat {
       "plan",
     ] as const);
     const messageContext = this.parseMessageContext(input.messageContext);
+    const skills = this.skillSelections(input.skills);
     const preview = NativeFileReference.preview(input.preview);
     const resolved = await NativeFileReference.resolve(input.path, {
       cwd: this.cwd,
@@ -1487,6 +1525,7 @@ export class NativeAgentChat {
       selectionRevision: optionalSelectionRevision(input.selectionRevision),
       webSearch: optionalWebSearch(input.webSearch),
       messageContext,
+      skills,
     });
   }
 
@@ -1516,10 +1555,12 @@ export class NativeAgentChat {
     );
     const webSearch = optionalWebSearch(input.webSearch);
     const messageContext = this.parseMessageContext(input.messageContext);
+    const skills = this.skillSelections(input.skills);
     const text = input.text;
     textPrompt(
       text,
-      messageContext !== undefined ||
+      !!skills?.length ||
+        messageContext !== undefined ||
         NativeAttachmentBatch.onlyImages(input.attachments)
     );
     if (
@@ -1542,6 +1583,7 @@ export class NativeAgentChat {
           selectionRevision,
           webSearch,
           messageContext,
+          skills,
         })
     );
   }
@@ -1578,6 +1620,7 @@ export class NativeAgentChat {
       webSearch?: true;
       editorContext?: NativeEditorObservation;
       messageContext?: NativeChatMessageContext;
+      skills?: readonly NativeChatSkillReference[];
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
@@ -1594,6 +1637,7 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       messageContext,
+      skills,
       webSearch,
     } = options;
     if (
@@ -1614,7 +1658,8 @@ export class NativeAgentChat {
       throw new Error("native_chat_editor_context_unavailable");
     const prompt = textPrompt(
       text,
-      NativeAttachmentBatch.onlyImages(attachments) ||
+      !!skills?.length ||
+        NativeAttachmentBatch.onlyImages(attachments) ||
         (!!messageContext &&
           (!!messageContext.displayParts.length ||
             !!image ||
@@ -1633,6 +1678,11 @@ export class NativeAgentChat {
         ...(initialTitle && { initialTitle }),
         prompt: [
           ...prompt,
+          ...(skills?.map(({ name, uri }) => ({
+            type: "resource_link",
+            name,
+            uri,
+          })) ?? []),
           ...(image ? [image] : []),
           ...(reference ? [reference] : []),
         ],
@@ -3364,6 +3414,10 @@ export class NativeAgentChat {
       }
       if (!listeners) return;
       const attribution = object(meta);
+      const displayParts =
+        role === "user"
+          ? this.readDisplayParts(attribution.displayParts)
+          : undefined;
       orderedListeners = listeners;
       const projected: NativeChatStreamUpdate =
         attribution.resyncRequired === true && content.text === ""
@@ -3380,6 +3434,7 @@ export class NativeAgentChat {
                 attribution.inputId
               ),
               ...(role === "user" && questionReplyMetadata(attribution)),
+              ...(displayParts && { displayParts }),
               offsetBytes: revision(attribution.offsetBytes),
               replace: flag(attribution.replace),
               ...(role === "assistant" &&
@@ -3632,7 +3687,7 @@ export class NativeAgentChat {
 
   private readDisplayParts(value: unknown): NativeChatMessage["displayParts"] {
     if (!this.process.acceptsMessageContext || value === undefined) return;
-    const parts = parseNativeChatDisplayParts(value);
+    const parts = parseNativeChatHostDisplayParts(value);
     if (parts?.length) return parts;
   }
 

@@ -66,6 +66,7 @@ import { NativeAgentConfig } from "./native-agent-config";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
+import { FxExtension } from "./fx-extension";
 import type { NativeChatSelections } from "./native-chat-selections";
 
 const executeSelection = promisify(execFile);
@@ -368,6 +369,36 @@ export class NativeDesktopAgent {
         return { root: workspace.root };
       }
     );
+  }
+
+  /** GRIDA-SEC-007: discover skills only in the admitted workspace and personal scope. */
+  async skills(workspaceId?: string) {
+    if (workspaceId === undefined) {
+      const generation = this.accountGeneration;
+      if (this.accountDrain) await this.accountDrain;
+      if (this.closed || generation !== this.accountGeneration)
+        throw new Error("native_workspace_closing");
+      const skills = await NativeAgentProcess.skills(this.resourcesPath);
+      if (this.closed || generation !== this.accountGeneration)
+        throw new Error("native_workspace_closing");
+      return skills;
+    }
+    return await this.withWorkspace(workspaceId, async (workspace, check) => {
+      if (!workspace.identity)
+        throw new Error("native_chat_skills_unavailable");
+      const bundledFx = !!(await FxExtension.command(this.resourcesPath).catch(
+        () => undefined
+      ));
+      check();
+      const skills = await NativeAgentProcess.skills(this.resourcesPath, {
+        root: workspace.root,
+        device: workspace.identity.device,
+        inode: workspace.identity.inode,
+        bundledFx,
+      });
+      check();
+      return skills;
+    });
   }
 
   /** Ground the permission review in the registered directory, without a worker. */

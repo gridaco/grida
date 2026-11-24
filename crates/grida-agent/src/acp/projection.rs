@@ -221,6 +221,11 @@ impl Projection {
             }
             let mut text_meta = meta.clone();
             let text = question_text(&message, &mut text_meta)
+                .or_else(|| {
+                    message_context
+                        .then(|| input_facts.skill_message_text.get(&message.id).cloned())
+                        .flatten()
+                })
                 .unwrap_or_else(|| visible_parts(&message).collect());
             if message.role == Role::User
                 && turn.is_some()

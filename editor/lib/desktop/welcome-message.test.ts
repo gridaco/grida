@@ -38,6 +38,35 @@ describe("welcome_message", () => {
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
+  it("keeps an exact personal skill selection through the first-message handoff", () => {
+    const storage = memoryStorage();
+    const skills = [
+      { name: "slides", uri: `grida-skill:slides@${"f".repeat(64)}` },
+    ];
+    const document = { type: "doc", content: [{ type: "paragraph" }] };
+    expect(
+      welcome_message.stash(
+        "destination",
+        {
+          text: "",
+          profileId: PROFILE,
+          skills,
+          document,
+        },
+        storage
+      )
+    ).toBe(true);
+    expect(welcome_message.peek("destination", storage)).toMatchObject({
+      text: "",
+      skills,
+      document,
+    });
+    const arrived = welcome_message.pending("destination", storage)?.take();
+    expect(arrived?.skills).toEqual(skills);
+    arrived?.commit?.();
+    expect(welcome_message.peek("destination", storage)).toBeNull();
+  });
+
   it("does not let an older pane consume a replacement handoff", () => {
     const storage = memoryStorage();
     const message = { text: "Look this up", profileId: PROFILE };

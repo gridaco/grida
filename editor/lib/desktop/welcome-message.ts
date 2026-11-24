@@ -20,6 +20,7 @@
 
 import {
   NATIVE_CHAT_MAX_ATTACHMENTS,
+  NativeChatSkills,
   parseNativeChatMessageContext,
 } from "@grida/desktop-bridge";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -434,9 +435,25 @@ function parse(
     homeDraftKey,
     initialWorkbenchPath,
     messageContext: rawContext,
+    skills: rawSkills,
+    document,
   } = value as Record<string, unknown>;
   const messageContext =
     rawContext === undefined ? null : parseNativeChatMessageContext(rawContext);
+  const skills =
+    rawSkills === undefined
+      ? undefined
+      : NativeChatSkills.references(rawSkills);
+  if (skills === null) return null;
+  const skillDocument =
+    skills?.length &&
+    document &&
+    typeof document === "object" &&
+    "type" in document &&
+    document.type === "doc" &&
+    new TextEncoder().encode(JSON.stringify(document)).length <= 1024 * 1024
+      ? document
+      : undefined;
   const workbenchPath =
     typeof initialWorkbenchPath === "string"
       ? WorkspaceArtifact.normalizeRelativePath(initialWorkbenchPath)
@@ -554,6 +571,7 @@ function parse(
   if (
     !text.trim() &&
     !messageContext?.displayParts.length &&
+    !skills?.length &&
     !resource &&
     !missingAttachment &&
     !resources?.length &&
@@ -568,6 +586,8 @@ function parse(
     ...(includeRequestId &&
       typeof homeDraftKey === "string" && { homeDraftKey }),
     ...(messageContext && { messageContext }),
+    ...(skills?.length && { skills }),
+    ...(skillDocument && { document: skillDocument }),
     ...(workbenchPath && { initialWorkbenchPath: workbenchPath }),
     profileId,
     ...(effort !== undefined && {

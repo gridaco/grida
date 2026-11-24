@@ -2929,13 +2929,12 @@ secret is unset. A parallel mint policy or signer behind a new host adapter.
 
 ### `GRIDA-SEC-007` — Agent skill filesystem boundary
 
-**What it protects.** The native agent discovers skills and project guidance
-by reading directories that may be attacker-controlled — a checked-out repo's
-`.claude/skills` / `.agents/skills` and `AGENTS.md`, and the host-bundled skill
-tree. The boundary is the rule that **a skill lookup or capture can only ever
-read files inside a skill directory it legitimately resolved within the
-already-readable project root, no matter what a hostile skill dir names or
-links to.**
+**What it protects.** Skill discovery and guidance capture only read fixed
+documents under admitted sources. The project source is the explicitly
+readable primary directory. Personal skill discovery uses
+`$HOME/.agents/skills`. Bundled skills come from native package declarations.
+A workspace cannot redirect discovery into another source or use a skill to
+expand the turn's file authority.
 
 **Vulnerable scenario (prevented).** A user opens (or clones) a repo whose
 `.claude/skills/` contains a directory named to escape (`../../../etc`), a
@@ -2948,7 +2947,7 @@ context.
 
 1. **Name validation before any path is built** — the
    [native catalog](crates/grida-agent/src/skills.rs) rejects any skill name
-   that is not lowercase ASCII letters, digits and `-` starting with a letter,
+   that is not lowercase ASCII letters, digits and `-` starting with a letter or digit,
    so `..`, absolute paths, and path separators never become a filesystem skill
    name. A qualified extension selector consists of two individually validated
    identifiers. The host resolves it exclusively against compiled package
@@ -2956,28 +2955,39 @@ context.
 2. **Native project authority** — a local one-shot invocation pins its
    explicit project root. ACP discovers project guidance only inside the
    primary root of a host-supplied profile with read access already allowed.
-   A client-provided working directory alone selects bundled skills. The native
-   reader opens fixed names relative to a pinned directory, refuses links and
-   nonregular files, and bounds document reads. The accepted snapshot carries
-   text and provenance. A newly captured project skill also carries a labeled
-   workspace-relative directory derived from its validated name and layer. It
-   grants no tool access and follows no companion paths; later supporting-file
-   reads use the ordinary workspace authority. A turn with workspace file tools
-   also captures the catalog's names, descriptions and sources with its input;
-   the model reads a listed project skill through those same file tools.
+   A client-provided working directory alone confers no project discovery.
+   Desktop Main admits a registered destination and passes its directory
+   identity to the pre-chat metadata query. Native discovery opens the
+   directory with no-follow and verifies the identity of the opened descriptor
+   before reading project content. Project references are bound to their
+   origin and revision.
+3. **Fixed personal scope and bounded reads** — the host resolves the local
+   user's home and opens only `.agents/skills/<validated-name>/SKILL.md`
+   beneath it. The same reader rejects links and nonregular files under both
+   roots and bounds directory and document reads. Candidates from one source
+   cannot satisfy an explicit reference to another. The accepted snapshot
+   carries text and provenance. A captured project skill includes its validated
+   workspace-relative directory. Supporting files are accessed under the
+   ordinary turn authority.
+4. **Host-issued presentation** — skill display entries come from accepted
+   selections. The ACP input contract reserves that display kind for the
+   host. The metadata query returns names, descriptions, sources and opaque
+   references.
 
 **Files bound by this id.**
 
 - [Native catalog and capture](crates/grida-agent/src/skills.rs),
   [native document reads](crates/grida-agent/src/skills/native.rs),
   [project authority](crates/grida-agent/src/host/skills.rs),
-  [permission profile](crates/grida-agent/src/permissions.rs), and
+  [permission profile](crates/grida-agent/src/permissions.rs),
+  [Main workspace admission](desktop/src/main/native-desktop-agent.ts),
+  [retained display validation](crates/grida-agent/src/host/message_context.rs),
   [native process fixtures](crates/grida-agent/tests/process/skills.rs), and
   [delegated skill-read cases](crates/grida-agent/tests/process/delegation.rs).
 
 **What does NOT belong here.** Following a link out of a skill tree.
-Accepting a skill name with a path separator. Reading a `SKILL.md` or
-`AGENTS.md` from outside the pinned, already-readable project root.
+Accepting a skill name with a path separator. Project reads outside the pinned, already-readable root. Personal reads outside
+the fixed home skill tree.
 
 ---
 

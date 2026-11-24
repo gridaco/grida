@@ -39,6 +39,7 @@ import {
   SquareIcon,
 } from "lucide-react";
 import { isDesktopVoiceReady } from "@grida/desktop-bridge";
+import type { NativeChatSkillReference } from "@grida/desktop-bridge";
 import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
@@ -98,6 +99,7 @@ export type AgentComposerInputProps = {
     onCancel(): void;
   }>;
   catalog: ComposerCatalog;
+  onSkillMenuOpen?: () => void;
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
@@ -107,10 +109,18 @@ export type AgentComposerInputProps = {
    * Receives the lowered prompt and the document captured at Send.
    * Empty submissions are filtered unless `allowEmptySubmit` is set.
    */
-  onSubmit: (text: string, document: unknown | null) => void | Promise<void>;
+  onSubmit: (
+    text: string,
+    document: unknown | null,
+    skills?: readonly NativeChatSkillReference[]
+  ) => void | Promise<void>;
   readOnly?: boolean;
   /** Transfer the draft immediately. An undefined result uses onSubmit. */
-  onCapture?: (text: string, document: unknown) => boolean | undefined;
+  onCapture?: (
+    text: string,
+    document: unknown,
+    skills?: readonly NativeChatSkillReference[]
+  ) => boolean | undefined;
   /** Override the inline notice when an awaited send fails. */
   onSubmitError?: (error: unknown) => void;
   isStreaming: boolean;
@@ -203,7 +213,12 @@ export function AgentComposerInput({
 }: AgentComposerInputProps) {
   // Surface action commands in the `/` menu alongside catalog commands.
   const effectiveCatalog = useMemo<ComposerCatalog>(() => {
-    if (editing) return { commands: [], mentions: catalog.mentions };
+    if (editing)
+      return {
+        commands: [],
+        mentions: catalog.mentions,
+        skillMentions: undefined,
+      };
     if (!commandActions || commandActions.length === 0) return catalog;
     const actionCommands = commandActions.map((a) => ({
       id: a.id,
@@ -211,8 +226,8 @@ export function AgentComposerInput({
       description: a.description,
     }));
     return {
+      ...catalog,
       commands: [...actionCommands, ...catalog.commands],
-      mentions: catalog.mentions,
     };
   }, [catalog, commandActions, !!editing]);
 
@@ -235,6 +250,7 @@ function AgentComposerInner({
   commandActions,
   onSubmit,
   onCapture,
+  onSkillMenuOpen,
   onSubmitError,
   readOnly: inputReadOnly = false,
   isStreaming,
@@ -265,6 +281,10 @@ function AgentComposerInner({
 }: Omit<AgentComposerInputProps, "catalog">) {
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
+  const skillMenuOpen = composer.trigger?.kind === "skill";
+  useEffect(() => {
+    if (skillMenuOpen) onSkillMenuOpen?.();
+  }, [skillMenuOpen, onSkillMenuOpen]);
   const openLink = useContext(BrowserOpen);
   const { readDocument, restoreDocument } = composer;
   const [editSession] = useState(() => new AgentComposerEditSession());

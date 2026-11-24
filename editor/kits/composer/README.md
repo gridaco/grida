@@ -79,7 +79,9 @@ function ComposerBox() {
   outside the document until the person presses Tab. It then becomes editable
   text and follows the ordinary Send action.
 - Optional host actions on explicit command selection, shared by keyboard and menu clicks.
-- Mentions from a caller-provided catalog.
+- Mentions from a caller-provided catalog. The optional `skillMentions`
+  catalog opens with `$`. A chosen skill is a removable inline reference with
+  a book icon. Its payload is lowered separately from the authored message.
 - File attachments as message parts.
 - Inline file references.
 - Opaque, read-only directory references (never recursive attachments).

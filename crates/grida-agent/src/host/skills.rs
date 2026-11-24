@@ -1,7 +1,53 @@
-//! GRIDA-SEC-007 discovery and capture within an explicitly readable project.
+//! GRIDA-SEC-007 discovery and capture in admitted skill sources.
 
 use super::*;
 use crate::skills::{CapturedGuidance, ProjectRoot, SkillDescription};
+
+#[cfg(unix)]
+fn personal_skills() -> Option<crate::skills::PersonalSkills> {
+    std::env::home_dir().and_then(|home| crate::skills::PersonalSkills::open(&home).ok())
+}
+
+/// Metadata for the local composer, before it has a session or provider.
+/// The trusted launcher has already admitted the optional workspace.
+pub fn discover_skill_metadata(
+    workspace: Option<(&Path, u64, u64)>,
+    bundled_fx: bool,
+) -> Result<Vec<SkillDescription>> {
+    #[cfg(not(unix))]
+    if workspace.is_some() {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "skill_workspace_unavailable",
+        ));
+    }
+    #[cfg(unix)]
+    let root = workspace
+        .map(|(path, device, inode)| {
+            let root = ProjectRoot::open(path)?;
+            if !root.matches_identity(device, inode) {
+                return Err(problem(ErrorKind::Conflict, "skill_workspace_changed"));
+            }
+            Ok(root)
+        })
+        .transpose()?;
+    #[cfg(not(unix))]
+    let root: Option<ProjectRoot> = None;
+    let optional = if bundled_fx {
+        vec!["desktop-fx".to_owned()]
+    } else {
+        Vec::new()
+    };
+    catalog(root.as_ref(), &optional)
+}
+
+fn catalog(root: Option<&ProjectRoot>, optional: &[String]) -> Result<Vec<SkillDescription>> {
+    #[cfg(unix)]
+    let personal = personal_skills();
+    #[cfg(not(unix))]
+    let personal = None;
+    crate::skills::catalog_for(root, personal.as_ref(), optional)
+}
 
 #[cfg(unix)]
 pub(super) struct HeadlessGuidance {
@@ -53,11 +99,9 @@ impl Host {
             let view = host.store.inspect(session).await?;
             let root = host.guidance_scope(&view)?;
             let optional = host.optional_bundled_skills();
-            tokio::task::spawn_blocking(move || {
-                crate::skills::catalog_with(root.as_ref(), &optional)
-            })
-            .await
-            .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
+            tokio::task::spawn_blocking(move || catalog(root.as_ref(), &optional))
+                .await
+                .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
         })
         .await
     }
@@ -85,9 +129,25 @@ pub(super) async fn capture_guidance(
             PromptPart::Skill { reference } => Some(reference.clone()),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let plain = crate::skills::mentioned_names(parts.iter().filter_map(|part| match part {
+        PromptPart::Text { text } => Some(text.as_str()),
+        _ => None,
+    }));
     tokio::task::spawn_blocking(move || {
-        crate::skills::capture_with(root.as_ref(), selected, &optional)
+        #[cfg(unix)]
+        let personal = (!selected.is_empty() || !plain.is_empty())
+            .then(personal_skills)
+            .flatten();
+        #[cfg(not(unix))]
+        let personal = None;
+        crate::skills::capture_for(
+            root.as_ref(),
+            personal.as_ref(),
+            selected,
+            &plain,
+            &optional,
+        )
     })
     .await
     .map_err(|_| problem(ErrorKind::Unavailable, "skill_capture_interrupted"))?

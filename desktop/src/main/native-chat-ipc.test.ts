@@ -69,6 +69,43 @@ const HOOKS = {
   results: [],
 } as const;
 
+it("reads pre-chat skills only for the current composer and admitted workspace", async () => {
+  const pending = Promise.withResolvers<[]>();
+  const list = vi.fn<(workspaceId?: string) => Promise<[]>>(
+    async () => pending.promise
+  );
+  const { ipc } = setup(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    list
+  );
+  const home = windowAt(`${ORIGIN}/desktop/welcome`);
+  const workbench = windowAt();
+  const personal = ipc.skills(home.event, undefined);
+  const selected = ipc.skills(home.event, "selected");
+  const inferred = ipc.skills(workbench.event, undefined);
+  await expect(ipc.skills(home.event, "/private")).rejects.toThrow(
+    "native_chat_skills_invalid"
+  );
+  await expect(ipc.skills(workbench.event, "another")).rejects.toThrow(
+    "native_chat_scope_changed"
+  );
+  await expect(
+    ipc.skills(windowAt(`${ORIGIN}/desktop/settings`).event, undefined)
+  ).rejects.toThrow("native_chat_scope_changed");
+  expect(list.mock.calls).toEqual([[undefined], ["selected"], [WORKSPACE]]);
+  home.contents.emit("did-start-navigation", { isMainFrame: true });
+  pending.resolve([]);
+  await expect(personal).rejects.toThrow("native_chat_scope_changed");
+  await expect(selected).rejects.toThrow("native_chat_scope_changed");
+  await expect(inferred).resolves.toEqual([]);
+});
+
 it("keeps the captured editor observation on its exact workbench, chat and input", async () => {
   const sample = {
     kind: "selection",
@@ -710,7 +747,8 @@ function setup(
   profiles?: ConstructorParameters<typeof NativeChatIpc>[5],
   selections?: ConstructorParameters<typeof NativeChatIpc>[11],
   browserTools?: ConstructorParameters<typeof NativeChatIpc>[12],
-  predictions?: ConstructorParameters<typeof NativeChatIpc>[14]
+  predictions?: ConstructorParameters<typeof NativeChatIpc>[14],
+  skillCatalog?: ConstructorParameters<typeof NativeChatIpc>[15]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -944,7 +982,8 @@ function setup(
       selections,
       browserTools,
       undefined,
-      predictions
+      predictions,
+      skillCatalog
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);

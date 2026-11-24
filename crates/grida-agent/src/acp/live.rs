@@ -36,10 +36,15 @@ pub(super) async fn forward(
                     let visible = {
                         let state = sessions.lock().unwrap();
                         state.can_deliver(&update.session)
-                            && (!matches!(&update.kind, LiveTextKind::QuestionReply(_))
-                                || state
+                            && match &update.kind {
+                                LiveTextKind::Assistant(_) => true,
+                                LiveTextKind::QuestionReply(_) => state
                                     .negotiated
-                                    .contains(super::extensions::QUESTION_BATCH_LIST))
+                                    .contains(super::extensions::QUESTION_BATCH_LIST),
+                                LiveTextKind::SkillInput { .. } => state
+                                    .negotiated
+                                    .contains(super::extensions::MESSAGE_CONTEXT),
+                            }
                     };
                     if !visible {
                         continue;
@@ -47,7 +52,9 @@ pub(super) async fn forward(
                     let mut offset = update.offset;
                     let mut replace = update.replace;
                     let mut text = update.text.as_ref();
-                    while !text.is_empty() {
+                    while !text.is_empty()
+                        || (replace && matches!(&update.kind, LiveTextKind::SkillInput { .. }))
+                    {
                         let end = text.floor_char_boundary(text.len().min(CHUNK_BYTES));
                         let (part, remaining) = text.split_at(end);
                         let chunk = ContentChunk::new(part.to_owned().into())
@@ -69,6 +76,16 @@ pub(super) async fn forward(
                                 if replace {
                                     metadata["questionReplies"] =
                                         question_replies_metadata(replies);
+                                }
+                                SessionUpdate::UserMessageChunk(chunk)
+                            }
+                            LiveTextKind::SkillInput {
+                                input,
+                                display_parts,
+                            } => {
+                                metadata["inputId"] = json!(input);
+                                if replace {
+                                    metadata["displayParts"] = json!(display_parts);
                                 }
                                 SessionUpdate::UserMessageChunk(chunk)
                             }

@@ -46,6 +46,7 @@ mod selected_file;
 mod selection;
 pub(crate) mod side_chats;
 mod skills;
+pub use skills::discover_skill_metadata;
 mod spending;
 mod sponsorship;
 pub(crate) mod subagent_activity;
@@ -789,6 +790,7 @@ struct PreparedInput {
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     project_instructions: Option<String>,
+    skill_input: Option<live::SkillInput>,
     skills: Option<crate::skills::SkillListing>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -2164,6 +2166,7 @@ impl Host {
         cancellation_only: bool,
         acceptance: Option<Acceptance>,
     ) -> Result<Option<Admitted>> {
+        let fresh = claim.lease.binding().epoch == 1;
         let activity_parent = self.order_admission(&claim, &prepared.messages).await;
         let permission_scope = if let Some(permissions) = sponsored_permissions {
             permissions.bind_claim(claim.lease.binding().clone())?;
@@ -2671,6 +2674,13 @@ impl Host {
         {
             active.queued_steer = Some(queue_actions::QueueSteerTarget::with_raster(raster_steer));
         }
+        if fresh
+            && !closing
+            && !cancellation_only
+            && let Some(skill) = prepared.skill_input
+        {
+            skill.publish(&self.live_updates, session, turn);
+        }
         Ok(Some(Admitted {
             opened,
             work: TurnWork::Conversation {
@@ -2970,7 +2980,7 @@ impl Host {
                 .desktop_image_generation
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::references);
-        let guidance = if child_work {
+        let guidance = if child_work || self.inference_only {
             None
         } else {
             skills::capture_guidance(
@@ -3130,6 +3140,7 @@ impl Host {
         let mut retained_files = Vec::new();
         let skills;
         let project_instructions;
+        let skill_input;
         let (
             messages,
             operating_regime,
@@ -3544,6 +3555,25 @@ impl Host {
                     .as_ref()
                     .map(|guidance| guidance.message(&input.id))
                     .transpose()?;
+                let selected = stored
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                // Attachment links arrive with transcript replay. Publishing a
+                // text-only update first would replace the complete client preview.
+                skill_input = if selected.is_empty()
+                    || stored.parts.iter().any(attachment_batch::is_attachment)
+                {
+                    None
+                } else {
+                    Some(live::SkillInput {
+                        input: input.id.clone(),
+                        message: prompt_message_id(&input.id)?,
+                        text: message_context::skill_input_text(&stored.parts),
+                        display_parts: message_context::display_parts(&stored.parts, &selected),
+                    })
+                };
                 if guidance.is_some() {
                     config.instructions.push_str("\n\n");
                     config.instructions.push_str(crate::skills::GUIDANCE_POLICY);
@@ -3690,6 +3720,7 @@ impl Host {
             image_generation,
             guidance,
             project_instructions,
+            skill_input,
             skills,
             goal,
             completion_checks,
@@ -4942,6 +4973,7 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     attachment_batch::check_count(parts)?;
+    message_context::validate_client_display_parts(parts)?;
     for part in parts {
         match part {
             PromptPart::SelectedImage { selection } => {

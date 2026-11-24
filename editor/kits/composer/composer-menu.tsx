@@ -298,7 +298,13 @@ export function ComposerTriggerMenu({
         }}
       >
         <CommandList
-          aria-label={trigger.kind === "command" ? "Commands" : "Mentions"}
+          aria-label={
+            trigger.kind === "command"
+              ? "Commands"
+              : trigger.kind === "skill"
+                ? "Skills"
+                : "Mentions"
+          }
           className="max-h-64 scroll-py-1 p-1 outline-none"
         >
           <CommandGroup className="p-0">
@@ -338,13 +344,23 @@ export function ComposerTriggerMenu({
                       forces the title to give up space.) */}
                   <span className="flex w-full min-w-0 items-baseline gap-2">
                     <span className="shrink-0 font-mono text-muted-foreground">
-                      {trigger.kind === "command" ? "/" : "@"}
+                      {trigger.kind === "command"
+                        ? "/"
+                        : trigger.kind === "skill"
+                          ? "$"
+                          : "@"}
                     </span>
                     <span className="max-w-full shrink-0 truncate font-normal">
                       {trigger.kind === "command"
                         ? (item as ComposerCommand).title
                         : (item as ComposerMention).label}
                     </span>
+                    {trigger.kind === "skill" &&
+                      (item as ComposerMention).source && (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {(item as ComposerMention).source}
+                        </span>
+                      )}
                     {description && (
                       <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
                         {description}

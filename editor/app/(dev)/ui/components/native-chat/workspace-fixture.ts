@@ -197,6 +197,7 @@ export class NativeChatWorkspaceFixture {
       this.activate(session);
       return session.fixture.bridge.load(id);
     },
+    skills: async () => this.active.fixture.bridge.skills!(),
     submitInRegime: async (action, id, ...args) =>
       this.session(id).fixture.bridge.submitInRegime!(action, id, ...args),
     queueCheckout: {

@@ -18,6 +18,7 @@ import { NativeAttachmentBatch } from "./native-attachment-batch";
 import type {
   DesktopComposerPredictionSettings,
   NativeChatAcceptance,
+  NativeChatSkill,
   NativeChatAttachment,
   NativeChatApproval,
   NativeChatBackgroundProcess,
@@ -505,7 +506,10 @@ export class NativeChatIpc {
     private readonly composerPredictions?: {
       get(): Promise<DesktopComposerPredictionSettings>;
       capture(revision: number): AbortSignal | undefined;
-    }
+    },
+    private readonly skillCatalog?: (
+      workspaceId?: string
+    ) => Promise<readonly NativeChatSkill[]>
   ) {}
 
   async documentRequest<T>(
@@ -1097,6 +1101,47 @@ export class NativeChatIpc {
           effort: selected.effort,
         }
       : undefined;
+  }
+
+  async skills(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    requestedWorkspace: unknown
+  ): Promise<readonly NativeChatSkill[]> {
+    const href = frame?.url;
+    const route = ipc_sender.pathname(href);
+    if (!frame || !href || !this.frameCurrent(sender, frame, href))
+      throw new Error("native_chat_scope_changed");
+    if (
+      requestedWorkspace !== undefined &&
+      !validWelcomeWorkspaceId(requestedWorkspace)
+    )
+      throw new Error("native_chat_skills_invalid");
+    let workspace = requestedWorkspace;
+    if (route === "/desktop/workspace") {
+      const currentWorkspace = this.workspaceId(sender, frame);
+      if (
+        !currentWorkspace ||
+        (workspace !== undefined && workspace !== currentWorkspace)
+      )
+        throw new Error("native_chat_scope_changed");
+      workspace = currentWorkspace;
+    } else if (route !== "/desktop/welcome") {
+      throw new Error("native_chat_scope_changed");
+    }
+    if (this.disabled || !this.skillCatalog) return [];
+
+    let current = true;
+    const stopWatching = ipc_sender.watchNavigation(sender, () => {
+      current = false;
+    });
+    try {
+      const result = await this.skillCatalog(workspace);
+      if (!current || !this.frameCurrent(sender, frame, href))
+        throw new Error("native_chat_scope_changed");
+      return result;
+    } finally {
+      stopWatching();
+    }
   }
 
   /** Look up a new chat's turn options without launching or attaching it. */
@@ -2929,7 +2974,8 @@ export class NativeChatIpc {
     selectionRevision?: unknown,
     editorContextId?: unknown,
     editorToolContextId?: unknown,
-    webSearch?: unknown
+    webSearch?: unknown,
+    skills?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const mode = operatingRegime(regime);
@@ -2970,7 +3016,8 @@ export class NativeChatIpc {
           selected,
           selectionRevision,
           this.editorContext(owner, attachment, inputId, editorContextId),
-          webSearch
+          webSearch,
+          skills
         )
       )
     ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
@@ -3025,7 +3072,8 @@ export class NativeChatIpc {
     selectionRevision?: unknown,
     editorContextId?: unknown,
     editorToolContextId?: unknown,
-    webSearch?: unknown
+    webSearch?: unknown,
+    skills?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const mode = operatingRegime(regime);
@@ -3066,7 +3114,8 @@ export class NativeChatIpc {
           selected,
           selectionRevision,
           this.editorContext(owner, attachment, inputId, editorContextId),
-          webSearch
+          webSearch,
+          skills
         )
       )
     ).catch((error: unknown) => receiptAfterBrowserChange(error, prior));
@@ -3088,7 +3137,8 @@ export class NativeChatIpc {
     effort?: unknown,
     selectionRevision?: unknown,
     editorContextId?: unknown,
-    webSearch?: unknown
+    webSearch?: unknown,
+    skills?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -3118,7 +3168,8 @@ export class NativeChatIpc {
           agentEffort(effort),
           selectionRevision,
           this.editorContext(owner, attachment, inputId, editorContextId),
-          webSearch
+          webSearch,
+          skills
         )
       )
     );
@@ -4478,7 +4529,11 @@ export class NativeChatIpc {
               ? Buffer.byteLength(update.item.summary)
               : 0;
         if (update.kind === "text" && bytes > MAX_UPDATE_BYTES) return;
-        delivered += bytes;
+        delivered +=
+          bytes +
+          (update.kind === "text" && update.displayParts
+            ? Buffer.byteLength(JSON.stringify(update.displayParts))
+            : 0);
         const limited =
           ++chunks > MAX_DELIVERY_CHUNKS || delivered > MAX_DELIVERY_BYTES;
         if (limited) accepting = false;
@@ -5202,14 +5257,28 @@ function submitSelections(
   effort: NativeChatEffort | undefined,
   selectionRevision?: unknown,
   editorContext?: NativeEditorObservation,
-  webSearch?: unknown
+  webSearch?: unknown,
+  skills?: unknown
 ): [
   surfaces?: NativeEditorSurfaceSelection,
   effort?: NativeChatEffort,
   selectionRevision?: number,
   editorContext?: NativeEditorObservation,
   webSearch?: true,
+  skills?: unknown,
 ] {
+  if (skills !== undefined) {
+    if (webSearch !== undefined && webSearch !== true)
+      throw new Error("web_search_invalid");
+    return [
+      surfaces,
+      effort,
+      selectionRevision as number | undefined,
+      editorContext,
+      webSearch,
+      skills,
+    ];
+  }
   if (webSearch !== undefined) {
     if (webSearch !== true) throw new Error("web_search_invalid");
     return [

@@ -10,7 +10,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { promisify } from "node:util";
-import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
+import {
+  NativeChatSkills,
+  type NativeChatSkill,
+  type NativeEditorSurfaceSnapshot,
+} from "@grida/desktop-bridge";
 import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
@@ -62,7 +66,7 @@ const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
 const EDITOR_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
-const readAgentHelp = promisify(execFile);
+const execAgent = promisify(execFile);
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
@@ -601,7 +605,7 @@ export class NativeAgentProcess {
     ].join("/");
     const cached = this.approvalProbes.get(installed);
     if (cached?.identity === identity) return cached.supported;
-    const supported: Promise<ReadonlySet<string>> = readAgentHelp(
+    const supported: Promise<ReadonlySet<string>> = execAgent(
       executable,
       ["serve", "--help"],
       {
@@ -631,6 +635,45 @@ export class NativeAgentProcess {
       });
     this.approvalProbes.set(installed, { identity, supported });
     return supported;
+  }
+
+  /** Read the native skill catalog without opening storage or a model route. */
+  static async skills(
+    resourcesPath: string,
+    workspace?: Readonly<{
+      root: string;
+      device: string;
+      inode: string;
+      bundledFx: boolean;
+    }>
+  ): Promise<readonly NativeChatSkill[]> {
+    const args = ["skills"];
+    if (workspace) {
+      args.push(
+        "--workspace-root",
+        workspace.root,
+        "--workspace-device",
+        workspace.device,
+        "--workspace-inode",
+        workspace.inode
+      );
+      if (workspace.bundledFx) args.push("--bundled-fx");
+    }
+    try {
+      const { stdout } = await execAgent(this.executable(resourcesPath), args, {
+        env: {},
+        timeout: 5000,
+        killSignal: "SIGKILL",
+        maxBuffer: FRAME_LIMIT,
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      const skills = NativeChatSkills.catalog(JSON.parse(stdout));
+      if (!skills) throw new Error("native_chat_skills_invalid_response");
+      return skills;
+    } catch {
+      throw new Error("native_chat_skills_unavailable");
+    }
   }
 
   /** Metadata-only ACP host. Its client has no provider route or editor capabilities. */

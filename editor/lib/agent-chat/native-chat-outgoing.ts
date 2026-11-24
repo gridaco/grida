@@ -4,6 +4,7 @@ import type {
   NativeChatMessageContext,
 } from "@grida/desktop-bridge";
 import type { ComposerDraftPending } from "./composer-drafts";
+import { SkillMentions } from "./skill-mentions";
 import type { NativeChatView } from "./native-chat-controller";
 
 /** An ordinary main-chat request owns its presentation until the host can show it. */
@@ -61,7 +62,10 @@ export namespace NativeChatOutgoing {
       ...(attachment
         ? { attachment: { kind: attachment.kind, name: attachment.name } }
         : missing && { attachment: { kind: "file", name: missing } }),
-      displayParts: pending.messageContext?.displayParts,
+      displayParts: SkillMentions.display(
+        pending.skills,
+        pending.messageContext?.displayParts
+      ),
       ...(pending.attachments && {
         attachments: pending.attachments.map(({ card }) => card),
       }),

@@ -249,7 +249,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         request.expected_session_revision,
                         request.checkout_id.as_ref(),
                     )?;
-                    let (parts, text_editable) = queued_message_host
+                    let (parts, text_editable, display) = queued_message_host
                         .queued_message_parts(&request.session_id, &request.input_id, basis)
                         .await
                         .map_err(host_error)?;
@@ -273,7 +273,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         text_only: matches!(parts.as_slice(), [PromptPart::Text { .. }]),
                         text_editable,
                         attachment_indexes,
-                        display_parts: display_parts(&parts, &queued_message_sessions),
+                        display_parts: display_parts(display, &queued_message_sessions),
                         prompt: parts
                             .into_iter()
                             .filter(|part| {

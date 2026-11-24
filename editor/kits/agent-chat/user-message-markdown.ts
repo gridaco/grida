@@ -1,4 +1,64 @@
 import { defaultRemarkPlugins } from "streamdown";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
+
+const SKILL_MARKER_ORIGIN = "https://grida-skill.invalid/";
+
+export function isUserMessageSkillMarker(href: string | undefined): boolean {
+  return href?.startsWith(SKILL_MARKER_ORIGIN) ?? false;
+}
+
+/** Accept inline positioning only for the display parts bound to this input. */
+export function projectUserMessageSkills(
+  text: string,
+  parts?: readonly unknown[]
+) {
+  const context = parts ?? [];
+  const inline = SkillMentions.inline(text, context);
+  const links = new Map<string, { label: string; source?: string }>();
+  if (!inline.length) return { text, context, links };
+
+  let start = 0;
+  let markdown = "";
+  const positioned = new Set<string>();
+  for (const match of inline) {
+    const { label, source, uri } = match;
+    // The renderer consumes this local marker as a span. Including the source
+    // keeps the Markdown view current when the host confirms an optimistic send.
+    const href =
+      SKILL_MARKER_ORIGIN +
+      encodeURIComponent(uri) +
+      "#" +
+      encodeURIComponent(source ?? "");
+    links.set(href, { label: label.slice(1), source });
+    positioned.add(uri);
+    markdown +=
+      text.slice(start, match.from) + SkillMentions.markup(label, href);
+    start = match.to;
+  }
+  return {
+    text: markdown + text.slice(start),
+    context: context.filter((part) => !positioned.has(skillUri(part) ?? "")),
+    links,
+  };
+}
+
+function skillUri(part: unknown): string | undefined {
+  if (
+    !part ||
+    typeof part !== "object" ||
+    !("kind" in part) ||
+    part.kind !== "skill" ||
+    !("version" in part) ||
+    part.version !== 1 ||
+    !("data" in part) ||
+    !part.data ||
+    typeof part.data !== "object" ||
+    !("uri" in part.data) ||
+    typeof part.data.uri !== "string"
+  )
+    return;
+  return part.data.uri;
+}
 
 // Match the document formatting supported by ComposerTiptap. Use Streamdown's
 // parser to recognize extended syntax as a unit before displaying its source.

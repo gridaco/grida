@@ -321,12 +321,16 @@ pub(super) fn handlers(
                             _ => {}
                         }
                     }
+                    let display = crate::host::message_context::display_parts(
+                        &inspected.parts,
+                        &inspected.settings.skills,
+                    );
                     Ok(InputResponse {
                         receipt,
                         settings: inspected.settings,
                         text_editable: inspected.text_editable,
                         text_only: matches!(inspected.parts.as_slice(), [PromptPart::Text { .. }]),
-                        display_parts: display_parts(&inspected.parts, &input.1),
+                        display_parts: display_parts(display, &input.1),
                         prompt: inspected
                             .parts
                             .into_iter()

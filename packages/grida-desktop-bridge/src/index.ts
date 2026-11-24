@@ -75,6 +75,7 @@ export {
   NATIVE_CHAT_MAX_ATTACHMENT_IMAGE_BYTES,
 } from "./native-chat";
 export * from "./native-chat-message-context";
+export * from "./native-chat-skills";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";

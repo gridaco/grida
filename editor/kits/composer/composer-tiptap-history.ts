@@ -16,7 +16,10 @@ const adapters = new WeakMap<Editor, ComposerTiptapHistory>();
 const restoreDraft = "composerRestoreDraft";
 const parsers = new WeakMap<Schema, MarkdownParser>();
 
-function parsePrompt(schema: Schema, text: string): Node | undefined {
+export function parseComposerPrompt(
+  schema: Schema,
+  text: string
+): Node | undefined {
   let parser = parsers.get(schema);
   if (!parser) {
     const { tokenizer, tokens } = defaultMarkdownParser;
@@ -223,7 +226,7 @@ export class ComposerTiptapHistory implements ComposerHistory.Editor {
   materialize(prompt: ComposerHistory.Prompt): ComposerHistory.Draft {
     return (
       prompt.draft ?? {
-        document: parsePrompt(
+        document: parseComposerPrompt(
           this.editor.state.schema,
           prompt.text
         )?.toJSON() ?? {

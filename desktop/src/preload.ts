@@ -787,6 +787,8 @@ const bridge: DesktopBridge = {
       return location.href === href ? target : null;
     },
     list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    skills: (workspaceId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SKILLS, workspaceId),
     acceptsAutomaticApprovalReview: () =>
       location.pathname === "/desktop/workspace" ||
       location.pathname === "/desktop/welcome"

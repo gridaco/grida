@@ -91,6 +91,10 @@ export namespace ipc_admission {
           return pathname === "/desktop/settings" || isVoiceComposer(pathname);
         if (channel.startsWith("grida:voice:"))
           return pathname === "/desktop/settings";
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_SKILLS)
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
           return (
             pathname === "/desktop/workspace" &&

@@ -1,16 +1,64 @@
-//! GRIDA-SEC-007 descriptor-relative reads for project guidance.
+//! GRIDA-SEC-007 descriptor-relative reads for project and personal guidance.
 
 use super::*;
 use rustix::fs::{self, AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use rustix::io::Errno;
 use std::fs::File;
 use std::io::Read as _;
+use std::os::unix::fs::MetadataExt as _;
 use std::path::{Component, Path};
 
 pub(super) const MAX_LAYER_ENTRIES: usize = 256;
 
-pub(crate) struct Root(File);
-pub(super) struct Layer(File);
+pub(crate) struct Root {
+    directory: File,
+    identity: (u64, u64),
+}
+
+pub(crate) struct PersonalSkills(Root);
+
+pub(super) struct Layer {
+    directory: File,
+    scope: (u64, u64),
+    source: SkillSource,
+}
+
+impl PersonalSkills {
+    pub(crate) fn open(home: &Path) -> Result<Self> {
+        Root::open(home).map(Self)
+    }
+}
+
+/// Only the declared project and personal locations contribute names.
+pub(super) fn layers(
+    project: Option<&Root>,
+    personal: Option<&PersonalSkills>,
+) -> Vec<Result<Layer>> {
+    let mut layers = Vec::new();
+    if let Some(root) = project {
+        layers.extend(
+            root.layer(".agents", SkillSource::ProjectAgents)
+                .transpose(),
+        );
+        layers.extend(
+            root.layer(".claude", SkillSource::ProjectClaude)
+                .transpose(),
+        );
+    }
+    if let Some(personal) = personal {
+        // A separately installed personal directory may be unavailable. Keep
+        // other choices usable; a reference to that source cannot resolve.
+        layers.extend(
+            personal
+                .0
+                .layer(".agents", SkillSource::Personal)
+                .ok()
+                .flatten()
+                .map(Ok),
+        );
+    }
+    layers
+}
 
 impl Root {
     pub(crate) fn open(path: &Path) -> Result<Self> {
@@ -35,35 +83,45 @@ impl Root {
                 .map_err(|_| problem(ErrorKind::Unavailable, "skill_workspace_unavailable"))?
                 .into();
         }
-        Ok(Self(root))
+        Self::from_file(root)
+    }
+
+    fn from_file(directory: File) -> Result<Self> {
+        let metadata = directory.metadata().map_err(|_| unavailable())?;
+        Ok(Self {
+            directory,
+            identity: (metadata.dev(), metadata.ino()),
+        })
     }
 
     pub(crate) fn from_pinned(file: &File) -> Result<Self> {
-        file.try_clone().map(Self).map_err(|_| unavailable())
+        Self::from_file(file.try_clone().map_err(|_| unavailable())?)
     }
 
     pub(crate) fn try_clone(&self) -> Result<Self> {
-        Self::from_pinned(&self.0)
+        Ok(Self {
+            directory: self.directory.try_clone().map_err(|_| unavailable())?,
+            identity: self.identity,
+        })
     }
 
-    pub(super) fn layers(&self) -> Result<Vec<(Layer, SkillSource)>> {
-        let mut layers = Vec::new();
-        for (name, source) in [
-            (".agents", SkillSource::ProjectAgents),
-            (".claude", SkillSource::ProjectClaude),
-        ] {
-            let Some(owner) = child_directory(&self.0, name)? else {
-                continue;
-            };
-            if let Some(layer) = child_directory(&owner, "skills")? {
-                layers.push((Layer(layer), source));
-            }
-        }
-        Ok(layers)
+    pub(crate) fn matches_identity(&self, device: u64, inode: u64) -> bool {
+        self.identity == (device, inode)
+    }
+
+    fn layer(&self, parent: &str, source: SkillSource) -> Result<Option<Layer>> {
+        let Some(owner) = child_directory(&self.directory, parent)? else {
+            return Ok(None);
+        };
+        Ok(child_directory(&owner, "skills")?.map(|directory| Layer {
+            directory,
+            scope: self.identity,
+            source,
+        }))
     }
 
     pub(super) fn project_guidance(&self) -> Result<Option<String>> {
-        let text = read_document(&self.0, "AGENTS.md")
+        let text = read_document(&self.directory, "AGENTS.md")
             .map_err(|error| problem(error.kind, "project_instruction_unavailable"))?;
         Ok(text.filter(|text| !text.trim().is_empty()))
     }
@@ -72,7 +130,7 @@ impl Root {
 impl Layer {
     pub(super) fn names(&self) -> Result<Vec<String>> {
         let mut names = Vec::new();
-        let entries = Dir::read_from(&self.0).map_err(|_| unavailable())?;
+        let entries = Dir::read_from(&self.directory).map_err(|_| unavailable())?;
         for (index, entry) in entries.enumerate() {
             if index >= MAX_LAYER_ENTRIES {
                 return Err(problem(ErrorKind::LimitExceeded, "skill_layer_limit"));
@@ -88,15 +146,21 @@ impl Layer {
         Ok(names)
     }
 
-    pub(super) fn skill(&self, name: &str, source: SkillSource) -> Result<Option<CapturedSkill>> {
+    pub(super) fn skill(&self, name: &str) -> Result<Option<CapturedSkill>> {
         validate_name(name)?;
-        let Some(directory) = child_directory(&self.0, name)? else {
+        let Some(directory) = child_directory(&self.directory, name)? else {
             return Ok(None);
         };
-        match read_document(&directory, "SKILL.md") {
-            Ok(Some(document)) => parse(name, source, &document),
-            Ok(None) | Err(_) => Ok(None),
-        }
+        let Ok(Some(document)) = read_document(&directory, "SKILL.md") else {
+            return Ok(None);
+        };
+        let Some(mut skill) = parse(name, self.source, &document)? else {
+            return Ok(None);
+        };
+        let descriptor = &mut skill.descriptor;
+        descriptor.revision = Fingerprint::of(&(self.scope, &descriptor.revision))?.to_hex();
+        descriptor.uri = format!("{URI_PREFIX}{name}@{}", descriptor.revision);
+        Ok(Some(skill))
     }
 }
 

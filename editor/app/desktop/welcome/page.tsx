@@ -59,6 +59,7 @@ import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
 import { AgentPermissionConfirmation } from "@/scaffolds/desktop/shared/agent-permission-confirmation";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
+import { useSkillMentions } from "@/scaffolds/desktop/shared/use-skill-mentions";
 import { useWorkspaceFileMentions } from "@/scaffolds/desktop/shared/use-workspace-file-mentions";
 import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace-canvas-creation";
 import {
@@ -357,9 +358,13 @@ function WelcomeSurface({
   const defaultWorkspaceRead = useRef<Promise<Workspace | null> | null>(null);
   const destination = target ?? defaultWorkspace;
   const mentions = useWorkspaceFileMentions(destination?.id);
+  const skillMenu = useSkillMentions(
+    bridge?.nativeChat?.skills,
+    destination?.id
+  );
   const catalog = useMemo<ComposerCatalog>(
-    () => ({ commands: [], mentions }),
-    [mentions]
+    () => ({ commands: [], mentions, skillMentions: skillMenu.mentions }),
+    [mentions, skillMenu.mentions]
   );
   // Keep the Images picks while browsing other presets.
   const [pickedRefs, setPickedRefs] = useState<
@@ -615,7 +620,10 @@ function WelcomeSurface({
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
   const submission = useCallback(
-    (text: string): HomeComposer.Input => {
+    (
+      text: string,
+      skills?: HomeComposer.Input["skills"]
+    ): HomeComposer.Input => {
       const template = pickedTemplate;
       const workflowReferences = selectedWorkflows?.map(
         ({ number, showcase }) => ({
@@ -636,12 +644,21 @@ function WelcomeSurface({
         text.trim() ||
         template ||
         messageContext?.displayParts.length ||
+        skills?.length ||
         composer.read().attachments.length;
       if (hasRequest) {
         const chat = getDesktopBridge()?.nativeChat;
         if (!chat)
           throw new Error(
             "Chat isn't available in this version of Grida Desktop."
+          );
+        if (skills?.length && (!chat.skills || !chat.submitInRegime))
+          throw new Error(
+            "Skill selection is unavailable on this Desktop connection."
+          );
+        if (skills?.length && composer.read().goal)
+          throw new Error(
+            "Send skill selections in a new chat turn before starting a goal."
           );
         if ((template || messageContext) && !chat.submitMessage)
           throw new Error(
@@ -659,6 +676,7 @@ function WelcomeSurface({
         target: destination,
         references: [],
         messageContext,
+        ...(skills?.length && { skills }),
         ...(template && {
           template: {
             name: template.name,
@@ -694,15 +712,24 @@ function WelcomeSurface({
       error instanceof Error ? error.message : "Couldn't start a session."
     );
 
-  const capture = (text: string, document: unknown) => {
+  const capture = (
+    text: string,
+    document: unknown,
+    skills?: HomeComposer.Input["skills"]
+  ) => {
     try {
-      return composer.capture(submission(text), document, submissionHost, {
-        ...composerDraft,
-        read: () =>
-          editorRef.current?.draftKey === composerDraft.key
-            ? editorRef.current.readDocument()
-            : undefined,
-      });
+      return composer.capture(
+        submission(text, skills),
+        document,
+        submissionHost,
+        {
+          ...composerDraft,
+          read: () =>
+            editorRef.current?.draftKey === composerDraft.key
+              ? editorRef.current.readDocument()
+              : undefined,
+        }
+      );
     } catch (error) {
       reportSubmitError(error);
       return false;
@@ -1016,10 +1043,11 @@ function WelcomeSurface({
                     }}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
+                    onSkillMenuOpen={skillMenu.refresh}
                     className={docked ? "shadow-xl" : undefined}
                     onCapture={capture}
-                    onSubmit={(text) =>
-                      composer.submit(submission(text), submissionHost)
+                    onSubmit={(text, _document, skills) =>
+                      composer.submit(submission(text, skills), submissionHost)
                     }
                     onSubmitError={reportSubmitError}
                     awaitSubmission

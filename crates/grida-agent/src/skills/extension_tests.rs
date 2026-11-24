@@ -63,7 +63,7 @@ fn duplicate_extension_skills_resolve_independently_at_acceptance_and_reopen() {
     .unwrap();
     let root = ProjectRoot::open(&root).unwrap();
 
-    let catalog_entries = catalog.descriptions(Some(&root)).unwrap();
+    let catalog_entries = catalog.descriptions(Some(&root), None, true).unwrap();
     let inspect: Vec<_> = catalog_entries
         .iter()
         .filter(|s| s.name == "inspect")
@@ -73,7 +73,9 @@ fn duplicate_extension_skills_resolve_independently_at_acceptance_and_reopen() {
         .iter()
         .map(|s| SkillReference::from_uri(&s.uri).unwrap().unwrap())
         .collect();
-    let captured = capture_from(Some(&root), refs, &catalog).unwrap().unwrap();
+    let captured = capture_from(Some(&root), None, refs, &[], &catalog)
+        .unwrap()
+        .unwrap();
     let captured: CapturedGuidance =
         serde_json::from_slice(&serde_json::to_vec(&captured).unwrap()).unwrap();
     assert!(captured.skills[0].body.ends_with("Workspace body"));
@@ -102,7 +104,7 @@ fn duplicate_extension_skills_resolve_independently_at_acceptance_and_reopen() {
     );
     let bare = vec![SkillReference::named("inspect".into()).unwrap()];
     assert!(
-        capture_from(Some(&root), bare.clone(), &catalog)
+        capture_from(Some(&root), None, bare.clone(), &[], &catalog)
             .unwrap()
             .unwrap()
             .skills[0]
@@ -110,7 +112,9 @@ fn duplicate_extension_skills_resolve_independently_at_acceptance_and_reopen() {
             .ends_with("Workspace body")
     );
     assert_eq!(
-        capture_from(None, bare, &catalog).unwrap_err().code,
+        capture_from(None, None, bare, &[], &catalog)
+            .unwrap_err()
+            .code,
         "ambiguous_bundled_skill"
     );
     assert_eq!(
@@ -221,7 +225,7 @@ fn a_pinned_legacy_name_cannot_switch_to_another_package_with_identical_text() {
         packages: &packages,
         enabled: &both,
     };
-    let captured = capture_from(None, vec![pinned.clone()], &catalog)
+    let captured = capture_from(None, None, vec![pinned.clone()], &[], &catalog)
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -233,7 +237,7 @@ fn a_pinned_legacy_name_cannot_switch_to_another_package_with_identical_text() {
         enabled: &both[1..],
     };
     assert_eq!(
-        capture_from(None, vec![pinned], &other_only)
+        capture_from(None, None, vec![pinned], &[], &other_only)
             .unwrap_err()
             .code,
         "selected_skill_unavailable"

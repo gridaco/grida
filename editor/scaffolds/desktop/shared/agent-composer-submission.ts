@@ -2,6 +2,8 @@ import type {
   ComposerCore,
   ComposerMessage,
 } from "@/kits/composer/composer-core";
+import type { NativeChatSkillReference } from "@grida/desktop-bridge";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
 import type { ComposerHistory } from "@/kits/composer/composer-history";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import {
@@ -62,10 +64,26 @@ export class AgentComposerSubmission {
     if (!message) return;
     const command = editing ? undefined : this.runCommand(request, message);
     if (command) return command;
+    let skills: readonly NativeChatSkillReference[] | undefined;
+    try {
+      skills = SkillMentions.selected(message, editing);
+      if (editing && skills?.length)
+        throw new Error("Send skill selections in a new message.");
+    } catch (error) {
+      if (onSubmitError) onSubmitError(error);
+      else
+        notify(
+          error instanceof Error
+            ? error.message
+            : "A selected skill is unavailable."
+        );
+      return;
+    }
     const text = lowerPrompt(message, editing);
-    if (!text.trim() && !allowEmpty) return;
+    if (!text.trim() && !allowEmpty && !skills?.length) return;
 
     const document = editor.readDocument();
+    const selected = skills ? ([skills] as const) : ([] as const);
     const historyDraft = editing ? undefined : editor.readHistoryDraft();
     const sameDocument = editing ? undefined : editor.guardHistoryDocument();
     const clearSent = () =>
@@ -77,11 +95,11 @@ export class AgentComposerSubmission {
       );
     const reportError = (error: unknown, fallback: string) => {
       if (onSubmitError) onSubmitError(error);
-      else notify(fallback);
+      else notify(SkillMentions.refusal(error) ?? fallback);
     };
     if (!editing && onCapture) {
       try {
-        const captured = onCapture(text, document);
+        const captured = onCapture(text, document, ...selected);
         if (captured !== undefined) {
           if (captured) {
             clearSent();
@@ -107,7 +125,7 @@ export class AgentComposerSubmission {
       try {
         if (!editing && draft)
           sentDraft = draft.store.beginDocumentSend(draft.key, document);
-        await onSubmit(text, document);
+        await onSubmit(text, document, ...selected);
         if (editing) return;
         const current =
           this.guard.owns(lease) &&
@@ -140,7 +158,7 @@ export class AgentComposerSubmission {
 
     clearSent();
     notify(null);
-    void onSubmit(text, document);
+    void onSubmit(text, document, ...selected);
   }
 
   private matches(
@@ -291,8 +309,16 @@ export namespace AgentComposerSubmission {
       key: string;
       store: Pick<ComposerDrafts, "beginDocumentSend" | "settleDocumentSend">;
     };
-    onCapture?: (text: string, document: unknown) => boolean | undefined;
-    onSubmit(text: string, document: unknown | null): void | Promise<void>;
+    onCapture?: (
+      text: string,
+      document: unknown,
+      skills?: readonly NativeChatSkillReference[]
+    ) => boolean | undefined;
+    onSubmit(
+      text: string,
+      document: unknown | null,
+      skills?: readonly NativeChatSkillReference[]
+    ): void | Promise<void>;
     onSubmitError?(error: unknown): void;
     notify(message: string | null): void;
   };

@@ -6,6 +6,9 @@ import type {
   NativeChatMessageAttachment,
 } from "@grida/desktop-bridge";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
+import { UserMessageText } from "@/kits/agent-chat/message";
+import { projectUserMessageSkills } from "@/kits/agent-chat/user-message-markdown";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
 import { ListEndIcon } from "lucide-react";
 import {
   HoverCard,
@@ -65,6 +68,7 @@ export function NativeQueuedMessagePreview({
     controller.read
   );
   useEffect(() => controller.connect(), [controller]);
+  const authored = projectUserMessageSkills(state.text ?? "", displayParts);
   return (
     <HoverCard
       open={state.open}
@@ -90,7 +94,9 @@ export function NativeQueuedMessagePreview({
               className="size-7 shrink-0 rounded-md object-cover"
             />
           )}
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {SkillMentions.previewText(label, displayParts)}
+          </span>
         </button>
       </HoverCardTrigger>
       <HoverCardContent
@@ -99,11 +105,23 @@ export function NativeQueuedMessagePreview({
         sideOffset={8}
         className="w-96 max-w-[calc(100vw-2rem)] rounded-xl p-3"
       >
-        {displayParts?.length ? (
-          <MessageContextParts parts={displayParts} className="mb-2" />
-        ) : null}
+        {authored.context.length > 0 && (
+          <MessageContextParts parts={authored.context} className="mb-2" />
+        )}
         <NativeQueuedMessagePreview.Content
-          text={state.text}
+          text={
+            state.text === null
+              ? null
+              : SkillMentions.previewText(state.text, displayParts)
+          }
+          formattedText={
+            authored.links.size > 0 && (
+              <UserMessageText
+                text={authored.text}
+                skillLinks={authored.links}
+              />
+            )
+          }
           loading={state.loading}
           unavailable={state.unavailable}
           attachments={attachments}
@@ -251,6 +269,7 @@ export namespace NativeQueuedMessagePreview {
 
   export function Content({
     text,
+    formattedText,
     loading = false,
     unavailable = false,
     attachments = [],
@@ -258,6 +277,7 @@ export namespace NativeQueuedMessagePreview {
     onImageError,
   }: {
     text: string | null;
+    formattedText?: React.ReactNode;
     loading?: boolean;
     unavailable?: boolean;
     attachments?: readonly NativeChatMessageAttachment[];
@@ -284,9 +304,13 @@ export namespace NativeQueuedMessagePreview {
             {attachments.map((entry) => entry.name).join(", ")}
           </p>
         )}
-        <p className="whitespace-pre-wrap break-words text-sm">
-          {text ?? "Message with other content"}
-        </p>
+        {formattedText ? (
+          <div className="text-sm">{formattedText}</div>
+        ) : (
+          <p className="whitespace-pre-wrap break-words text-sm">
+            {text ?? "Message with other content"}
+          </p>
+        )}
         {loading && (
           <p role="status" className="text-xs text-muted-foreground">
             Loading full message…

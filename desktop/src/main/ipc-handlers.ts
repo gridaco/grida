@@ -30,6 +30,7 @@ import {
 import {
   isDesktopVoiceReady,
   type DesktopVoiceSettings,
+  type NativeChatSkill,
 } from "@grida/desktop-bridge";
 import { isSafeExternalUrl } from "../window";
 import { servicesSidecarClient } from "./services-sidecar-client";
@@ -129,6 +130,9 @@ type RegisterIpcHandlersOptions = {
     workspaceId: string
   ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
+  native_chat_skills?: (
+    workspaceId?: string
+  ) => Promise<readonly NativeChatSkill[]>;
   supports_automatic_approval_review?: () => Promise<boolean>;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
@@ -279,7 +283,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     options.native_chat_selections,
     browserTools,
     options.resolve_welcome_chat_workspace,
-    options.personalization
+    options.personalization,
+    options.native_chat_skills
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
@@ -588,6 +593,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       (await catalogIpc.pickerPage(event, cursor)) ??
       nativeChat.list(event, cursor)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_SKILLS, (event, ...args: unknown[]) => {
+    if (args.length > 1) throw new Error("native_chat_skills_invalid");
+    return nativeChat.skills(event, args[0]);
+  });
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)
   );
@@ -863,7 +872,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       selectionRevision?: unknown,
       editorContextId?: unknown,
       editorToolContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -876,7 +886,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         selectionRevision,
         editorContextId,
         editorToolContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(
@@ -902,7 +913,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       selectionRevision?: unknown,
       editorContextId?: unknown,
       editorToolContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -915,7 +927,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         selectionRevision,
         editorContextId,
         editorToolContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
@@ -952,7 +965,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       selectionRevision?: unknown,
       editorContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.submitWithLibrarySelection(
         event,
@@ -963,7 +977,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         selectionRevision,
         editorContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>

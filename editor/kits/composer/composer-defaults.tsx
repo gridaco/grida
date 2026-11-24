@@ -20,7 +20,7 @@ export function ComposerAttachmentStrip({
   return (
     <div
       className={cn(
-        "flex max-w-full items-end gap-2.5 overflow-x-auto overscroll-x-contain px-3 pt-2.5 pb-0.5 [scrollbar-width:none] [&>*]:shrink-0",
+        "flex max-w-full items-end gap-2.5 overflow-x-auto overscroll-x-contain px-3 pt-2.5 pb-0.5 [scrollbar-width:none] empty:hidden [&>*]:shrink-0",
         className
       )}
     >

@@ -15,6 +15,9 @@ draft can be checked after detaching. The fixture lives for the page session.
   with **Hold replies** enabled to try Pause, Resume, queueing, and delivery
   after **Finish reply** or **Fail reply**. **Hold submission** lets you
   check the composer and next draft while an acknowledgement is pending.
+- Type `$slides` in **Conversation** to choose the project or personal skill.
+  **Update project skill** makes a selected project revision stale so you can
+  try restoring the refused send and choosing another skill.
 - **Message queue** starts with text, image, and file messages already waiting.
   Edit one in the composer, save with Send or restore with Escape, reorder,
   steer an eligible item, or resume the queue after making the chat idle.

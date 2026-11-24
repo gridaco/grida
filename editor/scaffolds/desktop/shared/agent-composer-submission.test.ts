@@ -61,6 +61,50 @@ function fixture(
 }
 
 describe("AgentComposerSubmission", () => {
+  it("submits the inline mention with its exact reference and removes both when deleted", async () => {
+    const { request, submission } = fixture();
+    const skill = {
+      name: "slides",
+      uri: `grida-skill:slides@${"a".repeat(64)}`,
+    };
+    const plain = {
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "Use $PATH" }],
+      meta: {
+        markdown: "Use $PATH",
+        text: "Use $PATH",
+        attachments: [],
+        submitted_at: 1,
+      },
+    };
+    const markdown = "Use [$slides](" + skill.uri + ") with $PATH";
+    request.editor.submit.mockReturnValue({
+      ...plain,
+      meta: { ...plain.meta, markdown, text: "Use $slides with $PATH" },
+      parts: [
+        {
+          type: "mention",
+          target: {
+            id: skill.uri,
+            sigil: "$",
+            label: skill.name,
+            payload: skill,
+          },
+        },
+        ...plain.parts,
+      ],
+    });
+    await submission.submit(request);
+    expect(request.onSubmit).toHaveBeenLastCalledWith(
+      markdown,
+      "Original draft",
+      [skill]
+    );
+    request.editor.submit.mockReturnValue(plain);
+    await submission.submit(request);
+    expect(request.onSubmit).toHaveBeenLastCalledWith("Use $PATH", "");
+  });
+
   it.each(["accepted", "refused", "unconfirmed"] as const)(
     "clears a dispatched standalone command and preserves the next draft after %s",
     async (result) => {

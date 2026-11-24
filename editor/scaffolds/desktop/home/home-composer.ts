@@ -920,6 +920,7 @@ export class HomeComposer {
   }
 
   private hasRequest(input: HomeComposer.Input, attachmentCount: number) {
+    if (input.skills?.length) return true;
     return !!(
       input.text.trim() ||
       input.template ||
@@ -1025,6 +1026,10 @@ export class HomeComposer {
         const goal = captured
           ? captured.goal && !attachments.length
           : intent.goal;
+        if (goal && input.skills?.length)
+          throw new Error(
+            "Send skill selections in a new chat turn before starting a goal."
+          );
         if (contextRequested && goal && !input.text.trim())
           throw new Error("Write an objective before starting a goal.");
         if (
@@ -1063,9 +1068,11 @@ export class HomeComposer {
               text: input.prompt,
               references: input.references,
             }) ??
-            (attachments.length > 1
-              ? "Inspect the attachments."
-              : "Inspect the attached file."));
+            (input.skills?.length && !attachments.length
+              ? ""
+              : attachments.length > 1
+                ? "Inspect the attachments."
+                : "Inspect the attached file."));
         const prepared =
           accessRequest && (await this.startApprovedChat(accessRequest));
         if (
@@ -1079,6 +1086,10 @@ export class HomeComposer {
               }),
             }),
             ...(messageContext && { messageContext }),
+            ...(input.skills?.length && {
+              skills: input.skills,
+              document: captured?.document,
+            }),
             ...(template && { initialWorkbenchPath: template.path }),
             profileId: prepared ? prepared.profileId : input.profileId,
             ...(prepared
@@ -1213,6 +1224,7 @@ export namespace HomeComposer {
     target: Workspace | null;
     references: readonly { title: string; url: string }[];
     messageContext?: WelcomeMessage["messageContext"];
+    skills?: WelcomeMessage["skills"];
     template?: Template;
   }>;
   export type DraftSource = Readonly<{

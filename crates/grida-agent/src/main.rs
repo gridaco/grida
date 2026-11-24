@@ -336,6 +336,29 @@ fn command() -> Command {
                 .arg(Arg::new("operation").long("operation").value_parser(["inspect", "update", "receipt", "ack"]).default_value("inspect"))
                 .arg(Arg::new("request-json").long("request-json")),
         )
+        .subcommand(
+            Command::new("skills")
+                .hide(true)
+                .arg(
+                    Arg::new("workspace-root")
+                        .long("workspace-root")
+                        .value_parser(value_parser!(PathBuf))
+                        .requires_all(["workspace-device", "workspace-inode"]),
+                )
+                .arg(
+                    Arg::new("workspace-device")
+                        .long("workspace-device")
+                        .value_parser(value_parser!(u64))
+                        .requires("workspace-root"),
+                )
+                .arg(
+                    Arg::new("workspace-inode")
+                        .long("workspace-inode")
+                        .value_parser(value_parser!(u64))
+                        .requires("workspace-root"),
+                )
+                .arg(Arg::new("bundled-fx").long("bundled-fx").action(ArgAction::SetTrue)),
+        )
         .subcommand(Command::new("serve-catalog")
             .about("Serve a provider-independent ACP catalog of authorized native workspaces")
             .arg(Arg::new("catalog-registry").long("catalog-registry").value_parser(value_parser!(PathBuf)).required(true))
@@ -626,6 +649,23 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "workspace-file" {
         return grida_agent::workspace_file::serve_stdio().map(|()| 0);
+    }
+    if name == "skills" {
+        let workspace = args.get_one::<PathBuf>("workspace-root").map(|root| {
+            (
+                root.as_path(),
+                *args
+                    .get_one::<u64>("workspace-device")
+                    .expect("required device"),
+                *args
+                    .get_one::<u64>("workspace-inode")
+                    .expect("required inode"),
+            )
+        });
+        let skills =
+            grida_agent::host::discover_skill_metadata(workspace, args.get_flag("bundled-fx"))?;
+        process::write_record(&json!({ "skills": skills })).await?;
+        return Ok(0);
     }
     if name == "serve-catalog" {
         let catalog = acp::catalog_service::Catalog::open(

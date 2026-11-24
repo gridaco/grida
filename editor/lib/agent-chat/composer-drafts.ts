@@ -19,6 +19,8 @@
  */
 import {
   NativeEditorSelection,
+  NativeChatSkills,
+  type NativeChatSkillReference,
   parseNativeChatMessageContext,
   type NativeChatEffort,
   type NativeChatMessageContext,
@@ -80,6 +82,7 @@ export type ComposerDraftPending = Readonly<{
   editorContextId?: string;
   editorToolContextId?: string | NativeEditorSelection.Capture;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
   outgoing?: Readonly<{
     id: string;
     /** This capture has not been bound to a native admission request. */
@@ -1264,6 +1267,8 @@ function validPending(value: ComposerDraftPending): boolean {
     (value.editorSvgTargetId !== undefined &&
       (typeof value.editorSvgTargetId !== "string" ||
         value.editorSvgTargetId.length > 256)) ||
+    (value.skills !== undefined &&
+      !NativeChatSkills.references(value.skills)) ||
     (value.messageContext !== undefined &&
       !parseNativeChatMessageContext(value.messageContext)) ||
     (value.editorContextId !== undefined &&
@@ -1303,6 +1308,7 @@ function validPending(value: ComposerDraftPending): boolean {
           "editorContextId",
           "editorToolContextId",
           "messageContext",
+          "skills",
           "attachment",
           "attachments",
           "outgoing",

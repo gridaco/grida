@@ -871,7 +871,7 @@ had its end read. Its `_meta["co.grida/session/processes"]` holds the complete
 `processes` list. After missed live updates the host sends the current list.
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
-the prompt. Standalone and project skills use `grida-skill:<name>@<revision>`.
+the prompt. Standalone, personal, and project skills use `grida-skill:<name>@<revision>`.
 An extension skill uses `grida-skill:<extension>/<name>@<revision>`. Use the
 URI returned by the catalog to select that revision. A client can also name an
 extension skill before it has a turn-specific catalog. For example,
@@ -880,20 +880,44 @@ skill only if the attached Act turn captures a Browser grant. Acceptance pins
 the resolved revision, and input inspection returns its complete URI. A bare
 ACP skill URI still requires a revision. The catalog returns metadata and omits
 local paths and bodies. A stale or unavailable selection rejects the input
-before inference. Use a new submission or
-queued replacement to change skills for accepted work. Steering keeps the
-active turn's captured guidance.
+before inference.
+
+An authored text part may also contain a bare `$skill-name`. During prompt
+acceptance the host captures it only if one eligible source supplies that
+name. A structured selection takes priority for the same name. Repeated plain
+mentions are captured once, up to the per-input skill limit. Unknown or
+ambiguous names remain text. The authored text and accepted skill versions
+are both retained. A new submission or a full queued replacement can select
+different skills. Text-only queue edits preserve captured guidance. A queued
+input with captured skills runs as its own turn. Steering keeps the active
+turn's captured guidance.
 
 Standalone bundled skills are available to every session. Project discovery
-reads only the explicitly readable primary root supplied by the host. A bare
-name looks in `.agents/skills` before `.claude/skills` and standalone bundled
-skills. Extension entries carry their own identity through selection and read.
-A qualified name selects an eligible owner directly. A bare name shared by
-multiple extensions needs qualification when no project or standalone entry
-resolves it. An accepted input retains its
-chosen skill bodies and any root `AGENTS.md` guidance. The `input` operation
-reports selected skill versions and the project instruction revision when
-present. These sources supply model context without changing tool permissions.
+reads the explicitly readable primary root supplied by the host. Personal
+discovery reads the local user's `$HOME/.agents/skills` directly. The catalog
+lists eligible same-named sources separately. An explicit name supplied with
+`grida-agent run --skill` selects a valid project skill (`.agents/skills`,
+then `.claude/skills`), followed by a personal skill and then a bundled skill.
+An explicit versioned link binds the source and revision. Workspace links also
+bind the discovered root identity. Qualified extension names keep their
+existing ownership and eligibility checks.
+
+An accepted input retains its chosen skill bodies and root `AGENTS.md` guidance.
+The `input` operation reports the selected skill versions and the project
+instruction revision. With `co.grida/session/message-context` negotiated, live user updates, input
+inspection, queued inspection and transcript windows return host-owned
+`displayParts` entries of kind `skill`, version `1`, with `name`, `source`,
+`uri` and optional `extension` in `data`. They use the accepted input and the
+authored user message. Live user updates for inputs without attachments
+include the accepted `inputId` and put the display parts on the initial
+replacement chunk. Inputs with attachments use the complete transcript
+projection for the authored message. Clients reserve this kind for host output.
+Skill selection supplies model context under the existing turn permissions.
+
+The Desktop launcher also queries metadata before chat creation. The native
+reader takes either the fixed personal scope and bundled catalog, or that
+scope plus one launcher-admitted, identity-checked workspace root. This query
+reads no provider credentials or conversation state.
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
 and optional `seed` provenance. The basis carries `view`, `tail` and a

@@ -9,6 +9,7 @@ export type ComposerMention = {
   label: string;
   kind?: string;
   description?: string;
+  source?: string;
   path?: string;
   payload?: Record<string, unknown>;
 };
@@ -82,10 +83,11 @@ export type ComposerEditorContext = {
 export type ComposerCatalog = {
   commands: ComposerCommand[];
   mentions: ComposerMention[];
+  skillMentions?: ComposerMention[];
 };
 
 export type ComposerTrigger = {
-  kind: "command" | "mention";
+  kind: "command" | "mention" | "skill";
   query: string;
   range: { from: number; to: number };
   items: (ComposerCommand | ComposerMention)[];
@@ -107,6 +109,7 @@ export type ComposerMentionPart = {
   target: {
     id: string;
     label: string;
+    sigil?: "$";
     kind?: string;
     path?: string;
     payload?: Record<string, unknown>;
@@ -212,6 +215,7 @@ export namespace ComposerDocument {
     type: "mention";
     id: string;
     label: string;
+    sigil?: "$";
     kind?: string;
     path?: string;
     payload?: Record<string, unknown>;
@@ -270,6 +274,7 @@ export class ComposerCore {
     this.catalog = {
       commands: catalog.commands ?? [],
       mentions: catalog.mentions ?? [],
+      skillMentions: catalog.skillMentions,
     };
     this.snapshot = {
       text: "",
@@ -296,17 +301,18 @@ export class ComposerCore {
     const next = {
       commands: catalog.commands ?? this.catalog.commands,
       mentions: catalog.mentions ?? this.catalog.mentions,
+      skillMentions: Object.hasOwn(catalog, "skillMentions")
+        ? catalog.skillMentions
+        : this.catalog.skillMentions,
     };
     if (
       next.commands === this.catalog.commands &&
-      next.mentions === this.catalog.mentions
+      next.mentions === this.catalog.mentions &&
+      next.skillMentions === this.catalog.skillMentions
     ) {
       return;
     }
-    this.catalog = {
-      commands: next.commands,
-      mentions: next.mentions,
-    };
+    this.catalog = next;
     const trigger = this.cursor
       ? this.inspectTrigger(this.cursor.textBeforeCursor, this.cursor.position)
       : this.snapshot.trigger;
@@ -476,6 +482,20 @@ export class ComposerCore {
     textBeforeCursor: string,
     cursorPosition: number
   ): ComposerTrigger | null {
+    const skills = this.catalog.skillMentions;
+    const skill = /(?:^|\s)\$([a-z0-9][a-z0-9-]*(?:\/[a-z0-9-]*)?)?$/.exec(
+      textBeforeCursor
+    );
+    if (skills && skill) {
+      const query = skill[1] ?? "";
+      if (/^\d+$/.test(query)) return null;
+      return {
+        kind: "skill",
+        query,
+        range: { from: cursorPosition - query.length - 1, to: cursorPosition },
+        items: skills.filter((mention) => this.matches(query, mention.label)),
+      };
+    }
     const match = /(^|\s)([/@])([^\s/@]*)$/.exec(textBeforeCursor);
     if (!match) return null;
 
@@ -649,13 +669,16 @@ export class ComposerCore {
 
     if (node.type === "mention") {
       this.flushText(state);
-      const mention = this.catalog.mentions.find((item) => item.id === node.id);
+      const mention = (
+        node.sigil === "$" ? this.catalog.skillMentions : this.catalog.mentions
+      )?.find((item) => item.id === node.id);
 
       this.pushPart(state, {
         type: "mention",
         target: {
           id: node.id,
           label: node.label || mention?.label || node.id,
+          sigil: node.sigil,
           kind: node.kind || mention?.kind,
           path: node.path || mention?.path,
           payload: node.payload ?? mention?.payload,

@@ -5,6 +5,10 @@ import type {
 } from "./native-editor-surfaces";
 import type { NativeEditorSelection } from "./native-editor-selection";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
+import type {
+  NativeChatSkill,
+  NativeChatSkillReference,
+} from "./native-chat-skills";
 import type { NativeSubagentClient } from "./native-subagents";
 import type {
   NativeChatDisplayPart,
@@ -35,6 +39,7 @@ export type NativeChatMessageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 type EditorObservationValue =
@@ -214,6 +219,7 @@ export type NativeChatImageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 /**
@@ -232,6 +238,7 @@ export type NativeChatSelectedImageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 export type NativeChatFileInput = Readonly<{
@@ -245,6 +252,7 @@ export type NativeChatFileInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 /**
@@ -276,6 +284,7 @@ export type NativeChatFileReferenceInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 /** Maximum number of items in one negotiated native attachment batch. */
@@ -306,6 +315,7 @@ export type NativeChatAttachmentsInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 export type NativeChatReadState = Readonly<{
@@ -1224,7 +1234,10 @@ export type NativeChatTextUpdate = Readonly<{
   activityOrder?: number;
   activityOrderIncomplete?: true;
 }> &
-  Pick<NativeChatMessage, "inputId" | "questionReply" | "questionReplies">;
+  Pick<
+    NativeChatMessage,
+    "inputId" | "questionReply" | "questionReplies" | "displayParts"
+  >;
 
 export type NativeChatActivityUpdate = Readonly<{
   kind: "activity";
@@ -1316,6 +1329,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** Discover selectable skills before starting a chat or connecting a model. */
+  skills?(workspaceId?: string): Promise<readonly NativeChatSkill[]>;
   /**
    * On the Welcome screen only: the connections a new chat can choose before a
    * workspace opens, with nothing active or saved. Listing starts nothing.
@@ -1491,7 +1506,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     selectionRevision?: number,
     editorContextId?: string,
     editorToolContext?: string | NativeEditorSelection.Capture,
-    webSearch?: true
+    webSearch?: true,
+    skills?: readonly NativeChatSkillReference[]
   ): Promise<NativeChatAcceptance>;
   submitMessage?(
     attachmentId: string,
@@ -1521,7 +1537,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     effort?: NativeChatEffort,
     selectionRevision?: number,
     editorContextId?: string,
-    webSearch?: true
+    webSearch?: true,
+    skills?: readonly NativeChatSkillReference[]
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(

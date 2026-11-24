@@ -22,50 +22,63 @@ impl<'a> Catalog<'a> {
             .filter(|package| self.enabled.iter().any(|id| id == package.id))
     }
 
-    pub(super) fn descriptions(&self, root: Option<&ProjectRoot>) -> Result<Vec<SkillDescription>> {
-        let mut descriptions = BTreeMap::new();
+    pub(super) fn descriptions(
+        &self,
+        root: Option<&ProjectRoot>,
+        personal: Option<&PersonalSkills>,
+        picker: bool,
+    ) -> Result<Vec<SkillDescription>> {
+        let mut descriptions = Vec::new();
+        #[allow(unused_mut)] // The Unix build can insert names from filesystem sources.
+        let mut names = BTreeSet::<String>::new();
         #[cfg(unix)]
-        if let Some(root) = root {
-            for (directory, source) in root.layers()? {
-                for name in directory.names()? {
-                    if !valid_name(&name) || descriptions.contains_key(&name) {
-                        continue;
+        for layer in native::layers(root, personal) {
+            let Some(layer) = accessible_for_listing(layer.map(Some), picker)? else {
+                continue;
+            };
+            let Some(layer_names) = accessible_for_listing(layer.names().map(Some), picker)? else {
+                continue;
+            };
+            for name in layer_names {
+                if !picker && names.contains(&name) {
+                    continue;
+                }
+                if let Some(skill) = accessible_for_listing(layer.skill(&name), picker)? {
+                    descriptions.push(skill.descriptor);
+                    if !picker {
+                        names.insert(name);
                     }
-                    if let Some(skill) = directory.skill(&name, source)? {
-                        descriptions.insert(name, skill.descriptor);
-                        if descriptions.len() > MAX_CATALOG {
-                            return Err(problem(ErrorKind::LimitExceeded, "skill_catalog_limit"));
-                        }
+                    if descriptions.len() > MAX_CATALOG {
+                        return Err(problem(ErrorKind::LimitExceeded, "skill_catalog_limit"));
                     }
                 }
             }
         }
         #[cfg(not(unix))]
-        let _ = root;
+        let _ = (root, personal);
         for &(name, text) in &BUILTIN {
-            if !descriptions.contains_key(name) {
-                descriptions.insert(name.to_owned(), bundled_skill(None, name, text)?.descriptor);
+            if picker || !names.contains(name) {
+                descriptions.push(bundled_skill(None, name, text)?.descriptor);
             }
         }
         for package in self.eligible() {
             for &(name, text) in package.skills {
-                let owner = Some(package.id);
-                descriptions.insert(
-                    selector(owner, name),
-                    bundled_skill(owner, name, text)?.descriptor,
-                );
+                descriptions.push(bundled_skill(Some(package.id), name, text)?.descriptor);
             }
         }
         if descriptions.len() > MAX_CATALOG {
             return Err(problem(ErrorKind::LimitExceeded, "skill_catalog_limit"));
         }
-        Ok(descriptions.into_values().collect())
+        // Earlier sources win bare-name lookup. A picker may explicitly select
+        // another source, so preserve all entries and their order within a name.
+        descriptions.sort_by_cached_key(|skill| selector(skill.extension.as_deref(), &skill.name));
+        Ok(descriptions)
     }
 
     pub(super) fn listing(&self, root: Option<&ProjectRoot>) -> Result<SkillListing> {
-        let (described, workspace_unavailable) = match self.descriptions(root) {
+        let (described, workspace_unavailable) = match self.descriptions(root, None, false) {
             Ok(described) => (described, false),
-            Err(_) if root.is_some() => (self.descriptions(None)?, true),
+            Err(_) if root.is_some() => (self.descriptions(None, None, false)?, true),
             Err(error) => return Err(error),
         };
         let mut skills: Vec<_> = described
@@ -92,7 +105,112 @@ impl<'a> Catalog<'a> {
         })
     }
 
-    pub(super) fn resolve(&self, owner: Option<&str>, name: &str) -> Result<Option<CapturedSkill>> {
+    pub(super) fn select(
+        &self,
+        reference: &SkillReference,
+        #[cfg(unix)] layers: &[Result<native::Layer>],
+    ) -> Result<CapturedSkill> {
+        let (owner, name) = split_selector(reference.name());
+        let revision = reference.revision.as_deref();
+        #[cfg(unix)]
+        let mut found = false;
+        #[cfg(not(unix))]
+        let found = false;
+        #[cfg(unix)]
+        if owner.is_none() {
+            if revision.is_none()
+                && let Some(error) = layers.iter().find_map(|layer| layer.as_ref().err())
+            {
+                return Err(error.clone());
+            }
+            let mut legacy_precedence_known = true;
+            for layer in layers {
+                let candidate = layer
+                    .as_ref()
+                    .map_err(Clone::clone)
+                    .and_then(|layer| layer.skill(name));
+                let skill = match candidate {
+                    Ok(Some(skill)) => skill,
+                    Ok(None) => continue,
+                    Err(error) if revision.is_some() && error.kind == ErrorKind::Unavailable => {
+                        legacy_precedence_known = false;
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                };
+                if revision.is_none_or(|revision| revision == skill.descriptor.revision) {
+                    return Ok(skill);
+                }
+                // A historical link addresses the first workspace match by
+                // content. An unreadable earlier source leaves that match unknown.
+                if legacy_precedence_known
+                    && matches!(
+                        skill.descriptor.source,
+                        SkillSource::ProjectAgents | SkillSource::ProjectClaude
+                    )
+                    && revision == Some(skill.content_revision()?.as_str())
+                {
+                    return Ok(skill);
+                }
+                legacy_precedence_known = false;
+                found = true;
+            }
+        }
+        let bundled = match (owner, revision) {
+            // A former standalone name may identify one historical package.
+            // An unrelated extension with byte-identical content cannot match.
+            (None, Some(_)) => match legacy_owner(name) {
+                Some(owner) => self.resolve(Some(owner), name)?,
+                None => document(self.packages, None, name)?,
+            },
+            _ => self.resolve(owner, name)?,
+        };
+        match bundled {
+            Some(skill)
+                if revision.is_none_or(|revision| revision == skill.descriptor.revision) =>
+            {
+                Ok(skill)
+            }
+            Some(_) => Err(problem(ErrorKind::Conflict, "selected_skill_changed")),
+            None if found => Err(problem(ErrorKind::Conflict, "selected_skill_changed")),
+            None => Err(problem(
+                ErrorKind::Unavailable,
+                "selected_skill_unavailable",
+            )),
+        }
+    }
+
+    /// A text mention can select only one eligible source. Unlike a
+    /// structured selection, it gives us no basis for choosing between them.
+    pub(super) fn unambiguous(
+        &self,
+        name: &str,
+        #[cfg(unix)] layers: &[Result<native::Layer>],
+    ) -> Option<CapturedSkill> {
+        let bundled = std::iter::once_with(|| document(self.packages, None, name)).chain(
+            self.eligible()
+                .map(|package| document(self.packages, Some(package.id), name)),
+        );
+        #[cfg(unix)]
+        let candidates = layers
+            .iter()
+            .map(|layer| layer.as_ref().map_err(Clone::clone)?.skill(name))
+            .chain(bundled);
+        #[cfg(not(unix))]
+        let candidates = bundled;
+        let mut found = None;
+        for candidate in candidates {
+            if let Some(skill) = candidate.ok()? {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(skill);
+            }
+        }
+        found
+    }
+
+    fn resolve(&self, owner: Option<&str>, name: &str) -> Result<Option<CapturedSkill>> {
         if owner.is_none()
             && let Some(skill) = document(self.packages, None, name)?
         {
@@ -114,6 +232,14 @@ impl<'a> Catalog<'a> {
         first
             .map(|(owner, text)| bundled_skill(Some(owner), name, text))
             .transpose()
+    }
+}
+
+#[cfg(unix)]
+fn accessible_for_listing<T>(result: Result<Option<T>>, picker: bool) -> Result<Option<T>> {
+    match result {
+        Err(error) if picker && error.kind == ErrorKind::Unavailable => Ok(None),
+        result => result,
     }
 }
 

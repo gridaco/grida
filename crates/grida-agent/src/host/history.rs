@@ -102,6 +102,7 @@ pub(crate) struct TranscriptInputFacts {
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
     pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
+    pub(crate) skill_message_text: BTreeMap<MessageId, String>,
 }
 
 impl Host {
@@ -221,12 +222,22 @@ impl Host {
                 if stored.editor_tool_context_id.is_some() {
                     facts.editor_tool_contexts.insert(message.clone());
                 }
-                if let Some(context) = message_context::context(&stored.parts)
-                    && !context.display_parts.is_empty()
-                {
-                    facts
-                        .display_parts
-                        .insert(message, context.display_parts.clone());
+                let skills = stored
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                if !skills.is_empty() {
+                    // Keep the actual authored text. The model's generated
+                    // selection marker is represented here by the skill chip.
+                    facts.skill_message_text.insert(
+                        message.clone(),
+                        message_context::skill_input_text(&stored.parts),
+                    );
+                }
+                let display = message_context::display_parts(&stored.parts, &skills);
+                if !display.is_empty() {
+                    facts.display_parts.insert(message, display);
                 }
             }
             for input in self

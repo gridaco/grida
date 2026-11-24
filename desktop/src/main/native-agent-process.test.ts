@@ -97,6 +97,50 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("queries skill metadata without starting ACP, storage, or a provider", async () => {
+    const revision = "a".repeat(64);
+    const skill = {
+      name: "slides",
+      description: "Make a deck",
+      source: "personal",
+      revision,
+      uri: `grida-skill:slides@${revision}`,
+    };
+    const test = fixture(
+      "",
+      1,
+      undefined,
+      false,
+      `
+      const args=process.argv.slice(2);
+      const root=require('node:path').dirname(__dirname);
+      const expected=process.argv.includes('--workspace-root')
+        ? ['skills','--workspace-root',root,'--workspace-device','101','--workspace-inode','202','--bundled-fx']
+        : ['skills'];
+      if (JSON.stringify(args) !== JSON.stringify(expected) || process.env.GRIDA_HOME || process.env.OPENAI_API_KEY)
+        process.exit(2);
+      fs.writeSync(1, JSON.stringify({skills:[${JSON.stringify(skill)}]}));
+      process.exit(0);
+    `
+    );
+    try {
+      await expect(NativeAgentProcess.skills(test.root)).resolves.toEqual([
+        skill,
+      ]);
+      await expect(
+        NativeAgentProcess.skills(test.root, {
+          root: fs.realpathSync(test.root),
+          device: "101",
+          inode: "202",
+          bundledFx: true,
+        })
+      ).resolves.toEqual([skill]);
+      expect(fs.existsSync(test.options.stateDirectory)).toBe(false);
+    } finally {
+      test.close();
+    }
+  });
+
   it("passes the global home to the native host and surfaces bounded config errors", async () => {
     const test = fixture(
       "",
@@ -597,6 +641,133 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           turnId: "turn",
           role: "assistant",
           text: "I see it.",
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it("lowers selections as exact skill resource links and uses only the host display projection live and in replay", async () => {
+    const capability = "co.grida/session/message-context";
+    const selection = {
+      name: "slides",
+      uri: `grida-skill:slides@${"a".repeat(64)}`,
+    };
+    const displayPart = {
+      kind: "skill",
+      version: 1,
+      data: { ...selection, source: "personal" },
+    };
+    const text = "Make a deck about tides for $100.";
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      const { inputId, prompt } = request.params;
+      if (request.method === '_co.grida/session/submit' || request.method === '_co.grida/session/enqueue') {
+        const empty = request.method.endsWith('/submit');
+        const expected = [...(empty ? [] : [{type:'text',text:${JSON.stringify(text)}}]), {type:'resource_link',...${JSON.stringify(selection)}}];
+        if (JSON.stringify(prompt) !== JSON.stringify(expected)) throw Error('incorrect skill resource link');
+        if (empty) send({method:'session/update',params:{sessionId:'chat',
+          _meta:{'co.grida/session/updates':{inputId,turnId:'turn',offsetBytes:0,replace:true,displayParts:[${JSON.stringify(displayPart)}]}},
+          update:{sessionUpdate:'user_message_chunk',messageId:'only-skill',content:{type:'text',text:''}}
+        }});
+        send({id:request.id,result:{sessionId:'chat',inputId,inputPosition:1,turnId:empty?'turn':null,disposition:empty?'claimed':'queued'}}); return;
+      }
+      if (request.method !== 'session/load') throw Error('unexpected fixture method');
+      const window='${TRANSCRIPT_WINDOW}',read=request.params._meta[window];
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:{[window]:{requestId:read.requestId,turnId:'turn',displayParts:[${JSON.stringify(displayPart)}]}},
+        update:{sessionUpdate:'user_message_chunk',messageId:'with-skill',content:{type:'text',text:${JSON.stringify(text)}}}
+      }});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, [capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const live: unknown[] = [];
+      chat.subscribe(session, (update) => live.push(update));
+      await expect(
+        chat.submit(
+          session,
+          "only-skill",
+          "",
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [selection]
+        )
+      ).resolves.toMatchObject({ inputId: "only-skill" });
+      expect(live).toEqual([
+        {
+          kind: "text",
+          role: "user",
+          text: "",
+          messageId: "only-skill",
+          inputId: "only-skill",
+          turnId: "turn",
+          offsetBytes: 0,
+          replace: true,
+          displayParts: [displayPart],
+        },
+      ]);
+      await expect(
+        chat.enqueue(
+          session,
+          "with-skill",
+          text,
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [selection]
+        )
+      ).resolves.toMatchObject({ inputId: "with-skill" });
+      expect(() =>
+        chat!.submit(
+          session,
+          "wrong-scope",
+          "Hello",
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [{ ...selection, workspaceId: "another-project" }]
+        )
+      ).toThrow("selected_skill_unavailable");
+      await expect(
+        chat.submitMessage(session, {
+          text,
+          inputId: "forged",
+          operatingRegime: "act",
+          messageContext: {
+            modelText: "Extra context",
+            displayParts: [displayPart],
+          },
+        })
+      ).rejects.toThrow("native_chat_message_context_invalid");
+      expect((await chat.transcriptPage(session)).messages).toEqual([
+        {
+          messageId: "with-skill",
+          turnId: "turn",
+          role: "user",
+          text,
+          displayParts: [displayPart],
         },
       ]);
     } finally {

@@ -1127,6 +1127,7 @@ app.on("ready", async () => {
         native.ensure(workspaceId, requireCurrent),
       supports_automatic_approval_review: () =>
         NativeAgentProcess.supportsScopedApprovals(nativeResources),
+      native_chat_skills: (workspaceId) => native.skills(workspaceId),
       resolve_welcome_chat_workspace: (workspaceId) =>
         native.welcomeWorkspace(workspaceId),
       forget_native_workspace: (workspaceId) =>

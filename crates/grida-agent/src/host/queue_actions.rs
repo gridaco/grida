@@ -53,6 +53,10 @@ fn steer_parts(input: &Submission, target: &QueueSteerTarget) -> Result<Vec<Prom
         || stored.editor_tool_context_id.is_some()
         || stored.editor_svg_target.is_some()
         || stored.completion_checks.is_some()
+        || stored
+            .guidance
+            .as_ref()
+            .is_some_and(crate::skills::CapturedGuidance::has_skills)
         || !stored.parts.iter().all(|part| match part {
             PromptPart::Text { .. } | PromptPart::FileReference { .. } => true,
             PromptPart::RetainedImage { .. } | PromptPart::PreparedImage { .. } => {

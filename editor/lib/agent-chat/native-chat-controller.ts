@@ -29,6 +29,7 @@ import type {
   NativeChatCompaction,
   NativeChatMessage,
   NativeChatMessageContext,
+  NativeChatSkillReference,
   NativeChatObservation,
   NativeChatRevisionInput,
   NativeChatRevisionTarget,
@@ -81,6 +82,7 @@ import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
 import { NativeChatOutgoing } from "./native-chat-outgoing";
 import { AttachmentBatch } from "./attachment-batch";
+import { SkillMentions } from "./skill-mentions";
 
 /** Composer choices made before opening a workspace; all execution uses existing APIs. */
 export type NativeChatInitialComposer = Readonly<{
@@ -117,6 +119,9 @@ export type NativeChatFirstInput = Readonly<{
   requestId?: string;
   text: string;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
+  /** Captured Home composer document for restoring a refused skill selection. */
+  document?: unknown;
   /** Retire this exact Home request once the destination owns it. */
   commit?: () => void;
   /** Give back a claim abandoned before dispatch. */
@@ -600,6 +605,7 @@ type Scope = {
     editorContextId?: string;
     editorToolContextId?: string | NativeEditorSelection.Capture;
     messageContext?: NativeChatMessageContext;
+    skills?: readonly NativeChatSkillReference[];
     outgoing?: ComposerDraftPending["outgoing"];
   };
   awaitingTurn?: {
@@ -1495,7 +1501,7 @@ export class NativeChatController {
         await this.sendFirstInput(scope, input, composer?.turnOptions);
         return null;
       } catch {
-        return this.keepFirstMessage(scope, input.text);
+        return this.keepFirstMessage(scope, input);
       }
     }
     this.beginConnection();
@@ -1542,7 +1548,7 @@ export class NativeChatController {
       // The send reported why; a refusal before it started has no notice yet.
       if (this.owns(scope) && !this.view.error)
         this.update({ error: MESSAGE_NOT_SENT });
-      return this.keepFirstMessage(scope, input.text);
+      return this.keepFirstMessage(scope, input);
     }
   }
 
@@ -1632,7 +1638,7 @@ export class NativeChatController {
     } catch {
       if (this.owns(scope) && !this.view.error)
         this.update({ error: PREPARED_MESSAGE_NOT_SENT });
-      return this.keepFirstMessage(scope, input.text);
+      return this.keepFirstMessage(scope, input);
     }
   }
 
@@ -1643,10 +1649,14 @@ export class NativeChatController {
   ) {
     if (input.messageContext)
       this.setDraftMessageContext(scope, input.messageContext);
+    if (input.skills?.length && this.view.goalIntent)
+      throw new Error(
+        "Send skill selections in a new chat turn before starting a goal."
+      );
     if (
       input.requestId &&
       input.commit &&
-      this.canSubmitOptimistically(input.text)
+      this.canSubmitOptimistically(input.text, input.skills)
     ) {
       const outgoing = this.captureOutgoing(scope, { ...input, turnOptions });
       return this.dispatchOutgoing(outgoing);
@@ -1665,17 +1675,33 @@ export class NativeChatController {
       });
       return Promise.resolve();
     }
-    return this.send(input.text, scope.id, { firstTurnOptions: turnOptions });
+    return this.send(input.text, scope.id, {
+      firstTurnOptions: turnOptions,
+      skills: input.skills,
+    });
   }
 
   /** A late failure belongs to its originating draft, never the newly focused chat. */
-  private keepFirstMessage(scope: Scope, text: string): string | null {
+  private keepFirstMessage(
+    scope: Scope,
+    input: NativeChatFirstInput
+  ): string | null {
+    const { text, skills, document } = input;
     const key = this.scopeDraftKey(scope);
-    if (text && key && this.drafts) {
-      const returned = text.split(/\r?\n/).map((line) => ({
-        type: "paragraph",
-        ...(line && { content: [{ type: "text", text: line }] }),
-      }));
+    if ((text || skills?.length) && key && this.drafts) {
+      const returned = skills?.length
+        ? document &&
+          typeof document === "object" &&
+          "type" in document &&
+          document.type === "doc" &&
+          "content" in document &&
+          Array.isArray(document.content)
+          ? document.content
+          : SkillMentions.restoreDocument(text, skills).content
+        : text.split(/\r?\n/).map((line) => ({
+            type: "paragraph",
+            ...(line && { content: [{ type: "text", text: line }] }),
+          }));
       const saved = this.drafts.store.read(key);
       if (
         saved &&
@@ -1694,6 +1720,7 @@ export class NativeChatController {
             content: [...saved.content, ...returned],
           });
       } else this.drafts.store.write(key, { type: "doc", content: returned });
+      if (skills?.length) return null;
     }
     return this.owns(scope) ? text : null;
   }
@@ -1923,7 +1950,7 @@ export class NativeChatController {
         this.update({ draftMessageContext: input.messageContext });
       }
     }
-    const text = scope ? this.keepFirstMessage(scope, input.text) : input.text;
+    const text = scope ? this.keepFirstMessage(scope, input) : input.text;
     if (scope) input.commit?.();
     return text;
   }
@@ -5602,7 +5629,10 @@ export class NativeChatController {
   }
 
   /** A regular message can move from the composer before native admission. */
-  canSubmitOptimistically(text: string): boolean {
+  canSubmitOptimistically(
+    text: string,
+    skills?: readonly NativeChatSkillReference[]
+  ): boolean {
     return (
       !this.fixed &&
       !this.view.queueDraft &&
@@ -5611,6 +5641,7 @@ export class NativeChatController {
       !this.view.steering &&
       !this.pausedTurn &&
       (!!this.scope?.messageContext ||
+        !!skills?.length ||
         !/^\/(?:plan|goal|side)(?:\s|$)|^\/(?:compact|fork|stop)$/.test(
           text.trim()
         ))
@@ -5620,7 +5651,8 @@ export class NativeChatController {
   submitOptimistically(
     text: string,
     scopeId: number,
-    document?: unknown
+    document?: unknown,
+    skills?: readonly NativeChatSkillReference[]
   ): boolean {
     const scope = this.scope;
     if (
@@ -5628,11 +5660,11 @@ export class NativeChatController {
       scope.id !== scopeId ||
       this.view.submitting ||
       !this.canSubmit ||
-      !this.canSubmitOptimistically(text) ||
-      (!text.trim() && !this.canSubmitWithoutText)
+      !this.canSubmitOptimistically(text, skills) ||
+      (!text.trim() && !skills?.length && !this.canSubmitWithoutText)
     )
       return false;
-    const outgoing = this.captureOutgoing(scope, { text, document });
+    const outgoing = this.captureOutgoing(scope, { text, document, skills });
     void this.dispatchOutgoing(outgoing);
     return true;
   }
@@ -5729,13 +5761,9 @@ export class NativeChatController {
       )
         return false;
       const pending = outgoing.pending;
-      const document = pending.outgoing?.document ?? {
-        type: "doc",
-        content: pending.text.split(/\r?\n/).map((text) => ({
-          type: "paragraph",
-          ...(text && { content: [{ type: "text", text }] }),
-        })),
-      };
+      const document =
+        pending.outgoing?.document ??
+        SkillMentions.restoreDocument(pending.text, pending.skills);
       if (!restoreDocument(document)) return false;
       scope.selectedAttachment = pending.attachment;
       if (pending.attachments)
@@ -5794,7 +5822,8 @@ export class NativeChatController {
       retryBlocked?: true;
     }
   ): Outgoing {
-    const { text, requestId, turnOptions, document, retryBlocked } = input;
+    const { text, requestId, turnOptions, document, retryBlocked, skills } =
+      input;
     const id = requestId ?? crypto.randomUUID();
     const attachment = scope.selectedAttachment;
     const attachments = scope.attachmentBatch;
@@ -5827,6 +5856,7 @@ export class NativeChatController {
       attachment,
       ...(attachments?.length && { attachments }),
       messageContext,
+      ...(skills?.length && { skills }),
       ...(editorToolContextId && { editorToolContextId }),
       allowLibrarySelection: false,
       outgoing: {
@@ -5847,6 +5877,10 @@ export class NativeChatController {
         }),
       },
     };
+    const displayParts = SkillMentions.display(
+      skills,
+      messageContext?.displayParts
+    );
     const outgoing: Outgoing = {
       view: {
         id,
@@ -5857,7 +5891,7 @@ export class NativeChatController {
         ...(attachments?.length && {
           attachments: attachments.map(({ card }) => card),
         }),
-        ...(messageContext && { displayParts: messageContext.displayParts }),
+        ...(displayParts && { displayParts }),
         placement: mode === "enqueue" ? "queue" : "transcript",
         status: "sending",
       },
@@ -5908,10 +5942,13 @@ export class NativeChatController {
     } catch (error) {
       if (outgoing.receipt || outgoing.observed) return;
       if (!outgoing.stageCommitted) outgoing.homeRelease?.();
+      const skillRefusal = !outgoing.dispatched && SkillMentions.refusal(error);
       outgoing.view = {
         ...outgoing.view,
         status: outgoing.dispatched ? "unconfirmed" : "failed",
+        ...(skillRefusal && { retryable: false }),
         error:
+          (skillRefusal || undefined) ??
           attachmentRefusal(error) ??
           describe(
             error,
@@ -6035,11 +6072,14 @@ export class NativeChatController {
     scopeId: number,
     queuedInputId?: string,
     queuedEditHasContent?: boolean,
-    document?: unknown
+    document?: unknown,
+    skills?: readonly NativeChatSkillReference[]
   ): Promise<void> {
     if (this.view.queueDraft?.inputId !== queuedInputId)
       throw new Error("native_chat_composer_target_changed");
     if (queuedInputId !== undefined) {
+      if (skills?.length)
+        throw new Error("Send skill selections in a new message.");
       if (
         this.scope?.id !== scopeId ||
         !(await this.saveQueueDraft(text, queuedEditHasContent))
@@ -6049,7 +6089,7 @@ export class NativeChatController {
     }
     return new Promise((resolve, reject) => {
       // Commands and other intents without an input receipt settle on completion.
-      this.send(text, scopeId, { onAccepted: resolve, document }).then(
+      this.send(text, scopeId, { onAccepted: resolve, document, skills }).then(
         resolve,
         reject
       );
@@ -6073,12 +6113,14 @@ export class NativeChatController {
       firstTurnOptions,
       outgoing,
       document,
+      skills,
     }: {
       editorContextId?: string;
       onAccepted?: () => void;
       firstTurnOptions?: NativeChatInitialComposer["turnOptions"];
       outgoing?: Outgoing;
       document?: unknown;
+      skills?: readonly NativeChatSkillReference[];
     } = {}
   ): Promise<void> {
     const scope = this.scope;
@@ -6096,10 +6138,11 @@ export class NativeChatController {
     // or attaching a new chat. A retry carries the original pending capture.
     const prompt = text.trim();
     const command =
-      /^\/(?:plan|goal|side)(?:\s|$)/.test(prompt) ||
-      ["/compact", "/fork", "/stop"].includes(prompt);
+      !skills?.length &&
+      (/^\/(?:plan|goal|side)(?:\s|$)/.test(prompt) ||
+        ["/compact", "/fork", "/stop"].includes(prompt));
     const editorCapture =
-      !outgoing && prompt && !command && !this.retainedSend(scope, text)
+      !outgoing && prompt && !command && !this.retainedSend(scope, text, skills)
         ? this.captureEditorSelection(scope, this.view.operatingRegime)
         : undefined;
     const submission = {};
@@ -6126,7 +6169,8 @@ export class NativeChatController {
         },
         firstTurnOptions,
         outgoing,
-        documentRevision
+        documentRevision,
+        skills
       );
     } catch (error) {
       const current = this.scope;
@@ -6150,7 +6194,8 @@ export class NativeChatController {
     onAccepted: () => void,
     firstTurnOptions?: NativeChatInitialComposer["turnOptions"],
     outgoing?: Outgoing,
-    documentRevision?: string
+    documentRevision?: string,
+    selectedSkills?: readonly NativeChatSkillReference[]
   ): Promise<void> {
     let scope = this.scope;
     if (
@@ -6169,12 +6214,14 @@ export class NativeChatController {
     const messageContext = outgoing
       ? outgoing.pending.messageContext
       : scope.messageContext;
+    const skills = outgoing ? outgoing.pending.skills : selectedSkills;
+    const hasSkills = !!skills?.length;
     const original = outgoing
       ? outgoing.pending.outgoing?.staged
         ? undefined
         : outgoing.pending
-      : (this.retainedSend(scope, text) ??
-        (messageContext
+      : (this.retainedSend(scope, text, skills) ??
+        (messageContext || hasSkills
           ? undefined
           : this.retainedSend(
               scope,
@@ -6234,14 +6281,17 @@ export class NativeChatController {
       throw new Error(
         "The original attachment is unavailable. This message cannot be sent without it."
       );
-    const side = !messageContext && /^\/side(?:\s+|$)/.exec(text.trim());
+    const side =
+      !messageContext && !hasSkills && /^\/side(?:\s+|$)/.exec(text.trim());
     if (side) {
       const message = text.trim().slice(side[0].length);
       return message ? this.openSideChat(message) : this.showSideChat();
     }
     this.fixed?.sent?.();
     const intent =
-      !messageContext && /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
+      !messageContext &&
+      !hasSkills &&
+      /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
     if (intent) {
       if (intent[1] === "plan") {
         if (!this.bridge.submitInRegime)
@@ -6256,13 +6306,18 @@ export class NativeChatController {
       if (!text) return;
     }
     const literal = text.trim();
-    if (!messageContext && (literal === "/compact" || literal === "/fork"))
+    if (
+      !messageContext &&
+      !hasSkills &&
+      (literal === "/compact" || literal === "/fork")
+    )
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
-    if (!messageContext && literal === "/stop")
+    if (!messageContext && !hasSkills && literal === "/stop")
       return this.stopBackgroundProcesses();
     if (
       !this.canSubmitInput(outgoing?.pending) ||
       (!text.trim() &&
+        !hasSkills &&
         !(outgoing
           ? this.permitsEmptyInput(outgoing.pending)
           : this.canSubmitWithoutText))
@@ -6272,9 +6327,20 @@ export class NativeChatController {
       this.update({ error: MESSAGE_CONTEXT_UNAVAILABLE });
       throw new Error(MESSAGE_CONTEXT_UNAVAILABLE);
     }
+    if (hasSkills) {
+      if (!this.bridge.skills || !this.bridge.submitInRegime)
+        throw new Error("native_chat_skill_selection_unsupported");
+      if (
+        this.fixed ||
+        (!outgoing && (this.view.goalIntent || this.view.steering))
+      )
+        throw new Error("native_chat_skill_requires_new_turn");
+    }
     if (!outgoing && messageContext && this.view.steering)
       throw new Error("Send the message context in a new turn.");
-    const retained = outgoing ? original : this.retainedSend(scope, text);
+    const retained = outgoing
+      ? original
+      : this.retainedSend(scope, text, skills);
     const selectedAttachment = outgoing
       ? outgoing.pending.attachment
       : scope.selectedAttachment;
@@ -6457,6 +6523,7 @@ export class NativeChatController {
           editorToolContextId: editorSelectionTarget,
         }),
         ...(messageContext && { messageContext }),
+        ...(hasSkills && { skills }),
         ...(outgoing && {
           outgoing: {
             id: outgoing.view.id,
@@ -6522,6 +6589,7 @@ export class NativeChatController {
           throw new Error("native_chat_editor_context_unavailable");
         if (next) await this.endPausedTurn(scope);
         const context = {
+          ...(pending.skills?.length && { skills: pending.skills }),
           ...(pending.messageContext && {
             messageContext: pending.messageContext,
           }),
@@ -6634,6 +6702,7 @@ export class NativeChatController {
             operatingRegime: pending.operatingRegime,
             ...(pending.webSearch && { webSearch: true }),
             messageContext: pending.messageContext,
+            ...(pending.skills?.length && { skills: pending.skills }),
             ...(pending.effort && { effort: pending.effort }),
             ...(pending.selectionRevision !== undefined && {
               selectionRevision: pending.selectionRevision,
@@ -6646,10 +6715,12 @@ export class NativeChatController {
             selectionRevision?: number,
             editorContextId?: string,
             webSearch?: true,
+            skills?: readonly NativeChatSkillReference[],
           ] = [
             pending.selectionRevision,
             pending.editorContextId,
             pending.webSearch,
+            pending.skills,
           ];
           while (options.length && options.at(-1) === undefined) options.pop();
           accepted = await this.bridge.submitWithLibrarySelection(
@@ -6676,6 +6747,7 @@ export class NativeChatController {
             editorContextId?: string,
             editorToolContextId?: string | NativeEditorSelection.Capture,
             webSearch?: true,
+            skills?: readonly NativeChatSkillReference[],
           ] = [
             pending.effort,
             pending.editorSvgTargetId || undefined,
@@ -6683,6 +6755,7 @@ export class NativeChatController {
             pending.editorContextId,
             pending.editorToolContextId,
             pending.webSearch,
+            pending.skills,
           ];
           while (options.length && options.at(-1) === undefined) options.pop();
           accepted = await this.bridge.submitInRegime(
@@ -6730,6 +6803,25 @@ export class NativeChatController {
                 else await this.discardPending(submissionScope);
                 throw new Error("native_chat_editor_context_reselect");
               }
+              if (SkillMentions.refusal(error)) {
+                if (outgoing) {
+                  outgoing.dispatched = undefined;
+                  outgoing.pending = {
+                    ...pending,
+                    outgoing: {
+                      ...pending.outgoing!,
+                      staged: true,
+                      retryBlocked: true,
+                    },
+                  };
+                  const key = this.scopeDraftKey(submissionScope);
+                  if (key && this.drafts)
+                    await this.drafts.store
+                      .writePending(key, this.pendingRecord(outgoing.pending))
+                      .catch(() => {});
+                } else await this.discardPending(submissionScope);
+                throw error;
+              }
               if (
                 selectionRouteRefused(error) ||
                 (error instanceof Error &&
@@ -6774,10 +6866,12 @@ export class NativeChatController {
           void this.readInputCapabilities(scope);
         if (!outgoing)
           this.update({
-            error: describe(
-              error,
-              "Couldn't confirm the send. Your draft is still here."
-            ),
+            error:
+              SkillMentions.refusal(error) ??
+              describe(
+                error,
+                "Couldn't confirm the send. Your draft is still here."
+              ),
           });
         await this.refresh(scope);
       }
@@ -7378,11 +7472,18 @@ export class NativeChatController {
         (message.text.trim() || message.attachments?.length) &&
         !message.questionReply &&
         !message.questionReplies?.length
-      )
+      ) {
+        const document = SkillMentions.recalledDocument(
+          message.text,
+          message.displayParts,
+          this.drafts?.workspace
+        );
         prompts.push({
           id: message.inputId ?? message.messageId,
           text: message.text,
+          ...(document && { draft: { document, attachment: null } }),
         });
+      }
     }
     return prompts;
   };
@@ -7425,11 +7526,22 @@ export class NativeChatController {
     if (stagedAttachment) {
       if (item.goalStart) return "blocked";
       const text = await this.readQueuedText(item.inputId).catch(() => "");
-      return text.trim() &&
-        stillEditingDraft() &&
-        (scope.attachmentBatch ?? scope.selectedAttachment) === stagedAttachment
-        ? { id: item.inputId, text }
-        : "blocked";
+      if (
+        !text.trim() ||
+        !stillEditingDraft() ||
+        (scope.attachmentBatch ?? scope.selectedAttachment) !== stagedAttachment
+      )
+        return "blocked";
+      const document = SkillMentions.recalledDocument(
+        text,
+        item.displayParts,
+        this.drafts?.workspace
+      );
+      return {
+        id: item.inputId,
+        text,
+        ...(document && { draft: { document, attachment: null } }),
+      };
     }
     if (!this.canEditQueuedText(item)) return "blocked";
     await this.editQueuedText(item.inputId, stillEditingDraft);
@@ -7700,11 +7812,16 @@ export class NativeChatController {
             savedAttachments
           )
         : undefined;
+    const original = SkillMentions.retainedDocument(
+      text,
+      message?.displayParts
+    );
+    const document = savedDocument ?? (original && { document: original });
     this.update({
       queueDraft: {
         inputId,
         text,
-        ...(savedDocument && { savedDocument }),
+        ...(document && { savedDocument: document }),
         ...(attachmentEntries && { attachmentEntries }),
         ...(savedAttachments && { attachmentsEdited: true as const }),
         ...(fromKeyboard && { fromKeyboard: true as const }),
@@ -8417,8 +8534,13 @@ export class NativeChatController {
   }
 
   /** The unconfirmed send this text and attachment would retry. */
-  private retainedSend(scope: Scope, text: string) {
+  private retainedSend(
+    scope: Scope,
+    text: string,
+    skills?: readonly NativeChatSkillReference[]
+  ) {
     return scope.pending?.text === text &&
+      SkillMentions.same(scope.pending.skills, skills) &&
       scope.pending.messageContext === scope.messageContext &&
       scope.pending.attachments === scope.attachmentBatch &&
       (scope.pending.attachment === scope.selectedAttachment ||
@@ -11023,6 +11145,13 @@ function applyText(
     return null;
   const inputId =
     update.role === "user" ? (update.inputId ?? previousInput) : undefined;
+  const displayParts =
+    update.role === "user"
+      ? (update.displayParts ??
+        (previous?.role === "user" && previous.turnId === update.turnId
+          ? previous.displayParts
+          : undefined))
+      : undefined;
   // A replacement rewrites text only; requested tool calls stay attached.
   const activity =
     previous?.turnId === update.turnId ? previous.activity : undefined;
@@ -11043,6 +11172,7 @@ function applyText(
     )
       return previous &&
         (previous.inputId !== inputId ||
+          !activityPayloadEqual(previous.displayParts, displayParts) ||
           previous.activityOrder !==
             (previous.activityOrder ?? update.activityOrder) ||
           (!previous.activityOrder &&
@@ -11051,6 +11181,7 @@ function applyText(
         ? {
             ...previous,
             ...(inputId && { inputId }),
+            ...(displayParts && { displayParts }),
             ...activityOrderMetadata(previous, update),
           }
         : "duplicate";
@@ -11064,6 +11195,7 @@ function applyText(
     ...(inputId && { inputId }),
     bytes: bytes + added.length,
     text: (existing?.text ?? "") + update.text,
+    ...(displayParts && { displayParts }),
     ...((update.citations ?? existing?.citations)?.length && {
       citations: update.citations ?? existing?.citations,
     }),

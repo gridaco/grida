@@ -174,6 +174,15 @@ export function DesktopComposerDemo({
     <TooltipProvider>
       <div data-testid="desktop-composer-playground" className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {showcase && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fixture.updateProjectSkill()}
+            >
+              Update project skill
+            </Button>
+          )}
           {webPreview && (
             <>
               <Button
