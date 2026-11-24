@@ -1183,6 +1183,8 @@ request. Pause holds the retry and Stop closes it. The value is absent when
 there is no current retry. An eligible pre-execution failure can reserve this
 retry, including a connection refusal verified by the direct HTTP host.
 
+### Questions and answers
+
 Clients negotiate both `co.grida/session/questions-v2` and
 `co.grida/session/answer-question-v2` with capability value `1` to enable
 question batches on newly accepted input. A connection advertising only the
@@ -1226,9 +1228,16 @@ negotiated `co.grida/session/questions-v2`. The first chunk carries
 negotiated window or update metadata, with `skipped: true` when applicable.
 Retained singleton reply chunks keep their window metadata
 `questionReply: {waitId, question}`. Quoted markup in ordinary chat stays
-ordinary text. An embedded `run --questions` exits with `input_required`,
-code `6`, and the pending question entries when it needs answers. An
-unanswered optional batch permits success.
+ordinary text.
+
+Embedded `run --questions` enables the singleton tools and emits
+`schema_version` 1 on both JSON Lines records. Pending question entries
+keep the v1 shape. The standalone `run --questions-v2` flag enables the
+batch tools and emits `schema_version` 2 on both records. Pending batch
+entries use the v2 shape and require the v2 ACP methods when the session is
+reopened. Either mode exits with `input_required`, code `6`, and the
+pending question entries when it needs an answer. Unanswered optional
+questions permit success.
 
 ### Temporary side chats
 

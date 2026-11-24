@@ -279,21 +279,23 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     check_reopened_reply(&state, workspace.path(), session, "Use large print.").await;
 }
 
-#[tokio::test]
-async fn embedded_questions_return_an_identified_input_required_result() {
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("agent-state");
-    let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Tool("question", QUESTION_BATCH)]).await;
+async fn run_with_questions(
+    state: &Path,
+    workspace: &Path,
+    endpoint: &str,
+    flag: &str,
+) -> std::process::Output {
     let mut command = executable();
     command.arg("run");
-    configured(&mut command, &state, &endpoint.url);
-    command.arg("--cwd").arg(workspace.path()).args([
-        "--questions",
-        "--prompt",
-        "Prepare the document.",
-    ]);
-    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    configured(&mut command, state, endpoint);
+    command
+        .arg("--cwd")
+        .arg(workspace)
+        .args([flag, "--prompt", "Prepare the document."]);
+    timeout(WAIT, command.output()).await.unwrap().unwrap()
+}
+
+fn input_required_result(output: std::process::Output, version: u64) -> Value {
     assert_eq!(
         output.status.code(),
         Some(6),
@@ -301,27 +303,85 @@ async fn embedded_questions_return_an_identified_input_required_result() {
         String::from_utf8_lossy(&output.stderr)
     );
     let result = records(&output.stdout);
-    assert_eq!(result.len(), 2);
-    assert_eq!(result[1]["disposition"], "input_required");
-    assert_eq!(result[1]["session_id"], result[0]["session_id"]);
-    assert_eq!(result[1]["turn_id"], result[0]["turn_id"]);
-    assert_eq!(result[1]["questions"][0]["style"], "answer_dependent");
-    assert_eq!(
-        result[1]["questions"][0]["questions"][0]["question"],
-        "Which edition?"
-    );
-    assert_eq!(
-        result[1]["questions"][0]["questions"]
-            .as_array()
-            .unwrap()
-            .len(),
-        3
-    );
-    assert!(result[1]["questions"][0]["waitId"].is_string());
-    endpoint.request().await;
-    endpoint.done().await;
+    let [accepted, finished] = result.as_slice() else {
+        panic!("expected an accepted and finished record: {result:?}");
+    };
+    assert_eq!(accepted["schema_version"], version);
+    assert_eq!(accepted["kind"], "accepted");
+    assert_eq!(finished["schema_version"], version);
+    assert_eq!(finished["kind"], "finished");
+    assert_eq!(finished["disposition"], "input_required");
+    for id in ["session_id", "turn_id", "input_id"] {
+        assert!(accepted[id].is_string());
+        assert_eq!(finished[id], accepted[id]);
+    }
+    finished.clone()
+}
 
-    let session = result[0]["session_id"].as_str().unwrap();
+fn assert_question_tools(request: &Value, field: &str) {
+    let tools = request["tools"].as_array().unwrap();
+    for name in ["question", "question_async"] {
+        assert!(tools.iter().any(|tool| {
+            tool["function"]["name"] == name
+                && tool["function"]["parameters"]["required"] == json!([field])
+        }));
+    }
+}
+
+async fn load_waiting_turn(
+    socket: &mut SharedSocket,
+    workspace: &Path,
+    session: &str,
+    turn: &str,
+) -> Value {
+    let loaded = ws_rpc(
+        socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let snapshot = session_snapshot(socket, session).await;
+    assert_eq!(snapshot["current"]["turnId"], turn);
+    assert_eq!(snapshot["current"]["disposition"], "suspended");
+    assert_eq!(snapshot["current"]["inputNeeded"], true);
+    snapshot
+}
+
+async fn assert_resumed_turn_settles(socket: &mut SharedSocket, session: &str, turn: &str) {
+    let settled =
+        wait_for_snapshot(socket, session, |snapshot| snapshot["current"].is_null()).await;
+    assert_eq!(settled["latest"]["turnId"], turn);
+    assert_eq!(settled["latest"]["status"], "succeeded");
+}
+
+#[tokio::test]
+async fn embedded_singleton_question_uses_v1_output_and_answers_over_v1_acp() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Question("question"),
+        Reply::Finished("Applied the print choice."),
+    ])
+    .await;
+    let output = run_with_questions(&state, workspace.path(), &endpoint.url, "--questions").await;
+    let result = input_required_result(output, 1);
+    let question = &result["questions"][0];
+    assert_eq!(
+        result["questions"],
+        json!([{
+            "waitId":question["waitId"].as_str().unwrap(),
+            "style":"answer_dependent",
+            "question":"Which edition?",
+            "options":["Screen", "Print"]
+        }])
+    );
+    assert_question_tools(&endpoint.request().await, "question");
+
+    let session = result["session_id"].as_str().unwrap();
+    let turn = result["turn_id"].as_str().unwrap();
     let inspected = timeout(
         WAIT,
         executable()
@@ -333,42 +393,116 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     .await
     .unwrap()
     .unwrap();
-    assert!(inspected.status.success());
+    assert!(
+        inspected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&inspected.stderr)
+    );
     let saved = records(&inspected.stdout);
     assert_eq!(saved[0]["current"]["disposition"], "suspended");
     assert_eq!(saved[0]["input_needed"], true);
 
-    // The same one-shot CLI must finish without an input-required exit when
-    // the tool only invited an optional refinement.
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = question_socket(&url, true).await;
+    load_waiting_turn(&mut socket, workspace.path(), session, turn).await;
+    let pending = question_list(&mut socket, session, turn).await;
+    assert_eq!(pending["questions"], result["questions"]);
+    answer_edition(&mut socket, session, turn).await;
+    endpoint.request().await;
+    assert_resumed_turn_settles(&mut socket, session, turn).await;
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
+#[tokio::test]
+async fn embedded_question_batch_uses_v2_output_and_answers_over_v2_acp() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("question", QUESTION_BATCH),
+        Reply::Finished("Applied the answers."),
+    ])
+    .await;
+    let output =
+        run_with_questions(&state, workspace.path(), &endpoint.url, "--questions-v2").await;
+    let result = input_required_result(output, 2);
+    let batch = &result["questions"][0];
+    assert_eq!(result["questions"].as_array().unwrap().len(), 1);
+    assert_eq!(batch["style"], "answer_dependent");
+    assert!(batch["waitId"].is_string());
+    assert_question_tools(&endpoint.request().await, "questions");
+
+    let session = result["session_id"].as_str().unwrap();
+    let turn = result["turn_id"].as_str().unwrap();
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = question_socket_with_batches(&url, false, true).await;
+    let snapshot = load_waiting_turn(&mut socket, workspace.path(), session, turn).await;
+    let pending = batch_list(&mut socket, session, turn).await;
+    assert_eq!(pending["questions"], result["questions"]);
+    let accepted = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/answer-question-v2",
+        batch_response(session, turn, &snapshot, &pending),
+    )
+    .await;
+    assert_eq!(accepted["result"]["turnId"], turn, "{accepted}");
+    endpoint.request().await;
+    assert_resumed_turn_settles(&mut socket, session, turn).await;
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
+#[tokio::test]
+async fn embedded_optional_question_batch_allows_completion() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Tool("question_async", QUESTION_BATCH),
         Reply::Finished("Applied the default."),
     ])
     .await;
-    let mut run = executable();
-    run.arg("run");
-    configured(&mut run, &state, &endpoint.url);
-    let output = timeout(
-        WAIT,
-        run.arg("--cwd")
-            .arg(workspace.path())
-            .args(["--questions", "--prompt", "Prepare a second document."])
-            .output(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let output =
+        run_with_questions(&state, workspace.path(), &endpoint.url, "--questions-v2").await;
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let result = records(&output.stdout);
-    assert_eq!(result.last().unwrap()["disposition"], "succeeded");
-    assert!(result.last().unwrap().get("questions").is_none());
+    let finished = result.last().unwrap();
+    assert_eq!(finished["schema_version"], 2);
+    assert_eq!(finished["disposition"], "succeeded");
+    assert!(finished.get("questions").is_none());
     endpoint.request().await;
     endpoint.request().await;
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn embedded_run_rejects_conflicting_question_flags() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let mut command = executable();
+    command.arg("run");
+    configured(&mut command, &state, "http://127.0.0.1:1");
+    command.args([
+        "--questions",
+        "--questions-v2",
+        "--prompt",
+        "Prepare the document.",
+    ]);
+    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "{stderr}");
+    assert!(stderr.contains("cannot be used with"), "{stderr}");
+    assert!(stderr.contains("'--questions'"), "{stderr}");
+    assert!(stderr.contains("--questions-v2"), "{stderr}");
+    assert!(output.stdout.is_empty());
 }
 
 async fn batch_list(socket: &mut SharedSocket, session: &str, turn: &str) -> Value {
@@ -433,14 +567,7 @@ async fn negotiated_question_client_can_capture_singleton_tools_for_one_input() 
     submit["_meta"] = json!({"co.grida/session/questions-v2": false});
     let started = ws_rpc(&mut socket, 3, "_co.grida/session/submit", submit).await;
     let turn = started["result"]["turnId"].as_str().unwrap();
-    let request = endpoint.request().await;
-    let tools = request["tools"].as_array().unwrap();
-    for name in ["question", "question_async"] {
-        assert!(tools.iter().any(|tool| {
-            tool["function"]["name"] == name
-                && tool["function"]["parameters"]["required"] == json!(["question"])
-        }));
-    }
+    assert_question_tools(&endpoint.request().await, "question");
     wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"]["disposition"] == "suspended"
     })
@@ -463,14 +590,7 @@ async fn negotiated_question_client_can_capture_singleton_tools_for_one_input() 
     )
     .await;
     let turn = started["result"]["turnId"].as_str().unwrap();
-    let request = endpoint.request().await;
-    let tools = request["tools"].as_array().unwrap();
-    for name in ["question", "question_async"] {
-        assert!(tools.iter().any(|tool| {
-            tool["function"]["name"] == name
-                && tool["function"]["parameters"]["required"] == json!(["questions"])
-        }));
-    }
+    assert_question_tools(&endpoint.request().await, "questions");
     wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"]["disposition"] == "suspended"
     })

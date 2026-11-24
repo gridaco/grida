@@ -1,4 +1,5 @@
 //! Test-only projection of the production parser into the shared contract DTO.
+use grida_agent::process::RunQuestions;
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -111,7 +112,14 @@ pub fn project(invocation: &Invocation) -> Value {
                             skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
                         );
                     }
-                    put(&mut object, "questions", *questions);
+                    put(
+                        &mut object,
+                        "questions",
+                        *questions == RunQuestions::Singleton,
+                    );
+                    if *questions == RunQuestions::Batch {
+                        put(&mut object, "questionsV2", true);
+                    }
                     put(&mut object, "deadlineMs", *deadline_ms);
                     "agent run"
                 }

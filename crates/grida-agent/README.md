@@ -274,12 +274,19 @@ Stop for that turn and reports its verified disposition. Reaching the run
 deadline after acceptance requests suspension. If output is unavailable,
 inspect the retained turn by its accepted IDs.
 
-Pass `--questions` to let a tool-capable model request input. If work reaches
-a question it still needs answered, `run` preserves the turn and emits a
-`finished` record with `input_required` and the pending `questions`. The
-process exits so an automation can hand the retained session to an ACP client.
-Each pending batch includes its wait ID, style, and ordered questions with
-stable item IDs. A client answers the wait with one value or skip per item.
+Pass `--questions` to enable single-question requests. Both the `accepted`
+and `finished` records use `schema_version` 1, and pending entries contain
+`waitId`, `style`, `question`, and `options` at the same level. To enable
+batches, pass `--questions-v2` on its own. Both records use `schema_version`
+2 and each pending entry contains its wait ID, style, and an ordered
+`questions` array with stable item IDs.
+
+When a required question is pending, `run` preserves the turn and emits a
+`finished` record with `input_required` and the pending `questions`, then
+exits with code 6. An automation can reopen the retained session through
+an ACP client and answer a single question through the v1 methods or submit
+one answer or skip per item through the v2 methods. See the
+[question protocol](docs/rust-client-protocol.md#questions-and-answers).
 
 Use `--require-completion-text` on `run` or `serve` to require a nonempty
 final answer on newly accepted tasks. The host records the check and its

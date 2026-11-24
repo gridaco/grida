@@ -1566,9 +1566,11 @@ limits.
 
 Headless describes the absence of a graphical interface. A service can still
 receive answers and approvals from protocol clients. `run` never prompts on a
-terminal. Its interaction support is declared explicitly: `--questions` lets a
-tool-capable model request input, and no launch option grants additional
-authority or relaxes the configured confinement and approval rules.
+terminal. A user passes `--questions` to enable singleton requests or
+`--questions-v2` to enable batches. Both flags select the corresponding
+[versioned output](./rust-client-protocol.md#questions-and-answers).
+Interaction flags grant no additional authority and keep the configured
+confinement and approval rules.
 Terminal presence and the `serve` command confer no interaction capability.
 
 A required unanswered question or approval produces a durable waiting or

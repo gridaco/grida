@@ -87,7 +87,7 @@ async fn historical_inspection_lists_operations_and_reads_only_the_selected_prep
     run.arg("--cwd").arg(workspace.path()).args([
         "--mode",
         "plan",
-        "--questions",
+        "--questions-v2",
         "--prompt",
         private,
     ]);

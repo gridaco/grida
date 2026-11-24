@@ -761,6 +761,7 @@ receipt from the driver.
 | Question requires an answer before further work | Preserve the pending interaction and optionally suspend the worker. No open inference request is needed.                                     |
 | User reviews several questions in one request   | Preserve display order and correlation. Accept complete typed answers and skips in one settlement, rejecting partial network submissions.    |
 | Tool contract changes across a restart          | An earlier pending singleton retains its exact original execution and answer contract. A newer client can inspect and answer it.             |
+| Script runs a task with questions enabled       | The existing flag exposes version 1 singleton entries that a v1 client can answer. Selecting batches explicitly exposes version 2 entries.   |
 | An answer races with suspension                 | Commit the correlated answer once and make it visible to the current or resumed owner.                                                       |
 | Answer arrives during explicit Pause            | Retain the answer while preserving the user's pause.                                                                                         |
 | User edits an earlier message                   | Cut at the selected boundary, preserve original later history and effects, supersede affected waits, and continue from the revised input.    |
@@ -784,7 +785,8 @@ work, while an immediate-return question lets independent work continue.
 Steering and queueing are separate input routes.
 
 The [built-process question cases](../tests/process/questions.rs) exercise
-required and optional replies, expiry, recovery and CLI dispositions. The
+required and optional replies, expiry, recovery, and the versioned CLI output
+and ACP answer paths for singleton and batch waits. The
 [catalog case](../tests/process/catalog.rs) checks that open user input can
 coexist with running work and that settlement clears it. Desktop verifies
 the corresponding [notification routing](../../../desktop/src/main/agent-notifications.test.ts)

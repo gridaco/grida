@@ -10,10 +10,14 @@ Options:
   --org SLUG | --org-id ID  Select a funding organization.
   --max-output-tokens N     Output-token allowance, default 4096.
   --deadline-ms N           Task deadline, default 120000.
-  --questions               Allow input-required outcomes for structured questions.
+  --questions               Allow one question per request with schema version 1 output.
+  --questions-v2            Allow question batches with schema version 2 output.
   --no-input                Run without terminal interaction.
 
+Choose at most one question flag. A required answer returns input_required
+and exit code 6. Optional questions expire at turn completion.
+
 Use absolute project and state directory paths. Results are JSON Lines on
-stdout; diagnostics use stderr. Sign in first with grida auth login.
+stdout. Diagnostics use stderr. Sign in first with grida auth login.
 
 Documentation: https://grida.co/docs/cli/agent

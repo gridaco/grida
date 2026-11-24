@@ -400,7 +400,7 @@ fn run(state: &Path, endpoint: &str, selected: &Path) -> Command {
     command.arg("run");
     configured(&mut command, state, endpoint);
     command.arg("--input-file").arg(selected).args([
-        "--questions",
+        "--questions-v2",
         "--prompt",
         "Inspect the file I selected.",
     ]);

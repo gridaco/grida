@@ -529,6 +529,12 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line));
+    const checkQuestionTools = (request, field) => {
+      for (const name of ["question", "question_async"]) {
+        const tool = request.tools.find((tool) => tool.function.name === name);
+        assert.deepEqual(tool?.function.parameters.required, [field]);
+      }
+    };
     const checkBilling = (record, kind, chargedMills) => {
       const { attempts, omittedAttempts } = record.gateway_billing;
       assert.equal(attempts.length, 1);
@@ -551,19 +557,15 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     const [accepted, finished] = records(
       await run([...task, "--questions"], { stdin: "Remember this fixture." })
     );
+    assert.equal(accepted.schema_version, 1);
+    assert.equal(finished.schema_version, 1);
     assert.equal(accepted.kind, "accepted");
     assert.equal(finished.kind, "finished");
     assert.equal(finished.turn_id, accepted.turn_id);
     assert.equal(finished.disposition, "succeeded");
     checkBilling(finished, "settled", "0");
     assert.equal(chatRequests.length, 1);
-    const questionTools = chatRequests[0].tools.map(
-      (tool) => tool.function.name
-    );
-    assert(
-      questionTools.includes("question") &&
-        questionTools.includes("question_async")
-    );
+    checkQuestionTools(chatRequests[0], "question");
 
     issuedGrant = "synthetic.agent.near-expiry";
     grantLifetimeMs = 20_000;
@@ -715,10 +717,13 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         accepted.session_id,
         "--org-id",
         "2",
+        "--questions-v2",
         "--prompt",
         "Continue with the selected organization.",
       ])
     );
+    assert.equal(changedAccepted.schema_version, 2);
+    assert.equal(changedFinished.schema_version, 2);
     assert.equal(changedAccepted.kind, "accepted");
     assert.equal(changedAccepted.session_id, accepted.session_id);
     assert.notEqual(changedAccepted.turn_id, accepted.turn_id);
@@ -731,6 +736,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       4,
       "one new idle turn dispatches with the selected organization's grant"
     );
+    checkQuestionTools(chatRequests.at(-1), "questions");
     const changedContext = JSON.stringify(chatRequests.at(-1).messages);
     assert(changedContext.includes("Remember this fixture."));
     assert(changedContext.includes("Use the saved context."));

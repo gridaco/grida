@@ -3,7 +3,7 @@ use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::configuration::{self, GlobalConfigEdit};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::mcp_client::McpClient;
-use grida_agent::process::{self, RunOptions};
+use grida_agent::process::{self, RunOptions, RunQuestions};
 use grida_agent::{
     CompatibleOutputLimitField, EffortPreset, OperatingRegime, ProviderOptions, ProviderProtocol,
     acp, mcp,
@@ -113,7 +113,14 @@ fn command() -> Command {
                     Arg::new("questions")
                         .long("questions")
                         .action(ArgAction::SetTrue)
-                        .help("Allow questions. Required answers produce an input_required exit. Optional questions expire at completion."),
+                        .help("Allow one question per request with schema version 1 output."),
+                )
+                .arg(
+                    Arg::new("questions-v2")
+                        .long("questions-v2")
+                        .conflicts_with("questions")
+                        .action(ArgAction::SetTrue)
+                        .help("Allow question batches with schema version 2 output."),
                 )
                 .arg(
                     Arg::new("skill")
@@ -1108,7 +1115,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 .cloned()
                 .map(grida_agent::skills::SkillReference::named)
                 .collect::<Result<_>>()?,
-            questions: args.get_flag("questions"),
+            questions: match (args.get_flag("questions"), args.get_flag("questions-v2")) {
+                (true, _) => RunQuestions::Singleton,
+                (_, true) => RunQuestions::Batch,
+                _ => RunQuestions::Disabled,
+            },
             // Ultra pairs the extended harness with the highest reasoning
             // level, as on every client surface.
             reasoning: ultra.then_some(agent_kit_core::inference::ReasoningEffort::XHigh),

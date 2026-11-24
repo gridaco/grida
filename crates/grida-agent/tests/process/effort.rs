@@ -390,7 +390,7 @@ async fn stopping_suspended_ultra_does_not_require_live_review_tools() {
     command.arg("--cwd").arg(workspace.path()).args([
         "--effort",
         "ultra",
-        "--questions",
+        "--questions-v2",
         "--prompt",
         PARENT,
     ]);

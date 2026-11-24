@@ -126,10 +126,14 @@ disposition when output remains available.
 After an output failure, use the accepted identifiers to inspect retained state.
 An uncertain outcome requires reconciliation before repeating effects.
 
-Use `run --questions` to enable structured questions in an embedded run. When
-an answer is needed, the process verifies suspension and returns `input_required`
-with the session, turn, and pending question identities. A capable service client
-can answer the retained question through the same state directory.
+Use `run --questions` for single-question requests with JSON Lines schema
+version 1, or `run --questions-v2` for batches with schema version 2. When a
+required answer is pending, the process verifies suspension and returns
+`input_required` with the session, turn, and pending question identities.
+Reopen the session through an ACP client using the same state directory.
+Use `questions` and `answer-question` for single questions, or negotiate
+`questions-v2` and `answer-question-v2` to list and answer a batch.
+[Grida Agent CLI question formats](../cli/agent.md#choose-a-question-format)
 
 If a granted launch profile requires human approval for a tool action, the
 same exit code identifies the retained approval. Only a host-authorized
