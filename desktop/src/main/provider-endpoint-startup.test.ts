@@ -29,14 +29,10 @@ vi.mock("electron", () => ({
   },
   dialog: { showMessageBox: fixture.confirm },
 }));
-vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
 vi.mock("./sidecar-log", () => ({
   SidecarLogWriter: class {
     write() {}
   },
-}));
-vi.mock("./media-root", () => ({
-  DesktopMediaRoot: { current: () => `${fixture.root}/media` },
 }));
 vi.mock("./retained-service-sandbox", () => ({
   RetainedServiceSandbox: class {
@@ -118,7 +114,6 @@ beforeEach(async () => {
       fs.mkdir(path.join(fixture.root, name), { mode: 0o700 })
     )
   );
-  vi.stubEnv("GRIDA_AGENT_USER_DATA", path.join(fixture.root, "agent"));
   fixture.configs.clear();
   fixture.children.length = 0;
   fixture.bootstraps.length = 0;
@@ -138,15 +133,34 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   for (const supervisor of active.splice(0)) supervisor.stop();
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   await fs.rm(fixture.root, { recursive: true, force: true });
 });
 
-async function start() {
-  const supervisor = new ServicesSidecarSupervisor();
+function setup() {
+  const browser = path.join(fixture.root, "browser");
+  const agent = path.join(fixture.root, "agent");
+  const supervisor = new ServicesSidecarSupervisor({
+    agentData: agent,
+    catalogueDirectory: path.join(browser, "model-catalogue"),
+    configHome: agent,
+    editorBaseUrl: "https://grida.co",
+    isPackaged: true,
+    mediaRoot: path.join(fixture.root, "media"),
+    nativeChat: "ordinary",
+    projectsRoot: path.join(fixture.root, "projects"),
+    providerHome: agent,
+    temp: path.join(fixture.root, "temp"),
+    userData: browser,
+    userHome: path.join(fixture.root, "home"),
+  });
   active.push(supervisor);
   supervisor.selectNativeChat(true);
+  return supervisor;
+}
+
+async function start() {
+  const supervisor = setup();
   await supervisor.start();
   return supervisor;
 }
@@ -255,9 +269,7 @@ it("does not start a service after stop while protected receipt initialization i
       await pending;
       return await open(options);
     });
-  const supervisor = new ServicesSidecarSupervisor();
-  active.push(supervisor);
-  supervisor.selectNativeChat(true);
+  const supervisor = setup();
   const starting = supervisor.start();
   const result = starting.catch((error: unknown) => error);
   await vi.waitFor(() => expect(opening).toHaveBeenCalledOnce());

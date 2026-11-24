@@ -7,60 +7,12 @@ import type { App } from "electron";
 import VitePlugin from "@electron-forge/plugin-vite";
 import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
 import { NativeDesktopProfile } from "./native-desktop-profile";
+import { DesktopProfile } from "./desktop-profile";
 import { NativeAgentProcess } from "./native-agent-process";
 import {
   stageNativeAgent,
   verifyNativeAgent,
 } from "../../scripts/native-agent-package.mjs";
-
-it("selects native chat across Unix channels and isolated ordinary profiles, without a Windows fallback", async () => {
-  vi.resetModules();
-  const { NativeDesktopProfile: profile } =
-    await import("./native-desktop-profile");
-  const argv = process.argv;
-  try {
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
-    process.argv = argv.slice(0, 2);
-    for (const platform of ["darwin", "linux", "win32"]) {
-      vi.stubGlobal("INSIDERS", 0);
-      vi.stubGlobal("process", { ...process, platform });
-      expect(profile.ordinaryChat()).toBe(platform !== "win32");
-      vi.stubGlobal("INSIDERS", 1);
-      expect(profile.ordinaryChat()).toBe(platform !== "win32");
-      vi.unstubAllGlobals();
-    }
-    for (const flag of [
-      "--native-chat",
-      "--native-chat-provider=gateway",
-      "--disable-agent",
-    ]) {
-      process.argv = [...argv.slice(0, 2), flag];
-      expect(profile.ordinaryChat()).toBe(false);
-    }
-    process.argv = [...argv.slice(0, 2), "--user-data-dir=/fixture"];
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/fixture/isolated");
-    expect(profile.ordinaryChat()).toBe(process.platform !== "win32");
-  } finally {
-    process.argv = argv;
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-  }
-});
-
-it("resolves development resources independently of the shared Electron installation", () => {
-  expect(
-    NativeDesktopProfile.resourcesPath({
-      isPackaged: false,
-      getAppPath: () => "/fixture/desktop",
-    })
-  ).toBe(path.join("/fixture/desktop", ".native-resources"));
-  expect(
-    NativeDesktopProfile.resourcesPath({
-      isPackaged: true,
-      getAppPath: () => "/fixture/desktop",
-    })
-  ).toBe(process.resourcesPath);
-});
 
 it.skipIf(process.platform === "win32")(
   "preserves staged development worker and helper through Forge startup cleanup",
@@ -69,10 +21,7 @@ it.skipIf(process.platform === "win32")(
       path.join(os.tmpdir(), "grida-dev-resources-")
     );
     try {
-      const resources = NativeDesktopProfile.resourcesPath({
-        isPackaged: false,
-        getAppPath: () => root,
-      });
+      const resources = path.join(root, ".native-resources");
       const artifacts = path.join(root, "artifacts");
       const target = path.join(
         artifacts,
@@ -128,9 +77,11 @@ it.skipIf(process.platform === "win32")(
     const appData = path.join(fixture, "app-data");
     const browser = path.join(root, "browser");
     const agent = path.join(root, "agent");
+    const config = path.join(root, "config");
     const argv = process.argv;
     const setPath = vi.fn<App["setPath"]>();
     const app = {
+      getAppPath: () => fixture,
       commandLine: { getSwitchValue: () => browser },
       getPath: (name: Parameters<App["getPath"]>[0]) =>
         name === "temp"
@@ -142,8 +93,10 @@ it.skipIf(process.platform === "win32")(
               : browser,
       setPath,
     };
+    const resolve = () =>
+      DesktopProfile.resolve(app, DesktopProfile.launch(true, true));
+    const configure = () => NativeDesktopProfile.configure(app, resolve());
     try {
-      vi.stubGlobal("INSIDERS", 1);
       vi.stubEnv("GRIDA_AGENT_USER_DATA", agent);
       const dotGrida = path.join(home, ".grida");
       const configured = path.join(fixture, "configured");
@@ -156,16 +109,28 @@ it.skipIf(process.platform === "win32")(
       await fs.mkdir(appData, { mode: 0o700 });
       await fs.mkdir(configured, { mode: 0o700 });
       await fs.symlink(configured, alias);
-      await expect(NativeDesktopProfile.configure(app)).resolves.toBe(
-        "gateway"
+      await expect(configure()).rejects.toThrow(
+        "native_desktop_profile_invalid"
       );
-      expect(NativeDesktopProfile.mediaRoot()).toBe(path.join(root, "media"));
+      vi.stubEnv("GRIDA_HOME", undefined);
+      await expect(configure()).rejects.toThrow(
+        "native_desktop_profile_invalid"
+      );
+      vi.stubEnv("GRIDA_HOME", config);
+      await expect(configure()).resolves.toBe("gateway");
+      expect(resolve().mediaRoot).toBe(path.join(root, "media"));
       const denials = NativeDesktopProfile.protectedRoots(app);
       expect(denials.overlaps(path.join(dotGrida, "agent"))).toBe(true);
-      expect(denials.overlaps(path.join(configured, "agent"))).toBe(true);
-      expect(denials.metadataPaths()).toContain(alias);
-      expect(denials.canonicalPaths()).toContain(configured);
-      expect(denials.canonicalPaths()).not.toContain(alias);
+      expect(denials.overlaps(path.join(config, "config.toml"))).toBe(true);
+      expect(denials.metadataPaths()).toContain(config);
+      expect(denials.overlaps(root)).toBe(true);
+      expect(() =>
+        NativeDesktopProfile.assertPreviewIsolation(app, root)
+      ).not.toThrow();
+      expect(() =>
+        NativeDesktopProfile.assertPreviewIsolation(app, dotGrida)
+      ).toThrow("native_desktop_profile_invalid");
+      expect((await fs.stat(config)).mode & 0o777).toBe(0o700);
       expect(
         denials.overlaps(path.join(appData, "Grida Insiders", "Media"))
       ).toBe(true);
@@ -175,11 +140,9 @@ it.skipIf(process.platform === "win32")(
         ["documents", path.join(root, "projects")],
       ]);
       process.argv.push("--native-chat-provider=chatgpt");
-      await expect(NativeDesktopProfile.configure(app)).resolves.toBe(
-        "chatgpt"
-      );
+      await expect(configure()).resolves.toBe("chatgpt");
       process.argv.push("--native-chat-provider=gateway");
-      await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+      await expect(configure()).rejects.toThrow(
         "native_desktop_profile_invalid"
       );
       for (const [flags, choice] of [
@@ -196,9 +159,7 @@ it.skipIf(process.platform === "win32")(
         ],
       ] as const) {
         process.argv = [...argv, "--native-chat", ...flags];
-        await expect(
-          NativeDesktopProfile.configure(app)
-        ).resolves.toMatchObject(choice);
+        await expect(configure()).resolves.toMatchObject(choice);
       }
       for (const flags of [
         ["--native-chat-provider=openrouter"],
@@ -211,7 +172,7 @@ it.skipIf(process.platform === "win32")(
         ["--native-chat-model=openai/gpt-5.5"],
       ]) {
         process.argv = [...argv, "--native-chat", ...flags];
-        await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+        await expect(configure()).rejects.toThrow(
           "native_desktop_profile_invalid"
         );
       }
@@ -221,26 +182,32 @@ it.skipIf(process.platform === "win32")(
         "--native-chat-provider=chatgpt",
       ];
       vi.stubEnv("GRIDA_HOME", root);
-      await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+      await expect(configure()).rejects.toThrow(
         "native_desktop_profile_invalid"
       );
-      vi.stubEnv("GRIDA_HOME", alias);
+      vi.stubEnv("GRIDA_HOME", path.join(root, "symlink"));
+      await fs.symlink(configured, process.env.GRIDA_HOME!);
+      await expect(configure()).rejects.toThrow(
+        "native_desktop_profile_invalid"
+      );
+      vi.stubEnv("GRIDA_HOME", config);
       await fs.rmdir(agent);
       await fs.symlink(browser, agent);
-      await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+      await expect(configure()).rejects.toThrow(
         "native_desktop_profile_invalid"
       );
       vi.stubEnv("GRIDA_AGENT_USER_DATA", path.dirname(root));
-      await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+      await expect(configure()).rejects.toThrow(
         "native_desktop_profile_invalid"
       );
       process.argv = [...argv, "--native-chat", "--disable-agent"];
-      expect(NativeDesktopProfile.selected()).toBe(false);
-      expect(NativeDesktopProfile.mediaRoot()).toBeUndefined();
+      expect(resolve().nativeChat).toBe("disabled");
+      await expect(configure()).rejects.toThrow(
+        "native_desktop_profile_invalid"
+      );
     } finally {
       process.argv = argv;
       vi.unstubAllEnvs();
-      vi.unstubAllGlobals();
       await fs.rm(fixture, { recursive: true, force: true });
     }
   }

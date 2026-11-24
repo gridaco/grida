@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 — disposable profiles exercise the native chat store.
 import fs from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
@@ -24,26 +24,17 @@ vi.mock("electron", () => ({
   },
 }));
 vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
-vi.mock("./media-root", () => ({
-  DesktopMediaRoot: {
-    current() {
-      return electron.media;
-    },
-  },
-}));
 
 const nativeResources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const supported = process.platform === "darwin" || process.platform === "linux";
 const roots: string[] = [];
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   for (const root of roots.splice(0))
     fs.rmSync(root, { recursive: true, force: true });
 });
 
-async function fixture() {
-  vi.resetModules();
+async function fixture(nativeChat: "ordinary" | "preview" = "preview") {
   const root = fs.mkdtempSync(
     path.join(fs.realpathSync(os.tmpdir()), "grida-chat-store-")
   );
@@ -59,8 +50,6 @@ async function fixture() {
   electron.temp = child("temp");
   electron.userData = child("desktop");
   electron.media = child("media");
-  vi.stubEnv("GRIDA_AGENT_USER_DATA", agentData);
-  vi.stubEnv("GRIDA_HOME", configHome);
   const nativeState = path.join(electron.userData, "chats");
   const marker = path.join(nativeState, "store.json");
   const launch: Omit<NativeAgentChatLaunch, "stateDirectory"> = {
@@ -70,9 +59,30 @@ async function fixture() {
     endpoint: "http://127.0.0.1:1/v1",
     model: "fixture",
   };
-  const { NativeChatStore } = await import("./native-chat-store");
+  const loadStore = async (agent = agentData, configuration = configHome) => {
+    vi.resetModules();
+    const { configureServicesSidecar } =
+      await import("./services-sidecar-supervisor");
+    configureServicesSidecar({
+      agentData: agent,
+      catalogueDirectory: path.join(electron.userData, "model-catalogue"),
+      configHome: configuration,
+      editorBaseUrl: "https://grida.co",
+      isPackaged: true,
+      mediaRoot: electron.media,
+      nativeChat,
+      projectsRoot: path.join(root, "projects"),
+      providerHome: agent,
+      temp: electron.temp,
+      userData: electron.userData,
+      userHome: root,
+    });
+    return (await import("./native-chat-store")).NativeChatStore;
+  };
+  const NativeChatStore = await loadStore();
   return {
     NativeChatStore,
+    loadStore,
     start: async (options = launch) =>
       (await NativeChatStore.prepareFresh()).startWorkspace("work", options),
     child,
@@ -109,13 +119,16 @@ describe.skipIf(!supported)("Native chat store", () => {
   it.runIf(Boolean(nativeResources))(
     "reopens an ordinary native chat after a temp-root change",
     async () => {
-      const test = await fixture();
+      const test = await fixture("ordinary");
       const start = async () => {
-        vi.resetModules();
-        const { NativeChatStore } = await import("./native-chat-store");
+        const NativeChatStore = await test.loadStore();
         const store = await NativeChatStore.prepareOrdinary([test.agentData]);
         expect(store.protectedPaths).toEqual(
-          expect.arrayContaining([electron.userData, test.agentData])
+          expect.arrayContaining([
+            electron.userData,
+            test.agentData,
+            test.configHome,
+          ])
         );
         return store.startWorkspace("work", {
           ...test.launch,
@@ -148,7 +161,9 @@ describe.skipIf(!supported)("Native chat store", () => {
   it.each(["fresh", "ordinary"] as const)(
     "threads authoritative private roots into %s workspace and fixed-document image custody",
     async (profile) => {
-      const test = await fixture();
+      const test = await fixture(
+        profile === "ordinary" ? "ordinary" : "preview"
+      );
       const prepared =
         profile === "fresh"
           ? await test.NativeChatStore.prepareFresh()
@@ -172,8 +187,13 @@ describe.skipIf(!supported)("Native chat store", () => {
         for (const [launch] of start.mock.calls) {
           expect(launch.protectedPaths).toBe(prepared.protectedPaths);
           expect(launch.protectedPaths).toEqual(
-            expect.arrayContaining([electron.userData, test.agentData])
+            expect.arrayContaining([
+              electron.userData,
+              test.agentData,
+              test.configHome,
+            ])
           );
+          expect(launch.configHome).toBe(test.configHome);
           expect(launch).not.toHaveProperty("workspace");
         }
       } finally {
@@ -200,38 +220,52 @@ describe.skipIf(!supported)("Native chat store", () => {
       version: 1,
       source: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", test.child("other-agent"));
-    vi.resetModules();
-    const { NativeChatStore } = await import("./native-chat-store");
+    const NativeChatStore = await test.loadStore(test.child("other-agent"));
     await expect(NativeChatStore.prepareFresh()).rejects.toThrow(
       "native_chat_store_source_changed"
     );
   });
 
-  it("keeps ordinary config separate from an explicit temporary agent data override", async () => {
-    const test = await fixture();
-    const opened = await test.NativeChatStore.prepareOrdinary([]);
-    expect(opened.configHome).toBe(test.configHome);
-    expect(opened.protectedPaths).toContain(test.configHome);
-  });
-
-  it("keeps the isolated config inside the disposable native profile", async () => {
-    const test = await fixture();
-    const opened = await test.NativeChatStore.prepareFresh();
-    expect(opened.configHome).toBe(test.agentData);
-    expect(opened.protectedPaths).toContain(test.agentData);
-  });
+  it.each(["preview", "ordinary"] as const)(
+    "accepts a %s store using its pre-refactor ownership marker",
+    async (mode) => {
+      const test = await fixture(mode);
+      const basis =
+        mode === "ordinary"
+          ? [
+              "ordinary-native-chat",
+              electron.userData,
+              test.agentData,
+              test.agentData,
+              electron.media,
+            ]
+          : ["isolated-native-chat", test.agentData];
+      const source = createHash("sha256")
+        .update(JSON.stringify(basis))
+        .digest("hex");
+      fs.mkdirSync(test.nativeState, { mode: 0o700 });
+      fs.writeFileSync(test.marker, JSON.stringify({ version: 1, source }), {
+        mode: 0o600,
+      });
+      const opened =
+        mode === "ordinary"
+          ? await test.NativeChatStore.prepareOrdinary([])
+          : await test.NativeChatStore.prepareFresh();
+      expect(opened.configHome).toBe(test.configHome);
+    }
+  );
 
   it("resolves config ancestor aliases with filesystem traversal semantics", async () => {
-    const test = await fixture();
+    const test = await fixture("ordinary");
     const configParent = test.child("physical-config-parent");
     const nested = path.join(configParent, "nested");
     fs.mkdirSync(nested, { mode: 0o700 });
     const alias = path.join(path.dirname(configParent), "config-alias");
     fs.symlinkSync(nested, alias);
-    vi.stubEnv("GRIDA_HOME", `${alias}/../grida`);
-    vi.resetModules();
-    const { NativeChatStore: configured } = await import("./native-chat-store");
+    const configured = await test.loadStore(
+      test.agentData,
+      `${alias}/../grida`
+    );
     const store = await configured.prepareOrdinary([]);
     const configHome = path.join(configParent, "grida");
     expect(store.configHome).toBe(configHome);
@@ -240,12 +274,10 @@ describe.skipIf(!supported)("Native chat store", () => {
   });
 
   it("keeps a symlink at the config home visible to source validation", async () => {
-    const test = await fixture();
+    const test = await fixture("ordinary");
     const alias = path.join(path.dirname(test.configHome), "config-alias");
     fs.symlinkSync(test.configHome, alias);
-    vi.stubEnv("GRIDA_HOME", alias);
-    vi.resetModules();
-    const { NativeChatStore: configured } = await import("./native-chat-store");
+    const configured = await test.loadStore(test.agentData, alias);
     const store = await configured.prepareOrdinary([]);
     expect(store.configHome).toBe(alias);
     expect(store.protectedPaths).toContain(test.configHome);
@@ -259,8 +291,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       test.marker,
       JSON.stringify({ ...recorded, owner: "other" })
     );
-    vi.resetModules();
-    const { NativeChatStore } = await import("./native-chat-store");
+    const NativeChatStore = await test.loadStore();
     await expect(NativeChatStore.prepareFresh()).rejects.toThrow(
       "native_chat_store_state_unsafe"
     );
@@ -279,7 +310,9 @@ describe.skipIf(!supported)("Native chat store", () => {
   it.runIf(Boolean(nativeResources)).each(["isolated", "ordinary"] as const)(
     "persists %s selected SVG chat with a rootless native worker and live text reply",
     async (profile) => {
-      const test = await fixture();
+      const test = await fixture(
+        profile === "ordinary" ? "ordinary" : "preview"
+      );
       const prepared =
         profile === "ordinary"
           ? await test.NativeChatStore.prepareOrdinary([test.agentData])

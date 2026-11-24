@@ -21,13 +21,10 @@ import create_menu, {
 import { createDesktopArchives } from "./main/native-desktop-archives";
 import { createDesktopChatCatalog } from "./main/native-desktop-chat-catalog";
 import { open_document_window } from "./window";
-import { DEEP_LINK_SCHEME, EDITOR_BASE_URL, IS_DEV, IS_INSIDERS } from "./env";
+import { DESKTOP_LAUNCH, EDITOR_BASE_URL } from "./env";
+import { USE_DEV_INSIDERS_BRANDING, create_runtime_app_icon } from "./branding";
 import {
-  RUNTIME_APP_NAME,
-  USE_DEV_INSIDERS_BRANDING,
-  create_runtime_app_icon,
-} from "./branding";
-import {
+  configureServicesSidecar,
   startServicesSidecar,
   getServicesSidecarInfo,
   stopServicesSidecar,
@@ -60,8 +57,8 @@ import { NativeChatSelections } from "./main/native-chat-selections";
 import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeAgentProcess } from "./main/native-agent-process";
-import { configurationErrorMessage } from "./main/native-agent-config";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
+import { configurationErrorMessage } from "./main/native-agent-config";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
 import type { DesktopBrowserTools } from "./main/desktop-browser-tools";
@@ -74,7 +71,6 @@ import {
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { NativeDocumentFiles } from "./main/native-document-files";
 import { ipc_sender } from "./main/ipc-sender";
-import { DesktopMediaRoot } from "./main/media-root";
 import { NativeImagePlacement } from "./main/native-image-placement";
 import type { ImageReferenceReview } from "./main/native-image-generation";
 import { NativeWorkspaceReview } from "./main/native-workspace-review";
@@ -82,6 +78,7 @@ import { requestDesktopCompatibility } from "./main/desktop-compatibility-reques
 import { DesktopLinuxUpdates } from "./main/desktop-linux-updates";
 import { DesktopUpdateFeed } from "./main/desktop-update-feed";
 import { DesktopUpdates } from "./main/desktop-updates";
+import { DesktopProfile } from "./main/desktop-profile";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -124,7 +121,7 @@ app.commandLine.appendSwitch("disable-async-dns");
 app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
-app.setName(RUNTIME_APP_NAME);
+DesktopProfile.applyBrowserProfile(app, DESKTOP_LAUNCH);
 // GRIDA-SEC-005 — register this build's channel-specific deep-link scheme
 // (`grida-dev` for local builds, `grida` for production) so dev and an installed
 // production Grida don't fight over one scheme. On macOS the reliable, declarative
@@ -137,11 +134,13 @@ if (process.defaultApp && process.argv.length >= 2) {
   // `grida-dev://` deep link could relaunch a blank Electron instead of delivering
   // the URL. Point the registration at the app entry (Electron's documented dev
   // pattern: setAsDefaultProtocolClient(scheme, execPath, [appPath])).
-  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [
-    path.resolve(process.argv[1]),
-  ]);
+  app.setAsDefaultProtocolClient(
+    DESKTOP_LAUNCH.deepLinkScheme,
+    process.execPath,
+    [path.resolve(process.argv[1])]
+  );
 } else {
-  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+  app.setAsDefaultProtocolClient(DESKTOP_LAUNCH.deepLinkScheme);
 }
 
 // GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme.
@@ -458,7 +457,7 @@ function attach_dirty_close_handler(window: BrowserWindow) {
 
 function nativeDocumentOwner(filePath: string) {
   if (
-    NativeDesktopProfile.selected() ||
+    DESKTOP_LAUNCH.nativeChat === "preview" ||
     path.extname(filePath).toLowerCase() === ".svg"
   )
     return nativeDocuments;
@@ -736,24 +735,29 @@ app.on("ready", async () => {
     return;
   }
 
-  // Keep a disposable profile on the build it was launched to exercise.
-  const nativeProfile = NativeDesktopProfile.selected();
-  const catalogueDirectory = path.join(
-    (nativeProfile && NativeDesktopProfile.agentData()) ||
-      app.getPath("userData"),
-    "model-catalogue"
-  );
+  let profile: DesktopProfile;
+  try {
+    profile = DesktopProfile.resolve(app, DESKTOP_LAUNCH);
+  } catch (error) {
+    const diagnostic =
+      error instanceof Error && configurationErrorMessage(error.message);
+    if (!diagnostic) throw error;
+    dialog.showErrorBox("Grida couldn’t start", diagnostic);
+    app.quit();
+    return;
+  }
+  const nativeProfile = profile.nativeChat === "preview";
   const modelCatalogue = new ModelCatalogueStore({
-    directory: catalogueDirectory,
+    directory: profile.catalogueDirectory,
     fetch: net.fetch,
     offline: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
   });
   app.once("will-quit", () => modelCatalogue.dispose());
-  if (!IS_DEV && !IS_INSIDERS && !nativeProfile) {
+  if (profile.isPackaged && !profile.isInsiders && !nativeProfile) {
     const version = app.getVersion();
     desktopUpdates = new DesktopUpdates({
       version,
-      origin: EDITOR_BASE_URL,
+      origin: profile.editorBaseUrl,
       requestCompatibility: requestDesktopCompatibility,
       linuxRelease:
         process.platform === "linux"
@@ -784,8 +788,8 @@ app.on("ready", async () => {
 
   // Capture the login-shell environment alongside hosted window startup.
   void NativeCommandProfiles.programEnvironment();
-  const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat();
-  const nativeResources = NativeDesktopProfile.resourcesPath(app);
+  const ordinaryNativeChat = profile.nativeChat === "ordinary";
+  const nativeResources = profile.resourcesPath;
   let externalProfile: string | undefined;
   try {
     externalProfile = NativeExternalRuns.launchProfile(
@@ -808,7 +812,7 @@ app.on("ready", async () => {
     pending_files: pendingFiles.length,
   });
   const accountSession = new DesktopAccountSession({
-    base_url: EDITOR_BASE_URL,
+    base_url: profile.editorBaseUrl,
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
@@ -833,19 +837,21 @@ app.on("ready", async () => {
       console.warn("[agent-notifications] Could not deliver notification")
     );
   let workspaceCatalog: NativeWorkspaceCatalog | undefined;
+  let documentWorkers: ReturnType<typeof nativeWorkspaceMedia>;
   if (nativeProfile) {
     try {
-      const provider = await NativeDesktopProfile.configure(app);
+      const provider = await NativeDesktopProfile.configure(app, profile);
+      configureServicesSidecar(profile);
       const mcp = await NativeMcpLaunch.configure(
         process.argv,
-        app.getPath("userData"),
+        profile.userData,
         provider
       );
-      workspaceCatalog = nativeWorkspaceCatalog();
+      workspaceCatalog = nativeWorkspaceCatalog(profile);
       const catalog = workspaceCatalog;
-      const documentWorkers = nativeWorkspaceMedia();
-      const media =
-        documentWorkers && new MediaStore(DesktopMediaRoot.current());
+      documentWorkers = nativeWorkspaceMedia(profile);
+      const workers = documentWorkers;
+      const media = workers && new MediaStore(profile.mediaRoot);
       {
         const options = {
           provider,
@@ -855,7 +861,7 @@ app.on("ready", async () => {
           workspaceCatalogRoot: path.dirname(catalog.directory),
           workspaceGrant: catalog.fileGrant.bind(catalog),
           imagePlacement:
-            documentWorkers && media
+            workers && media
               ? (
                   workspace: ConstructorParameters<
                     typeof NativeImagePlacement
@@ -863,7 +869,7 @@ app.on("ready", async () => {
                 ) =>
                   new NativeImagePlacement(workspace, {
                     catalog,
-                    workers: documentWorkers,
+                    workers,
                     media,
                     review: ({ workspace, relative, signal }) =>
                       workspaceReview.confirm(workspace.workspaceId, signal, {
@@ -911,23 +917,26 @@ app.on("ready", async () => {
         nativeFileWorkspaces = workspaceCatalog;
         nativeDocuments = new NativeDocumentFiles(
           workspaceCatalog.fileProtectionPaths(),
-          app.getPath("home"),
+          profile.userHome,
           documentWorkers,
-          path.join(app.getPath("userData"), "document-identities")
+          path.join(profile.userData, "document-identities")
         );
       }
-      recentFiles = new RecentStore(app.getPath("userData"), {
+      recentFiles = new RecentStore(profile.userData, {
         privateFile: true,
       });
-      servicesSidecarClient.setWorkspaceCatalog(workspaceCatalog);
+      servicesSidecarClient.setWorkspaceCatalog(workspaceCatalog, {
+        workers: documentWorkers,
+        protectedRoots: NativeDesktopProfile.protectedRoots(app),
+      });
       if (process.argv.includes("--native-chat")) {
         const catalog = workspaceCatalog;
         nativeEditorMcp = await NativeEditorMcpExport.start(
           process.argv,
-          app.getPath("userData"),
+          profile.userData,
           nativeResources,
           {
-            editorOrigin: new URL(EDITOR_BASE_URL).origin,
+            editorOrigin: new URL(profile.editorBaseUrl).origin,
             admits: (sender) => {
               const window = BrowserWindow.fromWebContents(sender);
               return (
@@ -947,13 +956,14 @@ app.on("ready", async () => {
           : "Chat could not start",
         externalProfile
           ? "Check the private launch profile, registered workspace, and installed sandbox helper."
-          : "Use a fresh Desktop profile with a separate Grida agent data directory."
+          : "Use a private temporary root with separate directories for --user-data-dir, GRIDA_AGENT_USER_DATA, and GRIDA_HOME."
       );
       app.quit();
       return;
     }
   } else {
-    nativeDocuments = ordinarySelectedSvgFiles();
+    configureServicesSidecar(profile);
+    nativeDocuments = ordinarySelectedSvgFiles(profile);
     if (ordinaryNativeChat) {
       try {
         const protectedPaths =
@@ -970,16 +980,14 @@ app.on("ready", async () => {
           }
         );
         nativeDocuments = ordinarySelectedSvgFiles(
+          profile,
           nativeDesktopAgent.documentIdentitiesDirectory,
           protectedPaths
         );
-      } catch (error) {
-        const diagnostic =
-          error instanceof Error && configurationErrorMessage(error.message);
+      } catch {
         dialog.showErrorBox(
           "Chat could not start",
-          diagnostic ||
-            "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
+          "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
         );
         app.quit();
         return;
@@ -991,12 +999,12 @@ app.on("ready", async () => {
   let chatSelections: NativeChatSelections | undefined;
   try {
     desktopPreferences = await DesktopPreferences.open({
-      user_data_path: app.getPath("userData"),
+      user_data_path: profile.userData,
     });
     if (nativeDesktopAgent) {
       const native = nativeDesktopAgent;
       chatSelections = await NativeChatSelections.open({
-        userDataPath: app.getPath("userData"),
+        userDataPath: profile.userData,
         choice: (workspaceId, profileId) =>
           native.selectionChoice(workspaceId, profileId),
         initial: (workspaceId) => native.initialSelection(workspaceId),
@@ -1026,7 +1034,7 @@ app.on("ready", async () => {
   });
   entryWindow = new DesktopEntryWindow({
     app,
-    base_url: EDITOR_BASE_URL,
+    base_url: profile.editorBaseUrl,
     account: accountSession,
     preferences: desktopPreferences,
     startup_main_path:
@@ -1061,14 +1069,14 @@ app.on("ready", async () => {
   // otherwise the renderer's first bridge call races the registration.
   const native = nativeDesktopAgent;
   try {
-    browserHistory = await BrowserHistory.open(app.getPath("userData"));
+    browserHistory = await BrowserHistory.open(profile.userData);
   } catch {
     console.warn("[grida] browser history is unavailable");
   }
   const voice = new VoiceService(desktopPreferences);
   installVoiceMicrophonePolicy({
     session: session.defaultSession,
-    editorOrigin: new URL(EDITOR_BASE_URL).origin,
+    editorOrigin: new URL(profile.editorBaseUrl).origin,
     admitted: (sender) => {
       const window = BrowserWindow.fromWebContents(sender);
       return (
@@ -1079,6 +1087,7 @@ app.on("ready", async () => {
     ready: () => isDesktopVoiceReady(voice.getSettings()),
   });
   browserHost = registerIpcHandlers({
+    profile,
     on_native_chat: (chat) => {
       chatIpc = chat;
     },
@@ -1087,21 +1096,15 @@ app.on("ready", async () => {
       browserTools = tools;
     },
     browser_downloads: new BrowserDownloads(
-      app.getPath("userData"),
+      profile.userData,
       app.getPath("downloads")
     ),
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     open_settings: (section) =>
       open_or_focus_settings(app, windowAdmission, section),
     voice,
-    archives: createDesktopArchives(
-      native,
-      NativeDesktopProfile.resourcesPath(app)
-    ),
-    chat_catalog: createDesktopChatCatalog(
-      native,
-      NativeDesktopProfile.resourcesPath(app)
-    ),
+    archives: createDesktopArchives(native, nativeResources),
+    chat_catalog: createDesktopChatCatalog(native, nativeResources),
     open_restored_chat: (workspaceId, sessionId) =>
       focusNativeChat(workspaceId, { sessionId }, windowAdmission),
     global_hooks: native?.globalHooks,
@@ -1205,15 +1208,14 @@ app.on("ready", async () => {
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
       servicesSidecarInfo = await startServicesSidecar(
-        workspaceCatalog?.directory,
-        catalogueDirectory
+        workspaceCatalog?.directory
       );
       console.log(
         `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`
       );
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route.
-      handleWorkspaceMediaProtocol(workspaceCatalog);
+      handleWorkspaceMediaProtocol(workspaceCatalog, documentWorkers);
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {

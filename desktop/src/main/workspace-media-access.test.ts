@@ -4,39 +4,25 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
+import { DesktopProfile } from "./desktop-profile";
 import {
   nativeWorkspaceMedia,
   ordinarySelectedSvgFiles,
 } from "./workspace-media-access";
 
 const host = vi.hoisted(() => ({
-  paths: new Map<string, string>(),
   events: {} as EventEmitter,
-  packaged: true,
-  agent: "",
 }));
 
 vi.mock("electron", () => ({
   app: {
-    get isPackaged() {
-      return host.packaged;
-    },
-    getPath: (name: string) => host.paths.get(name)!,
     once: (name: string, callback: () => void) =>
       host.events.once(name, callback),
   },
 }));
-vi.mock("@grida/home", () => ({
-  home: { dir: () => host.paths.get("grida")! },
-}));
-vi.mock("./media-root", () => ({
-  DesktopMediaRoot: { current: () => host.paths.get("media")! },
-}));
 vi.mock("./native-desktop-profile", () => ({
   NativeDesktopProfile: {
-    selected: () => false,
-    agentData: () => host.agent,
-    resourcesPath: () => process.resourcesPath,
+    installedRootsForDevelopment: () => undefined,
   },
 }));
 
@@ -52,46 +38,63 @@ it.runIf(
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-svg-")
     );
-    const argv = process.argv;
-    const resourceProperty = Object.getOwnPropertyDescriptor(
-      process,
-      "resourcesPath"
-    );
     host.events = new EventEmitter();
+    const userHome = path.join(root, "home");
+    const gridaHome = path.join(root, "grida");
+    const userData = path.join(root, "userData");
+    const sessionData = path.join(root, "sessionData");
+    const temp = path.join(root, "temp");
+    const mediaRoot = path.join(root, "media");
+    const agentData = path.join(root, "agent");
+    const documentsRoot = path.join(root, "documents");
+    const profile: DesktopProfile = {
+      ...DesktopProfile.launch(true, false),
+      nativeChat: "ordinary",
+      agentDisabled: false,
+      userHome,
+      userData,
+      sessionData,
+      gridaHome,
+      configHome: agentData,
+      providerHome: agentData,
+      agentData,
+      agentDataOverride: agentData,
+      mediaRoot,
+      temp,
+      documents: documentsRoot,
+      projectsRoot: path.join(documentsRoot, "Grida Projects"),
+      resourcesPath: resources!,
+      catalogueDirectory: path.join(userData, "model-catalogue"),
+    };
     try {
-      for (const name of [
-        "home",
-        "grida",
-        "userData",
-        "sessionData",
-        "temp",
-        "media",
-        "agent",
-      ]) {
-        const folder = path.join(root, name);
-        await fs.mkdir(folder);
-        host.paths.set(name, folder);
-      }
-      host.agent = host.paths.get("agent")!;
-      Object.defineProperty(process, "resourcesPath", {
-        value: resources,
-        configurable: true,
-      });
-      process.argv = argv.filter((arg) => arg !== "--disable-agent");
-      expect(ordinarySelectedSvgFiles()).toBeUndefined();
-      const temp = host.paths.get("temp")!;
+      for (const directory of [
+        userHome,
+        gridaHome,
+        userData,
+        sessionData,
+        temp,
+        mediaRoot,
+        agentData,
+        documentsRoot,
+      ])
+        await fs.mkdir(directory);
+      expect(ordinarySelectedSvgFiles(profile)).toBeUndefined();
       const selected = path.join(temp, "drawing.svg");
       await fs.writeFile(selected, "<svg>Original</svg>");
       const owner = { signal: new AbortController().signal, check() {} };
-      const chatState = path.join(host.paths.get("userData")!, "chats");
+      const chatState = path.join(userData, "chats");
       await fs.mkdir(chatState, { mode: 0o700 });
       const identities = path.join(chatState, "document-identities");
       const insidersProfile = path.join(root, "Grida Insiders");
-      const defaultGridaHome = path.join(host.paths.get("home")!, ".grida");
+      const defaultGridaHome = path.join(userHome, ".grida");
       await fs.mkdir(insidersProfile);
       await fs.mkdir(defaultGridaHome);
       const protectedPaths = [insidersProfile, defaultGridaHome];
-      const chatFiles = ordinarySelectedSvgFiles(identities, protectedPaths)!;
+      const chatFiles = ordinarySelectedSvgFiles(
+        profile,
+        identities,
+        protectedPaths
+      )!;
       for (const directory of protectedPaths) {
         const protectedSvg = path.join(directory, "retained.svg");
         await fs.writeFile(protectedSvg, "<svg>Protected</svg>");
@@ -106,6 +109,7 @@ it.runIf(
       expect(await chatFiles.chatIdentity(chatId, owner)).toBe(chatKey);
       chatFiles.release(chatId);
       const reopenedFiles = ordinarySelectedSvgFiles(
+        profile,
         identities,
         protectedPaths
       )!;
@@ -113,12 +117,16 @@ it.runIf(
       expect(await reopenedFiles.chatIdentity(reopenedId, owner)).toBe(chatKey);
       reopenedFiles.release(reopenedId);
       await fs.writeFile(selected, "<svg>Original</svg>");
-      process.argv = [...process.argv, "--disable-agent"];
-      host.packaged = false;
-      expect(ordinarySelectedSvgFiles()).toBeDefined();
-      host.packaged = true;
-      const documents = ordinarySelectedSvgFiles()!;
-      expect(nativeWorkspaceMedia()).toBeUndefined();
+      const disabled: DesktopProfile = {
+        ...profile,
+        nativeChat: "disabled",
+        agentDisabled: true,
+      };
+      expect(
+        ordinarySelectedSvgFiles({ ...disabled, isPackaged: false })
+      ).toBeDefined();
+      const documents = ordinarySelectedSvgFiles(disabled)!;
+      expect(nativeWorkspaceMedia(disabled)).toBeUndefined();
       const id = await documents.register(selected);
       expect(await documents.register(selected)).toBe(id);
       expect((await documents.read(id, owner)).content).toBe(
@@ -129,8 +137,8 @@ it.runIf(
       await expect(documents.chatIdentity(id, owner)).rejects.toThrow(
         "The selected document is unavailable"
       );
-      expect(await fs.readdir(host.paths.get("userData")!)).toEqual(["chats"]);
-      const secret = path.join(host.agent, "secret.svg");
+      expect(await fs.readdir(userData)).toEqual(["chats"]);
+      const secret = path.join(agentData, "secret.svg");
       const alias = path.join(root, "alias.svg");
       await fs.writeFile(secret, "<svg>Protected</svg>");
       await fs.symlink(secret, alias);
@@ -148,10 +156,6 @@ it.runIf(
       );
     } finally {
       host.events.emit("will-quit");
-      process.argv = argv;
-      if (resourceProperty)
-        Object.defineProperty(process, "resourcesPath", resourceProperty);
-      else Reflect.deleteProperty(process, "resourcesPath");
       await fs.rm(root, { recursive: true, force: true });
     }
   }

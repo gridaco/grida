@@ -104,6 +104,9 @@ To run Grida Desktop against this setup, use `just desktop`. It starts local
 Supabase and the editor dev server when they are not running, then the
 development app. Quit Desktop or press Ctrl+C to stop the session. The
 launcher stops the editor dev server if it started it.
+Grida Dev has its own sign-in, browser data, provider credentials, media, and
+default project folder. You can keep the installed Grida app open alongside it.
+Both use the global agent configuration at `~/.grida/config.toml` by default.
 With local services already running, `pnpm --dir desktop dev` provides
 Forge's interactive `rs` restart shortcut.
 

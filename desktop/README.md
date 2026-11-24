@@ -32,7 +32,7 @@ legal/support contract with OpenAI.
 Native agent settings and hooks use `$GRIDA_HOME/config.toml`, defaulting to
 `~/.grida/config.toml`. Settings → Configuration creates or opens the file.
 Settings → Hooks inspects the source and reviews new or changed definitions.
-[Hooks](https://grida.co/docs/agent/hooks)
+[Launch profiles](#launch-profiles) · [Hooks](https://grida.co/docs/agent/hooks)
 
 ## Architecture
 
@@ -131,11 +131,10 @@ cookies are not configured as HttpOnly; this is not a guarantee of isolation
 from the trusted same-origin renderer.
 
 Shared BYOK custody (GRIDA-SEC-014) is private plaintext on macOS/Linux.
-Desktop and CLI see the same provider changes without either requiring the
-other to run. The supervisor resolves Grida home once and captures the same
-physical authority for custody and confinement. Linux binds that authority
-beneath a private namespace alias; it does not copy keys, reset migration
-fences or create another store. Both physical and namespace private roots are
+Desktop and CLI see the same provider changes when they use the same Grida
+home. The supervisor captures the same physical authority for custody and
+confinement. Linux binds that authority beneath a private namespace alias;
+it does not copy keys, reset migration fences or create another store. Both physical and namespace private roots are
 excluded from ordinary file and workspace admission. An explicit
 `GRIDA_AGENT_USER_DATA` override isolates both agent state and provider custody.
 Migration preserves ChatGPT OAuth, retires old API entries and resumes pending
@@ -346,9 +345,10 @@ remains untested in the app.
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
 browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
-under the same owner-only root in the system temporary directory. The isolated
-launch keeps its own `config.toml` in that directory. Chat uses a
-separate native store for each registered workspace. Main owns the workspace
+under the same owner-only root in the system temporary directory. Set
+`GRIDA_HOME` to a third sibling directory under that root. The preview requires
+all three paths to keep its agent configuration and state isolated.
+Chat uses a separate native store for each registered workspace. Main owns the workspace
 catalog. On packaged macOS arm64 builds, directory listings, buffered editor
 reads and media Range reads use the confined read worker. A directory listing
 either returns all entries within its bound or reports a limit error. Workspace
@@ -542,6 +542,38 @@ In a second terminal, start Electron:
 ```bash
 pnpm --dir desktop dev
 ```
+
+## Launch profiles
+
+Electron Main scopes the instance lock to the browser profile, which holds
+cookies, preferences, and chats. Every launch uses `$GRIDA_HOME/config.toml`
+for agent settings. The default configuration directory is `~/.grida`, shared with the CLI.
+An absolute `GRIDA_HOME` selects the configuration directory and supplies the
+default provider home for packaged launches. Source launches have separate
+provider homes. Agent data holds retained service settings and ChatGPT OAuth. [Runtime profile](./src/main/desktop-profile.ts)
+
+| Launch                                     | Browser profile              | BYOK provider home        | Agent data                      | Media                      | Managed projects                        |
+| ------------------------------------------ | ---------------------------- | ------------------------- | ------------------------------- | -------------------------- | --------------------------------------- |
+| Packaged Stable                            | Electron `userData`          | Grida home                | Grida home `/agent`             | Stable media library       | `Documents/Grida Projects`              |
+| Packaged Insiders                          | Electron `userData`          | Grida home                | Grida home `/agent`             | Insiders media library     | `Documents/Grida Projects`              |
+| `just desktop` or `pnpm --dir desktop dev` | `Grida Dev/Browser`          | `Grida Dev/Home`          | `Grida Dev/Home/agent`          | `Grida Dev/Media`          | `Documents/Grida Dev Projects`          |
+| `pnpm --dir desktop dev:insiders`          | `Grida Insiders Dev/Browser` | `Grida Insiders Dev/Home` | `Grida Insiders Dev/Home/agent` | `Grida Insiders Dev/Media` | `Documents/Grida Insiders Dev Projects` |
+| Disposable native chat                     | `--user-data-dir`            | `GRIDA_AGENT_USER_DATA`   | `GRIDA_AGENT_USER_DATA`         | `<root>/media`             | `<root>/projects/Grida Projects`        |
+
+The `Grida Dev/` and `Grida Insiders Dev/` paths are relative to Electron's
+`appData` directory. Both packaged profiles let Electron resolve `userData`
+with the runtime name `Grida`. Windows Desktop stores its provider credentials
+in `auth.json` under agent data.
+
+`--user-data-dir` selects the browser profile. `GRIDA_AGENT_USER_DATA` selects
+the BYOK provider home and agent data directory. A disposable native chat
+launch also requires an explicit `GRIDA_HOME`. Set all three paths to distinct
+sibling directories inside a private temporary root, then launch it from a
+development or Insiders build with `--native-chat`.
+
+Stable loads `https://grida.co` and registers `grida://`. Insiders and both
+source launches load `http://localhost:3000` and register `grida-dev://`.
+A disposable launch inherits those settings from its build.
 
 ## Testing
 

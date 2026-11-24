@@ -61,9 +61,6 @@ vi.mock("./workspace-watcher-host", () => ({}));
 vi.mock("./workspace-files", () => ({}));
 vi.mock("./chatgpt-oauth", () => ({ unavailableChatGptOAuth: {} }));
 vi.mock("./media-host", () => ({ DesktopMediaHost: class {} }));
-vi.mock("./media-root", () => ({
-  DesktopMediaRoot: { current: () => "/fixture/media" },
-}));
 vi.mock("./native-chat-ipc", () => ({ NativeChatIpc: class {} }));
 vi.mock("./native-external-run-ipc", () => ({
   NativeExternalRunIpc: class {},
@@ -191,6 +188,12 @@ function setup(
   let role: DesktopIpcRole | null = "main";
   const open = vi.fn<(section?: DesktopSettingsSection) => void>();
   registerIpcHandlers({
+    profile: {
+      editorBaseUrl: "https://fixture.invalid",
+      mediaRoot: "/fixture/media",
+      nativeChat: "ordinary",
+      resourcesPath: "/fixture/resources",
+    },
     resolve_ipc_role: () => role,
     open_settings: open,
     global_hooks: hooks,
@@ -721,9 +724,10 @@ it("publishes completed route changes even when navigation-history flags remain 
     },
     send: vi.fn<(channel: string, state: unknown) => void>(),
   });
-  attachNavigationEvents({
-    webContents: contents as unknown as WebContents,
-  } as BrowserWindow);
+  attachNavigationEvents(
+    { webContents: contents as unknown as WebContents } as BrowserWindow,
+    "https://fixture.invalid"
+  );
   contents.emit("did-navigate", {}, url);
   url = "https://fixture.invalid/desktop/settings";
   contents.emit("did-navigate-in-page", {}, url, true);

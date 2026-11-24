@@ -7,7 +7,9 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { App, BrowserWindowConstructorOptions } from "electron";
-import { NativeDesktopProfile } from "./main/native-desktop-profile";
+const desktopLaunch = vi.hoisted(() => ({
+  nativeChat: "disabled" as "disabled" | "ordinary",
+}));
 
 const { browserWindowInstances, loadURL, showErrorBox } = vi.hoisted(() => ({
   browserWindowInstances: [] as Array<{
@@ -67,7 +69,7 @@ vi.mock("./main/ipc-handlers", () => ({
 vi.mock("./branding", () => ({
   RUNTIME_APP_ICON: { png: "icon.png", ico: "icon.ico" },
 }));
-vi.mock("./env", () => ({ IS_DEV: false }));
+vi.mock("./env", () => ({ IS_DEV: false, DESKTOP_LAUNCH: desktopLaunch }));
 
 import {
   create_desktop_window,
@@ -119,9 +121,6 @@ it("reports an initial load failure instead of leaving a hidden window open", as
 });
 
 it("offers a separate preload capability for native document chat", () => {
-  const selection = vi
-    .spyOn(NativeDesktopProfile, "ordinaryChat")
-    .mockReturnValue(false);
   const app = { getVersion: () => "1.0.0" } as App;
   const common = { app, base_url: BASE, doc_id: "selected", native: true };
   open_document_window(common);
@@ -138,13 +137,10 @@ it("offers a separate preload capability for native document chat", () => {
     "--grida-native-document=selected",
     "--grida-native-document-chat=selected",
   ]);
-  selection.mockRestore();
 });
 
 it("passes the ordinary workspace-only chat scope to a deck window", () => {
-  const selection = vi
-    .spyOn(NativeDesktopProfile, "ordinaryChat")
-    .mockReturnValueOnce(true);
+  desktopLaunch.nativeChat = "ordinary";
   const app = { getVersion: () => "1.0.0" } as App;
   try {
     open_canvas_window({ app, base_url: BASE, workspace_id: "workspace" });
@@ -152,7 +148,7 @@ it("passes the ordinary workspace-only chat scope to a deck window", () => {
       browserWindowInstances.at(-1)?.options.webPreferences?.additionalArguments
     ).toEqual(["--grida-version=1.0.0", "--grida-native-workspace-chat=1"]);
   } finally {
-    selection.mockRestore();
+    desktopLaunch.nativeChat = "disabled";
   }
 });
 

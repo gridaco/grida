@@ -31,7 +31,6 @@ import {
   isDesktopVoiceReady,
   type DesktopVoiceSettings,
 } from "@grida/desktop-bridge";
-import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
 import { servicesSidecarClient } from "./services-sidecar-client";
 import {
@@ -73,7 +72,7 @@ import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
-import { DesktopMediaRoot } from "./media-root";
+import type { DesktopProfile } from "./desktop-profile";
 import {
   NativeChatIpc,
   type ActiveNativeChat,
@@ -93,17 +92,11 @@ import type { NativeArchives } from "./native-archives";
 import type { NativeChatSelections } from "./native-chat-selections";
 import type { VoiceService } from "./voice";
 
-// `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
-// build-time constant once at module init rather than per call.
-const EDITOR_ORIGIN = (() => {
-  try {
-    return new URL(EDITOR_BASE_URL).origin;
-  } catch {
-    return "";
-  }
-})();
-
 type RegisterIpcHandlersOptions = {
+  profile: Pick<
+    DesktopProfile,
+    "editorBaseUrl" | "mediaRoot" | "nativeChat" | "resourcesPath"
+  >;
   browser_history?: BrowserHistory;
   browser_downloads?: BrowserDownloads;
   on_browser_tools?: (tools: DesktopBrowserTools) => void;
@@ -165,8 +158,9 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const editorOrigin = new URL(options.profile.editorBaseUrl).origin;
   const mediaHost = new DesktopMediaHost({
-    root: DesktopMediaRoot.current(),
+    root: options.profile.mediaRoot,
     reveal: (nativePath) => shell.showItemInFolder(nativePath),
     openFolder: async (nativePath) => {
       const error = await shell.openPath(nativePath);
@@ -188,17 +182,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }),
     history: options.browser_history,
     downloads: options.browser_downloads,
-    editorOrigin: EDITOR_ORIGIN,
+    editorOrigin,
     admitWindow: (window) => options.resolve_ipc_role(window) === "main",
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
-  const fx = new FxExtension(() => app, servicesSidecarClient);
+  const fx = new FxExtension(options.profile, () => app, servicesSidecarClient);
   const browserTools = new DesktopBrowserTools(browserHost, fx.viewer);
   const fxFiles = fx.files(browserTools);
   options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
-    EDITOR_ORIGIN,
+    editorOrigin,
     (sender, workspaceId, profileId) => {
       const window = admittedWindow(sender);
       return window
@@ -284,7 +278,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
-    EDITOR_ORIGIN,
+    editorOrigin,
     (sender) => admittedWindow(sender) !== null,
     () => {
       const owner = options.native_external_agent;
@@ -316,7 +310,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         !window ||
         window.webContents !== event.sender ||
         event.senderFrame !== event.sender.mainFrame ||
-        !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(senderUrl, editorOrigin) ||
         !role ||
         !pathname ||
         !ipc_admission.allows({
@@ -1268,7 +1262,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isDestroyed() ||
         frame !== sender.mainFrame ||
         options.resolve_ipc_role(window) !== role ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         result.canceled ||
         result.filePaths.length !== 1
       )
@@ -1418,7 +1412,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isDestroyed() ||
         frame !== sender.mainFrame ||
         options.resolve_ipc_role(window) !== "main" ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         (owner && !owner(window, frame.url))
       )
         throw new Error(unavailable);
@@ -1546,7 +1540,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         if (
           role &&
           pathname &&
-          ipc_sender.isAllowed(url, EDITOR_ORIGIN) &&
+          ipc_sender.isAllowed(url, editorOrigin) &&
           ipc_admission.allows({
             role,
             pathname,
@@ -1967,7 +1961,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isLoadingMainFrame() ||
         frame !== sender.mainFrame ||
         admittedWindow(sender) !== window ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         ipc_sender.pathname(frame.url) !== "/desktop/tools"
       )
         throw new Error("media-save-copy-unavailable");
@@ -1999,17 +1993,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_STATE, (event) =>
-    computeNavigationState(event.sender)
+    computeNavigationState(event.sender, editorOrigin)
   );
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_BACK, (event) => {
     const history = event.sender.navigationHistory;
-    if (desktopNavigationTarget(history, -1)) history.goToOffset(-1);
+    if (desktopNavigationTarget(history, -1, editorOrigin))
+      history.goToOffset(-1);
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD, (event) => {
     const history = event.sender.navigationHistory;
-    if (desktopNavigationTarget(history, 1)) history.goToOffset(1);
+    if (desktopNavigationTarget(history, 1, editorOrigin))
+      history.goToOffset(1);
   });
 
   guarded(
@@ -2138,20 +2134,24 @@ function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {
 /** Resolve the exact history step that this Desktop window can take. */
 function desktopNavigationTarget(
   history: WebContents["navigationHistory"],
-  offset: -1 | 1
+  offset: -1 | 1,
+  editorOrigin: string
 ): string | null {
   // Chromium's goBack/goForward may skip intervening entries. Use the same
   // exact offset for the snapshot and the action, and recheck it on invoke.
   if (!history.canGoToOffset(offset)) return null;
   const url = history.getEntryAtIndex(history.getActiveIndex() + offset)?.url;
-  return url && ipc_sender.isAllowed(url, EDITOR_ORIGIN) ? url : null;
+  return url && ipc_sender.isAllowed(url, editorOrigin) ? url : null;
 }
 
-export function computeNavigationState(wc: WebContents): NavigationState {
+function computeNavigationState(
+  wc: WebContents,
+  editorOrigin: string
+): NavigationState {
   const history = wc.navigationHistory;
-  const back = desktopNavigationTarget(history, -1);
-  const forward = desktopNavigationTarget(history, 1);
-  const home = `${EDITOR_ORIGIN}/desktop/welcome`;
+  const back = desktopNavigationTarget(history, -1, editorOrigin);
+  const forward = desktopNavigationTarget(history, 1, editorOrigin);
+  const home = `${editorOrigin}/desktop/welcome`;
   return {
     can_go_back: back !== null,
     can_go_forward: forward !== null,
@@ -2176,13 +2176,16 @@ export function computeNavigationState(wc: WebContents): NavigationState {
  * deliver a final event after the renderer process has gone away
  * (Chromium's teardown ordering is not deterministic).
  */
-export function attachNavigationEvents(window: BrowserWindow): void {
+export function attachNavigationEvents(
+  window: BrowserWindow,
+  editorOrigin: string
+): void {
   const wc = window.webContents;
   let last: NavigationState | null = null;
   let lastUrl: string | undefined;
   const publish = () => {
     if (wc.isDestroyed()) return;
-    const next = computeNavigationState(wc);
+    const next = computeNavigationState(wc, editorOrigin);
     const url = wc.getURL();
     // Route subscribers also revoke document-scoped owners. Publish a URL
     // change even when the back/forward booleans happen to remain identical.

@@ -15,9 +15,8 @@ import {
   type DesktopSettingsSection,
 } from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
-import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { RUNTIME_APP_ICON } from "./branding";
-import { IS_DEV } from "./env";
+import { DESKTOP_LAUNCH, IS_DEV } from "./env";
 
 /**
  * Title-bar row height in CSS pixels. Its controls center at 22px. The
@@ -339,7 +338,7 @@ export function create_desktop_window({
   });
 
   // Per-window nav-history push channel must observe the initial load too.
-  attachNavigationEvents(window);
+  attachNavigationEvents(window, new URL(baseUrl).origin);
 
   if (urlPath !== null) {
     if (show) {
@@ -485,7 +484,7 @@ function buildDesktopArguments({
   app: App;
   extra?: string[];
 }): string[] {
-  const workspaceChat = NativeDesktopProfile.ordinaryChat();
+  const workspaceChat = DESKTOP_LAUNCH.nativeChat === "ordinary";
   return [
     `--grida-version=${app.getVersion()}`,
     ...(workspaceChat ? [`--${NATIVE_WORKSPACE_CHAT_ARGUMENT}=1`] : []),

@@ -10,13 +10,9 @@ import { NativeWorkspaceReads } from "./native-workspace-reads";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
 
 const launch = vi.hoisted(() => ({
-  workers: undefined as WorkspaceFileWorkers | undefined,
   compatibility: vi.fn<() => never>(() => {
     throw new Error("sidecar must not serve the native read");
   }),
-}));
-vi.mock("./workspace-media-access", () => ({
-  nativeWorkspaceMedia: () => launch.workers,
 }));
 vi.mock("../env", () => ({
   EDITOR_BASE_URL: "https://editor.fixture.invalid",
@@ -111,7 +107,6 @@ it.runIf(
     const medium = path.join(project, "medium.bin");
     const large = path.join(project, "large.bin");
     const workers = new WorkspaceFileWorkers(resources!);
-    launch.workers = workers;
     try {
       for (const dir of [browserData, project])
         await fs.mkdir(dir, { mode: 0o700 });
@@ -125,7 +120,7 @@ it.runIf(
       );
       // Reopen the catalog without recapturing a media grant.
       const catalog = new NativeWorkspaceCatalog(options);
-      servicesSidecarClient.setWorkspaceCatalog(catalog);
+      servicesSidecarClient.setWorkspaceCatalog(catalog, { workers });
       const signal = new AbortController().signal;
       const read = (file: string, kind: "text" | "bytes") =>
         servicesSidecarClient.readWorkspaceFile(saved.id, file, kind, signal);
@@ -326,7 +321,6 @@ it.runIf(
       expect(launch.compatibility).not.toHaveBeenCalled();
     } finally {
       workers.close();
-      launch.workers = undefined;
       await fs.rm(root, { recursive: true, force: true });
     }
   },

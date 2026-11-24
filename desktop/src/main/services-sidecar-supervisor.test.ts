@@ -2,6 +2,7 @@
 // GRIDA-SEC-004 — sidecar supervision and launch-scoped command authority.
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
+import { ProtectedRoots } from "@grida/daemon/server";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -22,7 +23,6 @@ vi.mock("electron", () => ({
     },
   },
 }));
-vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
 vi.mock("./sidecar-log", () => ({
   SidecarLogWriter: class {
     write() {}
@@ -34,7 +34,6 @@ import { app } from "electron";
 import { ProviderNetworkHost } from "./provider-network-host";
 import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
-import { DesktopMediaRoot } from "./media-root";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
 import { ProviderEndpointConsent } from "./provider-endpoint-consent";
 
@@ -42,33 +41,57 @@ const supportsNativeChat =
   process.platform === "darwin" || process.platform === "linux";
 
 describe("ServicesSidecarSupervisor recovery", () => {
-  beforeEach(() => {
+  let root: string;
+  type Profile = ConstructorParameters<typeof ServicesSidecarSupervisor>[0];
+  function profile(overrides: Partial<Profile> = {}): Profile {
+    const userData = path.join(root, "browser");
+    const gridaHome = path.join(root, "grida");
+    return {
+      agentData: path.join(gridaHome, "agent"),
+      catalogueDirectory: path.join(userData, "model-catalogue"),
+      configHome: gridaHome,
+      editorBaseUrl: "https://grida.co",
+      isPackaged: true,
+      mediaRoot: path.join(root, "media"),
+      nativeChat: "ordinary",
+      projectsRoot: path.join(root, "projects"),
+      providerHome: gridaHome,
+      temp: path.join(root, "temp"),
+      userData,
+      userHome: root,
+      ...overrides,
+    };
+  }
+
+  beforeEach(async () => {
+    root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-sidecar-")
+    );
     // This suite owns process/ACK mechanics; receipt persistence and the real
     // startup composition are exercised in provider-endpoint-startup.test.ts.
     vi.spyOn(ProviderEndpointConsent, "open").mockResolvedValue({
       restore: async () => {},
     } as unknown as ProviderEndpointConsent);
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/compatibility-agent");
     vi.useFakeTimers();
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
     vi.useRealTimers();
+    await fs.rm(root, { recursive: true, force: true });
   });
 
   it("starts the media sandbox without preparing scratch or command authority", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const launch = profile({ nativeChat: "disabled" });
+    const supervisor = new ServicesSidecarSupervisor(launch);
     const state = supervisor as unknown as {
       initSandbox(): Promise<void>;
       scratchBase: string | null;
       commandHost: unknown;
     };
-    vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
     vi.mocked(app.getPath).mockClear();
 
     await state.initSandbox();
@@ -80,10 +103,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
       (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
         .nativeSandbox.configuration.filesystem.denyRead
     ).toContain(
-      path.join(
-        app.getPath("userData"),
-        NativeDesktopProfile.chatStateDirectory
-      )
+      path.join(launch.userData, NativeDesktopProfile.chatStateDirectory)
     );
     expect(
       (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
@@ -102,9 +122,6 @@ describe("ServicesSidecarSupervisor recovery", () => {
   it.runIf(supportsNativeChat)(
     "denies the chat store while serving ordinary native-chat services",
     async () => {
-      const root = await fs.mkdtemp(
-        path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-services-")
-      );
       const data = path.join(root, "agent");
       const browser = path.join(root, "browser");
       const media = path.join(browser, "Media");
@@ -115,14 +132,14 @@ describe("ServicesSidecarSupervisor recovery", () => {
             fs.mkdir(directory, { recursive: true })
           )
         );
-        vi.stubEnv("GRIDA_AGENT_USER_DATA", data);
-        vi.spyOn(app, "getPath").mockImplementation((name) =>
-          name === "temp" ? temporary : name === "userData" ? browser : root
+        const supervisor = new ServicesSidecarSupervisor(
+          profile({
+            agentData: data,
+            userData: browser,
+            mediaRoot: media,
+            temp: temporary,
+          })
         );
-        vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
-        vi.spyOn(DesktopMediaRoot, "current").mockReturnValue(media);
-
-        const supervisor = new ServicesSidecarSupervisor();
         const paths = supervisor.selectNativeChat(true);
         const state = supervisor as unknown as {
           initSandbox(): Promise<void>;
@@ -164,8 +181,44 @@ describe("ServicesSidecarSupervisor recovery", () => {
     }
   );
 
+  it.runIf(supportsNativeChat)(
+    "protects config inside an admitted preview root without blocking sidecar startup",
+    async () => {
+      const launch = profile({
+        nativeChat: "preview",
+        agentData: path.join(root, "agent"),
+        configHome: path.join(root, "config"),
+        providerHome: path.join(root, "agent"),
+      });
+      const check = vi
+        .spyOn(NativeDesktopProfile, "assertPreviewIsolation")
+        .mockImplementation(() => {});
+      vi.spyOn(NativeDesktopProfile, "protectedRoots").mockReturnValue(
+        new ProtectedRoots([launch.configHome])
+      );
+      const supervisor = new ServicesSidecarSupervisor(launch);
+      supervisor.selectNativeChat();
+      const state = supervisor as unknown as {
+        initSandbox(): Promise<void>;
+        nativeSandbox: RetainedServiceSandbox;
+        protectedFileRoots: readonly string[];
+      };
+      await state.initSandbox();
+      expect(check).toHaveBeenCalledExactlyOnceWith(app, root);
+      expect(state.protectedFileRoots).toContain(launch.configHome);
+      expect(state.nativeSandbox.configuration.filesystem.denyRead).toContain(
+        launch.configHome
+      );
+      supervisor.stop();
+    }
+  );
+
   it("forwards disabled agent startup without scratch or skill arguments", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const launch = profile({
+      nativeChat: "disabled",
+      editorBaseUrl: "http://localhost:3000",
+    });
+    const supervisor = new ServicesSidecarSupervisor(launch);
     // Inspect the exact native argv, then stop before spawning a real child.
     const prepare = vi
       .spyOn(RetainedServiceSandbox.prototype, "prepare")
@@ -175,18 +228,32 @@ describe("ServicesSidecarSupervisor recovery", () => {
 
     await expect(supervisor.start()).rejects.toThrow("stop before spawn");
 
-    const command = prepare.mock.calls.at(-1)?.[1].join(" ");
-    expect(command).toContain("--agent=disabled");
-    expect(command).toContain("--media-root=");
-    expect(command).toContain("--provider-home=");
-    expect(command).not.toContain("--scratch-base=");
-    expect(command).not.toContain("--skills-root=");
+    const [, command, , roots] = prepare.mock.calls.at(-1)!;
+    expect(command).toEqual(
+      expect.arrayContaining([
+        "--agent=disabled",
+        `--editor-base-url=${launch.editorBaseUrl}`,
+        `--media-root=${launch.mediaRoot}`,
+        `--model-catalogue=${launch.catalogueDirectory}`,
+        `--projects-root=${launch.projectsRoot}`,
+        `--provider-home=${launch.providerHome}`,
+        `--user-data=${launch.agentData}`,
+      ])
+    );
+    expect(roots).toEqual({
+      state: launch.agentData,
+      providerHome: launch.providerHome,
+      media: launch.mediaRoot,
+    });
+    expect(command.join(" ")).not.toMatch(/--(scratch-base|skills-root)=/);
     supervisor.stop();
   });
 
   it("binds native subscription settings only to the selected native chat paths", async () => {
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/subscription-source");
-    const supervisor = new ServicesSidecarSupervisor();
+    const launch = profile({
+      agentData: path.join(root, "subscription-source"),
+    });
+    const supervisor = new ServicesSidecarSupervisor(launch);
     const network = { prepare: () => null };
     const egress = vi
       .spyOn(ProviderNetworkHost, "nativeProviderNetwork")
@@ -195,9 +262,9 @@ describe("ServicesSidecarSupervisor recovery", () => {
       "native_chatgpt_source_unavailable"
     );
     expect(egress).not.toHaveBeenCalled();
-    supervisor.selectNativeChat();
+    supervisor.selectNativeChat(true);
     await expect(supervisor.nativeSubscriptionSettings()).resolves.toEqual({
-      userDataPath: "/synthetic/subscription-source",
+      userDataPath: launch.agentData,
       network,
     });
     expect(egress).toHaveBeenCalledExactlyOnceWith(
@@ -207,20 +274,20 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it("fixes native chat paths only for the primary app before starting chat services", async () => {
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/native-agent");
-    const supervisor = new ServicesSidecarSupervisor();
+    const launch = profile({ agentData: path.join(root, "native-agent") });
+    const supervisor = new ServicesSidecarSupervisor(launch);
     vi.mocked(app.hasSingleInstanceLock).mockReturnValueOnce(false);
-    expect(() => supervisor.selectNativeChat()).toThrow(
+    expect(() => supervisor.selectNativeChat(true)).toThrow(
       "native_chat_selection_unavailable"
     );
-    const paths = supervisor.selectNativeChat();
+    const paths = supervisor.selectNativeChat(true);
     expect(paths).toEqual(
       expect.objectContaining({
-        userDataPath: "/synthetic/native-agent",
-        desktopUserDataPath: app.getPath("userData"),
+        userDataPath: launch.agentData,
+        desktopUserDataPath: launch.userData,
       })
     );
-    expect(supervisor.selectNativeChat()).toBe(paths);
+    expect(supervisor.selectNativeChat(true)).toBe(paths);
     const prepare = vi
       .spyOn(RetainedServiceSandbox.prototype, "prepare")
       .mockImplementationOnce(() => {
@@ -234,7 +301,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it("cannot select native chat after services were started", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor(profile());
     vi.spyOn(
       supervisor as unknown as { initSandbox(): Promise<void> },
       "initSandbox"
@@ -243,44 +310,31 @@ describe("ServicesSidecarSupervisor recovery", () => {
       "services startup attempted"
     );
     supervisor.stop();
-    expect(() => supervisor.selectNativeChat()).toThrow(
+    expect(() => supervisor.selectNativeChat(true)).toThrow(
       "native_chat_selection_unavailable"
     );
   });
 
-  it("requires an absolute home for ordinary agent configuration", () => {
-    vi.stubEnv("GRIDA_HOME", "invalid-relative-home");
-    const supervisor = new ServicesSidecarSupervisor();
-    expect(() => supervisor.selectNativeChat(true)).toThrow(
-      "config_home_must_be_absolute"
+  it("uses the supplied configuration, credential, and agent paths", () => {
+    const launch = profile({
+      agentData: path.join(root, "private-agent"),
+      configHome: path.join(root, "configuration"),
+      providerHome: path.join(root, "credentials"),
+    });
+    const supervisor = new ServicesSidecarSupervisor(launch);
+    expect(supervisor.nativeByokSettings().credentialHome).toBe(
+      launch.providerHome
     );
+    expect(supervisor.selectNativeChat(true)).toMatchObject({
+      userDataPath: launch.agentData,
+      configHome: launch.configHome,
+      providerHome: launch.providerHome,
+    });
     supervisor.stop();
   });
 
-  it("shares the canonical Grida home and isolates an explicit agent data override", async () => {
-    vi.stubEnv("GRIDA_HOME", "/synthetic/grida-home");
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
-    const shared = new ServicesSidecarSupervisor() as unknown as {
-      user_data_path: string;
-      provider_home: string;
-      stop(): void;
-    };
-    expect(shared.user_data_path).toBe("/synthetic/grida-home/agent");
-    expect(shared.provider_home).toBe("/synthetic/grida-home");
-    shared.stop();
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/isolated-agent");
-    const isolated = new ServicesSidecarSupervisor() as unknown as {
-      user_data_path: string;
-      provider_home: string;
-      stop(): void;
-    };
-    expect(isolated.user_data_path).toBe("/synthetic/isolated-agent");
-    expect(isolated.provider_home).toBe("/synthetic/isolated-agent");
-    isolated.stop();
-  });
-
   it("retires and restarts when a grant snapshot is not acknowledged", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor(profile());
     const child = fakeChild();
     const networkHost = {
       updateGrants: vi.fn<() => Promise<void>>(async () => {
@@ -318,7 +372,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it("does not let a stale generation retire or restart its replacement", () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor(profile());
     const stale = fakeChild();
     const current = fakeChild();
     const networkHost = { close: vi.fn<() => void>() };
@@ -352,7 +406,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it("does not let a late grant failure retire its replacement host", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor(profile());
     const stale = fakeChild();
     const current = fakeChild();
     let rejectPublication!: (error: Error) => void;
@@ -410,7 +464,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it("commits revocation and retires the service if its ACK fails", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor(profile());
     const running = installRunningState(supervisor, [
       null,
       new Error("revocation acknowledgement timed out"),

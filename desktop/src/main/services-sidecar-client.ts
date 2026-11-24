@@ -40,13 +40,12 @@ import {
   nativeAgentEndpointNetwork,
   type ServicesSidecarInfo,
 } from "./services-sidecar-supervisor";
-import { app } from "electron";
-import { NativeDesktopProfile } from "./native-desktop-profile";
+import type { ProtectedRoots } from "@grida/daemon/server";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { NativeWorkspaceReads } from "./native-workspace-reads";
 import { NativeWorkspaceWrites } from "./native-workspace-writes";
-import { nativeWorkspaceMedia } from "./workspace-media-access";
+import type { WorkspaceFileWorkers } from "./workspace-file-worker";
 import { EDITOR_BASE_URL } from "../env";
 import { MediaTransport } from "@grida/ai-host/media-transport";
 import type { Workspace } from "@grida/daemon";
@@ -60,12 +59,22 @@ const REFERER = `${EDITOR_ORIGIN}/desktop`;
 
 export namespace servicesSidecarClient {
   let catalog: NativeWorkspaceCatalog | undefined;
+  let workspaceWorkers: WorkspaceFileWorkers | undefined;
+  let workspaceProtectedRoots: Pick<ProtectedRoots, "overlaps"> | undefined;
   let nativeReads: NativeWorkspaceReads | undefined;
   let nativeWrites: NativeWorkspaceWrites | undefined;
 
-  export function setWorkspaceCatalog(owner: NativeWorkspaceCatalog): void {
+  export function setWorkspaceCatalog(
+    owner: NativeWorkspaceCatalog,
+    options: {
+      workers?: WorkspaceFileWorkers;
+      protectedRoots?: Pick<ProtectedRoots, "overlaps">;
+    } = {}
+  ): void {
     if (catalog) throw new Error("workspace_catalog_already_bound");
     catalog = owner;
+    workspaceWorkers = options.workers;
+    workspaceProtectedRoots = options.protectedRoots;
   }
   export class ServicesSidecarNotReadyError extends Error {
     constructor() {
@@ -82,11 +91,7 @@ export namespace servicesSidecarClient {
    * focus it instead of opening a new one.
    */
   export async function registerPath(filePath: string): Promise<string> {
-    if (
-      NativeDesktopProfile.selected() &&
-      catalog &&
-      NativeDesktopProfile.protectedRoots(app).overlaps(filePath)
-    )
+    if (workspaceProtectedRoots?.overlaps(filePath))
       throw new Error("file-overlaps-protected-root");
     const data = await client().files.register(filePath);
     return data.doc_id;
@@ -196,10 +201,12 @@ export namespace servicesSidecarClient {
   }
 
   function nativeWorkspaceReader(): NativeWorkspaceReads | undefined {
-    const workers = nativeWorkspaceMedia();
-    if (!workers) return undefined;
+    if (!workspaceWorkers) return undefined;
     if (!catalog) throw new Error("workspace_read_catalog_unavailable");
-    return (nativeReads ??= new NativeWorkspaceReads(catalog, workers));
+    return (nativeReads ??= new NativeWorkspaceReads(
+      catalog,
+      workspaceWorkers
+    ));
   }
 
   export async function writeWorkspaceFile(
@@ -210,12 +217,11 @@ export namespace servicesSidecarClient {
     signal: AbortSignal,
     check: () => void
   ) {
-    const workers = nativeWorkspaceMedia();
-    if (workers) {
+    if (workspaceWorkers) {
       if (!catalog) throw new Error("workspace_write_catalog_unavailable");
       const writes = (nativeWrites ??= new NativeWorkspaceWrites(
         catalog,
-        workers
+        workspaceWorkers
       ));
       return await writes.save(
         id,

@@ -1265,10 +1265,10 @@ pixels through this reader, with no additional filesystem or model grant.
   fences pending admissions and drains the workspace's default and saved-profile
   workers before the catalog removes the entry. A worker without observed exit
   remains unavailable to replacement. The
-  [development profile](desktop/src/main/native-desktop-profile.ts) requires
-  separate canonical browser and agent directories under an owner-only
-  temporary root outside every known installed Desktop data and Grida home
-  location. The ordinary workspace-only launch keeps chats in the Main-owned
+  [disposable native profile](desktop/src/main/native-desktop-profile.ts)
+  requires separate canonical browser, agent, and configuration directories
+  under an owner-only temporary root outside known installed Desktop data and
+  Grida home locations. The ordinary workspace-only launch keeps chats in the Main-owned
   chat store under the browser profile. It
   applies the established home-secret exclusions to native workspace grants,
   and captures and rechecks the registered directory identity across all live
@@ -2240,7 +2240,7 @@ Today:
 - `desktop/src/main/retained-service-sandbox.ts` and its tests — shell-free Seatbelt or bubblewrap launch, executable identity recheck, literal/canonical protected paths, native-ABI seccomp, inherited IPC, denied new sockets and safe owned mask cleanup. Actual macOS and unprivileged Linux ARM64 fixtures cover filesystem denial and Main-transferred connected sockets. Native setup failure has no unconfined fallback on macOS/Linux.
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active. Committed quit revokes renderer admission and invalidates queued or in-flight entry reconciliation. The Grida-account transition is additionally bound by GRIDA-SEC-005.
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
-- `desktop/src/main/media-root.ts` and `desktop/src/main/media-host.ts` — one Main-owned app media root and its purpose-scoped adapter. The renderer can list, read, reveal, or save a copy by opaque item ID, or open the fixed library folder. Paths and filesystem details stay in Main. Whole-file reads are serialized, save-copy admits one active picker, and the recent view is capped at 20 records.
+- `desktop/src/main/desktop-profile.ts` and `desktop/src/main/media-host.ts` — one media root resolved by Main for the launch and its purpose-scoped adapter. The renderer can list, read, reveal, or save a copy by opaque item ID, or open the fixed library folder. Paths and filesystem details stay in Main. Whole-file reads are serialized, save-copy admits one active picker, and the recent view is capped at 20 records.
 - `desktop/src/main/ipc-handlers.ts`, `desktop/src/main/ipc-sender.ts`, and `desktop/src/main/ipc-admission.ts` — validate sender frame, window role, pathname and channel before executing OS capabilities. Diagnostics redact URL credentials, query and fragment. Sign-in and onboarding use closed entry-role allowlists. Media library channels require the exact main-role `/desktop/tools` route. Save-copy revokes its admission on main-frame navigation or teardown and rechecks it after the picker and before publication. Custom endpoint changes require the exact Settings main frame; explicit Connect/Save records full-destination consent in protected Main state.
 - `packages/grida-daemon/src/daemon-server.ts` — lifecycle owner for the same guarded Hono app in either loopback-listening or socketless host-delivered `fetch(Request)` mode; shutdown cancels and joins active response streams.
 - `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; the media tenant from `packages/grida-ai-host/src/media-server.ts` is the only tenant.
@@ -2494,6 +2494,7 @@ Today:
 - [editor/app/desktop/\_components/account-required.tsx](editor/app/desktop/_components/account-required.tsx) — defense-in-depth projection of that classification onto authenticated Desktop routes; unavailable fails closed instead of rendering an extra sign-in surface (pinned by `account-required.test.tsx`).
 - [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts) — native-Fetch-Metadata-gated, non-redirecting sign-out (never renderer-callable and never the web `/sign-out`; pinned by `route.test.ts`).
 - [desktop/src/deep-link.ts](desktop/src/deep-link.ts), [desktop/src/env.ts](desktop/src/env.ts), [desktop/forge.config.ts](desktop/forge.config.ts), and [desktop/scripts/prepare-dev-electron-branding.mjs](desktop/scripts/prepare-dev-electron-branding.mjs) — closed per-environment scheme vocabulary and registration; production and local/insiders never contend for one handler.
+- [Desktop launch profile](desktop/src/main/desktop-profile.ts) — selects the editor origin and callback scheme from the build channel and sets the development browser profile before Electron initializes the session.
 - [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) + [desktop/src/main.ts](desktop/src/main.ts) — collect OS/secondary-instance callback URLs, re-validate them through the parser, and deliver the closed intent only to the canonical entry controller.
 - [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm; forwards only the closed callback allowlist and then adds the constant native-entry provenance marker (pinned by `protocol-router.test.ts`).
 - [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts) — fixed-route, redirect-refusing account projection and native-intent sign-out over Chromium's cookie-owning session (pinned by `account-session.test.ts`).
@@ -4539,6 +4540,10 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [producer tests](packages/grida-ai/src/provider-credentials.test.ts), and the
   [provider entry](packages/grida-ai/src/providers.ts) remain owned by the AI package
   under GRIDA-SEC-004; they add no provider awareness to the TOML storage protocol.
+- [Desktop launch profile](desktop/src/main/desktop-profile.ts) supplies the
+  absolute provider and configuration homes to Main. Packaged launches default
+  to the CLI's provider home. Source launches isolate provider custody in their
+  application data directory and use the global agent configuration by default.
 - Desktop [supervisor](desktop/src/main/services-sidecar-supervisor.ts),
   [retained-service sandbox](desktop/src/main/retained-service-sandbox.ts),
   [sidecar](desktop/src/services-sidecar.ts),
