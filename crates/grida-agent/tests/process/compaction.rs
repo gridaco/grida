@@ -7,15 +7,26 @@ use agent_kit_core::history::HistoryRecord;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message;
 
+#[path = "compaction/limits.rs"]
+mod limits;
+
+const COMPACT_START: &str = "co.grida/session/compact/start";
+const START_COMPACTION: &str = "_co.grida/session/compact/start";
+
 async fn client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
     let mut initialize = extension_initialize();
     initialize["clientCapabilities"]["_meta"]["co.grida/session/compact"] = 1.into();
+    initialize["clientCapabilities"]["_meta"][COMPACT_START] = 1.into();
     let reply = ws_rpc(&mut socket, 1, "initialize", initialize).await;
     assert_eq!(
         reply["result"]["agentCapabilities"]["_meta"]["co.grida/session/compact"],
+        1
+    );
+    assert_eq!(
+        reply["result"]["agentCapabilities"]["_meta"][COMPACT_START],
         1
     );
     socket
@@ -118,6 +129,225 @@ async fn prime_automatic_history(
         endpoint.request().await;
     }
     older
+}
+
+#[tokio::test]
+async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compaction() {
+    use super::approvals::Stdio as PrivateStdio;
+
+    const LIFECYCLE: &str = "co.grida/session/lifecycle";
+    const WINDOW: &str = "co.grida/session/transcript-window";
+    const ITEMS: &str = "co.grida/session/compaction-items";
+    async fn observe(
+        client: &mut PrivateStdio,
+        method: &str,
+        params: Value,
+        settlements: usize,
+    ) -> (Value, Vec<Value>, Vec<Value>) {
+        let id = client.send(method, params).await;
+        timeout(WAIT, async {
+            let mut reply = None;
+            let mut events = Vec::new();
+            let mut compactions = Vec::new();
+            loop {
+                let frame = client.read_frame().await;
+                if frame["id"] == id {
+                    assert!(frame.get("result").is_some(), "{frame}");
+                    reply = Some(frame["result"].clone());
+                }
+                if let Some(event) = frame["params"]["_meta"].get(LIFECYCLE) {
+                    events.push(event.clone());
+                }
+                if let Some(item) = frame["params"]["_meta"].get(ITEMS) {
+                    compactions.push(item.clone());
+                }
+                if events.len() >= settlements
+                    && let Some(reply) = reply
+                {
+                    return (reply, events, compactions);
+                }
+            }
+        })
+        .await
+        .unwrap()
+    }
+
+    for (summary, status) in [
+        (
+            Reply::Finished("An automatic context summary."),
+            "succeeded",
+        ),
+        (Reply::Stop("length"), "failed"),
+    ] {
+        let temporary = TempDir::new().unwrap();
+        let state = temporary.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let endpoint = Endpoint::start(vec![
+            Reply::Finished("First original answer."),
+            Reply::Finished("Recent original answer."),
+            summary,
+            Reply::Finished("The queued chat reply."),
+            Reply::Finished("A manual context summary."),
+            Reply::Finished("The reply after reopening."),
+        ])
+        .await;
+        let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+        let mut capabilities = extension_initialize();
+        for key in [LIFECYCLE, WINDOW, ITEMS, "co.grida/session/compact"] {
+            capabilities["clientCapabilities"]["_meta"][key] = json!(1);
+        }
+        let ready = client.request("initialize", capabilities.clone()).await;
+        assert_eq!(ready["result"]["agentCapabilities"]["_meta"][LIFECYCLE], 1);
+        let created = client
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        for text in [
+            "Earlier requirements. ".repeat(5_200),
+            "Recent request.".into(),
+        ] {
+            let (_, facts, items) = observe(
+                &mut client,
+                "session/prompt",
+                json!({
+                    "sessionId":session,"prompt":[{"type":"text","text":text}],
+                }),
+                1,
+            )
+            .await;
+            assert_eq!(facts[0]["kind"], "settled", "{facts:?}");
+            assert!(items.is_empty(), "{items:?}");
+        }
+        let (_, facts, items) = observe(
+            &mut client,
+            "_co.grida/session/enqueue",
+            prompt_request(session, "next-input", "Continue the chat."),
+            2,
+        )
+        .await;
+        assert_eq!(facts.len(), 2, "{facts:?}");
+        assert_eq!(
+            facts[0]["kind"], "automatic_compaction_settled",
+            "{facts:?}"
+        );
+        assert_eq!(facts[0]["status"], status, "{facts:?}");
+        assert_eq!(facts[1]["kind"], "settled", "{facts:?}");
+        assert_eq!(facts[1]["status"], "succeeded", "{facts:?}");
+        assert_ne!(facts[0]["turnId"], facts[1]["turnId"]);
+        assert_eq!(items.len(), 2, "{items:?}");
+        assert_eq!(items[0]["item"]["status"], "running", "{items:?}");
+        assert_eq!(items[1]["item"]["status"], status, "{items:?}");
+        assert_eq!(items[0]["item"]["id"], items[1]["item"]["id"]);
+        assert_eq!(items[1]["item"]["automatic"], true);
+        assert_eq!(items[1]["turnId"], facts[0]["turnId"]);
+
+        let (manual, manual_facts, manual_items) = observe(
+            &mut client,
+            "_co.grida/session/compact",
+            compact(session, "manual"),
+            1,
+        )
+        .await;
+        assert_eq!(manual["status"], "installed", "{manual}");
+        assert_eq!(manual_items.len(), 2, "{manual_items:?}");
+        assert_eq!(
+            manual_items[0]["item"]["status"], "running",
+            "{manual_items:?}"
+        );
+        assert_eq!(
+            manual_items[1]["item"]["status"], "succeeded",
+            "{manual_items:?}"
+        );
+        assert_eq!(manual_items[0]["item"]["id"], manual_items[1]["item"]["id"]);
+        assert_eq!(manual_items[1]["item"]["automatic"], false);
+        assert_eq!(manual_items[1]["turnId"], manual["turnId"]);
+        assert_ne!(manual_items[1]["item"]["id"], items[1]["item"]["id"]);
+        assert_eq!(
+            manual_facts,
+            [json!({"kind":"settled","turnId":manual["turnId"],"status":"succeeded"})]
+        );
+        client.close().await;
+
+        let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+        client.request("initialize", capabilities).await;
+        let mut load = json!({
+            "sessionId":session, "cwd":workspace.path(), "mcpServers":[],
+            "_meta":{WINDOW:{"kind":"attach"}},
+        });
+        let (_, attachment_facts, attachment_items) =
+            observe(&mut client, "session/load", load.clone(), 0).await;
+        assert!(attachment_facts.is_empty(), "{attachment_facts:?}");
+        assert!(attachment_items.is_empty(), "{attachment_items:?}");
+        load["_meta"][WINDOW] = json!({"kind":"read","requestId":"after-compaction"});
+        let (page, replay_facts, replay_items) =
+            observe(&mut client, "session/load", load, 0).await;
+        assert!(replay_facts.is_empty(), "{replay_facts:?}");
+        assert!(replay_items.is_empty(), "{replay_items:?}");
+        let turns = page["_meta"][WINDOW]["turns"]
+            .as_array()
+            .expect("transcript turns");
+        for item in [&items[1], &manual_items[1]] {
+            let record = turns
+                .iter()
+                .find(|turn| turn["turnId"] == item["turnId"])
+                .unwrap();
+            let replayed = record["compactions"].as_array().unwrap();
+            assert_eq!(replayed.len(), 1, "{record}");
+            for field in ["id", "status", "automatic"] {
+                assert_eq!(replayed[0][field], item["item"][field], "{replayed:?}");
+            }
+            assert!(replayed[0].get("summary").is_none(), "{record}");
+            assert_eq!(
+                record["compaction"]["summary"], item["item"]["summary"],
+                "{record}"
+            );
+        }
+        let automatic = turns
+            .iter()
+            .find(|turn| turn["turnId"] == facts[0]["turnId"])
+            .and_then(|turn| turn.get("compaction"));
+        if status == "succeeded" {
+            assert_eq!(
+                automatic,
+                Some(&json!({"summary":"An automatic context summary.","automatic":true})),
+                "{turns:?}"
+            );
+        } else {
+            assert!(automatic.is_none(), "{turns:?}");
+        }
+        assert!(
+            turns
+                .iter()
+                .any(|turn| turn["turnId"] == facts[1]["turnId"]),
+            "{turns:?}"
+        );
+        assert!(
+            turns.iter().any(|turn| {
+                turn["turnId"] == manual["turnId"]
+                    && turn["compaction"]
+                        == json!({"summary":"A manual context summary.","automatic":false})
+            }),
+            "{turns:?}"
+        );
+        let (submitted, fresh_facts, fresh_items) = observe(
+            &mut client,
+            "_co.grida/session/submit",
+            prompt_request(session, "after-reopen", "Continue after reopening."),
+            1,
+        )
+        .await;
+        assert!(submitted["turnId"].is_string(), "{submitted}");
+        assert!(fresh_items.is_empty(), "{fresh_items:?}");
+        assert_eq!(
+            fresh_facts,
+            [json!({"kind":"settled","turnId":submitted["turnId"],"status":"succeeded"})]
+        );
+        client.close().await;
+        endpoint.done().await;
+    }
 }
 
 #[tokio::test]
@@ -1065,6 +1295,117 @@ async fn compact_on_peer(
     load(&mut peer, session, cwd).await;
     let request = compact(session, id);
     tokio::spawn(async move { ws_rpc(&mut peer, 3, "_co.grida/session/compact", request).await })
+}
+
+#[tokio::test]
+async fn compact_start_returns_before_inference_and_replays_the_admitted_turn() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Original answer."),
+        Reply::Release("Summary contains the retained constraints.", held),
+        Reply::Finished("Queued answer."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+
+    let no_change = ws_rpc(
+        &mut socket,
+        3,
+        START_COMPACTION,
+        compact(&session, "empty-compaction"),
+    )
+    .await;
+    assert_eq!(
+        no_change["result"],
+        json!({"requestId":"empty-compaction","status":"no_change","turnId":null}),
+        "{no_change}"
+    );
+    let initial = session_snapshot(&mut socket, &session).await;
+    assert!(initial["current"].is_null() && initial["latest"].is_null());
+
+    let original = "Design requirements to keep in the transcript. ".repeat(32);
+    let first = prompt(&mut socket, 4, &session, &original).await;
+    assert_eq!(first["result"]["stopReason"], "end_turn", "{first}");
+    endpoint.request().await;
+
+    let mut requester = client(&url).await;
+    let params = compact(&session, "compact-start");
+    let unattached = ws_rpc(&mut requester, 2, START_COMPACTION, params.clone()).await;
+    assert_eq!(unattached["error"]["data"], "session_setup_required");
+    load(&mut requester, &session, workspace.path()).await;
+    let started = ws_rpc(&mut requester, 3, START_COMPACTION, params.clone()).await;
+    let receipt = started["result"].clone();
+    assert_eq!(receipt["requestId"], "compact-start", "{started}");
+    assert_eq!(receipt["status"], "admitted", "{started}");
+    let turn = receipt["turnId"].as_str().unwrap();
+
+    // The provider cannot finish until release. Drop the initiating
+    // connection and recover the same admission through another attachment.
+    drop(requester);
+    let summary_request = endpoint.request().await;
+    assert!(summary_request["messages"].to_string().contains(&original));
+    let retry = ws_rpc(&mut socket, 5, START_COMPACTION, params.clone()).await;
+    assert_eq!(retry["result"], receipt, "{retry}");
+    let active = session_snapshot(&mut socket, &session).await;
+    assert_eq!(active["current"]["turnId"], turn);
+    assert_eq!(active["current"]["disposition"], "running");
+    let refused = ws_rpc(
+        &mut socket,
+        6,
+        START_COMPACTION,
+        compact(&session, "another-compaction"),
+    )
+    .await;
+    assert_eq!(refused["error"]["data"], "session_prompt_in_progress");
+
+    let queued = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "next-input", "Use the retained constraints."),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    assert!(endpoint.requests.try_recv().is_err());
+    release.send(()).unwrap();
+
+    let follow_up = endpoint.request().await;
+    let messages = follow_up["messages"].to_string();
+    assert!(messages.contains("Summary contains the retained constraints."));
+    assert!(messages.contains("Use the retained constraints."));
+    assert!(!messages.contains(&original));
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    let settled = ws_rpc(&mut socket, 8, START_COMPACTION, params.clone()).await;
+    assert_eq!(settled["result"], receipt, "{settled}");
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        [
+            original.as_str(),
+            "Original answer.",
+            "Use the retained constraints.",
+            "Queued answer.",
+        ]
+    );
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut reopened = client(&url).await;
+    load(&mut reopened, &session, workspace.path()).await;
+    let recovered = ws_rpc(&mut reopened, 3, START_COMPACTION, params).await;
+    assert_eq!(recovered["result"], receipt, "{recovered}");
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(reopened);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

@@ -1,14 +1,15 @@
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
-use grida_agent::configuration::WorkspaceConfiguration;
+use grida_agent::configuration::{self, GlobalConfigEdit};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::mcp_client::McpClient;
-use grida_agent::process::{self, RunOptions};
+use grida_agent::process::{self, RunOptions, RunQuestions};
 use grida_agent::{
     CompatibleOutputLimitField, EffortPreset, OperatingRegime, ProviderOptions, ProviderProtocol,
     acp, mcp,
 };
 use serde_json::json;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -37,7 +38,17 @@ fn main() -> ExitCode {
     match result {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
-            eprintln!("grida-agent: {}", error.code);
+            if error.code.starts_with("config_")
+                && let Ok(directory) = configuration::global_directory()
+            {
+                eprintln!(
+                    "grida-agent: {} ({:?})",
+                    error.code,
+                    directory.join("config.toml")
+                );
+            } else {
+                eprintln!("grida-agent: {}", error.code);
+            }
             ExitCode::from(if error.kind == ErrorKind::Uncertain {
                 5
             } else {
@@ -52,6 +63,19 @@ fn command() -> Command {
         .version(env!("CARGO_PKG_VERSION"))
         .about("Native Grida Agent host")
         .subcommand_required(true)
+        .subcommand(
+            Command::new("config")
+                .hide(true)
+                .subcommand_required(true)
+                .arg(Arg::new("confirm-stdio").long("confirm-stdio").action(ArgAction::SetTrue))
+                .subcommand(Command::new("create"))
+                .subcommand(Command::new("check"))
+                .subcommand(
+                    Command::new("set-personalization")
+                        .arg(Arg::new("key").required(true).value_parser(["suggested-prompts", "web-search"]))
+                        .arg(Arg::new("value").required(true)),
+                ),
+        )
         .subcommand(launch(
             Command::new("run")
                 .about("Run one prompt without interactive UI")
@@ -61,7 +85,7 @@ fn command() -> Command {
                         .value_name("DIRECTORY")
                         .value_parser(value_parser!(PathBuf))
                         .required_unless_present_any(["permission-profile", "input-png", "input-file"])
-                        .help("Working directory. Defaults to the trusted profile's primary or a private attachment context."),
+                        .help("Working directory. Defaults to the trusted profile's primary or a private attachment context. Select a subdirectory to load its project instructions."),
                 )
                 .arg(
                     Arg::new("input-png")
@@ -89,7 +113,14 @@ fn command() -> Command {
                     Arg::new("questions")
                         .long("questions")
                         .action(ArgAction::SetTrue)
-                        .help("Allow questions. Required answers produce an input_required exit. Optional questions expire at completion."),
+                        .help("Allow one question per request with schema version 1 output."),
+                )
+                .arg(
+                    Arg::new("questions-v2")
+                        .long("questions-v2")
+                        .conflicts_with("questions")
+                        .action(ArgAction::SetTrue)
+                        .help("Allow question batches with schema version 2 output."),
                 )
                 .arg(
                     Arg::new("skill")
@@ -118,6 +149,14 @@ fn command() -> Command {
             Command::new("serve")
                 .about("Serve stable Agent Client Protocol")
                 .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
+                .arg(
+                    Arg::new("cwd")
+                        .long("cwd")
+                        .value_name("DIRECTORY")
+                        .value_parser(value_parser!(PathBuf))
+                        .requires("permission-profile")
+                        .help("Select project instructions for a directory inside the trusted profile's primary workspace"),
+                )
                 .arg(
                     Arg::new("subagents")
                         .long("subagents")
@@ -153,23 +192,6 @@ fn command() -> Command {
                         .hide(true),
                 )
                 .arg(
-                    Arg::new("workspace-configuration")
-                        .long("workspace-configuration")
-                        .value_name("DIRECTORY")
-                        .value_parser(value_parser!(PathBuf))
-                        .requires_all(["supervised-provider", "workspace-configuration-epoch"])
-                        .conflicts_with("listen")
-                        .hide(true),
-                )
-                .arg(
-                    Arg::new("workspace-configuration-epoch")
-                        .long("workspace-configuration-epoch")
-                        .value_name("UUID")
-                        .value_parser(value_parser!(uuid::Uuid))
-                        .requires("workspace-configuration")
-                        .hide(true),
-                )
-                .arg(
                     Arg::new("supervised-wire-model")
                         .long("supervised-wire-model")
                         .value_name("SELECTOR")
@@ -187,6 +209,14 @@ fn command() -> Command {
                         .long("supervised-image-input")
                         .requires("supervised-wire-model")
                         .action(ArgAction::SetTrue)
+                        .hide(true),
+                )
+                .arg(
+                    Arg::new("supervised-context-window-tokens")
+                        .long("supervised-context-window-tokens")
+                        .value_name("TOKENS")
+                        .value_parser(value_parser!(u64).range(1..=9_007_199_254_740_991))
+                        .requires("supervised-provider")
                         .hide(true),
                 )
                 .arg(
@@ -313,6 +343,29 @@ fn command() -> Command {
                 .arg(Arg::new("session").long("session").required(true))
                 .arg(Arg::new("operation").long("operation").value_parser(["inspect", "update", "receipt", "ack"]).default_value("inspect"))
                 .arg(Arg::new("request-json").long("request-json")),
+        )
+        .subcommand(
+            Command::new("skills")
+                .hide(true)
+                .arg(
+                    Arg::new("workspace-root")
+                        .long("workspace-root")
+                        .value_parser(value_parser!(PathBuf))
+                        .requires_all(["workspace-device", "workspace-inode"]),
+                )
+                .arg(
+                    Arg::new("workspace-device")
+                        .long("workspace-device")
+                        .value_parser(value_parser!(u64))
+                        .requires("workspace-root"),
+                )
+                .arg(
+                    Arg::new("workspace-inode")
+                        .long("workspace-inode")
+                        .value_parser(value_parser!(u64))
+                        .requires("workspace-root"),
+                )
+                .arg(Arg::new("bundled-fx").long("bundled-fx").action(ArgAction::SetTrue)),
         )
         .subcommand(Command::new("serve-catalog")
             .about("Serve a provider-independent ACP catalog of authorized native workspaces")
@@ -508,7 +561,7 @@ fn launch(command: Command) -> Command {
             Arg::new("llama-cpp-input-count")
                 .long("llama-cpp-input-count")
                 .action(ArgAction::SetTrue)
-                .help("Use the llama.cpp text request counter on a direct numeric-loopback /v1 endpoint"),
+                .hide(true),
         )
         .arg(
             Arg::new("reasoning")
@@ -525,8 +578,53 @@ fn launch(command: Command) -> Command {
         )
 }
 
+fn global_config_edit(args: &ArgMatches) -> Result<()> {
+    use std::io::{Read, Write};
+
+    let invalid = || problem(ErrorKind::InvalidInput, "config_invalid_personalization");
+    let edit = match args.subcommand().expect("required config command") {
+        ("create", _) => GlobalConfigEdit::Create,
+        ("set-personalization", args) => {
+            let key = args.get_one::<String>("key").expect("required key");
+            let value = args.get_one::<String>("value").expect("required value");
+            match (key.as_str(), value.as_str()) {
+                ("suggested-prompts", "true") => GlobalConfigEdit::SuggestedPrompts(true),
+                ("suggested-prompts", "false") => GlobalConfigEdit::SuggestedPrompts(false),
+                ("web-search", "automatic") => GlobalConfigEdit::WebSearch(true),
+                ("web-search", "disabled") => GlobalConfigEdit::WebSearch(false),
+                _ => return Err(invalid()),
+            }
+        }
+        _ => return Err(invalid()),
+    };
+    configuration::edit_global_config(&configuration::global_directory()?, edit, || {
+        if args.get_flag("confirm-stdio") {
+            let rejected = || problem(ErrorKind::Unavailable, "config_write_admission_denied");
+            let mut stdout = std::io::stdout().lock();
+            stdout.write_all(b"ready\n").map_err(|_| rejected())?;
+            stdout.flush().map_err(|_| rejected())?;
+            let mut decision = [0];
+            std::io::stdin()
+                .read_exact(&mut decision)
+                .map_err(|_| rejected())?;
+            if decision != *b"y" {
+                return Err(rejected());
+            }
+        }
+        Ok(())
+    })
+}
+
 async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let (name, args) = matches.subcommand().expect("required subcommand");
+    if name == "config" {
+        if args.subcommand_matches("check").is_some() {
+            let check = configuration::Configuration::check(&configuration::global_directory()?)?;
+            process::write_record(&check).await?;
+            return Ok(0);
+        }
+        return global_config_edit(args).map(|()| 0);
+    }
     if name == "bake-prompt" {
         let regime = if args.get_one::<String>("mode").map(String::as_str) == Some("plan") {
             OperatingRegime::Plan
@@ -559,6 +657,23 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "workspace-file" {
         return grida_agent::workspace_file::serve_stdio().map(|()| 0);
+    }
+    if name == "skills" {
+        let workspace = args.get_one::<PathBuf>("workspace-root").map(|root| {
+            (
+                root.as_path(),
+                *args
+                    .get_one::<u64>("workspace-device")
+                    .expect("required device"),
+                *args
+                    .get_one::<u64>("workspace-inode")
+                    .expect("required inode"),
+            )
+        });
+        let skills =
+            grida_agent::host::discover_skill_metadata(workspace, args.get_flag("bundled-fx"))?;
+        process::write_record(&json!({ "skills": skills })).await?;
+        return Ok(0);
     }
     if name == "serve-catalog" {
         let catalog = acp::catalog_service::Catalog::open(
@@ -935,13 +1050,6 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             "desktop_image_generation_provider_invalid",
         ));
     }
-    let workspace_configuration = if name == "serve" {
-        args.get_one::<PathBuf>("workspace-configuration")
-            .zip(args.get_one::<uuid::Uuid>("workspace-configuration-epoch"))
-            .map(|(directory, epoch)| WorkspaceConfiguration::new(directory.clone(), *epoch))
-    } else {
-        None
-    };
     let host = match (&supervisor, gateway_scope, chatgpt_scope) {
         (Some(supervisor), _, Some(scope)) => {
             if provider.protocol != ProviderProtocol::Responses {
@@ -956,7 +1064,6 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 provider.model,
                 scope,
                 supervisor.clone(),
-                workspace_configuration.as_ref(),
             )?
         }
         (Some(supervisor), Some(scope), None) => {
@@ -972,16 +1079,20 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 &provider.endpoint,
                 scope,
                 supervisor.clone(),
-                workspace_configuration.as_ref(),
             )?
         }
-        (Some(supervisor), None, None) => Host::open_supervised(
-            state_dir,
-            provider,
-            supervisor.clone(),
-            workspace_configuration.as_ref(),
-        )?,
+        (Some(supervisor), None, None) => {
+            Host::open_supervised(state_dir, provider, supervisor.clone())?
+        }
         (None, _, _) => Host::open(state_dir, Some(provider))?,
+    };
+    let host = match supervisor.as_ref().and_then(|_| {
+        args.get_one::<u64>("supervised-context-window-tokens")
+            .copied()
+            .and_then(NonZeroU64::new)
+    }) {
+        Some(window) => host.with_supervised_context_window(window)?,
+        None => host,
     };
     let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;
     let host = host.with_operating_regime(regime);
@@ -1021,6 +1132,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         Some(profile) => host.with_permission_profile(profile),
         None => host,
     };
+    let host = if name == "serve"
+        && let Some(cwd) = args.get_one::<PathBuf>("cwd")
+    {
+        host.with_instruction_directory(cwd)?
+    } else {
+        host
+    };
     let host = Arc::new(if args.get_flag("require-completion-text") {
         host.with_required_completion_text()
     } else {
@@ -1052,7 +1170,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 .cloned()
                 .map(grida_agent::skills::SkillReference::named)
                 .collect::<Result<_>>()?,
-            questions: args.get_flag("questions"),
+            questions: match (args.get_flag("questions"), args.get_flag("questions-v2")) {
+                (true, _) => RunQuestions::Singleton,
+                (_, true) => RunQuestions::Batch,
+                _ => RunQuestions::Disabled,
+            },
             // Ultra pairs the extended harness with the highest reasoning
             // level, as on every client surface.
             reasoning: ultra.then_some(agent_kit_core::inference::ReasoningEffort::XHigh),

@@ -374,13 +374,7 @@ impl Host {
             .permissions
             .as_ref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
-        profile.bind(
-            capture,
-            binding,
-            self.store.clone(),
-            true,
-            self.configuration.clone(),
-        )
+        profile.bind(capture, binding, self.store.clone(), true)
     }
 
     pub(super) fn bind_worker_permissions(

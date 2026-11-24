@@ -600,9 +600,8 @@ function NativeChildTranscript({
         if (block.kind === "compaction")
           return (
             <CompactionNotice
-              key={block.turnId}
+              key={block.compactionId}
               summary={block.summary}
-              auto={block.automatic}
             />
           );
         const record = records.get(block.turnId);

@@ -547,6 +547,100 @@ async fn denials_outside_the_grant_never_widen_access() {
     assert_eq!(evidence.stdout, b"complete");
 }
 
+#[cfg(target_os = "macos")]
+#[tokio::test]
+#[ignore = "requires native Seatbelt"]
+async fn prefix_denial_protects_entries_created_after_launch() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let parent = fixture.workspace.join("project+[1]");
+    let directory = parent.join(r#"preferences\with"quotes"#);
+    let alias = fixture.workspace.join("alias");
+    fs::create_dir_all(&directory).unwrap();
+    std::os::unix::fs::symlink(&directory, &alias).unwrap();
+    let mut scope = fixture.scope();
+    scope.disk_read = true;
+    scope.protected.push(ProtectedPath {
+        path: alias.join("stage-[1]-"),
+        access: DeniedAccess::ReadWritePrefix,
+    });
+    let mut command = fixture.command(
+        r#"
+        printf ready > ready || exit 30
+        while [ ! -f release ]; do /bin/sleep 0.02; done
+        for name in "$1/stage-[1]-file" "$2/stage-[1]-file" "$2/stage-[1]-dir/content"; do
+            if /bin/cat "$name" >/dev/null 2>&1; then exit 31; fi
+            if (printf denied > "$name") 2>/dev/null; then exit 32; fi
+        done
+        if /bin/cat "$2/STAGE-[1]-FILE" >/dev/null 2>&1; then exit 35; fi
+        if "$2/stage-[1]-executable" >/dev/null 2>&1; then exit 36; fi
+        if /bin/ln "$2/stage-[1]-file" file-alias 2>/dev/null; then exit 37; fi
+        if (printf denied > "$1/stage-[1]-new") 2>/dev/null; then exit 33; fi
+        if /bin/mv "$3" moved 2>/dev/null; then exit 34; fi
+        /bin/cat "$2/stage-1-ordinary"
+        "#,
+    );
+    command.arguments.extend([
+        directory.display().to_string(),
+        alias.display().to_string(),
+        parent.display().to_string(),
+    ]);
+    let running = sandbox
+        .prepare(command, scope)
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while !fixture.workspace.join("ready").exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    fs::write(directory.join("stage-[1]-file"), "private").unwrap();
+    fs::create_dir(directory.join("stage-[1]-dir")).unwrap();
+    fs::write(directory.join("stage-[1]-dir/content"), "private").unwrap();
+    let executable = directory.join("stage-[1]-executable");
+    fs::write(&executable, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(executable, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::write(directory.join("stage-1-ordinary"), "ordinary").unwrap();
+    fs::write(fixture.workspace.join("release"), "").unwrap();
+
+    let evidence = running.finish().await.unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&evidence.stderr)
+    );
+    assert_eq!(evidence.stdout, b"ordinary");
+    assert_eq!(
+        fs::read(directory.join("stage-[1]-file")).unwrap(),
+        b"private"
+    );
+    assert!(!directory.join("stage-[1]-new").exists());
+    assert!(!fixture.workspace.join("file-alias").exists());
+    assert!(!fixture.workspace.join("moved").exists());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "requires a trusted bubblewrap installation"]
+fn unsupported_prefix_denial_refuses_before_linux_launch() {
+    let fixture = Fixture::new();
+    let mut scope = fixture.scope();
+    scope.protected.push(ProtectedPath {
+        path: fixture.workspace.join("stage-"),
+        access: DeniedAccess::ReadWritePrefix,
+    });
+    let error = fixture
+        .sandbox()
+        .prepare(fixture.command("exit 0"), scope)
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_protected_prefix_unsupported");
+}
+
 #[test]
 #[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
 fn a_launch_outlives_the_thread_that_started_it() {

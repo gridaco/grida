@@ -2,6 +2,7 @@
 import type {
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatCompactionAdmission,
 } from "@grida/desktop-bridge";
 import type { NativeChatSession } from "./native-agent-chat";
 import { NativeAgentHistory } from "./native-agent-history";
@@ -9,6 +10,7 @@ import { NativeAgentHistory } from "./native-agent-history";
 const { anchor: historyAnchor, basis, identity, object } = NativeAgentHistory;
 
 const COMPACT = "co.grida/session/compact";
+const COMPACT_START = "co.grida/session/compact/start";
 const HISTORY = "co.grida/session/history";
 const FORK = "co.grida/session/fork";
 const MAX_RETAINED_FORKS = 16;
@@ -29,6 +31,7 @@ const UNVERIFIED = new Set([
   "store_task_interrupted",
   "control_worker_interrupted",
   "compaction_admission_interrupted",
+  "compaction_admission_pending",
   "compaction_worker_interrupted",
   "native_agent_disconnected",
   "native_agent_input_failed",
@@ -48,8 +51,10 @@ type ForkRequest = {
 };
 
 export class NativeAgentCommands {
+  static readonly compactionStartCapability = COMPACT_START;
   static readonly capabilities = {
     [COMPACT]: 1,
+    [COMPACT_START]: 1,
     [HISTORY]: 1,
     [FORK]: 1,
   } as const;
@@ -79,10 +84,7 @@ export class NativeAgentCommands {
     requestId: string,
     check: () => void
   ): Promise<NativeChatCommandResult> {
-    if (this.active.has(session))
-      throw new Error("native_chat_command_in_progress");
-    this.active.add(session);
-    try {
+    return this.exclusive(session, async () => {
       if (command === "fork") {
         const request = await this.forkRequest(session, requestId);
         check();
@@ -105,6 +107,38 @@ export class NativeAgentCommands {
       )
         throw new Error("native_chat_command_unverified");
       return { command, status, turnId: turnId as string | null };
+    });
+  }
+
+  startCompaction(
+    session: NativeChatSession,
+    requestId: string,
+    check: () => void
+  ): Promise<NativeChatCompactionAdmission> {
+    return this.exclusive(session, async () => {
+      check();
+      const result = object(
+        await this.dispatch(COMPACT_START, { sessionId: session.id, requestId })
+      );
+      if (result?.requestId === requestId) {
+        if (result.status === "admitted" && identity(result.turnId))
+          return { requestId, status: "admitted", turnId: result.turnId };
+        if (result.status === "no_change" && result.turnId === null)
+          return { requestId, status: "no_change", turnId: null };
+      }
+      throw new Error("native_chat_command_unverified");
+    });
+  }
+
+  private async exclusive<T>(
+    session: NativeChatSession,
+    run: () => Promise<T>
+  ): Promise<T> {
+    if (this.active.has(session))
+      throw new Error("native_chat_command_in_progress");
+    this.active.add(session);
+    try {
+      return await run();
     } finally {
       this.active.delete(session);
     }
@@ -155,7 +189,12 @@ export class NativeAgentCommands {
     try {
       return await this.request(`_${method}`, params);
     } catch (error) {
-      if (error instanceof Error && UNVERIFIED.has(error.message))
+      if (
+        error instanceof Error &&
+        (UNVERIFIED.has(error.message) ||
+          (method === COMPACT_START &&
+            error.message === "native_agent_request_failed"))
+      )
         throw new Error("native_chat_command_unverified", { cause: error });
       throw error;
     }

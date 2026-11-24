@@ -94,12 +94,16 @@ pub enum DeniedAccess {
     Write,
     /// The path is neither readable nor writable.
     ReadWrite,
+    /// Deny reads and writes to immediate entries whose names start with the
+    /// path's literal basename, and to their descendants. Requires Seatbelt.
+    ReadWritePrefix,
 }
 
 /// A path the process must not reach, whether or not it exists yet.
 #[derive(Clone, Debug)]
 pub struct ProtectedPath {
-    /// Absolute path. Missing trailing components are allowed.
+    /// Absolute path. Missing trailing components are allowed. For a prefix
+    /// denial the parent is a directory and the final component is the prefix.
     pub path: PathBuf,
     pub access: DeniedAccess,
 }

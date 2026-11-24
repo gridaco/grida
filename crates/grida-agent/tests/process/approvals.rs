@@ -115,6 +115,7 @@ impl Fixture {
         let mut process = executable();
         process.arg(mode);
         configured(&mut process, &self.state, endpoint);
+        process.env("GRIDA_HOME", self.profile.with_file_name("grida-home"));
         process.arg("--permission-profile").arg(&self.profile);
         if self.scoped_approvals {
             process.arg("--allow-scoped-approvals");
@@ -575,16 +576,17 @@ async fn external_file_approval_leaves_a_sibling_read_waiting_for_its_own_decisi
 const HOST_SETTINGS: &str = "schema_version = 1\n# protected host settings\n";
 
 fn seed_host_settings(fixture: &Fixture) -> PathBuf {
-    fs::create_dir(&fixture.state).unwrap();
-    fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
-    let config = fixture.state.join("config.toml");
+    let home = fixture.profile.with_file_name("grida-home");
+    fs::create_dir(&home).unwrap();
+    fs::set_permissions(&home, fs::Permissions::from_mode(0o700)).unwrap();
+    let config = home.join("config.toml");
     fs::write(&config, HOST_SETTINGS).unwrap();
     fs::set_permissions(&config, fs::Permissions::from_mode(0o600)).unwrap();
     config
 }
 
 #[tokio::test]
-async fn model_file_tools_cannot_read_write_or_edit_host_settings() {
+async fn removed_settings_directory_cannot_read_write_or_edit_global_config() {
     let fixture = Fixture::new(false);
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["directories"][0]["write"] = json!("allow");
@@ -1090,7 +1092,7 @@ async fn plan_and_act_read_outside_the_workspace_with_a_broad_read_profile() {
         let mut endpoint = Endpoint::start(vec![
             Reply::Tool(
                 "exec_command",
-                r#"{"cmd":"if (: < ../protected/secret) 2>/dev/null; then exit 41; fi; if (: < ../state/config.toml) 2>/dev/null; then exit 44; fi; if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > ../ordinary.txt) 2>/dev/null; then exit 43; fi; /bin/cat ../ordinary.txt","access":"read"}"#,
+                r#"{"cmd":"if (: < ../protected/secret) 2>/dev/null; then exit 41; fi; if (: < ../private/grida-home/config.toml) 2>/dev/null; then exit 44; fi; if (printf write > note) 2>/dev/null; then exit 42; fi; if (printf write > ../ordinary.txt) 2>/dev/null; then exit 43; fi; /bin/cat ../ordinary.txt","access":"read"}"#,
             ),
             exec_input_file(json!({
                 "cmd":"/bin/cat","access":"read", "input_file":{

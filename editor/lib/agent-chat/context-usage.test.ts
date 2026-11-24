@@ -267,7 +267,16 @@ describe("computeContextUsage with a measured context", () => {
     expect(usage.measured).toBe(false);
   });
 
-  it("never reports less than the visible transcript", () => {
-    expect(computeContextUsage(messages, 100_000, 10).usedTokens).toBe(300);
+  it("keeps a smaller measured request after the visible transcript is compacted", () => {
+    const usage = computeContextUsage(messages, 100_000, 10);
+    expect(usage.usedTokens).toBe(10);
+    expect(usage.percent).toBeCloseTo(0.0001);
+    expect(usage.breakdown).toEqual({
+      user: 0,
+      assistant: 0,
+      tools: 0,
+      other: 10,
+    });
+    expect(usage.measured).toBe(true);
   });
 });

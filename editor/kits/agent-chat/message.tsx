@@ -29,6 +29,7 @@ import {
 import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
 import type { NativeChatQuestionReply } from "@grida/desktop-bridge";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
 import { cn } from "@app/ui/lib/utils";
 import markdownStyles from "@/components/chat-markdown.module.css";
 import { cjk } from "@streamdown/cjk";
@@ -100,7 +101,11 @@ import { EditorSelectionIndicator } from "./editor-selection-indicator";
 import { MessageContextParts } from "./message-context-parts";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import { WorkingIndicator } from "./working-indicator";
-import { userMessageRemarkPlugins } from "./user-message-markdown";
+import {
+  isUserMessageSkillMarker,
+  projectUserMessageSkills,
+  userMessageRemarkPlugins,
+} from "./user-message-markdown";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -124,7 +129,13 @@ const markdown = {
   components: workspace_links.components,
 } as const;
 
-function UserMessageText({ text }: { text: string }) {
+export function UserMessageText({
+  text,
+  skillLinks,
+}: {
+  text: string;
+  skillLinks?: ReturnType<typeof projectUserMessageSkills>["links"];
+}) {
   return (
     <MessageResponse
       className={cn(
@@ -137,7 +148,28 @@ function UserMessageText({ text }: { text: string }) {
       plugins={markdown.plugins}
       remarkPlugins={userMessageRemarkPlugins}
       rehypePlugins={markdown.rehypePlugins}
-      components={markdown.components}
+      components={{
+        ...markdown.components,
+        a: (props) => {
+          if (!isUserMessageSkillMarker(props.href))
+            return <workspace_links.Link {...props} />;
+          const skill = props.href && skillLinks?.get(props.href);
+          return skill ? (
+            <span
+              title={skill.source}
+              className="font-medium text-blue-600 dark:text-blue-400"
+            >
+              <BookOpenIcon
+                aria-hidden
+                className="mr-1 inline size-[1em] align-[-0.15em]"
+              />
+              {skill.label}
+            </span>
+          ) : (
+            <span>{props.children}</span>
+          );
+        },
+      }}
     >
       {text}
     </MessageResponse>
@@ -221,9 +253,7 @@ export function ChatMessageView({
   // summary rather than an empty assistant bubble.
   const compaction = findCompactionSummary(message);
   if (compaction) {
-    return (
-      <CompactionNotice summary={compaction.summary} auto={compaction.auto} />
-    );
+    return <CompactionNotice summary={compaction.summary} />;
   }
 
   if (message.role === "user") {
@@ -255,8 +285,15 @@ export function ChatMessageView({
     const messageContext = message.parts.find(
       (part) => part.type === chat_vocabulary.CONTEXT_PARTS.messageContext
     );
-    // Perceived images and host-supplied resources stay outside the prose
-    // bubble. Neither their labels nor their previews become copyable text.
+    const displayParts =
+      messageContext &&
+      "data" in messageContext &&
+      Array.isArray(messageContext.data)
+        ? messageContext.data
+        : undefined;
+    const authored = projectUserMessageSkills(text, displayParts);
+    // Perceived images and attachments stay outside the prose bubble.
+    // Neither their labels nor their previews become copyable text.
     const images = message.parts.filter(
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")
@@ -274,14 +311,12 @@ export function ChatMessageView({
             className="self-end"
           />
         )}
-        {messageContext &&
-          "data" in messageContext &&
-          Array.isArray(messageContext.data) && (
-            <MessageContextParts
-              parts={messageContext.data}
-              className="justify-end"
-            />
-          )}
+        {authored.context.length > 0 && (
+          <MessageContextParts
+            parts={authored.context}
+            className="justify-end"
+          />
+        )}
         <UserMessageAttachments
           contexts={contexts}
           images={images}
@@ -319,7 +354,10 @@ export function ChatMessageView({
                         {questionReplyData}
                       </blockquote>
                     )}
-                    <UserMessageText text={text} />
+                    <UserMessageText
+                      text={authored.text}
+                      skillLinks={authored.links}
+                    />
                   </>
                 )}
               </CollapsibleBubbleBody>
@@ -338,7 +376,11 @@ export function ChatMessageView({
                 {actions?.sentAtMs !== undefined && (
                   <MessageTime at={actions.sentAtMs} />
                 )}
-                {hasText && <CopyMessageAction text={text} />}
+                {hasText && (
+                  <CopyMessageAction
+                    text={SkillMentions.plainText(text, displayParts)}
+                  />
+                )}
                 {hasText && actions?.onEdit && (
                   <MessageAction
                     tooltip="Edit and resubmit"
@@ -861,14 +903,28 @@ export function CompactionProgress() {
   );
 }
 
-/** A transcript disclosure for the summary the model now reads. */
+/** A transcript marker and, when retained, the summary it installed. */
 export function CompactionNotice({
   summary,
-  auto,
+  elapsedMs,
+  failed = false,
 }: {
-  summary: string;
-  auto: boolean;
+  summary?: string;
+  elapsedMs?: number;
+  failed?: boolean;
 }) {
+  const label = failed
+    ? "Context compaction failed"
+    : elapsedMs === undefined
+      ? "Context compacted"
+      : `Context compacted · ${formatElapsed(Math.floor(elapsedMs / 1000))}`;
+  const marker = (
+    <>
+      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
+      {label}
+    </>
+  );
+  if (!summary) return <div className={compactionRowClassName}>{marker}</div>;
   return (
     <details className="group/compaction w-full">
       <summary
@@ -877,8 +933,7 @@ export function CompactionNotice({
           "cursor-pointer list-none transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
         )}
       >
-        <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
-        {auto ? "Conversation auto-compacted" : "Conversation compacted"}
+        {marker}
         <ChevronRightIcon
           aria-hidden
           className="size-3 shrink-0 opacity-0 transition-[opacity,rotate] group-open/compaction:rotate-90 group-open/compaction:opacity-100 group-hover/compaction:opacity-100 group-focus-within/compaction:opacity-100"

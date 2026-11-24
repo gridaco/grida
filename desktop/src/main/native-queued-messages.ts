@@ -1,14 +1,16 @@
 // GRIDA-SEC-004 — observation-bound queued input display, with no dispatch authority.
 import { randomUUID } from "node:crypto";
+import { NativeChatSkills } from "@grida/desktop-bridge";
 import type {
   NativeChatMessageAttachment,
   NativeChatQueuedMessage,
 } from "@grida/desktop-bridge";
+import { NATIVE_CHAT_MAX_ATTACHMENTS } from "@grida/desktop-bridge";
 import { NativeFileReference } from "./native-file-reference";
 
 type Image = Readonly<{
   sessionId: string;
-  sessionRevision: number;
+  basis: number | string;
   inputId: string;
   attachmentUri: string;
   mimeType: string;
@@ -25,6 +27,7 @@ const MAX_BASE64 = Math.ceil(CHUNK_BYTES / 3) * 4;
 export class NativeQueuedMessages {
   static readonly capability = "co.grida/session/queued-input-image-chunks";
   static readonly inspectMethod = "_co.grida/session/queued-message";
+  static readonly actionsCapability = "co.grida/session/queue-actions";
   static readonly replaceTextCapability = "co.grida/session/replace-text";
   static readonly replaceTextMethod = "_co.grida/session/replace-text";
   static readonly readMethod =
@@ -34,10 +37,11 @@ export class NativeQueuedMessages {
 
   describe(
     sessionId: string,
-    sessionRevision: number,
+    basis: number | string,
     inputId: string,
     value: unknown,
-    textReplacement = false
+    textReplacement = false,
+    attachmentEdit = false
   ): NativeChatQueuedMessage {
     const result = record(value);
     if (
@@ -63,6 +67,13 @@ export class NativeQueuedMessages {
         if (textBytes > 512 * 1024) throw unavailable();
         texts.push(part.text);
       } else if (part?.type === "resource_link") {
+        // The independent accepted display projection carries the skill chip.
+        // A retained skill reference is never a file attachment or preview.
+        if (
+          typeof part.uri === "string" &&
+          part.uri.startsWith(NativeChatSkills.uriPrefix)
+        )
+          continue;
         if (
           attachments.length >= 64 ||
           typeof part.name !== "string" ||
@@ -101,7 +112,7 @@ export class NativeQueuedMessages {
             ((size as number) > 0 && (size as number) <= MAX_BYTES))
             ? this.offer({
                 sessionId,
-                sessionRevision,
+                basis,
                 inputId,
                 attachmentUri: part.uri,
                 mimeType,
@@ -120,6 +131,16 @@ export class NativeQueuedMessages {
         );
       } else throw unavailable();
     }
+    const attachmentIndexes = result.attachmentIndexes;
+    if (
+      attachmentEdit &&
+      (typeof basis !== "string" ||
+        !Array.isArray(attachmentIndexes) ||
+        attachmentIndexes.length > NATIVE_CHAT_MAX_ATTACHMENTS ||
+        attachmentIndexes.length !== attachments.length ||
+        attachmentIndexes.some((member, index) => member !== index))
+    )
+      throw unavailable();
     return Object.freeze({
       inputId,
       text: texts.join("\n"),
@@ -131,13 +152,18 @@ export class NativeQueuedMessages {
           textEditable: result.textEditable,
         }),
       ...(attachments.length && { attachments: Object.freeze(attachments) }),
+      ...(attachmentEdit && {
+        attachmentIndexes: Object.freeze(
+          (attachmentIndexes as number[]).slice()
+        ),
+      }),
     });
   }
 
   require(
     sessionId: string,
-    sessionRevision: number,
-    inputId: string,
+    basis: number | string,
+    inputId: string | undefined,
     token: unknown
   ): Image {
     const image =
@@ -145,8 +171,8 @@ export class NativeQueuedMessages {
     if (
       !image ||
       image.sessionId !== sessionId ||
-      image.sessionRevision !== sessionRevision ||
-      image.inputId !== inputId
+      image.basis !== basis ||
+      (inputId !== undefined && image.inputId !== inputId)
     )
       throw unavailable();
     return image;

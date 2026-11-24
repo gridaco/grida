@@ -94,11 +94,15 @@ pub(super) struct PriorContext {
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
     pub(crate) models: BTreeMap<TurnId, ModelId>,
+    pub(crate) context_windows: BTreeMap<TurnId, NonZeroU64>,
+    pub(crate) compaction_summaries: BTreeMap<TurnId, String>,
+    pub(crate) compaction_items: BTreeMap<TurnId, Vec<super::live::CompactionItem>>,
     pub(crate) authored_inputs: BTreeMap<MessageId, (TurnId, ChangeId)>,
     pub(crate) approval_reviews: BTreeMap<TurnId, Vec<ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
     pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
+    pub(crate) skill_message_text: BTreeMap<MessageId, String>,
 }
 
 impl Host {
@@ -180,6 +184,7 @@ impl Host {
         let mut facts = TranscriptInputFacts::default();
         for turn in turns {
             let mut automatic_review = false;
+            let mut inline_compaction = false;
             let inputs = self
                 .store
                 .turn_submissions(session.clone(), turn.clone())
@@ -199,6 +204,12 @@ impl Host {
                 if single_input && let Some(model) = stored.model {
                     facts.models.insert(turn.clone(), model);
                 }
+                if let Some(limits) = stored.context_limits {
+                    if single_input && let Some(window) = limits.window {
+                        facts.context_windows.insert(turn.clone(), window);
+                    }
+                    inline_compaction |= limits.auto_compact.is_some();
+                }
                 automatic_review |= stored.permission_capture.as_ref().is_some_and(|capture| {
                     capture.mode() == crate::permissions::PermissionMode::ApproveForMe
                 });
@@ -211,23 +222,62 @@ impl Host {
                 if stored.editor_tool_context_id.is_some() {
                     facts.editor_tool_contexts.insert(message.clone());
                 }
-                if let Some(context) = message_context::context(&stored.parts)
-                    && !context.display_parts.is_empty()
-                {
-                    facts
-                        .display_parts
-                        .insert(message, context.display_parts.clone());
+                let skills = stored
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                if !skills.is_empty() {
+                    // Keep the actual authored text. The model's generated
+                    // selection marker is represented here by the skill chip.
+                    facts.skill_message_text.insert(
+                        message.clone(),
+                        message_context::skill_input_text(&stored.parts),
+                    );
+                }
+                let display = message_context::display_parts(&stored.parts, &skills);
+                if !display.is_empty() {
+                    facts.display_parts.insert(message, display);
                 }
             }
-            if automatic_review {
-                let mut reviews = self
+            for input in self
+                .store
+                .transferred_input_ids(session.clone(), turn.clone())
+                .await?
+            {
+                let message = super::queue_actions::steering_message_id(&input)?;
+                facts.authored_inputs.insert(message, (turn.clone(), input));
+            }
+            if inline_compaction || automatic_review {
+                let ordering = self.activity_order.clone();
+                let (summary, mut reviews, items) = self
                     .store
-                    .inspect_turn_with(
-                        session.clone(),
-                        turn.clone(),
-                        super::permissions::approval_review_facts,
-                    )
+                    .inspect_turn_with(session.clone(), turn.clone(), move |state| {
+                        let summary = inline_compaction
+                            .then(|| grida_agent_master::compaction::inline_summary(state))
+                            .flatten();
+                        let reviews = if automatic_review {
+                            super::permissions::approval_review_facts(state)?
+                        } else {
+                            Vec::new()
+                        };
+                        let items = if inline_compaction {
+                            let binding = state.binding();
+                            super::live::compaction_items(state, |id| {
+                                ordering.event(&binding.session, &binding.turn, id)
+                            })
+                        } else {
+                            Vec::new()
+                        };
+                        Ok((summary, reviews, items))
+                    })
                     .await?;
+                if let Some(summary) = summary {
+                    facts.compaction_summaries.insert(turn.clone(), summary);
+                }
+                if !items.is_empty() {
+                    facts.compaction_items.insert(turn.clone(), items);
+                }
                 let with_ids = reviews
                     .iter_mut()
                     .filter_map(|review| {

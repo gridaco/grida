@@ -37,7 +37,7 @@ async function privateHome() {
 }
 
 it.runIf(sharedCustody)(
-  "binds the named project key to the two official Responses POSTs",
+  "binds the named project key to the official Responses generation POST",
   async () => {
     const home = await privateHome();
     const store = new ProviderCredentialStore({ home });
@@ -93,22 +93,21 @@ it.runIf(sharedCustody)(
           headers
         )
       ).toBeNull();
+      expect(egress.prepare(`${responses}/input_tokens`, headers)).toBeNull();
       expect(prepare).not.toHaveBeenCalled();
-      for (const url of [responses, `${responses}/input_tokens`]) {
-        const dispatch = egress.prepare(url, headers);
-        expect(
-          (await dispatch!(Buffer.from("{}"), new AbortController().signal))
-            ?.status
-        ).toBe(401);
-        expect(prepare).toHaveBeenLastCalledWith(url, headers);
-      }
-      expect(authenticationFailed).toHaveBeenCalledTimes(2);
+      const dispatch = egress.prepare(responses, headers);
+      expect(
+        (await dispatch!(Buffer.from("{}"), new AbortController().signal))
+          ?.status
+      ).toBe(401);
+      expect(prepare).toHaveBeenCalledExactlyOnceWith(responses, headers);
+      expect(authenticationFailed).toHaveBeenCalledTimes(1);
       const stale = egress.prepare(responses, headers);
       await store.remove(OPENAI_PROJECT_PROVIDER_ID);
       expect(
         await stale!(Buffer.from("{}"), new AbortController().signal)
       ).toBeNull();
-      expect(prepare).toHaveBeenCalledTimes(2);
+      expect(prepare).toHaveBeenCalledTimes(1);
       expect(await store.read("openai")).toBe("legacy-key");
     } finally {
       await fs.rm(home, { recursive: true, force: true });
@@ -179,6 +178,30 @@ it("uses a registered model and binds the anonymous launch to the approved route
   expect(explicit.model).toBe("alpha");
 });
 
+it("reopens the existing llama.cpp binding with generation only", async () => {
+  const owner = settings();
+  const saved = { ...config, input_counting: "llama.cpp" as const };
+  owner.list.mockResolvedValue([saved]);
+  const launch = NativeChatProfiles.configuredLaunch(
+    await NativeProviderSelection.configuredEndpoint(
+      saved.id,
+      undefined,
+      owner,
+      true
+    )
+  );
+  expect(launch.llamaCppInputCount).toBe(true);
+  expect(NativeChatProfiles.binding(saved.id, launch)).toBe(
+    "6cd46ce9fe37b9b41a27c7796c3bf7640037a21acade7dfdfc70a4d32ab5fe5e"
+  );
+  const headers = new Headers();
+  expect(
+    launch.providerNetwork.prepare(`${target}/input_tokens`, headers)
+  ).toBeNull();
+  expect(owner.prepare).not.toHaveBeenCalled();
+  expect(launch.providerNetwork.prepare(target, headers)).toBe(owner.dispatch);
+});
+
 it("refuses missing selections, models and approval", async () => {
   const owner = settings();
   const select = (provider: string, model?: string) =>
@@ -198,9 +221,31 @@ it("refuses missing selections, models and approval", async () => {
   );
 });
 
-it("retains ordinary connection choices at capacity when local counting is enabled", async () => {
+it("offers only ordinary choices even when a legacy llama.cpp endpoint setting is present", async () => {
   const owner = settings();
-  const endpoints = Array.from({ length: 4 }, (_, index) => ({
+  const optedIn = { ...config, input_counting: "llama.cpp" as const };
+  owner.list.mockResolvedValue([optedIn]);
+  const resolve = vi.fn<
+    Parameters<typeof NativeChatProfiles.configuredChoices>[1]
+  >((id, model, counting) =>
+    NativeProviderSelection.configuredEndpoint(id, model, owner, counting)
+  );
+  const choices = await NativeChatProfiles.configuredChoices(
+    [optedIn],
+    resolve
+  );
+  expect(
+    choices.map(({ connection, modelId }) => [connection, modelId])
+  ).toEqual([
+    ["local", "alpha"],
+    ["local", "beta"],
+  ]);
+  expect(resolve).toHaveBeenCalledExactlyOnceWith("local");
+});
+
+it("bounds configured choices", async () => {
+  const owner = settings();
+  const endpoints = Array.from({ length: 5 }, (_, index) => ({
     id: `local-${index}`,
     base_url: base,
     models: Array.from({ length: 64 }, (_, model) => ({
@@ -211,19 +256,9 @@ it("retains ordinary connection choices at capacity when local counting is enabl
   const select = (id: string, model?: string, counting?: true) =>
     NativeProviderSelection.configuredEndpoint(id, model, owner, counting);
   owner.list.mockResolvedValue(endpoints);
-  const ordinary = await NativeChatProfiles.configuredChoices(
-    endpoints,
-    select
-  );
-  expect(ordinary).toHaveLength(256);
-  const optedIn = [
-    { ...endpoints[0], input_counting: "llama.cpp" as const },
-    ...endpoints.slice(1),
-  ];
-  owner.list.mockResolvedValue(optedIn);
   await expect(
-    NativeChatProfiles.configuredChoices(optedIn, select)
-  ).resolves.toEqual(ordinary);
+    NativeChatProfiles.configuredChoices(endpoints, select)
+  ).resolves.toHaveLength(256);
 });
 
 it.each([

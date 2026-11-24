@@ -5,7 +5,8 @@ import path from "node:path";
 import { stringify } from "smol-toml";
 import { afterEach, describe, expect, it } from "vitest";
 import { NativeAgentHooks } from "./native-agent-hooks";
-import { DesktopPersonalization } from "./desktop-personalization";
+import { NativeAgentConfig } from "./native-agent-config";
+import { NativeAgentProcess } from "./native-agent-process";
 import { NativeAgentChat } from "./native-agent-chat";
 
 const fixtures: string[] = [];
@@ -45,7 +46,20 @@ async function fixture() {
     fs.writeFile(file, stringify({ schema_version: 1, hooks }), {
       mode: 0o600,
     });
-  const settings = NativeAgentHooks.settings(home);
+  const settings = NativeAgentHooks.settings(home, {
+    check: async () => [],
+    create: async (check) => {
+      check();
+      await fs
+        .writeFile(file, "schema_version = 1\n", {
+          flag: "wx",
+          mode: 0o600,
+        })
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== "EEXIST") throw error;
+        });
+    },
+  });
   const trust = async (id = definition.id) => {
     const configured = (await settings.configuration()).hooks.find(
       (hook) => hook.id === id
@@ -100,7 +114,7 @@ describe("global config.toml hooks", () => {
     expect(await fs.readFile(f.file, "utf8")).toContain("[[hooks]]");
   });
 
-  it("preserves reviewed hooks and permits rolling back to the hook-only schema", async () => {
+  it("keeps hook trust when compaction and personalization settings change", async () => {
     const f = await fixture();
     await f.write();
     await fs.appendFile(f.file, "# Keep the verification hook.\n");
@@ -109,23 +123,18 @@ describe("global config.toml hooks", () => {
     const receipt = path.join(f.home, "agent", "hooks-trust.json");
     const trusted = await fs.readFile(receipt);
     const before = await NativeAgentHooks.open(f.home, f.workspace);
-    const setting = new DesktopPersonalization(f.file);
-    await setting.set(true);
-    const withDesktop = await fs.readFile(f.file, "utf8");
-    expect(withDesktop).toBe(
-      source + "\n[desktop]\ncomposer-predictions-enabled = true\n"
+    await fs.writeFile(
+      f.file,
+      'model_auto_compact_token_limit = 1024\nunknown_setting = 9223372036854775807\nweb_search = "automatic"\n' +
+        source +
+        "\n[desktop]\ncomposer-predictions-enabled = true\n"
     );
-    await setting.setPersonalization({ webSearch: "live" });
     const after = await NativeAgentHooks.open(f.home, f.otherWorkspace);
     expect(await after.inspect(active)).toEqual(await before.inspect(active));
     expect(await fs.readFile(receipt)).toEqual(trusted);
-    await fs.writeFile(
-      f.file,
-      withDesktop.slice(0, withDesktop.indexOf("\n[desktop]"))
-    );
+    await fs.writeFile(f.file, source);
     expect(await fs.readFile(f.file, "utf8")).toBe(source);
     expect((await f.settings.configuration()).hooks[0].trusted).toBe(true);
-    expect((await setting.get()).enabled).toBe(false);
   });
 
   it("accepts an existing 0755 Grida home and agent directory without a config", async () => {
@@ -177,6 +186,7 @@ describe("global config.toml hooks", () => {
   it("creates only the canonical config and never trusts it by opening it", async () => {
     const f = await fixture();
     expect(await f.settings.ensureConfig()).toBe(f.file);
+    expect(await fs.readFile(f.file, "utf8")).toBe("schema_version = 1\n");
     expect(await f.settings.configuration()).toMatchObject({
       exists: true,
       hooks: [],
@@ -186,7 +196,9 @@ describe("global config.toml hooks", () => {
       fs.stat(path.join(f.home, "agent", "hooks-trust.json"))
     ).rejects.toMatchObject({ code: "ENOENT" });
     await f.write();
+    const authored = await fs.readFile(f.file, "utf8");
     await f.settings.ensureConfig();
+    expect(await fs.readFile(f.file, "utf8")).toBe(authored);
     expect((await f.settings.configuration()).hooks[0].trusted).toBe(false);
     expect((await fs.stat(f.file)).mode & 0o777).toBe(0o600);
   });
@@ -260,11 +272,22 @@ describe("global config.toml hooks", () => {
     }
   );
 
+  it("reports an oversized global config before starting a worker", async () => {
+    const f = await fixture();
+    await fs.writeFile(f.file, Buffer.alloc(64 * 1024 + 1), { mode: 0o600 });
+    expect((await f.settings.configuration()).diagnostics).toEqual([
+      "config.toml must be no larger than 64 KiB.",
+    ]);
+    await expect(NativeAgentHooks.open(f.home, f.workspace)).rejects.toThrow(
+      "config_file_too_large"
+    );
+  });
+
   it("reports malformed TOML, duplicate IDs and excess definitions", async () => {
     const f = await fixture();
     await fs.writeFile(f.file, "[broken", { mode: 0o600 });
     expect((await f.settings.configuration()).diagnostics).toEqual([
-      "config.toml is not valid UTF-8 TOML. Correct its syntax and reload.",
+      "config.toml must contain valid UTF-8 TOML.",
     ]);
     await f.write([f.definition, f.definition]);
     expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
@@ -330,10 +353,22 @@ it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
         ],
       },
     ]);
+    const authored = await fs.readFile(f.file, "utf8");
+    await fs.writeFile(
+      f.file,
+      "model_auto_compact_token_limit = 1024\n" + authored
+    );
     await f.trust();
-    await new DesktopPersonalization(f.file).set(true);
-    const hooks = await NativeAgentHooks.open(f.home, f.workspace);
     const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!;
+    const config = new NativeAgentConfig(f.home, () =>
+      NativeAgentProcess.executable(resourcesPath)
+    );
+    await config.set({ suggestedPrompts: true }, () => {});
+    expect(await config.check()).toEqual([]);
+    expect(await fs.readFile(f.file, "utf8")).toContain(
+      "model_auto_compact_token_limit = 1024"
+    );
+    const hooks = await NativeAgentHooks.open(f.home, f.workspace);
     const plan = await hooks.launch(resourcesPath, {
       id: "global-hook-fixture",
       primary: { id: "project", name: "Project", path: f.workspace },
@@ -343,6 +378,7 @@ it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
     if (plan) fixtures.push(plan.command.temporaryParent);
     const chat = await NativeAgentChat.start({
       resourcesPath,
+      configHome: f.home,
       stateDirectory: path.join(f.root, "state"),
       cwd: f.workspace,
       provider: "openai-compatible",

@@ -24,8 +24,8 @@ headless host. Windows Desktop has no agent chat.
 
 Describe what you want in the Welcome composer and press **Send**. The composer
 clears so you can start typing your next message while Grida opens the selected
-project. Your first message and its attachment appear in the project chat while
-it starts. Reloading during the handoff preserves the follow-up as a separate
+project. Your first message and its attachment appear in a new project chat
+with a fresh set of tabs. Reloading during the handoff preserves the follow-up as a separate
 draft. If that chat already has an unsent draft, the text you typed during
 opening stays on Home.
 
@@ -43,7 +43,8 @@ Grida models appear in the project's own picker once its chat is running.
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template
-into the project as its own deck and asks the agent to adapt that copy. The
+into the project as its own deck, opens it in the new chat, and asks the agent
+to adapt that copy. The
 chat shows the template as a separate chip beside your words. Add a description
 when starting a Goal or sending a non-image file or folder with the template.
 References you add from the gallery are sent as links in the first message.
@@ -61,7 +62,11 @@ guidance as context.
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. A new chat starts in
+Open a folder in Grida Desktop to return to its last selected chat and tabs.
+Switch chats from the chat list to return to the files and pages you had open
+in that conversation. Files are shared across chats in the same project.
+
+A new chat starts in
 **Auto** when available. The agent reads and edits files in the project and
 runs commands in a sandbox. The chat’s model reviews eligible requests for
 extra access. Choose **Ask for approval** in the access picker to review them
@@ -114,9 +119,12 @@ preview is unavailable.
 
 ## Attach an image
 
-Choose **+ → Image**, or drop or paste one PNG, JPEG, WebP or GIF into the
+Choose **+ → Image**, or drop or paste PNG, JPEG, WebP or GIF images into the
 composer, then describe what you want. In a project chat, **+ → Library**
-can attach one selected Library image. A message accepts one attachment.
+adds a selected image. A message can include up to eight attachments, in
+the order shown in the composer. Use the × on a card to remove that item.
+In a project chat you can send images by themselves. Add a prompt when the
+message also includes a file or folder.
 
 On a model that takes images, the first request includes actual prepared
 pixels. An image picked from disk also includes its verified original path;
@@ -139,7 +147,7 @@ the model saw, so its resolution can be lower than the original.
 
 ## Attach a file
 
-Choose **+ → Files**, or drop or paste one file into the composer. A file from
+Choose **+ → Files**, or drop or paste files into the composer. A file from
 disk is a reference: the agent receives its verified path, name, type and size
 and inspects its contents on demand with its existing tools and permissions.
 Small disk files follow the same rule. No text extraction or file read happens
@@ -156,12 +164,13 @@ Pasted ordinary files with no usable disk path can use the bounded retained
 file workflow when available. This retains a private copy and leaves content
 inspection to tools. It never invents an original path.
 
-Dropping several files or folders keeps the existing draft and attachment.
-Files in Grida's own protected data cannot be attached.
+You can send files, folders and images together. A file that cannot be
+accepted leaves the message available for correction. Files in Grida's
+protected data cannot be attached.
 
 ## Attach a folder
 
-Drop one folder from your file manager onto the chat pane or composer. Grida
+Drop a folder from your file manager onto the chat pane or composer. Grida
 attaches a reference with the folder's name, location and type. Its card has
 no total size or media preview. Attaching it does not copy, list or archive
 its contents.
@@ -212,9 +221,8 @@ the file, the save dialog handles the conflict.
 
 ## Current limits
 
-- A message with an attachment cannot be edited later; send a new message
-  instead. To change the attachment on a queued message, remove the queued
-  message and send it again.
+- To change files on a waiting message, choose **… → Edit**. Once it runs,
+  send a follow-up with any attachment changes.
 - Attachments are unavailable while the **Goal** badge is on. Send or remove
   an attachment before choosing another model.
 - The agent cannot render an SVG or HTML file it wrote into an image to check

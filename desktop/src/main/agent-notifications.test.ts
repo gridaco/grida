@@ -1,10 +1,15 @@
 import { EventEmitter } from "node:events";
+import { realpath } from "node:fs/promises";
 import type { IpcMainInvokeEvent } from "electron";
 import { beforeEach, expect, it, vi } from "vitest";
-import type {
-  NativeChatCompletionPreview,
-  NativeChatLifecycle,
+import {
+  NativeAgentChat,
+  type NativeAgentChatLaunch,
+  type NativeChatCompletionPreview,
+  type NativeChatLifecycle,
+  type NativeChatSession,
 } from "./native-agent-chat";
+import { NativeAgentProcess } from "./native-agent-process";
 import {
   focusNativeChat,
   notifyNativeChat,
@@ -44,6 +49,7 @@ const workspaceId = "eac20941e6a410aa";
 const event: NativeChatLifecycle = {
   kind: "settled",
   status: "succeeded",
+  session: { id: "saved-chat" },
   sessionId: "saved-chat",
   turnId: "turn-1",
 };
@@ -96,6 +102,131 @@ beforeEach(() => {
   host.click = undefined;
 });
 
+it("notifies for replies and manual compaction in another chat of the focused workspace", async () => {
+  const key = "co.grida/session/lifecycle";
+  const sessionId = event.sessionId;
+  const target = workspaceWindow();
+  target.state.focused = true;
+  const otherChat = { id: "different-chat" };
+  let visibleSession = otherChat;
+  const nav = {
+    ...navigation(),
+    chatPresentation: (_sender: unknown, session: NativeChatSession) =>
+      session === visibleSession ? true : undefined,
+  };
+  host.windows.mockReturnValue([target.window]);
+  const request = vi.fn<NativeAgentProcess["request"]>(
+    async (method, params) => {
+      switch (method) {
+        case "session/new":
+          return { sessionId };
+        case "_co.grida/session/catalog-entry":
+          return {
+            sessionId,
+            title: "Background chat",
+            revision: 1,
+            archived: false,
+          };
+        case "_co.grida/session/turn-summary": {
+          const { turnId } = params as { turnId: string };
+          return {
+            turnId,
+            status: "succeeded",
+            text: turnId === "reply" ? "The reply is ready." : "",
+          };
+        }
+        default:
+          throw new Error(`Unexpected request ${method}`);
+      }
+    }
+  );
+  let onUpdate: ((params: unknown) => void) | undefined;
+  const start = vi
+    .spyOn(NativeAgentProcess, "start")
+    .mockImplementationOnce(async (launch) => {
+      onUpdate = launch.onSessionUpdate;
+      return {
+        request,
+        close: async () => {},
+      } as unknown as NativeAgentProcess;
+    });
+  const deliveries: Promise<void>[] = [];
+  const onLifecycle = vi.fn<NonNullable<NativeAgentChatLaunch["onLifecycle"]>>(
+    (fact, current) => {
+      deliveries.push(notifyNativeChat(workspaceId, fact, nav, current));
+    }
+  );
+  const cwd = await realpath(process.cwd());
+  let chat: NativeAgentChat | undefined;
+  try {
+    chat = await NativeAgentChat.start({
+      cwd,
+      resourcesPath: cwd,
+      stateDirectory: cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+      onLifecycle,
+    });
+    const session = await chat.create();
+    request.mockClear();
+    const signal = (kind: string, turnId: string, status: string) =>
+      onUpdate!({
+        sessionId,
+        _meta: { [key]: { kind, turnId, status } },
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "" },
+        },
+      });
+    for (const status of ["succeeded", "failed", "uncertain", "cancelled"]) {
+      const turnId = `maintenance-${status}`;
+      signal("automatic_compaction_settled", turnId, status);
+      signal("automatic_compaction_settled", turnId, status);
+      expect(onLifecycle.mock.lastCall?.[0]).toEqual({
+        kind: "automatic_compaction_settled",
+        sessionId,
+        turnId,
+        status,
+      });
+    }
+    signal("automatic_compaction_settled", "bad-status", "unknown");
+    signal("future_kind", "unknown-event", "succeeded");
+    await Promise.all(deliveries);
+    expect(onLifecycle).toHaveBeenCalledTimes(4);
+    expect(request).not.toHaveBeenCalled();
+    expect(host.shown).not.toHaveBeenCalled();
+
+    visibleSession = session;
+    signal("settled", "while-visible", "succeeded");
+    await deliveries.at(-1);
+    expect(request).not.toHaveBeenCalled();
+    expect(host.shown).not.toHaveBeenCalled();
+
+    visibleSession = otherChat;
+    for (const turnId of ["reply", "manual-compact"]) {
+      signal("settled", turnId, "succeeded");
+      await deliveries.at(-1);
+      expect(host.shown).toHaveBeenLastCalledWith({
+        title: "Background chat",
+        body: turnId === "reply" ? "The reply is ready." : "Turn completed",
+      });
+    }
+    expect(host.shown).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      "_co.grida/session/catalog-entry",
+      "_co.grida/session/turn-summary",
+      "_co.grida/session/catalog-entry",
+      "_co.grida/session/turn-summary",
+    ]);
+    host.click!();
+    expect(target.take()).toEqual({ sessionId });
+  } finally {
+    start.mockRestore();
+    await chat?.close();
+  }
+});
+
 it("keeps the saved model connection when reopening a workspace from a notification", () => {
   const nav = navigation();
   const profileId = "b".repeat(64);
@@ -143,7 +274,7 @@ it("shows the actual question on a background side tab and routes only to its ow
   };
   const nav = {
     ...navigation(),
-    questionPresentation: (sender: unknown, source: unknown) =>
+    chatPresentation: (sender: unknown, source: unknown) =>
       sender === owner.sender && source === session ? presented : undefined,
   };
   notifyNativeChat(workspaceId, question, nav, () => true);
@@ -221,7 +352,11 @@ it.each(["focused", "retired"] as const)(
     const readPreview = vi.fn<() => Promise<NativeChatCompletionPreview>>(
       () => pending.promise
     );
-    const nav = navigation();
+    let presented = true;
+    const nav = {
+      ...navigation(),
+      chatPresentation: () => presented,
+    };
     let current = true;
     const notify = () =>
       notifyNativeChat(
@@ -234,10 +369,10 @@ it.each(["focused", "retired"] as const)(
     target.state.focused = true;
     await notify();
     expect(readPreview).not.toHaveBeenCalled();
-    target.state.focused = false;
+    presented = false;
     const showing = notify();
     expect(readPreview).toHaveBeenCalledOnce();
-    if (reason === "focused") target.state.focused = true;
+    if (reason === "focused") presented = true;
     else current = false;
     pending.resolve({ title: "Poster", text: "Print it." });
     await showing;
@@ -246,7 +381,7 @@ it.each(["focused", "retired"] as const)(
 );
 
 it("suppresses watched work and user cancellation, and only wakes the pane when clicked", () => {
-  const nav = navigation();
+  const nav = { ...navigation(), chatPresentation: () => true };
   const target = workspaceWindow();
   const { send } = target;
   target.state.focused = true;

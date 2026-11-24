@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 — bounded original-image reads for an attached recorded message.
 
 use super::*;
-use crate::host::PromptPart;
+use crate::host::{PromptPart, QueueReadBasis};
 use agent_client_protocol::v1::schema::ResourceLink;
 use agent_kit_core::{ArtifactId, MessageId};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -29,7 +29,8 @@ pub(super) fn queued_capability(private_stdio: bool) -> Option<&'static str> {
 struct QueuedMessageRequest {
     session_id: SessionId,
     input_id: ChangeId,
-    expected_session_revision: SessionRevision,
+    expected_session_revision: Option<SessionRevision>,
+    checkout_id: Option<ChangeId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -39,6 +40,8 @@ struct QueuedMessageResponse {
     text_only: bool,
     text_editable: bool,
     prompt: Vec<ContentBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attachment_indexes: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     display_parts: Vec<DisplayPart>,
 }
@@ -49,7 +52,8 @@ struct QueuedMessageResponse {
 struct QueuedImageChunkRequest {
     session_id: SessionId,
     input_id: ChangeId,
-    expected_session_revision: SessionRevision,
+    expected_session_revision: Option<SessionRevision>,
+    checkout_id: Option<ChangeId>,
     attachment_uri: String,
     offset: usize,
 }
@@ -239,29 +243,46 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             async move |request: QueuedMessageRequest, responder, _| {
                 let result = async {
                     require(&queued_message_sessions, QUEUED, Some(&request.session_id))?;
-                    let parts = queued_message_host
-                        .queued_message_parts(
-                            &request.session_id,
-                            &request.input_id,
-                            request.expected_session_revision,
-                        )
+                    let basis = queue_read_basis(
+                        &queued_message_sessions,
+                        &request.session_id,
+                        request.expected_session_revision,
+                        request.checkout_id.as_ref(),
+                    )?;
+                    let (parts, text_editable, display) = queued_message_host
+                        .queued_message_parts(&request.session_id, &request.input_id, basis)
                         .await
                         .map_err(host_error)?;
                     require(&queued_message_sessions, QUEUED, Some(&request.session_id))?;
-                    let text_editable = queued_message_host
-                        .queued_text_editable(
-                            &request.session_id,
-                            &request.input_id,
-                            request.expected_session_revision,
+                    let edit_attachments = request.checkout_id.is_some()
+                        && require(
+                            &queued_message_sessions,
+                            attachments::CAPABILITY,
+                            Some(&request.session_id),
                         )
-                        .await
-                        .map_err(host_error)?;
+                        .is_ok();
+                    let attachment_indexes = edit_attachments.then(|| {
+                        (0..parts
+                            .iter()
+                            .filter(|part| crate::host::is_attachment(part))
+                            .count())
+                            .collect()
+                    });
                     Ok(QueuedMessageResponse {
                         input_id: request.input_id,
                         text_only: matches!(parts.as_slice(), [PromptPart::Text { .. }]),
                         text_editable,
-                        display_parts: display_parts(&parts, &queued_message_sessions),
-                        prompt: parts.into_iter().filter_map(queued_prompt_block).collect(),
+                        attachment_indexes,
+                        display_parts: display_parts(display, &queued_message_sessions),
+                        prompt: parts
+                            .into_iter()
+                            .filter(|part| {
+                                !edit_attachments
+                                    || matches!(part, PromptPart::Text { .. })
+                                    || crate::host::is_attachment(part)
+                            })
+                            .filter_map(queued_prompt_block)
+                            .collect(),
                     })
                 }
                 .await;
@@ -278,11 +299,17 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .strip_prefix(crate::acp::projection::RETAINED_ATTACHMENT_URI)
                         .and_then(|id| ArtifactId::new(id).ok())
                         .ok_or_else(|| unavailable("queued_input_image_unavailable"))?;
+                    let basis = queue_read_basis(
+                        &queued_sessions,
+                        &request.session_id,
+                        request.expected_session_revision,
+                        request.checkout_id.as_ref(),
+                    )?;
                     let (mime_type, total_bytes, bytes, next_offset) = queued_host
                         .read_queued_input_image_chunk(
                             request.session_id.clone(),
                             request.input_id.clone(),
-                            request.expected_session_revision,
+                            basis,
                             attachment,
                             request.offset,
                         )
@@ -304,4 +331,20 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
+}
+
+fn queue_read_basis<'a>(
+    sessions: &Mutex<ConnectionSessions>,
+    session: &SessionId,
+    revision: Option<SessionRevision>,
+    checkout: Option<&'a ChangeId>,
+) -> Result<QueueReadBasis<'a>> {
+    match (revision, checkout) {
+        (Some(expected), None) => Ok(QueueReadBasis::Waiting(expected)),
+        (None, Some(checkout)) => {
+            require(sessions, super::queue_actions::CAPABILITY, Some(session))?;
+            Ok(QueueReadBasis::Checkout(checkout))
+        }
+        _ => Err(Error::invalid_params()),
+    }
 }

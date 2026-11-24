@@ -6,7 +6,10 @@ import type {
   NativeChatMessageAttachment,
 } from "@grida/desktop-bridge";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
-import { FileIcon, ImageIcon, ListEndIcon } from "lucide-react";
+import { UserMessageText } from "@/kits/agent-chat/message";
+import { projectUserMessageSkills } from "@/kits/agent-chat/user-message-markdown";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
+import { ListEndIcon } from "lucide-react";
 import {
   HoverCard,
   HoverCardContent,
@@ -65,6 +68,7 @@ export function NativeQueuedMessagePreview({
     controller.read
   );
   useEffect(() => controller.connect(), [controller]);
+  const authored = projectUserMessageSkills(state.text ?? "", displayParts);
   return (
     <HoverCard
       open={state.open}
@@ -81,12 +85,18 @@ export function NativeQueuedMessagePreview({
           onClick={() => controller.setOpen(!state.open)}
         >
           <ListEndIcon className="size-4 shrink-0 text-muted-foreground" />
-          <AttachmentIndicator
-            attachments={attachments}
-            source={state.image}
-            onError={controller.imageFailed}
-          />
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {state.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={state.image}
+              alt={imageName ?? "Queued image"}
+              onError={controller.imageFailed}
+              className="size-7 shrink-0 rounded-md object-cover"
+            />
+          )}
+          <span className="min-w-0 flex-1 truncate">
+            {SkillMentions.previewText(label, displayParts)}
+          </span>
         </button>
       </HoverCardTrigger>
       <HoverCardContent
@@ -95,11 +105,23 @@ export function NativeQueuedMessagePreview({
         sideOffset={8}
         className="w-96 max-w-[calc(100vw-2rem)] rounded-xl p-3"
       >
-        {displayParts?.length ? (
-          <MessageContextParts parts={displayParts} className="mb-2" />
-        ) : null}
+        {authored.context.length > 0 && (
+          <MessageContextParts parts={authored.context} className="mb-2" />
+        )}
         <NativeQueuedMessagePreview.Content
-          text={state.text}
+          text={
+            state.text === null
+              ? null
+              : SkillMentions.previewText(state.text, displayParts)
+          }
+          formattedText={
+            authored.links.size > 0 && (
+              <UserMessageText
+                text={authored.text}
+                skillLinks={authored.links}
+              />
+            )
+          }
           loading={state.loading}
           unavailable={state.unavailable}
           attachments={attachments}
@@ -247,6 +269,7 @@ export namespace NativeQueuedMessagePreview {
 
   export function Content({
     text,
+    formattedText,
     loading = false,
     unavailable = false,
     attachments = [],
@@ -254,6 +277,7 @@ export namespace NativeQueuedMessagePreview {
     onImageError,
   }: {
     text: string | null;
+    formattedText?: React.ReactNode;
     loading?: boolean;
     unavailable?: boolean;
     attachments?: readonly NativeChatMessageAttachment[];
@@ -280,9 +304,13 @@ export namespace NativeQueuedMessagePreview {
             {attachments.map((entry) => entry.name).join(", ")}
           </p>
         )}
-        <p className="whitespace-pre-wrap break-words text-sm">
-          {text ?? "Message with other content"}
-        </p>
+        {formattedText ? (
+          <div className="text-sm">{formattedText}</div>
+        ) : (
+          <p className="whitespace-pre-wrap break-words text-sm">
+            {text ?? "Message with other content"}
+          </p>
+        )}
         {loading && (
           <p role="status" className="text-xs text-muted-foreground">
             Loading full message…
@@ -303,40 +331,6 @@ export namespace NativeQueuedMessagePreview {
       ? source
       : null;
   }
-}
-
-function AttachmentIndicator({
-  attachments,
-  source,
-  onError,
-}: {
-  attachments: readonly NativeChatMessageAttachment[];
-  source: string | null;
-  onError: () => void;
-}) {
-  if (source)
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={source}
-        alt={imageName(attachments)}
-        onError={onError}
-        className="size-7 shrink-0 rounded-md object-cover"
-      />
-    );
-  if (attachments.some((entry) => entry.mimeType?.startsWith("image/")))
-    return (
-      <ImageIcon
-        aria-label="Image attachment"
-        className="size-4 shrink-0 text-muted-foreground"
-      />
-    );
-  return attachments.length ? (
-    <FileIcon
-      aria-label="File attachment"
-      className="size-4 shrink-0 text-muted-foreground"
-    />
-  ) : null;
 }
 
 function imageName(

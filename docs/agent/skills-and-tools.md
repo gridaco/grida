@@ -40,26 +40,56 @@ they are unavailable until it finishes.
 ## Give the agent project instructions and skills
 
 On macOS and Linux, put project instructions in `AGENTS.md` at the top of the
-project folder. Desktop workspace chats and source-built hosts follow it
-automatically. A message keeps the instructions it started with, and edits
+project folder. To give a subdirectory its own instructions, put another
+`AGENTS.md` there. Each file applies to the directory that contains it and
+all directories below it. For example, `slides/AGENTS.md` applies to work
+in `slides/`. If project instructions conflict for a file, the agent follows
+the closest applicable `AGENTS.md`. Instructions in your chat message take
+precedence over project guidance.
+
+Desktop starts with the selected project folder. When a source-built host
+has both an admitted project root and a starting directory within it, it
+loads the instructions along the path from the root to that directory. As work
+reaches deeper directories, the agent checks for applicable files there
+using the workspace's existing tools. Instructions that Grida loads when it
+accepts a message stay with that message while it waits or resumes. Edits
 apply to later messages.
 
-You don't have to pick a skill. In a chat that can use project files, such
-as a Desktop workspace chat, the agent sees each available skill's name and
-description. When you name a skill or ask for work a skill describes, for
+In a chat that can use project files, such as a Desktop workspace chat,
+the agent sees names and descriptions for project and bundled skills.
+When you name a listed skill or ask for work a skill describes, for
 example "make a short deck about tides", the agent reads that skill's full
 instructions and follows them. It says which skill it is using. The bundled
 skills include `dotcanvas`, `slides` and `svg`. Workspace chats with bundled
 FX also offer a skill for planning workflows and inspecting saved runs. A
 Desktop turn with Browser access can discover guidance for inspecting pages.
 
-For an ordinary skill name, Grida looks in `.agents/skills/<name>/SKILL.md`
-first, then `.claude/skills/<name>/SKILL.md`. To select a particular
-extension's skill, use the name shown by discovery, such as
-`desktop-fx/desktop-fx`. This also works when another extension or your project
-uses the same local name. If several extensions match a bare name, choose one
-by its full name. Each message keeps the skill selection it accepted. All
-skills use the chat's existing permissions.
+In the Home or workspace composer, type `$` and choose a skill by name,
+description, and source. Grida discovers skills installed as
+`.agents/skills/<name>/SKILL.md` in your project and under your home directory.
+Home shows your personal skills and bundled skills before you choose a
+destination. Choosing a project also shows the skills in that project.
+Project skills rank ahead of personal skills with the same name, followed by
+bundled skills. Projects can also share skills under `.claude/skills/`.
+
+A selection stays in the draft as a removable mention with a book icon and
+the skill name. You can choose the personal copy of a skill even when the
+project has one with the same name. Ordinary dollar text such as `$100`
+stays in your message. After sending, the mention appears inline where you
+placed it, including when you reopen the chat. Hover over it to see the
+source the host accepted.
+If the skill changed or was removed before sending, refresh the selection or
+remove it and send again. Each accepted message keeps the skill version it
+selected. All skills use the chat's existing permissions.
+
+You can also send a plain `$skill-name` from Desktop or the terminal chat.
+Grida loads the instructions when the name matches one available skill.
+When several skills share the name, use the Desktop picker to choose a source.
+Use a mention to invoke a personal skill.
+
+A qualified name, such as `desktop-fx/desktop-fx`, chooses an eligible
+extension's skill. Use the qualified name when multiple extensions offer the
+same skill name.
 
 To choose a skill yourself from a source-built host, add `--skill svg` to
 `grida-agent run`, and repeat the flag for more skills. A selected skill's

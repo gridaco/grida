@@ -5,6 +5,10 @@ import type {
 } from "./native-editor-surfaces";
 import type { NativeEditorSelection } from "./native-editor-selection";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
+import type {
+  NativeChatSkill,
+  NativeChatSkillReference,
+} from "./native-chat-skills";
 import type { NativeSubagentClient } from "./native-subagents";
 import type {
   NativeChatDisplayPart,
@@ -35,6 +39,7 @@ export type NativeChatMessageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 type EditorObservationValue =
@@ -167,6 +172,7 @@ export type NativeGlobalHookInspection = Readonly<{
   exists: boolean;
   hooks: readonly (NativeHookInfo & { trusted: boolean })[];
   diagnostics: readonly string[];
+  configDiagnostics?: readonly string[];
   activation: "new_connections";
 }>;
 
@@ -198,6 +204,11 @@ export type NativeChatCommandResult =
         | "no_change";
     }>;
 
+/** The host admitted an identified manual compaction or had no context to compact. */
+export type NativeChatCompactionAdmission =
+  | Readonly<{ requestId: string; status: "admitted"; turnId: string }>
+  | Readonly<{ requestId: string; status: "no_change"; turnId: null }>;
+
 export type NativeChatImageInput = Readonly<{
   action: "submit" | "enqueue";
   inputId: string;
@@ -208,6 +219,7 @@ export type NativeChatImageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 /**
@@ -226,6 +238,7 @@ export type NativeChatSelectedImageInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 export type NativeChatFileInput = Readonly<{
@@ -239,6 +252,7 @@ export type NativeChatFileInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 /**
@@ -270,6 +284,38 @@ export type NativeChatFileReferenceInput = Readonly<{
   selectionRevision?: number;
   webSearch?: true;
   messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
+}>;
+
+/** Maximum number of items in one negotiated native attachment batch. */
+export const NATIVE_CHAT_MAX_ATTACHMENTS = 8;
+/** Total selected original raster bytes per negotiated attachment batch. */
+export const NATIVE_CHAT_MAX_ATTACHMENT_IMAGE_BYTES = 64 * 1024 * 1024;
+
+/** One explicitly selected item, in the order shown in the composer. */
+export type NativeChatAttachmentInput = Readonly<
+  | { kind: "image"; file: File; originalFile?: File }
+  | { kind: "png" | "file"; name: string; bytes: ArrayBuffer }
+  | {
+      kind: "reference";
+      file: File;
+      mimeType?: string;
+      preview?: NativeChatAttachmentPreview;
+    }
+>;
+
+/** Submit the text and complete attachment list under one acceptance identity. */
+export type NativeChatAttachmentsInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  attachments: readonly NativeChatAttachmentInput[];
+  operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
+  selectionRevision?: number;
+  webSearch?: true;
+  messageContext?: NativeChatMessageContext;
+  skills?: readonly NativeChatSkillReference[];
 }>;
 
 export type NativeChatReadState = Readonly<{
@@ -406,6 +452,7 @@ export type NativeChatReadiness =
   | "native-provider-model-unavailable"
   | "native-hooks-review-required"
   | "native-hooks-configuration-invalid"
+  | "native-configuration-invalid"
   | "native-provider-endpoint-https-required"
   | "native-provider-endpoint-approval-required"
   | "native-workspace-capacity";
@@ -439,6 +486,13 @@ export type NativeChatSnapshot = Readonly<{
   /** First page of waiting rows from this observation. Richer details can load separately. */
   queuePreview?: NativeChatQueuePage;
   pendingGoalId?: string;
+  /** Changes when action eligibility changes at the same committed session revision. */
+  queueActionRevision?: string;
+  queueCheckout?: Readonly<{ checkoutId: string; inputId: string }>;
+  /** The connected host accepts ordered attachment submissions and edits. */
+  attachmentBatches?: true;
+  /** The connected host acknowledges manual compaction at admission. */
+  compactionStart?: true;
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
   /** Parent-scoped status, lifecycle and real child conversation observation. */
@@ -715,6 +769,18 @@ export type NativeChatMessageAttachment = Readonly<{
   previewId?: string;
 }>;
 
+/** One native context compaction, identified across live delivery and replay. */
+export type NativeChatCompaction = Readonly<{
+  id: string;
+  status: "running" | "succeeded" | "failed";
+  automatic: boolean;
+  startedAtMs?: number;
+  finishedAtMs?: number;
+  /** Position within the owning turn, when the host retained it. */
+  activityOrder?: number;
+  summary?: string;
+}>;
+
 /** Recorded facts about a turn in a transcript page. */
 export type NativeChatTurnRecord = Readonly<{
   turnId: string;
@@ -744,10 +810,11 @@ export type NativeChatTurnRecord = Readonly<{
    * plus the reply. Absent when no call reported usage.
    */
   contextTokens?: number;
-  /**
-   * The turn summarized earlier context into the summary the model now reads.
-   * It adds no messages; the transcript shows it as a note in its place.
-   */
+  /** Captured context capacity for the turn, when known. */
+  contextWindowTokens?: number;
+  /** Individual compactions in this turn, including their settled outcome. */
+  compactions?: readonly NativeChatCompaction[];
+  /** Summary carried by an older host or recovered from a historical turn. */
   compaction?: Readonly<{ summary: string; automatic: boolean }>;
 }>;
 
@@ -764,7 +831,14 @@ export type NativeChatAcceptance = Readonly<{
   inputId: string;
   inputPosition: number;
   turnId: string | null;
-  disposition: "queued" | "claimed" | "completed" | "superseded" | "withdrawn";
+  disposition:
+    | "queued"
+    | "claimed"
+    | "completed"
+    | "superseded"
+    | "withdrawn"
+    | "checked_out"
+    | "transferred";
   replacementInputId?: string;
 }>;
 
@@ -781,6 +855,9 @@ export type NativeChatQueueItem = Readonly<{
   textOnly?: boolean;
   /** Native host can replace this waiting input's text while retaining its other parts. */
   textEditable?: boolean;
+  /** Host eligibility at the current queue and turn observation. */
+  checkoutable?: boolean;
+  steerable?: boolean;
   /** Display metadata only; bytes require a current queued-preview read. */
   attachments?: readonly NativeChatMessageAttachment[];
   displayParts?: readonly NativeChatDisplayPart[];
@@ -798,6 +875,8 @@ export type NativeChatQueuedMessage = Readonly<{
   /** Factual eligibility for the negotiated text-preserving replacement operation. */
   textEditable?: boolean;
   attachments?: readonly NativeChatMessageAttachment[];
+  /** Corresponding retained attachment indexes, scoped to the open checkout. */
+  attachmentIndexes?: readonly number[];
   displayParts?: readonly NativeChatDisplayPart[];
 }>;
 
@@ -827,6 +906,72 @@ export type NativeChatQueueReceipt = Readonly<{
   sessionId: string;
   requestId: string;
   sessionRevision: number;
+}>;
+
+export type NativeChatQueueActionReceipt = NativeChatQueueReceipt &
+  Readonly<
+    | { action: "checkout" | "reinsert"; inputId: string; checkoutId: string }
+    | { action: "steer"; inputId: string; turnId: string }
+  >;
+
+export type NativeChatQueueCheckoutRequest = Readonly<{
+  observationId: string;
+  inputId: string;
+  requestId: string;
+}>;
+
+export type NativeChatQueueReinsertRequest = Readonly<{
+  checkoutId: string;
+  requestId: string;
+  /** An empty string clears the text. Omit both fields to restore the original. */
+  text?: string;
+  /** Replace the full attachment list. Empty removes all attachments. */
+  attachments?: readonly (
+    | NativeChatAttachmentInput
+    | Readonly<{ kind: "keep"; index: number }>
+  )[];
+}>;
+
+export type NativeChatQueueReinsertResult =
+  | Readonly<{ outcome: "reinserted"; receipt: NativeChatQueueReceipt }>
+  /** The host confirmed it made no change and the checkout is still open. */
+  | Readonly<{ outcome: "refused" }>;
+
+/** Host-owned checkout of an accepted input. The client never supplies its queue position. */
+export type NativeChatQueueCheckout = Readonly<{
+  /** Atomically removes a still-waiting input. An exact retry replays the receipt. */
+  checkout(
+    attachmentId: string,
+    request: NativeChatQueueCheckoutRequest
+  ): Promise<
+    Readonly<{ checkoutId: string; message: NativeChatQueuedMessage }>
+  >;
+  /**
+   * Consume the checkout and restore its position among the remaining inputs.
+   * An exact retry replays the result even after the checkout was consumed.
+   * A rejection can have an unknown outcome; clients must retry the same intent.
+   */
+  reinsert(
+    attachmentId: string,
+    request: NativeChatQueueReinsertRequest
+  ): Promise<NativeChatQueueReinsertResult>;
+  /** Reopen an observed checkout on an authorized attachment to the same chat. */
+  read?(
+    attachmentId: string,
+    checkoutId: string,
+    inputId: string
+  ): Promise<NativeChatQueuedMessage>;
+  /** Observe a committed action, including after reattachment or restart. */
+  receipt?(
+    attachmentId: string,
+    requestId: string
+  ): Promise<NativeChatQueueActionReceipt | null>;
+  /** Read an opaque preview belonging to this open checkout. */
+  readAttachmentPreview?(
+    attachmentId: string,
+    checkoutId: string,
+    previewId: string
+  ): Promise<ArrayBuffer>;
 }>;
 
 export type NativeChatSteer = Readonly<{
@@ -1089,7 +1234,10 @@ export type NativeChatTextUpdate = Readonly<{
   activityOrder?: number;
   activityOrderIncomplete?: true;
 }> &
-  Pick<NativeChatMessage, "inputId" | "questionReply" | "questionReplies">;
+  Pick<
+    NativeChatMessage,
+    "inputId" | "questionReply" | "questionReplies" | "displayParts"
+  >;
 
 export type NativeChatActivityUpdate = Readonly<{
   kind: "activity";
@@ -1125,8 +1273,15 @@ export type NativeChatBackgroundProcessesUpdate = Readonly<{
   processes: readonly NativeChatBackgroundProcess[];
 }>;
 
+export type NativeChatCompactionUpdate = Readonly<{
+  kind: "compaction";
+  turnId: string;
+  item: NativeChatCompaction;
+}>;
+
 export type NativeChatStreamUpdate =
   | NativeChatTextUpdate
+  | NativeChatCompactionUpdate
   | NativeChatActivityUpdate
   | NativeChatBackgroundProcessesUpdate
   | Readonly<{ kind: "resync" }>;
@@ -1174,6 +1329,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** Discover selectable skills before starting a chat or connecting a model. */
+  skills?(workspaceId?: string): Promise<readonly NativeChatSkill[]>;
   /**
    * On the Welcome screen only: the connections a new chat can choose before a
    * workspace opens, with nothing active or saved. Listing starts nothing.
@@ -1284,6 +1441,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     command: NativeChatCommand,
     requestId: string
   ): Promise<NativeChatCommandResult>;
+  /** Acknowledge manual compaction at admission. The turn owns its outcome. */
+  startCompaction?(
+    attachmentId: string,
+    requestId: string
+  ): Promise<NativeChatCompactionAdmission>;
   prepareRevision?(
     attachmentId: string,
     observationId: string,
@@ -1344,7 +1506,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     selectionRevision?: number,
     editorContextId?: string,
     editorToolContext?: string | NativeEditorSelection.Capture,
-    webSearch?: true
+    webSearch?: true,
+    skills?: readonly NativeChatSkillReference[]
   ): Promise<NativeChatAcceptance>;
   submitMessage?(
     attachmentId: string,
@@ -1374,7 +1537,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     effort?: NativeChatEffort,
     selectionRevision?: number,
     editorContextId?: string,
-    webSearch?: true
+    webSearch?: true,
+    skills?: readonly NativeChatSkillReference[]
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(
@@ -1403,6 +1567,12 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   submitFileReference?(
     attachmentId: string,
     input: NativeChatFileReferenceInput
+  ): Promise<NativeChatAcceptance>;
+  /** The current host offers ordered attachment batches. */
+  acceptsAttachments?(): Promise<boolean>;
+  submitAttachments?(
+    attachmentId: string,
+    input: NativeChatAttachmentsInput
   ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,
@@ -1476,6 +1646,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     change: NativeChatQueueChange
   ): Promise<NativeChatQueueReceipt>;
+  /** Offered only when the host can recover an unsettled checkout and replay its receipts. */
+  queueCheckout?: NativeChatQueueCheckout;
+  /** Transfer a queued input into the turn from the supplied observation. */
+  steerQueued?(
+    attachmentId: string,
+    request: NativeChatQueueCheckoutRequest
+  ): Promise<NativeChatQueueActionReceipt>;
   steer?(
     attachmentId: string,
     input: NativeChatSteer
@@ -1538,11 +1715,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     control: NativeChatControl
   ): Promise<NativeChatControlResult>;
-  /** Pass true when this attachment can render and settle a question batch. */
   subscribe(
     attachmentId: string,
     update: (update: NativeChatUpdate) => void,
-    acceptsQuestionBatches?: true
+    /** Pass true when this attachment can render and settle a question batch. */
+    acceptsQuestionBatches?: true,
+    /** Pass true to receive live per-item compaction updates. */
+    acceptsCompactionItems?: true
   ): Promise<string>;
   unsubscribe(subscriptionId: string): Promise<void>;
 };

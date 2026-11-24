@@ -153,7 +153,7 @@ type AgentNotificationNavigation = {
   admits: (window: BrowserWindow) => boolean;
   register: (window: BrowserWindow) => boolean;
   focus_entry: () => void;
-  questionPresentation?: (
+  chatPresentation?: (
     sender: WebContents,
     session: NativeChatSession
   ) => boolean | undefined;
@@ -175,10 +175,8 @@ function attendSession(
   const owning =
     question &&
     ((window: BrowserWindow) =>
-      navigation.questionPresentation?.(
-        window.webContents,
-        question.session
-      ) !== undefined);
+      navigation.chatPresentation?.(window.webContents, question.session) !==
+      undefined);
   focusNativeChat(
     workspaceId,
     {
@@ -248,6 +246,7 @@ export async function notifyNativeChat(
   current: () => boolean,
   profileId?: string
 ): Promise<void> {
+  if (event.kind === "automatic_compaction_settled") return;
   const mayNotify = () =>
     current() &&
     navigation.can_open() &&
@@ -276,10 +275,11 @@ function shouldNotifyInBackground(
   event: NativeChatLifecycle,
   navigation: AgentNotificationNavigation
 ): boolean {
-  if (event.kind === "question_asked") {
+  if (event.kind === "question_asked" || event.kind === "settled") {
     const presentation = (window: BrowserWindow) =>
-      navigation.questionPresentation?.(window.webContents, event.session);
+      navigation.chatPresentation?.(window.webContents, event.session);
     if (
+      event.kind === "question_asked" &&
       event.side &&
       !resolveWorkspaceWindow(
         workspaceId,

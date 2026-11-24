@@ -22,16 +22,24 @@ import type {
   DesktopBrowserHost,
 } from "./browser-host";
 import type { FxViewer, FxViewerFileOutcome } from "./fx-viewer";
+import { ipc_sender } from "./ipc-sender";
 
 const MAX_INVENTORY_BYTES = 64 * 1024;
 
 type Publication = {
-  frame: WebFrameMain;
-  href: string;
+  viewId?: number;
   files: NativeEditorSurfaceSnapshot;
   fileIds: Map<string, string>;
   activePageId: string | null;
   activeRevision: number;
+};
+
+type WorkbenchDocument = {
+  frame: WebFrameMain;
+  href: string;
+  retiredThrough: number;
+  publication?: Publication;
+  unwatch(): void;
 };
 
 export type BrowserWorkbenchTarget =
@@ -70,7 +78,7 @@ export type DesktopBrowserToolLease = Readonly<{
 
 export class DesktopBrowserTools {
   private readonly pages: BrowserAutomation;
-  private readonly workbenches = new WeakMap<WebContents, Publication>();
+  private readonly workbenches = new WeakMap<WebContents, WorkbenchDocument>();
 
   constructor(
     private readonly browser: DesktopBrowserHost,
@@ -82,46 +90,85 @@ export class DesktopBrowserTools {
   publish(
     event: IpcMainInvokeEvent,
     args: unknown,
-    activePageId: unknown
+    activePageId: unknown,
+    viewId?: unknown
   ): boolean {
     const files = NativeEditorSurfaces.parse(args);
-    const { sender, senderFrame: frame } = event;
     if (
       !files ||
-      !frame ||
-      sender.isDestroyed() ||
-      sender.isLoadingMainFrame() ||
-      sender.mainFrame !== frame ||
-      (activePageId !== null && !DesktopBrowser.isIdentity(activePageId))
+      (activePageId !== null && !DesktopBrowser.isIdentity(activePageId)) ||
+      (viewId !== undefined && !validViewId(viewId))
     )
       return false;
-    if (!URL.canParse(frame.url)) return false;
-    const url = new URL(frame.url);
-    if (url.pathname !== "/desktop/workspace" || !url.searchParams.get("id"))
+    const document = this.workbenchDocument(event);
+    if (
+      !document ||
+      (viewId ?? 0) < (document.publication?.viewId ?? 0) ||
+      (document.retiredThrough > 0 && (viewId ?? 0) <= document.retiredThrough)
+    )
       return false;
-    const previous = this.workbenches.get(sender);
-    const ids =
-      previous?.frame === frame && previous.href === frame.url
-        ? previous.fileIds
-        : new Map<string, string>();
+    const previous = document.publication;
+    const ids = previous?.viewId === viewId ? previous?.fileIds : undefined;
     const fileIds = new Map(
-      files.open.map((path) => [path, ids.get(path) ?? randomUUID()])
+      files.open.map((path) => [path, ids?.get(path) ?? randomUUID()])
     );
-    this.workbenches.set(sender, {
-      frame,
-      href: frame.url,
+    document.publication = {
+      viewId,
       files,
       fileIds,
       activePageId,
       activeRevision:
         (previous?.activeRevision ?? 0) +
-        (previous?.frame === frame &&
-        previous.href === frame.url &&
+        (previous &&
+        previous.viewId === viewId &&
         previous.activePageId === activePageId
           ? 0
           : 1),
-    });
+    };
     return true;
+  }
+
+  retire(event: IpcMainInvokeEvent, viewId: unknown): boolean {
+    if (!validViewId(viewId)) return false;
+    const document = this.workbenchDocument(event);
+    if (!document) return false;
+    document.retiredThrough = Math.max(viewId, document.retiredThrough);
+    if ((document.publication?.viewId ?? 0) <= viewId)
+      document.publication = undefined;
+    return true;
+  }
+
+  private workbenchDocument({
+    sender,
+    senderFrame: frame,
+  }: IpcMainInvokeEvent): WorkbenchDocument | undefined {
+    if (
+      !frame ||
+      sender.isDestroyed() ||
+      sender.isLoadingMainFrame() ||
+      sender.mainFrame !== frame ||
+      !URL.canParse(frame.url)
+    )
+      return;
+    const href = frame.url;
+    const url = new URL(href);
+    if (url.pathname !== "/desktop/workspace" || !url.searchParams.get("id"))
+      return;
+    const existing = this.workbenches.get(sender);
+    if (existing?.frame === frame && existing.href === href) return existing;
+    existing?.unwatch();
+    const document: WorkbenchDocument = {
+      frame,
+      href,
+      retiredThrough: 0,
+      unwatch: ipc_sender.watchNavigation(sender, () => {
+        document.unwatch();
+        if (this.workbenches.get(sender) === document)
+          this.workbenches.delete(sender);
+      }),
+    };
+    this.workbenches.set(sender, document);
+    return document;
   }
 
   async captureEditorObservation(sender: WebContents, signal?: AbortSignal) {
@@ -186,9 +233,12 @@ export class DesktopBrowserTools {
   }
 
   private selectedFxPage(sender: WebContents) {
-    const publication = this.workbenches.get(sender);
-    if (!publication?.activePageId || sender.isDestroyed()) return null;
-    const { frame, href, activePageId: tabId, activeRevision } = publication;
+    const document = this.workbenches.get(sender);
+    const publication = document?.publication;
+    if (!document || !publication?.activePageId || sender.isDestroyed())
+      return null;
+    const { frame, href } = document;
+    const { activePageId: tabId, activeRevision, viewId } = publication;
     const workspaceId = new URL(href).searchParams.get("id");
     if (!workspaceId || !/^[a-f0-9]{16}$/.test(workspaceId)) return null;
     const auth = this.workbenchScope(sender, frame, href);
@@ -204,10 +254,13 @@ export class DesktopBrowserTools {
         workspaceId,
         tabId,
         selected: () => {
-          const latest = this.workbenches.get(sender);
+          const current = this.workbenches.get(sender);
+          const latest = current?.publication;
           return (
+            current === document &&
             latest?.activeRevision === activeRevision &&
             latest?.activePageId === tabId &&
+            latest?.viewId === viewId &&
             page.visible()
           );
         },
@@ -226,8 +279,10 @@ export class DesktopBrowserTools {
   ): DesktopBrowserToolLease {
     const id = randomUUID();
     const href = frame.url;
+    const document = this.workbenches.get(sender);
+    const viewId = document?.publication?.viewId;
     let closed = false;
-    const live = () => {
+    const routeCurrent = () => {
       if (
         closed ||
         sender.isDestroyed() ||
@@ -238,11 +293,34 @@ export class DesktopBrowserTools {
         return false;
       try {
         requireCurrent();
-        const publication = this.workbenches.get(sender);
-        return publication?.frame === frame && publication.href === href;
+        return true;
       } catch {
         return false;
       }
+    };
+    let browser:
+      | ReturnType<DesktopBrowserHost["automationWorkspace"]>
+      | undefined;
+    try {
+      browser = this.browser.automationWorkspace({
+        id,
+        sender,
+        frame,
+        live: routeCurrent,
+      });
+    } catch {
+      // A chat can still publish file surfaces without browser authority.
+    }
+    const live = () => {
+      if (!browser?.current()) return false;
+      const current = this.workbenches.get(sender);
+      return (
+        current?.frame === frame &&
+        current.href === href &&
+        (document === undefined || current === document) &&
+        current.publication !== undefined &&
+        current.publication.viewId === viewId
+      );
     };
     const scope: BrowserAutomationScope = { id, sender, frame, live };
     return {
@@ -294,7 +372,7 @@ export class DesktopBrowserTools {
     const request = record(args);
     if (!request || Object.keys(request).length !== 0)
       return refused("invalid_arguments");
-    const publication = this.workbenches.get(scope.sender)!;
+    const publication = this.workbenches.get(scope.sender)!.publication!;
     const pages = this.browserTabs(scope);
     const tabs = [
       ...publication.files.open.map((path) => ({
@@ -333,7 +411,7 @@ export class DesktopBrowserTools {
     const pages = this.browser
       .automationWorkbenchPages(scope)
       .map((page) => page.snapshot());
-    const { activePageId } = this.workbenches.get(scope.sender)!;
+    const { activePageId } = this.workbenches.get(scope.sender)!.publication!;
     return {
       activeTabId: pages.some((page) => page.id === activePageId)
         ? activePageId
@@ -416,7 +494,7 @@ export class DesktopBrowserTools {
         { kind: "url", url: target.url },
         focus
       );
-    const publication = this.workbenches.get(scope.sender)!;
+    const publication = this.workbenches.get(scope.sender)!.publication!;
     let path: string;
     let tabId: string | undefined;
     if (target.kind === "file" && NativeEditorSurfaces.isPath(target.path)) {
@@ -437,10 +515,17 @@ export class DesktopBrowserTools {
     scope.frame.send(IPC_CHANNELS.WORKSPACE_OPEN_AUTOMATION_FILE, {
       path,
       expiresAtMs: Math.min(expiresAtMs, Date.now() + 2000),
+      ...(publication.viewId === undefined
+        ? {}
+        : { viewId: publication.viewId }),
     });
     if (focus) this.focusWorkbench(scope);
     return requested(tabId ? { tabId } : {});
   }
+}
+
+function validViewId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

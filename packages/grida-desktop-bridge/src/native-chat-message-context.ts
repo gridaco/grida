@@ -1,3 +1,5 @@
+import { NativeChatSkills } from "./native-chat-skills";
+
 /** Passive data accepted with a chat message. All fields are data, including modelText. */
 export type NativeChatMessageContext = Readonly<{
   modelText: string;
@@ -37,19 +39,43 @@ export function parseNativeChatMessageContext(
   )
     return null;
   const displayParts = parseNativeChatDisplayParts(value.displayParts);
-  if (!displayParts) return null;
+  if (!displayParts || displayParts.some(({ kind }) => kind === "skill"))
+    return null;
   const context = { modelText: value.modelText, displayParts };
   return fits(context) ? context : null;
 }
 
-/** Validate the display-only projection emitted by the agent host. */
 export function parseNativeChatDisplayParts(
   value: unknown
 ): readonly NativeChatDisplayPart[] | null {
-  if (!Array.isArray(value) || value.length > MAX_PARTS) return null;
+  return parseParts(value, false);
+}
+
+/** Host-authored skill parts have a separate bound from caller-supplied display context. */
+export function parseNativeChatHostDisplayParts(
+  value: unknown
+): readonly NativeChatDisplayPart[] | null {
+  return parseParts(value, true);
+}
+
+function parseParts(
+  value: unknown,
+  host: boolean
+): readonly NativeChatDisplayPart[] | null {
+  const maxSkills = host ? NativeChatSkills.maxSelected : 0;
+  if (!Array.isArray(value) || value.length > MAX_PARTS + maxSkills)
+    return null;
   const remaining = { units: MAX_BYTES };
   const parts: NativeChatDisplayPart[] = [];
+  const context: NativeChatDisplayPart[] = [];
+  let skills = 0;
   for (const part of value) {
+    if (host && record(part) && part.kind === "skill") {
+      const skill = NativeChatSkills.displayPart(part);
+      if (!skill || ++skills > maxSkills) return null;
+      parts.push({ kind: "skill", version: 1, data: skill });
+      continue;
+    }
     if (
       !record(part) ||
       Object.keys(part).length !== 3 ||
@@ -63,9 +89,11 @@ export function parseNativeChatDisplayParts(
       !json(part.data, 0, remaining)
     )
       return null;
-    parts.push({ kind: part.kind, version: part.version, data: part.data });
+    const entry = { kind: part.kind, version: part.version, data: part.data };
+    parts.push(entry);
+    context.push(entry);
   }
-  return fits(parts) ? parts : null;
+  return context.length <= MAX_PARTS && fits(context) ? parts : null;
 }
 
 function fits(value: unknown): boolean {

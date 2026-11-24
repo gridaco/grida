@@ -9,6 +9,7 @@ import type {
 import type { NativeChatStore } from "./native-chat-store";
 import { NativeAgentTerminationPending } from "./native-agent-process";
 import type { ActiveNativeChat } from "./native-chat-ipc";
+import type { NativeDesktopProfile } from "./native-desktop-profile";
 
 /** Live agent processes: workspaces, their connections, documents and decks. */
 const MAX_LIVE_WORKSPACES = 8;
@@ -18,7 +19,7 @@ type Project =
       requireDirectoryCurrent?: () => void;
       nestedDeck?: {
         parentWorkspaceId: string;
-        protectedPaths: readonly string[];
+        protection: NativeDesktopProfile.ChatProtection;
         requireCurrent(): Promise<void>;
       };
     })

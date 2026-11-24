@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
 /// The SQLite application identity of this store's databases.
 pub(crate) const APPLICATION_ID: i64 = 0x4752_4147;
-pub(crate) const VERSION: i64 = 5;
+pub(crate) const VERSION: i64 = 6;
 
 /// Encoded values are JSON. Digests and identities the store compares in SQL
 /// are raw 32-byte blobs. No CHECK enumerates an open vocabulary such as
@@ -230,6 +230,33 @@ WHEN OLD.active_turn IS NOT NULL AND OLD.active_turn IS NOT NEW.active_turn
 BEGIN DELETE FROM private_branches WHERE session=OLD.id AND turn=OLD.active_turn; END;
 ";
 
+// Keep the original submission row and rank reserved during checkout. A
+// transfer retains a link to the recipient without changing its claim inputs.
+const QUEUE_ACTION_SCHEMA: &str = "
+CREATE TABLE queue_checkouts (
+    session TEXT PRIMARY KEY NOT NULL,
+    input TEXT NOT NULL,
+    checkout TEXT NOT NULL,
+    FOREIGN KEY (session, input) REFERENCES submissions(session, id) ON DELETE CASCADE
+) WITHOUT ROWID;
+
+CREATE VIEW runnable_queue AS
+    SELECT s.session,s.id,s.queue_order FROM submissions AS s
+    WHERE s.queue_order IS NOT NULL AND NOT EXISTS(
+        SELECT 1 FROM queue_checkouts AS c WHERE c.session=s.session AND c.input=s.id
+    );
+
+CREATE TABLE queue_transfers (
+    session TEXT NOT NULL,
+    input TEXT NOT NULL,
+    turn TEXT NOT NULL,
+    PRIMARY KEY (session, input),
+    FOREIGN KEY (session, input) REFERENCES submissions(session, id) ON DELETE CASCADE,
+    FOREIGN KEY (session, turn) REFERENCES turns(session, id) ON DELETE CASCADE
+) WITHOUT ROWID;
+CREATE INDEX queue_transfers_turn ON queue_transfers(session, turn, input);
+";
+
 /// The owner projections a store opens with. A database keeps the profile it
 /// was created with.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -251,7 +278,7 @@ pub(crate) fn prepare(
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(database_error)?;
     match (application_id, version) {
-        (APPLICATION_ID, VERSION | 4 | 3 | 2) => {
+        (APPLICATION_ID, VERSION | 5 | 4 | 3 | 2) => {
             require_profile(connection, profile)?;
             let enabled: bool = connection
                 .query_row(
@@ -278,7 +305,11 @@ pub(crate) fn prepare(
                 tx.execute_batch(ANNOTATION_SCHEMA)
                     .map_err(database_error)?;
             }
-            tx.execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+            if version < 5 {
+                tx.execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+                    .map_err(database_error)?;
+            }
+            tx.execute_batch(QUEUE_ACTION_SCHEMA)
                 .map_err(database_error)?;
             tx.pragma_update(None, "user_version", VERSION)
                 .map_err(database_error)?;
@@ -318,6 +349,9 @@ fn install(connection: &mut Connection, profile: Profile, conversations: bool) -
         .map_err(database_error)?;
     transaction
         .execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(QUEUE_ACTION_SCHEMA)
         .map_err(database_error)?;
     transaction
         .execute(
@@ -361,6 +395,9 @@ fn upgrade(
         .map_err(database_error)?;
     transaction
         .execute_batch(PRIVATE_CHECKPOINT_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(QUEUE_ACTION_SCHEMA)
         .map_err(database_error)?;
     if let Some(project) = conversations {
         // Version 1 retained immutable session configuration but no message
@@ -407,6 +444,7 @@ fn verify_definitions(connection: &Connection, version: i64) -> Result<()> {
         (version >= 3).then_some(READ_STATE_SCHEMA),
         (version >= 4).then_some(ANNOTATION_SCHEMA),
         (version >= 5).then_some(PRIVATE_CHECKPOINT_SCHEMA),
+        (version >= 6).then_some(QUEUE_ACTION_SCHEMA),
     ]
     .into_iter()
     .flatten()

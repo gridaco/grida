@@ -150,7 +150,6 @@ pub async fn bake(
         Some(|inputs| {
             Execution::with_transport(&state, options, None, inputs, |_| Arc::new(Offline))
         }),
-        None,
     )?
     .with_operating_regime(regime);
     if subagents || effort == EffortPreset::Ultra {

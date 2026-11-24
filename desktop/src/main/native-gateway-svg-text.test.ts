@@ -676,6 +676,7 @@ function svgChatFixture(chat: NativeAgentChat, cwd: string, surface: string) {
             ...grant,
             parentWorkspaceId: project,
             parentIdentity: identity,
+            launchProtected: grant.protected,
           }),
           current: () => active,
           ensure: async () => {},

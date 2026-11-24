@@ -5,6 +5,7 @@ import type { App } from "electron";
 import { ProtectedRoots } from "@grida/daemon/server";
 import definition from "../../../extensions/desktop-fx/extension.json";
 import type { DesktopBrowserTools } from "./desktop-browser-tools";
+import type { DesktopProfile } from "./desktop-profile";
 import { FxViewer } from "./fx-viewer";
 import { FxWorkspaceFiles } from "./fx-workspace-files";
 import { pinExecutable } from "./native-agent-hooks";
@@ -20,6 +21,7 @@ export class FxExtension {
   readonly viewer: FxViewer;
 
   constructor(
+    profile: Pick<DesktopProfile, "nativeChat" | "resourcesPath">,
     desktopApp: () => App,
     private readonly workspace: WorkspaceFiles
   ) {
@@ -29,19 +31,19 @@ export class FxExtension {
       async (workspaceId) => {
         const registered = await this.workspace.findWorkspace(workspaceId);
         if (registered?.id !== workspaceId) return undefined;
-        protectedRoots ??= NativeDesktopProfile.selected()
-          ? NativeDesktopProfile.protectedRoots(desktopApp())
-          : new ProtectedRoots(
-              NativeDesktopProfile.ordinaryChatProtectedPaths(desktopApp())
-            );
+        protectedRoots ??=
+          profile.nativeChat === "preview"
+            ? NativeDesktopProfile.protectedRoots(desktopApp())
+            : new ProtectedRoots(
+                NativeDesktopProfile.ordinaryChatProtection(desktopApp())
+                  .workspace
+              );
         return protectedRoots.overlaps(registered.root)
           ? undefined
           : FxViewer.projectDirectory(registered.root);
       },
       async (args, signal) => {
-        command ??= FxExtension.command(
-          NativeDesktopProfile.resourcesPath(desktopApp())
-        ).catch(() => {
+        command ??= FxExtension.command(profile.resourcesPath).catch(() => {
           command = undefined;
           return undefined;
         });

@@ -6,33 +6,47 @@ import type { NativeChatDisplayPart } from "@grida/desktop-bridge";
 import { Message, MessageContent } from "@app/ui/ai-elements/message";
 import { Button } from "@app/ui/components/button";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
+import { UserMessageText } from "@/kits/agent-chat/message";
+import { projectUserMessageSkills } from "@/kits/agent-chat/user-message-markdown";
 
 /** The workspace transcript entry until the host confirms the send. */
 export function OutgoingMessage({
   text,
   attachmentName,
+  attachmentNames,
   displayParts,
   children,
 }: {
   text: string;
   attachmentName?: string;
+  attachmentNames?: readonly string[];
   displayParts?: readonly NativeChatDisplayPart[];
   children?: ReactNode;
 }) {
+  const authored = projectUserMessageSkills(text, displayParts);
   return (
     <Message from="user">
-      {displayParts?.length ? (
-        <MessageContextParts parts={displayParts} className="justify-end" />
-      ) : null}
-      {attachmentName && (
-        <span className="ml-auto inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
-          <PaperclipIcon aria-hidden className="size-3.5 shrink-0" />
-          <span className="truncate">{attachmentName}</span>
-        </span>
+      {authored.context.length > 0 && (
+        <MessageContextParts parts={authored.context} className="justify-end" />
+      )}
+      {(attachmentNames ?? (attachmentName ? [attachmentName] : [])).map(
+        (name, index) => (
+          <span
+            key={index}
+            className="ml-auto inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
+          >
+            <PaperclipIcon aria-hidden className="size-3.5 shrink-0" />
+            <span className="truncate">{name}</span>
+          </span>
+        )
       )}
       {text && (
         <MessageContent className="text-[14px] leading-[23px] whitespace-pre-wrap">
-          {text}
+          {authored.links.size ? (
+            <UserMessageText text={authored.text} skillLinks={authored.links} />
+          ) : (
+            text
+          )}
         </MessageContent>
       )}
       {children ?? <OutgoingMessageStatus status="sending" />}

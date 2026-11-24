@@ -505,11 +505,26 @@ async fn approved_command_keeps_host_state_unreadable() {
         "private fixture content",
     )
     .unwrap();
+    let home = fixture.profile.with_file_name("grida-home");
+    fs::create_dir_all(home.join("providers")).unwrap();
+    fs::write(
+        home.join("providers/credentials.toml"),
+        "private fixture key",
+    )
+    .unwrap();
+    fs::write(home.join("note.txt"), "ordinary home note\n").unwrap();
     let mut endpoint = Endpoint::start(vec![
         call(
             "exec_command",
             request(
-                "if /bin/cat ../state/private-test >/dev/null 2>&1; then exit 77; fi; if (printf forbidden > .grida) 2>/dev/null; then exit 78; fi; printf recorded > receipt",
+                r#"
+                set -eu
+                if (: < ../state/private-test) 2>/dev/null; then exit 77; fi
+                if (printf forbidden > .grida) 2>/dev/null; then exit 78; fi
+                if (: < ../private/grida-home/providers/credentials.toml) 2>/dev/null; then exit 79; fi
+                /bin/cat ../private/grida-home/note.txt
+                printf recorded > receipt
+                "#,
                 "Write the requested receipt into the project.",
             ),
         ),
@@ -525,7 +540,7 @@ async fn approved_command_keeps_host_state_unreadable() {
     assert_eq!(evidence["action"]["kind"], "escalated_command");
     assert_eq!(evidence["action"]["network"], "denied");
     let result = last_tool(&endpoint.request().await);
-    assert_eq!(result["status"], "succeeded", "{result}");
+    assert_command_output(&result, "ordinary home note\n");
     assert_eq!(
         fs::read(fixture.primary.join("receipt")).unwrap(),
         b"recorded"

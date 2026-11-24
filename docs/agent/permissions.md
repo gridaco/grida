@@ -21,18 +21,19 @@ ask “Run the tests and fix what fails.” The composer shows the current mode.
 - Desktop reads your login shell's environment from your home folder so
   commands can find your usual tools. If shell startup stalls, Desktop uses
   its own environment and opens chat.
-- In Desktop's default profile, Act and Plan commands can read elsewhere on
-  your computer, except protected locations such as Grida's own data and
-  saved credentials. Act commands can write to the project and temporary
-  storage. Ordinary commands have no direct internet access.
+- In Desktop's default profile, Act and Plan commands can read ordinary files
+  elsewhere on your computer, including in your Grida home. Saved credentials,
+  private app data, and the global agent configuration stay protected. Act
+  commands can write to the project and temporary storage. Ordinary commands
+  have no direct internet access.
 - Sandboxed commands can start a new repository. Ordinary commands and
   listener retries keep existing version-control metadata read-only. An
   approved offline write can update that metadata. Agent settings stay protected.
 - With the **Plan** badge on, the agent can investigate with confined
   commands and ask questions. Each command finishes within its call, runs
   offline, and can write only to private temporary storage.
-- The workspace's agent settings file stays in protected storage. Edit the
-  file while Desktop is closed to change the context limit for future
+- The global agent settings file stays in protected storage. Edit the
+  file while Desktop is closed to change the context settings for future
   messages. [Change agent settings](./settings.md#edit-the-file-yourself)
 
 ## Choose who reviews extra access

@@ -91,6 +91,10 @@ export namespace ipc_admission {
           return pathname === "/desktop/settings" || isVoiceComposer(pathname);
         if (channel.startsWith("grida:voice:"))
           return pathname === "/desktop/settings";
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_SKILLS)
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
           return (
             pathname === "/desktop/workspace" &&
@@ -209,7 +213,9 @@ export namespace ipc_admission {
         }
         if (
           channel.startsWith("grida:native-external:") ||
-          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES ||
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES ||
+          channel === IPC_CHANNELS.WORKSPACE_RETIRE_VIEW
         ) {
           return pathname === "/desktop/workspace";
         }

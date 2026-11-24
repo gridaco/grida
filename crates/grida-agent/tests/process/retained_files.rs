@@ -264,18 +264,15 @@ async fn shared_clients_cannot_admit_embedded_files() {
 }
 
 #[tokio::test]
-async fn responses_counts_the_admitted_resource_descriptor_and_tools_before_generation() {
+async fn responses_sends_the_admitted_resource_descriptor_and_tools_without_the_legacy_count_preflight()
+ {
     let root = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
     let state = root.path().join("state");
-    super::responses::input_limit(&state, 64);
+    super::responses::legacy_input_limit(&state, 64);
     let mut endpoint = Endpoint::start_protocol(
         ProviderProtocol::Responses,
-        vec![
-            Reply::InputCount(32),
-            Reply::Finished("The descriptor fits."),
-            Reply::InputCount(65),
-        ],
+        vec![Reply::Finished("The descriptor arrived.")],
         Some(TEST_CREDENTIAL),
     )
     .await;
@@ -302,38 +299,23 @@ async fn responses_counts_the_admitted_resource_descriptor_and_tools_before_gene
         "prompt":[{"type":"text","text":"Inspect the attached reference."},
                   {"type":"resource","resource":{"uri":"file:///unselected/notes.txt","text":"supplied-private-bytes"}}],
     });
-    let first = read(&mut client, "session/prompt", prompt.clone()).await;
+    let first = read(&mut client, "session/prompt", prompt).await;
     assert_eq!(first["stopReason"], "end_turn");
-    let count = endpoint.request().await;
+    let generation = endpoint.request().await;
     assert!(
-        count["input"]
+        generation["input"]
             .to_string()
             .contains("Attached file notes.txt.")
     );
-    assert!(!count.to_string().contains("supplied-private-bytes"));
-    assert!(!count.to_string().contains("file:///unselected/"));
+    assert!(!generation.to_string().contains("supplied-private-bytes"));
+    assert!(!generation.to_string().contains("file:///unselected/"));
     assert!(
-        count["tools"]
+        generation["tools"]
             .as_array()
             .unwrap()
             .iter()
             .any(|tool| tool["name"] == TOOL)
     );
-    let mut generation = endpoint.request().await;
-    for field in ["stream", "store", "max_output_tokens", "include"] {
-        generation.as_object_mut().unwrap().remove(field);
-    }
-    assert_eq!(count, generation);
-
-    let refused = client.request("session/prompt", prompt).await;
-    assert_eq!(refused["error"]["data"], "input_token_limit", "{refused}");
-    let count = endpoint.request().await;
-    assert!(
-        count["input"]
-            .to_string()
-            .contains("Attached file notes.txt.")
-    );
-    assert!(endpoint.requests.try_recv().is_err());
     client.close().await;
     endpoint.done().await;
 }
@@ -418,7 +400,7 @@ fn run(state: &Path, endpoint: &str, selected: &Path) -> Command {
     command.arg("run");
     configured(&mut command, state, endpoint);
     command.arg("--input-file").arg(selected).args([
-        "--questions",
+        "--questions-v2",
         "--prompt",
         "Inspect the file I selected.",
     ]);

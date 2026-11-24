@@ -38,6 +38,35 @@ describe("welcome_message", () => {
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
+  it("keeps an exact personal skill selection through the first-message handoff", () => {
+    const storage = memoryStorage();
+    const skills = [
+      { name: "slides", uri: `grida-skill:slides@${"f".repeat(64)}` },
+    ];
+    const document = { type: "doc", content: [{ type: "paragraph" }] };
+    expect(
+      welcome_message.stash(
+        "destination",
+        {
+          text: "",
+          profileId: PROFILE,
+          skills,
+          document,
+        },
+        storage
+      )
+    ).toBe(true);
+    expect(welcome_message.peek("destination", storage)).toMatchObject({
+      text: "",
+      skills,
+      document,
+    });
+    const arrived = welcome_message.pending("destination", storage)?.take();
+    expect(arrived?.skills).toEqual(skills);
+    arrived?.commit?.();
+    expect(welcome_message.peek("destination", storage)).toBeNull();
+  });
+
   it("does not let an older pane consume a replacement handoff", () => {
     const storage = memoryStorage();
     const message = { text: "Look this up", profileId: PROFILE };
@@ -247,6 +276,61 @@ describe("welcome_message", () => {
       profileId: null,
       effort: "low",
       missingAttachment: { kind: "directory", name: "References" },
+    });
+  });
+
+  it("hands off every selected File in order without persisting browser custody", () => {
+    const storage = memoryStorage();
+    const notes = new File(["notes"], "same.txt");
+    const sameName = new File(["different notes"], "same.txt");
+    const folder = new File([], "References");
+    const message = {
+      text: "Compare these references",
+      profileId: null,
+      attachments: [
+        { kind: "file" as const, file: notes },
+        { kind: "directory" as const, file: folder },
+        { kind: "file" as const, file: sameName },
+      ],
+    };
+    expect(welcome_message.stash("batch", message, storage)).toBe(true);
+    const peeked = welcome_message.peek("batch", storage);
+    expect(peeked?.attachments?.map(({ file }) => file)).toEqual([
+      notes,
+      folder,
+      sameName,
+    ]);
+    expect(peeked?.attachments?.[0].file).toBe(notes);
+    expect(peeked?.attachments?.[2].file).toBe(sameName);
+    expect(welcome_message.takeMessage("batch", storage)).toEqual(message);
+    expect(welcome_message.takeMessage("batch", storage)).toBeNull();
+  });
+
+  it("keeps an entire unavailable batch explicit after process-local files disappear", () => {
+    const storage = memoryStorage();
+    storage.entries.set(
+      "grida.welcome.message.v1.detached-batch",
+      JSON.stringify({
+        text: "Compare the references",
+        profileId: null,
+        attachments: {
+          token: "gone",
+          items: [
+            { kind: "file", name: "a.png" },
+            { kind: "directory", name: "References" },
+            { kind: "file", name: "a.png" },
+          ],
+        },
+      })
+    );
+    expect(welcome_message.takeMessage("detached-batch", storage)).toEqual({
+      text: "Compare the references",
+      profileId: null,
+      missingAttachments: [
+        { name: "a.png" },
+        { name: "References" },
+        { name: "a.png" },
+      ],
     });
   });
 

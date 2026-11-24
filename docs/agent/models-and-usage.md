@@ -103,11 +103,8 @@ in place. Removing a key or changing an endpoint can make its saved selection
 unavailable. Restore the connection to continue its accepted work, or resolve
 that work before explicitly choosing another connection for future messages.
 
-A local llama.cpp endpoint can also appear as a separate **llama.cpp
-counting** connection. Choose it when the workspace has a context input limit
-and you want the endpoint to count each request against it.
-[Change agent settings](./settings.md) ·
-[Configure local request counting](../reference/agent-configuration.md#configure-local-request-counting)
+Previously saved llama.cpp connections appear as **legacy** in their workspace.
+They keep their saved endpoint and model identity.
 
 ## Use your ChatGPT subscription
 
@@ -209,21 +206,20 @@ request again; review any partial work before asking again.
 
 ## See how full the context is
 
-The ring beside the model picker shows how much of the selected model's
-context window the chat uses. After a reply, it uses the size the model's
-provider reported for the latest request: the agent's instructions, its tool
-definitions and results, and the conversation. Before then, it estimates from
-the visible conversation. The tooltip and breakdown say whether the value is
-**Estimated** or **Reported by provider**. Hover it for the percentage and
-token count; open it for a breakdown by user, assistant, tools and other
-content, where other covers instructions and tool work you don't see in the
-chat. The ring appears once the model's window is known.
+The ring beside the model picker shows context usage. A reported measurement
+uses the context window resolved for that turn. Otherwise the ring estimates
+usage from the visible conversation and the selected model's known window.
+The tooltip and breakdown say whether the value is **Estimated** or
+**Reported by provider**. Hover for the percentage and token count. Open the
+breakdown to see how the visible content accounts for the measured request.
+When the visible transcript is larger than the reported request, such as
+after compaction, the provider total is shown as **Other**.
 
-When the earlier conversation grows large, Grida summarizes it before the next
-message and shows **Conversation auto-compacted** in the chat; open the note
-to read the summary. To do this yourself in an idle chat with nothing queued,
-type `/compact` and send it on its own. The full transcript stays visible
-either way. [Continue a long conversation](./history.md#continue-a-long-conversation)
+Grida can summarize earlier conversation before the next message or earlier
+tool exchanges while a turn runs. The current user messages and full
+transcript stay visible. Open **Context compacted** to read the summary
+when available. To compact an idle chat with nothing queued, send `/compact` on
+its own. [Continue a long conversation](./history.md#continue-a-long-conversation)
 
 ## Usage and charges
 

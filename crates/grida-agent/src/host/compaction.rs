@@ -4,9 +4,7 @@
 use super::*;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, MeasurementKind,
-    PreparedRequest,
-    usage::{INPUT_TOKENS, TOKENS},
+    FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, PreparedRequest,
 };
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
@@ -16,15 +14,25 @@ use agent_kit_runtime::{
 use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed, RetainedHistory};
 use grida_agent_master::compaction::{
-    CompactionAccount, CompactionFailure, Coverage, SummaryRequest, summary_request,
+    CompactionAccount, CompactionActivityStatus, CompactionFailure, Coverage, SummaryRequest,
+    context_tokens, same_context_scope, summary_request,
 };
 use grida_agent_master::read_account;
 use grida_agent_master::usage::InferenceUsage;
 
 const PLAN_SCHEMA: &str = "grida.agent.native.compaction.plan";
 const MAX_PRE_DISPATCH_IDENTITIES: usize = 4;
-pub(crate) const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
+const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
 const AUTOMATIC_SOURCE_BYTES: usize = 96 * 1024;
+
+/// Automatic compaction has a host-owned turn identity that survives recovery.
+pub(crate) fn is_automatic_turn(turn: &TurnId) -> bool {
+    turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX)
+}
+
+pub(crate) fn is_compaction_turn(turn: &TurnId) -> bool {
+    turn.as_str().starts_with("compact/") || is_automatic_turn(turn)
+}
 
 #[derive(Clone)]
 pub struct CompactRequest {
@@ -91,7 +99,7 @@ pub(super) struct AutomaticCompaction {
 enum CompactionTrigger {
     Manual,
     Automatic {
-        verified_pressure: bool,
+        token_pressure: Option<bool>,
         has_unprojected_suffix: bool,
     },
     /// A side chat's inherited history, summarized before its first turn so
@@ -100,9 +108,70 @@ enum CompactionTrigger {
     Inherited,
 }
 
+enum ManualCompaction {
+    NoChange,
+    Existing(Box<RecordedCompaction>),
+    Started(Box<StartedCompaction>),
+}
+
+struct RecordedCompaction {
+    view: TurnView,
+    plan: CompactionPlan,
+}
+
+struct StartedCompaction {
+    host: Host,
+    turn: TurnId,
+    completion: oneshot::Receiver<Result<RunResult>>,
+}
+
 impl Host {
+    pub(crate) async fn running_standalone_compaction(
+        &self,
+        session: &SessionId,
+    ) -> Option<TurnId> {
+        if !self
+            .work
+            .lock()
+            .await
+            .active
+            .get(session)
+            .is_some_and(|active| active.admitted)
+        {
+            return None;
+        }
+        let current = self.store.inspect(session.clone()).await.ok()?.current?;
+        (is_compaction_turn(&current.binding.turn)
+            && current.disposition == agent_kit_sessions::TurnDisposition::Running
+            && current.controls.admits_work())
+        .then_some(current.binding.turn)
+    }
+
     pub async fn compact(&self, request: CompactRequest) -> Result<CompactionReport> {
         self.compact_observed(request, None).await
+    }
+
+    /// Admit manual compaction and leave execution with the registered worker.
+    pub(crate) async fn start_compaction(
+        &self,
+        session: SessionId,
+        request: ChangeId,
+    ) -> Result<Option<TurnId>> {
+        self.owned_control(move |host| async move {
+            match host
+                .admit_manual_compaction(CompactRequest {
+                    session,
+                    request,
+                    recover: false,
+                })
+                .await?
+            {
+                ManualCompaction::NoChange => Ok(None),
+                ManualCompaction::Existing(record) => Ok(Some(record.view.binding.turn)),
+                ManualCompaction::Started(started) => Ok(Some(started.turn)),
+            }
+        })
+        .await
     }
 
     pub(crate) async fn compact_observed(
@@ -111,106 +180,24 @@ impl Host {
         accepted: Option<oneshot::Sender<TurnId>>,
     ) -> Result<CompactionReport> {
         self.owned_control(move |host| async move {
-            let CompactRequest {
-                session,
-                request,
-                recover,
-            } = request;
-            host.refuse_in_side_chat(&session, side_chats::Refusal::Compaction)
-                .await?;
-            let fingerprint = Fingerprint::of(&(&session, &request))?;
-            let turn = TurnId::new(format!(
-                "compact/{:x}",
-                uuid::Uuid::from_bytes(
-                    fingerprint.bytes()[..16]
-                        .try_into()
-                        .expect("fingerprint prefix")
-                )
-            ))?;
-            let launch = match host.store.inspect_turn(session.clone(), turn.clone()).await {
-                Ok(view) => {
-                    let plan = host
-                        .compaction_plan(session.clone(), turn.clone())
-                        .await?
-                        .ok_or_else(|| {
-                            problem(ErrorKind::Conflict, "compaction_identity_reused")
-                        })?;
-                    match view.disposition {
-                        TurnDisposition::Settled => {
-                            return host
-                                .report_compaction(
-                                    &session,
-                                    &turn,
-                                    &plan,
-                                    &view.outcome.ok_or_else(|| {
-                                        problem(
-                                            ErrorKind::InvalidState,
-                                            "compaction_outcome_missing",
-                                        )
-                                    })?,
-                                )
-                                .await;
-                        }
-                        TurnDisposition::Running => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Running,
-                            ));
-                        }
-                        TurnDisposition::Suspended => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Suspended,
-                            ));
-                        }
-                        TurnDisposition::Interrupted if !recover => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Interrupted,
-                            ));
-                        }
-                        TurnDisposition::Interrupted => {
-                            Launch::RecoverCompaction(RecoveryRequest {
-                                id: change_id()?,
-                                session: session.clone(),
-                                turn: turn.clone(),
-                                expected_epoch: view.binding.epoch,
-                            })
-                        }
-                    }
-                }
-                Err(error) if error.code == "turn_missing" && !recover => {
-                    Launch::Compact(request, None)
-                }
-                Err(error) => return Err(error),
-            };
-            let (host, launch) = match launch {
-                Launch::Compact(request, _) => {
-                    let (host, revision) = host.for_derived_session(&session).await?;
-                    (host, Launch::Compact(request, revision))
-                }
-                existing => (host, existing),
-            };
-            let ticket = {
-                let mut work = host.settled_work(&session).await?;
-                host.register(&mut work, session.clone(), turn.clone(), launch)?
-            };
-            match ticket
-                .admission
-                .await
-                .map_err(|_| problem(ErrorKind::Uncertain, "compaction_admission_interrupted"))?
-            {
-                Ok(_) => {}
-                Err(error) if error.code == "compaction_nothing_to_do" => {
+            let session = request.session.clone();
+            let StartedCompaction {
+                host,
+                turn,
+                completion,
+            } = match host.admit_manual_compaction(request).await? {
+                ManualCompaction::NoChange => {
                     return Ok(CompactionReport::state(None, CompactionStatus::NoChange));
                 }
-                Err(error) => return Err(error),
-            }
+                ManualCompaction::Existing(record) => {
+                    return host.read_compaction_report(&session, *record).await;
+                }
+                ManualCompaction::Started(started) => *started,
+            };
             if let Some(accepted) = accepted {
                 let _ = accepted.send(turn.clone());
             }
-            match ticket
-                .completion
+            match completion
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "compaction_worker_interrupted"))??
             {
@@ -235,6 +222,118 @@ impl Host {
             }
         })
         .await
+    }
+
+    async fn admit_manual_compaction(&self, request: CompactRequest) -> Result<ManualCompaction> {
+        let CompactRequest {
+            session,
+            request,
+            recover,
+        } = request;
+        self.refuse_in_side_chat(&session, side_chats::Refusal::Compaction)
+            .await?;
+        let fingerprint = Fingerprint::of(&(&session, &request))?;
+        let turn = TurnId::new(format!(
+            "compact/{:x}",
+            uuid::Uuid::from_bytes(
+                fingerprint.bytes()[..16]
+                    .try_into()
+                    .expect("fingerprint prefix")
+            )
+        ))?;
+        let inspected = self.recorded_compaction(&session, &turn).await?;
+        let (host, launch) = match inspected {
+            Some(record) if recover && record.view.disposition == TurnDisposition::Interrupted => (
+                self.clone(),
+                Launch::RecoverCompaction(RecoveryRequest {
+                    id: change_id()?,
+                    session: session.clone(),
+                    turn: turn.clone(),
+                    expected_epoch: record.view.binding.epoch,
+                }),
+            ),
+            Some(record) => return Ok(ManualCompaction::Existing(record)),
+            None if recover => return Err(problem(ErrorKind::InvalidInput, "turn_missing")),
+            None => {
+                let (host, revision) = self.for_derived_session(&session).await?;
+                (host, Launch::Compact(request, revision))
+            }
+        };
+        let ticket = {
+            let mut work = host.settled_work(&session).await?;
+            if !recover {
+                // A matching turn may commit after the first lookup. Recheck
+                // before this request can register another worker.
+                if let Some(record) = host.recorded_compaction(&session, &turn).await? {
+                    return Ok(ManualCompaction::Existing(record));
+                }
+                if work
+                    .active
+                    .get(&session)
+                    .is_some_and(|worker| worker.turn == turn)
+                {
+                    return Err(problem(
+                        ErrorKind::Uncertain,
+                        "compaction_admission_pending",
+                    ));
+                }
+            }
+            host.register(&mut work, session, turn.clone(), launch)?
+        };
+        match ticket
+            .admission
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "compaction_admission_interrupted"))?
+        {
+            Ok(_) => Ok(ManualCompaction::Started(Box::new(StartedCompaction {
+                host,
+                turn,
+                completion: ticket.completion,
+            }))),
+            Err(error) if error.code == "compaction_nothing_to_do" => {
+                Ok(ManualCompaction::NoChange)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn recorded_compaction(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<Option<Box<RecordedCompaction>>> {
+        let view = match self.store.inspect_turn(session.clone(), turn.clone()).await {
+            Ok(view) => view,
+            Err(error) if error.code == "turn_missing" => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let plan = self
+            .compaction_plan(session.clone(), turn.clone())
+            .await?
+            .ok_or_else(|| problem(ErrorKind::Conflict, "compaction_identity_reused"))?;
+        Ok(Some(Box::new(RecordedCompaction { view, plan })))
+    }
+
+    async fn read_compaction_report(
+        &self,
+        session: &SessionId,
+        record: RecordedCompaction,
+    ) -> Result<CompactionReport> {
+        let turn = record.view.binding.turn;
+        let status = match record.view.disposition {
+            TurnDisposition::Settled => {
+                let outcome = record.view.outcome.ok_or_else(|| {
+                    problem(ErrorKind::InvalidState, "compaction_outcome_missing")
+                })?;
+                return self
+                    .report_compaction(session, &turn, &record.plan, &outcome)
+                    .await;
+            }
+            TurnDisposition::Running => CompactionStatus::Running,
+            TurnDisposition::Suspended => CompactionStatus::Suspended,
+            TurnDisposition::Interrupted => CompactionStatus::Interrupted,
+        };
+        Ok(CompactionReport::state(Some(turn), status))
     }
 
     pub(super) async fn compaction_plan(
@@ -286,12 +385,10 @@ impl Host {
             .context_prefix_with(session.clone(), grida_agent_master::history::project)
             .await?;
         let expected_revision = prefix.history.session_revision;
-        let defaults = self.with_configuration(Configuration::snapshot).await?;
         let mut plan = compaction_plan_for(
             self.selected_route.clone(),
             execution,
             &execution.config,
-            defaults.defaults.context.max_input_tokens,
             prefix.history,
             CompactionTrigger::Manual,
         )?
@@ -355,13 +452,10 @@ impl Host {
         if self.inference_only
             || configuration.subagent.is_some()
             || !is_stored_input(&head.payload)
-            || view.latest.as_ref().is_some_and(|latest| {
-                latest
-                    .binding
-                    .turn
-                    .as_str()
-                    .starts_with(AUTOMATIC_TURN_PREFIX)
-            })
+            || view
+                .latest
+                .as_ref()
+                .is_some_and(|latest| is_automatic_turn(&latest.binding.turn))
         {
             return Ok(None);
         }
@@ -400,7 +494,10 @@ impl Host {
         )?;
         let prefix = self
             .store
-            .context_prefix_with(view.session.clone(), grida_agent_master::history::project)
+            .context_prefix_with(
+                view.session.clone(),
+                grida_agent_master::history::model_context,
+            )
             .await?;
         let has_unprojected_suffix = prefix.unprojected_suffix_after.is_some();
         let context = prefix.history;
@@ -417,7 +514,6 @@ impl Host {
                 self.selected_route.clone(),
                 execution,
                 &input.config,
-                input.limit,
                 context,
                 CompactionTrigger::Inherited,
             )?
@@ -433,24 +529,22 @@ impl Host {
                 },
             )));
         }
-        let verified_pressure = has_unprojected_suffix
-            || self
-                .verified_compaction_pressure(
-                    view,
-                    execution,
-                    &input,
-                    context.records.last().map(|entry| &entry.turn),
-                )
-                .await
-                .unwrap_or(false);
+        let token_pressure = if has_unprojected_suffix {
+            Some(true)
+        } else {
+            self.compaction_pressure(view, execution, &input, &context)
+                .await?
+        };
+        if token_pressure == Some(false) {
+            return Ok(None);
+        }
         let Some(plan) = compaction_plan_for(
             self.selected_route.clone(),
             execution,
             &input.config,
-            input.limit,
             context,
             CompactionTrigger::Automatic {
-                verified_pressure,
+                token_pressure,
                 has_unprojected_suffix,
             },
         )?
@@ -467,47 +561,51 @@ impl Host {
         )))
     }
 
-    async fn verified_compaction_pressure(
+    async fn compaction_pressure(
         &self,
         view: &SessionView,
         execution: &Execution,
         input: &PreparedInput,
-        retained_tail: Option<&TurnId>,
-    ) -> Result<bool> {
-        let Credential::Http(transport) = &execution.authorization.credential else {
-            return Ok(false);
-        };
-        let model = input.config.model.clone();
-        let threshold = transport
-            .verified_context_window(&model)
-            .zip(input.config.max_output_tokens)
-            .and_then(|(window, output)| window.get().checked_sub(output))
-            .and_then(NonZeroU64::new)
-            .map(|usable| input.limit.map_or(usable, |limit| usable.min(limit)));
-        let Some(latest) = view.latest.as_ref().filter(|turn| {
-            retained_tail == Some(&turn.binding.turn)
-                && turn
-                    .outcome
-                    .as_ref()
-                    .is_some_and(|outcome| match outcome.status {
-                        OutcomeStatus::Succeeded => threshold.is_some(),
-                        OutcomeStatus::Failed => true,
-                        _ => false,
-                    })
+        context: &RetainedHistory,
+    ) -> Result<Option<bool>> {
+        let (mut messages, _, _) = super::history::context_material(context.clone())?;
+        let history_len = messages.len();
+        messages.extend(input.guidance.iter().cloned());
+        messages.extend(input.messages.iter().cloned());
+        let limit = input.context_limits.auto_compact;
+        let estimated = || limit.map(|limit| context_tokens(&messages, None) >= limit.get());
+        let Some(latest) = view.latest.as_ref().filter(|latest| {
+            context
+                .records
+                .last()
+                .is_some_and(|record| record.turn == latest.binding.turn)
         }) else {
-            return Ok(false);
+            return Ok(estimated());
         };
-        let binding = transport.binding().clone();
+        let turn = &latest.binding.turn;
+        let tail_len = context
+            .records
+            .iter()
+            .rev()
+            .take_while(|record| &record.turn == turn)
+            .count();
+        let authority = execution.authority.inference.authority.clone();
+        let provider = execution.provider_id.clone();
+        let model = input.config.model.clone();
         self.store
-            .inspect_turn_with(
-                view.session.clone(),
-                latest.binding.turn.clone(),
-                move |state| {
-                    Ok(previous_context_pressure(
-                        state, &binding, &model, threshold,
-                    ))
-                },
-            )
+            .inspect_turn_with(view.session.clone(), turn.clone(), move |state| {
+                let compatible = |request: &PreparedRequest| {
+                    same_context_scope(request, &model, &provider, &authority)
+                };
+                if previous_context_rejection(state, compatible) {
+                    return Ok(Some(true));
+                }
+                let prior = state
+                    .latest_published_inference(&messages[history_len - tail_len..history_len])
+                    .filter(|(request, _)| compatible(request))
+                    .map(|(request, outcome)| (request.request(), outcome));
+                Ok(limit.map(|limit| context_tokens(&messages, prior) >= limit.get()))
+            })
             .await
     }
 
@@ -548,7 +646,7 @@ impl Host {
             return Ok(());
         };
         let turn = &latest.binding.turn;
-        if !turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX) {
+        if !is_automatic_turn(turn) {
             return Ok(());
         }
         let Some(outcome) = latest
@@ -636,6 +734,7 @@ impl Host {
         let binding = turn.view().state.binding().clone();
         let key = OperationKey::new(format!("compact/summary/{}", binding.epoch))?;
         let current_operation = operations.operation_id(&key)?;
+        let mut started_at = None;
         for (id, operation) in turn.view().state.operations() {
             if operation.is_running() {
                 operations.record_interruption(id.clone()).await?;
@@ -712,6 +811,15 @@ impl Host {
                 let account = match self.current_compaction_request(&plan) {
                     Ok(Some(prepared)) => {
                         let grant = self.execution()?.authority.inference.clone();
+                        if started_at.is_none() {
+                            started_at = grida_agent_master::compaction::now_ms();
+                            let mut item = live::CompactionItem::standalone(
+                                &binding.turn,
+                                CompactionActivityStatus::Running,
+                            );
+                            item.started_at_ms = started_at;
+                            live::publish_compaction(&self.live_updates, &binding, item);
+                        }
                         match operations.infer(key.clone(), prepared, grant).await {
                             Ok(_) => continue,
                             Err(error) if error.code == "admission_closed" => continue,
@@ -764,8 +872,28 @@ impl Host {
             {
                 FinishOutcome::Settled(receipt) => {
                     self.store.verify(CommitReceipt::Settled(*receipt)).await?;
-                    self.report_compaction(&binding.session, &binding.turn, &plan, &outcome)
+                    let report = self
+                        .report_compaction(&binding.session, &binding.turn, &plan, &outcome)
                         .await?;
+                    let mut item = live::CompactionItem::standalone(
+                        &binding.turn,
+                        if report.status == CompactionStatus::Installed {
+                            CompactionActivityStatus::Succeeded
+                        } else {
+                            CompactionActivityStatus::Failed
+                        },
+                    );
+                    item.started_at_ms = started_at;
+                    item.finished_at_ms = grida_agent_master::compaction::now_ms()
+                        .map(|time| time.max(started_at.unwrap_or(0)));
+                    if item.status == CompactionActivityStatus::Succeeded {
+                        item.summary = outcome
+                            .account
+                            .as_ref()
+                            .and_then(|account| CompactionAccount::from_envelope(account).ok())
+                            .and_then(|account| account.summary().map(str::to_owned));
+                    }
+                    live::publish_compaction(&self.live_updates, &binding, item);
                     return Ok(RunResult::Settled(outcome));
                 }
                 FinishOutcome::Continue(error) if error.code == "stale_completion_basis" => {
@@ -798,13 +926,10 @@ impl Host {
         let provider = execution
             .subscription_provider_for_request(&plan.request)
             .unwrap_or_else(|| execution.provider.clone());
-        let mut prepared = provider.prepare(plan.request.request().clone())?;
+        let prepared = provider.prepare(plan.request.request().clone())?;
         if prepared.binding().provider != old.provider || &prepared.binding().authority != authority
         {
             return Ok(None);
-        }
-        if let Some(limit) = plan.request.input_limit() {
-            prepared = prepared.with_input_limit(limit)?;
         }
         Ok(Some(prepared))
     }
@@ -882,7 +1007,6 @@ fn compaction_plan_for(
     route: Option<super::execution_routes::Selection>,
     execution: &Execution,
     configuration: &MasterConfig,
-    limit: Option<NonZeroU64>,
     mut context: RetainedHistory,
     trigger: CompactionTrigger,
 ) -> Result<Option<CompactionPlan>> {
@@ -936,22 +1060,17 @@ fn compaction_plan_for(
     };
     let automatic_pressure = match trigger {
         CompactionTrigger::Manual => None,
-        CompactionTrigger::Automatic {
-            verified_pressure, ..
-        } => Some(verified_pressure),
-        CompactionTrigger::Inherited => Some(false),
+        CompactionTrigger::Automatic { token_pressure, .. } => Some(token_pressure),
+        CompactionTrigger::Inherited => Some(None),
     };
-    if let Some(verified_pressure) = automatic_pressure
-        && ((!verified_pressure && coverage.input_bytes < AUTOMATIC_SOURCE_BYTES)
+    if let Some(token_pressure) = automatic_pressure
+        && (!token_pressure.unwrap_or(coverage.input_bytes >= AUTOMATIC_SOURCE_BYTES)
             || coverage.omissions.media != 0
             || coverage.omissions.tool_results_with_media != 0)
     {
         return Ok(None);
     }
-    let mut request = execution.provider.prepare(inference)?;
-    if let Some(limit) = limit {
-        request = request.with_input_limit(limit)?;
-    }
+    let request = execution.provider.prepare(inference)?;
     Ok(Some(CompactionPlan {
         route,
         source,
@@ -961,30 +1080,22 @@ fn compaction_plan_for(
     }))
 }
 
-fn previous_context_pressure(
+fn previous_context_rejection(
     state: &TurnState,
-    binding: &ProviderBinding,
-    model: &ModelId,
-    threshold: Option<NonZeroU64>,
+    compatible: impl Fn(&PreparedRequest) -> bool,
 ) -> bool {
-    let Some(terminal) = state.outcome() else {
-        return false;
-    };
-    let threshold = threshold.filter(|_| terminal.status == OutcomeStatus::Succeeded);
-    let rejection = terminal
-        .account
-        .as_ref()
-        .filter(|_| terminal.status == OutcomeStatus::Failed)
+    let Some(rejection) = state
+        .outcome()
+        .filter(|outcome| outcome.status == OutcomeStatus::Failed)
+        .and_then(|outcome| outcome.account.as_ref())
         .and_then(|account| read_account(account).ok())
         .and_then(|account| account.inference_failure)
         .filter(|failure| {
             failure.kind == FailureKind::ContextLimit && failure.code == "context_limit"
-        });
-    if threshold.is_none() && rejection.is_none() {
+        })
+    else {
         return false;
-    }
-    // Helper requests can quote conversation text, but only an ordinary
-    // request carries this turn's exact user message in its prepared input.
+    };
     let Some(user) = state.history().records().iter().rev().find_map(|record| {
         let HistoryRecord::Message(message) = record;
         (message.role == Role::User).then_some(message)
@@ -992,46 +1103,14 @@ fn previous_context_pressure(
         return false;
     };
     state.operations().values().any(|operation| {
-        let OperationInput::Inference(request) = &operation.record.input else {
-            return false;
-        };
-        let previous = request.binding();
-        if previous.provider != binding.provider
-            || previous.authority.principal != binding.authority.principal
-            || previous.authority.scope != binding.authority.scope
-            || &request.request().model != model
-            || !request.request().messages.contains(user)
-        {
-            return false;
-        }
-        let Some(attempt) = operation.attempts.last() else {
-            return false;
-        };
-        let Some(OperationOutcome::Inference(outcome)) = &attempt.outcome else {
-            return false;
-        };
-        if let Some(rejection) = &rejection {
-            return outcome.status == InferenceStatus::Limited
-                && outcome.failure.as_ref() == Some(rejection);
-        }
-        outcome.status == InferenceStatus::Completed
-            && threshold.is_some_and(|threshold| {
-                outcome
-                    .usage
-                    .iter()
-                    .filter(|usage| {
-                        usage.attempt == attempt.id
-                            && usage.source == binding.provider.as_str()
-                            && usage.category == INPUT_TOKENS
-                            && usage.unit == TOKENS
-                    })
-                    .max_by_key(|usage| usage.revision)
-                    .is_some_and(|usage| {
-                        usage.final_value
-                            && usage.certainty == MeasurementKind::Exact
-                            && usage.quantity >= threshold.get()
-                    })
-            })
+        matches!(
+            (&operation.record.input, operation.outcome()),
+            (OperationInput::Inference(request), Some(OperationOutcome::Inference(outcome)))
+                if compatible(request)
+                    && request.request().messages.contains(user)
+                    && outcome.status == InferenceStatus::Limited
+                    && outcome.failure.as_ref() == Some(&rejection)
+        )
     })
 }
 

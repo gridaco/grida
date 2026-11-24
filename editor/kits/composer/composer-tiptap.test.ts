@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSchema } from "@tiptap/core";
+import { generateText, getSchema } from "@tiptap/core";
 import { ComposerCore } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
 
@@ -75,6 +75,53 @@ describe("ComposerTiptap", () => {
     expect(
       ComposerTiptap.formattedMarkdown(schema.node("doc", null, doc.child(0)))
     ).toBeUndefined();
+  });
+
+  it("serializes a chosen skill in place and preserves literal dollar text", () => {
+    const extensions = ComposerTiptap.extensions({ placeholder: "" });
+    const schema = getSchema(extensions);
+    const uri = "grida-skill:slides@" + "a".repeat(64);
+    const json = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Use " },
+            {
+              type: "composerMention",
+              attrs: {
+                id: uri,
+                label: "slides",
+                sigil: "$",
+                payload: JSON.stringify({ name: "slides", uri }),
+              },
+            },
+            { type: "text", text: " for $100, then type $slides." },
+          ],
+        },
+      ],
+    };
+    const doc = schema.nodeFromJSON(json);
+    const mention = doc.child(0).child(1);
+    expect(mention.type.spec.toDOM?.(mention)).toMatchObject([
+      "span",
+      { sigil: "$", "data-composer-mention": uri },
+      "slides",
+    ]);
+    expect(ComposerTiptap.formattedMarkdown(doc)).toBe(
+      "Use [$slides](" + uri + ") for $100, then type $slides."
+    );
+    expect(generateText(json, extensions)).toBe(
+      "Use $slides for $100, then type $slides."
+    );
+    expect(ComposerTiptap.toDocument(json).children[0]).toMatchObject({
+      children: [
+        { type: "text" },
+        { type: "mention", sigil: "$", id: uri },
+        { type: "text" },
+      ],
+    });
   });
 
   it("maps Tiptap command, mention, file ref, list, and code nodes to composer document nodes", () => {

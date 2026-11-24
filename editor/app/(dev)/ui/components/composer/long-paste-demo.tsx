@@ -29,16 +29,15 @@ Observed: it opens on the previous first slide. Paging forward follows the updat
 
 The issue also happens when the presentation is open in two windows. In that case, the second window reflects the order correctly after refresh, but its initial preview still opens on the old first slide. This was tested with a local copy of the presentation and six text-only slides.`;
 
-type Paste = { id: string; text: string };
+type Paste = { id: number; text: string };
 
 export function LongPasteDemo() {
   const draft = useRef<Pick<ComposerController, "appendText" | "focus">>(null);
-  const [pastes, setPastes] = useState<Paste[]>([
-    { id: "sample", text: sample },
-  ]);
+  const nextPasteId = useRef(1);
+  const [pastes, setPastes] = useState<Paste[]>([{ id: 0, text: sample }]);
 
   const stage = (text: string) => {
-    const entry = { id: crypto.randomUUID(), text };
+    const entry = { id: nextPasteId.current++, text };
     setPastes((current) => [...current, entry]);
   };
 
@@ -64,7 +63,7 @@ export function LongPasteDemo() {
     stage(text);
   };
 
-  const remove = (id: string) => {
+  const remove = (id: number) => {
     setPastes((current) => current.filter((paste) => paste.id !== id));
   };
 
@@ -91,9 +90,18 @@ export function LongPasteDemo() {
                 draft.current?.focus();
               }}
               onRestore={() => {
-                if (draft.current?.appendText(paste.text, Infinity)) {
-                  remove(paste.id);
-                }
+                draft.current?.appendText(
+                  paste.text,
+                  Infinity,
+                  "paragraph",
+                  (forward) => {
+                    if (forward) remove(paste.id);
+                    else
+                      setPastes((current) =>
+                        [...current, paste].sort((a, b) => a.id - b.id)
+                      );
+                  }
+                );
               }}
             />
           ))

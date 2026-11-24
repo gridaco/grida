@@ -67,18 +67,23 @@ export class ComposerVoice {
     isSupported: () => !!getDesktopBridge()?.voice,
     getSettings: voice.getSettings,
     subscribe: voice.subscribe,
+    openMicrophone: openDictationMicrophone,
     recognize: (stream, signal, provider) =>
       recordDictation(stream, signal, voice, provider),
   };
 
   private snapshot = INITIAL;
   private readonly listeners = new Set<() => void>();
-  private readonly dictation = new Dictation(() =>
-    openDictationMicrophone(this.snapshot.settings?.microphoneId ?? "default")
-  );
+  private readonly dictation: Dictation;
   private run: Run | null = null;
 
   constructor(private readonly host = ComposerVoice.desktopHost) {
+    this.dictation = new Dictation((signal) =>
+      host.openMicrophone(
+        this.snapshot.settings?.microphoneId ?? "default",
+        signal
+      )
+    );
     this.dictation.subscribe(() => {
       const state = this.dictation.getSnapshot();
       const active =
@@ -187,6 +192,7 @@ export class ComposerVoice {
 export namespace ComposerVoice {
   export type Host = Pick<typeof voice, "getSettings" | "subscribe"> & {
     isSupported(): boolean;
+    openMicrophone(deviceId: string, signal: AbortSignal): Promise<MediaStream>;
     recognize(
       stream: MediaStream,
       signal: AbortSignal,

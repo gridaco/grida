@@ -21,8 +21,10 @@ covered_by:
 Browser tabs are ordinary content tabs with their own navigation state. Tab
 selection preserves a live page. Ordinary navigation and closure honor a
 website's unsaved-change request through Stay/Leave; confirmed closure ends it.
-Owner teardown and full browser reset remain forced. Reopen and application
-restart use recorded HTTP(S) addresses without promising form values or history.
+Owner teardown and full browser reset remain forced. Reopen, chat switching,
+and application restart restore recorded HTTP(S) addresses. Grida checks for
+Stay/Leave before switching chats. Choosing Stay keeps the current chat open,
+and any tabs already closed during the attempt reopen at their recorded URLs.
 Generated live locations are transient and are not restore/reopen addresses.
 Page-focused application shortcuts address the workbench, while ordinary text
 editing and composition remain website input.
@@ -50,8 +52,9 @@ error; starting, canceling or failing another load does not claim recovery.
    Expected: input edits remain in the page and application commands reach the
    correct browser or workbench target without duplicate actions.
 5. On a controlled page with an active `beforeunload` handler, try navigation,
-   reload and tab closure. Choose Stay, then repeat and choose Leave. Expected:
-   Stay preserves the live document and tab; Leave permits the requested action.
+   reload, tab closure, and switching chats. Choose Stay, then repeat and
+   choose Leave. Expected: Stay preserves the live document that asked and
+   its tab, and Leave permits the requested action.
    A host document reload or full browser reset still ends pages without a
    website veto.
 6. Close and reopen the browser tab. Expected: a new page opens at the recorded

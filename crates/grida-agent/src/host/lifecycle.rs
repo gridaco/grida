@@ -281,6 +281,15 @@ mod tests {
             .capture_input(&view, prompt.id, prompt.parts, policy)
             .await
             .unwrap();
+        suspend_input(host, session, input, None).await
+    }
+
+    async fn suspend_input(
+        host: &Host,
+        session: &SessionId,
+        input: Submission,
+        checkpoint: Option<Envelope>,
+    ) -> TurnView {
         let id = input.id.clone();
         host.store.submit(session.clone(), input).await.unwrap();
         let view = host.store.inspect(session.clone()).await.unwrap();
@@ -295,6 +304,14 @@ mod tests {
             panic!("expected turn lease")
         };
         let state = owner.lease.journal().load().await.unwrap();
+        let mut actions = Vec::new();
+        if let Some(checkpoint) = checkpoint {
+            actions.push(JournalAction::SetCheckpoint(checkpoint));
+        }
+        actions.extend([
+            JournalAction::Control(ControlDirective::Pause),
+            JournalAction::Suspend,
+        ]);
         owner
             .lease
             .journal()
@@ -304,10 +321,7 @@ mod tests {
                     state.binding().clone(),
                     state.position(),
                     state.controls().revision,
-                    vec![
-                        JournalAction::Control(ControlDirective::Pause),
-                        JournalAction::Suspend,
-                    ],
+                    actions,
                 )
                 .unwrap(),
             )
@@ -322,6 +336,89 @@ mod tests {
             .unwrap()
     }
 
+    #[tokio::test]
+    async fn resume_of_a_capped_checkpoint_is_refused_before_claim_and_stop_shuts_down_cleanly() {
+        let root = tempfile::tempdir().unwrap();
+        let host = fixture_host(&root.path().join("state"), "fixture");
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let prompt = fixture_prompt(&session, "historical");
+        let policy = host.submission_policy(&prompt, false).unwrap();
+        let mut input = host
+            .capture_input(&view, prompt.id, prompt.parts, policy)
+            .await
+            .unwrap();
+        let mut captured: serde_json::Value = decode_input(&input).unwrap();
+        let defaults = serde_json::json!({"context":{"max_input_tokens":1}});
+        let revision =
+            Fingerprint::of(b"schema_version = 1\n[context]\nmax_input_tokens = 1\n".as_slice())
+                .unwrap();
+        captured["configuration"] = serde_json::json!({
+            "identity": Fingerprint::of(&(Some(revision), &defaults)).unwrap(),
+            "source_revision": revision,
+            "defaults": defaults,
+        });
+        input.payload = encode(INPUT_SCHEMA, INPUT_VERSION, &captured).unwrap();
+        // Even a pre-generation pause with no request or operation is bound to its old configuration.
+        let checkpoint = encode("grida.agent.conversation", 1, &serde_json::json!({
+            "configuration": Fingerprint::of(&"historical master configuration").unwrap(), "step": 0,
+            "request": null, "interrupted": true, "outcome": null, "request_history": null,
+            "request_generation": 0
+        })).unwrap();
+        let paused = suspend_input(&host, &session, input, Some(checkpoint)).await;
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let turn = paused.binding.turn.clone();
+        let error = host
+            .resume(
+                TurnControl {
+                    session: session.clone(),
+                    turn: turn.clone(),
+                    request: change_id().unwrap(),
+                    expected_session: view.revision,
+                    expected_control: paused.controls.revision,
+                },
+                paused.binding.epoch,
+                paused.position,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "retired_input_cap_requires_restart");
+        assert_eq!(host.store.inspect(session.clone()).await.unwrap(), view);
+
+        host.stop(
+            session.clone(),
+            turn.clone(),
+            change_id().unwrap(),
+            view.revision,
+            paused.controls.revision,
+        )
+        .await
+        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let outcome = host
+                    .store
+                    .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                        assert!(state.operations().is_empty());
+                        Ok(state.outcome().map(|outcome| outcome.status))
+                    })
+                    .await
+                    .unwrap();
+                if let Some(status) = outcome {
+                    assert_eq!(status, OutcomeStatus::Cancelled);
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        host.shutdown().await.unwrap();
+    }
+
     async fn finishing_worker(
         host: &Host,
         session: &SessionId,
@@ -334,6 +431,7 @@ mod tests {
             Active {
                 turn,
                 admitted,
+                queued_steer: None,
                 handle: finishing.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,
@@ -634,6 +732,7 @@ mod tests {
             Active {
                 turn: TurnId::new("finishing").unwrap(),
                 admitted: true,
+                queued_steer: None,
                 handle: finishing.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,
@@ -833,7 +932,10 @@ pub struct InputSettings {
     /// identity on retry; not published with its settings.
     #[serde(skip)]
     pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
-    pub max_input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_context_window: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_auto_compact_token_limit: Option<u64>,
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
     pub questions: bool,
@@ -905,12 +1007,14 @@ impl InputSettings {
                     operating_regime: stored.operating_regime,
                     effort: stored.effort.map(|policy| policy.preset()),
                     reasoning: stored.reasoning,
-                    max_input_tokens: stored
-                        .configuration
-                        .defaults
-                        .context
-                        .max_input_tokens
-                        .map(|limit| limit.get()),
+                    model_context_window: stored
+                        .context_limits
+                        .and_then(|limits| limits.window)
+                        .map(NonZeroU64::get),
+                    model_auto_compact_token_limit: stored
+                        .context_limits
+                        .and_then(|limits| limits.auto_compact)
+                        .map(NonZeroU64::get),
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,

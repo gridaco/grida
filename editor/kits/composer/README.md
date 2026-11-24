@@ -4,6 +4,12 @@ Tiptap-based prompt composer kit for collecting user intent, lightweight rich te
 
 The kit is headless by default at the composition layer: the core model owns message lowering and trigger state, while React components provide a provider/content shell plus small default UI pieces. Consumers decide where attachments, controls, and submitted messages render.
 
+The application supplies draft storage and the send operation. The Desktop
+composer binds the editor to a caller-provided draft key and store. It passes
+the document captured at Send to the caller so a late acknowledgment can
+retire that draft while a newer one stays editable. The binding, submission,
+and attachment recovery tests run headlessly.
+
 ## Install Surface
 
 Import from the kit entrypoint:
@@ -53,7 +59,7 @@ function ComposerBox() {
   return (
     <ComposerMenuAnchor className="rounded-xl border">
       <ComposerTriggerMenu />
-      <ComposerAttachmentCards className="px-2 pt-2" />
+      <ComposerAttachmentCards />
       <ComposerContent
         onSubmitRequest={submit}
         placeholder="Type / for commands"
@@ -73,7 +79,9 @@ function ComposerBox() {
   outside the document until the person presses Tab. It then becomes editable
   text and follows the ordinary Send action.
 - Optional host actions on explicit command selection, shared by keyboard and menu clicks.
-- Mentions from a caller-provided catalog.
+- Mentions from a caller-provided catalog. The optional `skillMentions`
+  catalog opens with `$`. A chosen skill is a removable inline reference with
+  a book icon. Its payload is lowered separately from the authored message.
 - File attachments as message parts.
 - Inline file references.
 - Opaque, read-only directory references (never recursive attachments).
@@ -89,6 +97,13 @@ function ComposerBox() {
   Shift+Enter inserts a newline.
 - Empty submissions are rejected by default.
 - Core accepts duplicate attachment inputs and assigns unique attachment ids; consumers can pass an attachment filter when they want deduping.
+
+Desktop opts into `ComposerHistory` with a logical draft key and a prompt source.
+An optional `beforeRecall` callback can handle the first Up press, fall through
+to previous prompts, or report that the action is blocked. Desktop uses it to
+open a waiting message. `ComposerTiptapHistory` uses native editor transactions
+for undo, including recall, Send, and attachment-only changes. A host
+supplies staged attachment operations and keeps custody of the files.
 
 ## Public Model
 
@@ -227,16 +242,16 @@ For custom UI, keep `ComposerProvider` and `ComposerContent`, then replace `Comp
 `ComposerContent` accepts `readOnly` to freeze the mounted editor during a
 pending confirmation. The Desktop `AgentComposerInput` uses these capabilities
 for caller-owned `editing` sessions: it temporarily shows another message in the
-same input, preserves the ordinary rich draft, and restores it on Save or
-Cancel. The caller supplies the edit identity, text, label and save/cancel
-callbacks. Use `editing.saveDisabled` while refreshing the queue or reopening
-the connection so the person can continue editing before Save becomes
-available. The kit owns no queue or native state.
-The caller can set `editing.allowEmpty` when a retained message has other
-content, so clearing its text remains a valid save. Without it, saving requires
-nonblank text. This does not add or remove attachments in the kit.
+same input, preserves the ordinary rich draft, and restores it after Send or
+Escape. The caller supplies the edit identity, initial text and cancel callback.
+The ordinary `onSubmit` handler receives the edited text. Use `canSubmit` to
+defer saving while keeping the input available. Use `allowEmptySubmit` when a
+retained message has other content and an empty caption is valid.
 
 When using the default attachment cards with host-owned resources such as object URLs, pass `onRemoveAttachment` to release those resources when a card is removed.
+The strip scrolls horizontally as attachments accumulate. Images and files use
+square cards, and folders use a compact card. Hosts can supply a `poster` URL
+for a file with a preview and omit `onRemove` for a retained attachment.
 
 ## Boundaries
 

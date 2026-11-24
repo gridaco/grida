@@ -3,7 +3,6 @@
 use super::output::{self, Standing};
 use super::{Entry, Io, ProcessAccess, ProcessSessions, RETAINED_OUTPUT_BYTES};
 use crate::command::{CommandAccess, CommandLimits, valid_path};
-use crate::file_tools::{SETTINGS_DIRECTORY, SETTINGS_PATH};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
 use agent_kit_core::tools::{
@@ -162,8 +161,6 @@ impl CommandToolMode {
 pub(crate) enum CommandFileInput {
     None,
     Scoped,
-    Settings,
-    ScopedFiles,
 }
 
 enum Authority {
@@ -392,12 +389,7 @@ fn exec_definition(
     let version = match file_input {
         CommandFileInput::None if plan => 2,
         CommandFileInput::None => 1,
-        CommandFileInput::Scoped | CommandFileInput::ScopedFiles => {
-            let settings_hint = if file_input == CommandFileInput::Scoped {
-                " When available, use directory agent-settings and path config.toml for agent settings."
-            } else {
-                ""
-            };
+        CommandFileInput::Scoped => {
             schema["properties"]["input_file"] = json!({
                 "type": "object",
                 "properties": {
@@ -406,28 +398,10 @@ fn exec_definition(
                 },
                 "required": ["directory", "path"],
                 "additionalProperties": false,
-                "description": format!("Read one separately scoped file into stdin, followed by EOF. This file grants no filesystem access to the command.{settings_hint} For an approved read outside the workspace, use directory external-file and the absolute target path without its leading slash. The command starts in the primary workspace. Use read access and omit workdir, the command-level directory, tty, yield_time_ms and network.")
+                "description": "Read one separately scoped file into stdin, followed by EOF. This file grants no filesystem access to the command. For an approved read outside the workspace, use directory external-file and the absolute target path without its leading slash. The command starts in the primary workspace. Use read access and omit workdir, the command-level directory, tty, yield_time_ms and network."
             });
             description.push_str(" Use input_file only for a separately scoped file read. The host checks that grant and supplies the bounded contents on stdin to one offline, read-only command with /bin/sh.");
-            if file_input == CommandFileInput::Scoped {
-                3
-            } else {
-                5
-            }
-        }
-        CommandFileInput::Settings => {
-            schema["properties"]["input_file"] = json!({
-                "type": "object",
-                "properties": {
-                    "directory": {"enum": [SETTINGS_DIRECTORY]},
-                    "path": {"enum": [SETTINGS_PATH]}
-                },
-                "required": ["directory", "path"],
-                "additionalProperties": false,
-                "description": "Read agent settings into stdin, followed by EOF. This input grants no filesystem access to the command. The command starts in the primary workspace. Use read access and omit workdir, the command-level directory, tty, yield_time_ms and network."
-            });
-            description.push_str(" Use input_file to read the agent settings file (agent-settings/config.toml). The host supplies its bounded contents on stdin to one offline, read-only command with /bin/sh.");
-            4
+            5
         }
     };
     Ok(ToolDefinition {
@@ -602,23 +576,6 @@ impl ExecArguments {
                 return Err(invalid());
             }
             crate::file_tools::validate_path(&input.path)?;
-            if file_input == CommandFileInput::Settings
-                && (input.directory.as_str() != SETTINGS_DIRECTORY
-                    || input.path.as_os_str() != SETTINGS_PATH)
-            {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "command_input_file_requires_agent_settings",
-                ));
-            }
-            if file_input == CommandFileInput::ScopedFiles
-                && input.directory.as_str() == SETTINGS_DIRECTORY
-            {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "command_input_agent_settings_unavailable",
-                ));
-            }
         }
         if let Some(destination) = &command.network {
             if !scoped || !command.supports_finite() {
@@ -1540,7 +1497,7 @@ mod tests {
             properties(enabled)["sandbox_permissions"]["enum"],
             json!(["use_default", "require_escalated"])
         );
-        let parse = |input| parse(input, enabled, CommandFileInput::ScopedFiles);
+        let parse = |input| parse(input, enabled, CommandFileInput::Scoped);
         let auth = parse(request.clone()).unwrap();
         assert_eq!(
             auth.escalation_justification(),
@@ -1654,72 +1611,6 @@ mod tests {
                 parse(invalid.clone(), true, CommandFileInput::Scoped).is_err(),
                 "{invalid}"
             );
-        }
-    }
-
-    #[test]
-    fn command_file_inputs_advertise_and_validate_their_captured_sources() {
-        let limits = CommandLimits {
-            timeout: Duration::from_secs(1),
-            max_input_bytes: 4096,
-            max_output_bytes: 4096,
-        };
-        let definition =
-            |file_input| exec_definition(CommandToolMode::Plan, file_input, limits).unwrap();
-        assert_eq!(definition(CommandFileInput::None).version, 2);
-        let legacy_scoped = definition(CommandFileInput::Scoped);
-        assert_eq!(legacy_scoped.version, 3);
-        let scoped = definition(CommandFileInput::ScopedFiles);
-        assert_eq!(scoped.version, 5);
-        let input_description = |definition: ToolDefinition| {
-            let InputFormat::Json(schema) = definition.input else {
-                panic!("expected command JSON schema");
-            };
-            schema["properties"]["input_file"]["description"]
-                .as_str()
-                .unwrap()
-                .to_owned()
-        };
-        assert!(input_description(legacy_scoped).contains("config.toml"));
-        assert!(!input_description(scoped).contains("agent-settings"));
-        let settings = definition(CommandFileInput::Settings);
-        assert_eq!(settings.version, 4);
-        let InputFormat::Json(schema) = settings.input else {
-            panic!("expected command JSON schema");
-        };
-        let input = &schema["properties"]["input_file"]["properties"];
-        assert_eq!(input["directory"]["enum"], json!(["agent-settings"]));
-        assert_eq!(input["path"]["enum"], json!(["config.toml"]));
-
-        let parse = |directory, path, plan, file_input| {
-            parse(
-                json!({
-                    "cmd":"cat","access":"read","input_file":{"directory":directory,"path":path}
-                }),
-                if plan {
-                    CommandToolMode::Plan
-                } else {
-                    WORKSPACE
-                },
-                file_input,
-            )
-        };
-        for plan in [false, true] {
-            for input in [CommandFileInput::Scoped, CommandFileInput::Settings] {
-                assert!(parse("agent-settings", "config.toml", plan, input).is_ok());
-            }
-            let fresh = CommandFileInput::ScopedFiles;
-            assert!(parse("agent-settings", "config.toml", plan, fresh).is_err());
-            assert!(parse("external-file", "chosen/report.txt", plan, fresh).is_ok());
-            assert!(parse("chosen", "report.txt", plan, fresh).is_ok());
-            for (directory, path) in [
-                ("agent-settings", "other.toml"),
-                ("agent-settings", "config.toml/"),
-                ("external-file", "config.toml"),
-                ("chosen", "config.toml"),
-            ] {
-                assert!(parse(directory, path, plan, CommandFileInput::Settings).is_err());
-            }
         }
     }
 

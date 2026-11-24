@@ -186,10 +186,12 @@ Opening alone does not perform either of the other operations.
 Application startup restores the last valid workspace. When no valid
 workspace is available, the application shows the welcome page.
 
-Within that workspace, Grida restores the last active artifact when it
-still exists. If the artifact is unavailable, the workspace still opens
-without it.
+Within that workspace, Grida resumes the last selected available chat and
+restores its tab order and selection from a local snapshot. Switching to
+another chat restores that chat's own tab set. New chats start fresh, with
+any artifact explicitly chosen for the start. Missing files are omitted.
 
-Workspace and surface restoration are durable product state. They do not
-depend on replaying a chat transcript, and loading an old conversation
-does not replay presentation effects from its historical tool calls.
+Tab snapshots are optional application state. The workspace remains the
+shared home of its files, and reopening a conversation never replays its
+recorded presentation requests. A tool invocation retains its original live
+workbench binding, which can become unavailable if the user switches chats.

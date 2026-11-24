@@ -3,6 +3,7 @@
 mod access;
 pub(crate) mod activity_order;
 mod approval_review;
+mod attachment_batch;
 mod before_tool;
 mod bundled_skills;
 mod catalog;
@@ -35,14 +36,17 @@ mod permissions;
 pub(crate) mod prediction;
 pub mod prompt_preview;
 mod questions;
+pub(crate) mod queue_actions;
 mod queued_text;
 mod reconsideration;
 mod retained_file;
+pub(crate) use attachment_batch::{AttachmentEdit, MAX_ATTACHMENTS, is_attachment};
 mod retained_inputs;
 mod selected_file;
 mod selection;
 pub(crate) mod side_chats;
 mod skills;
+pub use skills::discover_skill_metadata;
 mod spending;
 mod sponsorship;
 pub(crate) mod subagent_activity;
@@ -62,6 +66,7 @@ pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use images::MAX_IMAGE_BYTES;
+pub(crate) use images::QueueReadBasis;
 pub use images::{ImageSource, ImageUpload, RetainedRaster, SelectedImage};
 pub(crate) use images::{is_retained_image, retained_image_size, retained_raster};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
@@ -84,9 +89,7 @@ pub use subagents::{
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::EffortPreset;
-use crate::configuration::{
-    Configuration, ConfigurationInspection, ConfigurationSnapshot, WorkspaceConfiguration,
-};
+use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::gg::{
     GatewayChildBilling, GatewayChildBillingPage, GatewayChildBillingRef, GgConnection,
 };
@@ -125,7 +128,6 @@ use agent_kit_sessions::{
 use agent_kit_store_sqlite::turn_links::TurnLinkCursor;
 use agent_kit_store_sqlite::{OperationPairReceipt, SqliteStore};
 pub use editor_observation::EditorObservation;
-use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::effort::Policy as EffortPolicy;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
@@ -240,6 +242,8 @@ pub struct Host {
     inference_only: bool,
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
+    #[cfg(unix)]
+    instruction_directory: PathBuf,
     configuration_admission: Arc<Mutex<()>>,
     delegation_controls: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
@@ -258,6 +262,8 @@ pub struct Host {
 }
 
 struct Execution {
+    context_window_tokens: Option<NonZeroU64>,
+    provider_id: agent_kit_core::ProviderId,
     /// Private catalog selector captured with accepted inputs for exact replay.
     model_binding: Option<SupervisedModel>,
     /// The supervisor offers billing lookup for this Gateway route.
@@ -391,6 +397,7 @@ impl Work {
 struct Active {
     turn: TurnId,
     admitted: bool,
+    queued_steer: Option<queue_actions::QueueSteerTarget>,
     handle: AbortHandle,
     pending_stop: Option<TurnId>,
     missed_stop: bool,
@@ -535,6 +542,8 @@ struct StoredPrompt {
     spending: Option<spending::Selection>,
     parts: Vec<PromptPart>,
     configuration: ConfigurationSnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    context_limits: Option<grida_agent_master::compaction::ContextLimits>,
     max_output_tokens: Option<u64>,
     max_steps: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -769,8 +778,8 @@ struct PreparedInput {
     subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
-    retained_file: Option<crate::scratch::WorkingCopyReceipt>,
-    limit: Option<NonZeroU64>,
+    retained_files: Vec<crate::scratch::WorkingCopyReceipt>,
+    context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
     allow_wakeups: bool,
@@ -783,6 +792,7 @@ struct PreparedInput {
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     project_instructions: Option<String>,
+    skill_input: Option<live::SkillInput>,
     skills: Option<crate::skills::SkillListing>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -864,7 +874,6 @@ impl Host {
             provider.map(|options| {
                 |retained_inputs| Execution::new(state_dir, options, None, retained_inputs)
             }),
-            None,
         )
     }
 
@@ -872,14 +881,12 @@ impl Host {
         state_dir: &Path,
         provider: ProviderOptions,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         Self::open_with(
             state_dir,
             Some(|retained_inputs| {
                 Execution::new(state_dir, provider, Some(supervisor), retained_inputs)
             }),
-            workspace_configuration,
         )
     }
 
@@ -890,7 +897,6 @@ impl Host {
         endpoint: &str,
         scope: &str,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         options.validate()?;
         let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
@@ -906,7 +912,6 @@ impl Host {
                     retained_inputs,
                 )
             }),
-            workspace_configuration,
         )
     }
 
@@ -917,7 +922,6 @@ impl Host {
         model: ModelId,
         scope: &str,
         supervisor: crate::SupervisedProvider,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
             endpoint, &model, scope, supervisor,
@@ -925,7 +929,6 @@ impl Host {
         Self::open_with(
             state_dir,
             Some(|images| Execution::new_chatgpt(model, connection, images)),
-            workspace_configuration,
         )
     }
 
@@ -952,7 +955,6 @@ impl Host {
                     retained_inputs,
                 )
             }),
-            None,
         )?;
         host.gg_connection = Some(connection);
         Ok(host)
@@ -963,7 +965,6 @@ impl Host {
         execution: Option<
             impl FnOnce(Option<Arc<retained_inputs::RetainedInputs>>) -> Result<Execution>,
         >,
-        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let database = state_dir.join(DATABASE_FILE);
         if execution.is_some() {
@@ -974,10 +975,7 @@ impl Host {
         let store = Arc::new(open_store(&database)?);
         let configuration = execution
             .as_ref()
-            .map(|_| match workspace_configuration {
-                Some(workspace) => workspace.open(state_dir),
-                None => Configuration::open(state_dir),
-            })
+            .map(|_| Configuration::open_global())
             .transpose()?
             .map(Arc::new);
         let execution = execution
@@ -1022,6 +1020,8 @@ impl Host {
             inference_only: false,
             #[cfg(unix)]
             guidance_root: None,
+            #[cfg(unix)]
+            instruction_directory: PathBuf::new(),
             configuration_admission: Arc::default(),
             delegation_controls: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
@@ -1533,7 +1533,9 @@ impl Host {
         let worker_session = session.clone();
         let worker_turn = turn.clone();
         let queue_dispatch = work.track_queue_dispatch(&session);
-        let task = async move {
+        // Pin the worker before wrapping its lifetime so launch does not copy
+        // the long-lived future through the request thread's stack.
+        let task = Box::pin(async move {
             let _queue_dispatch = queue_dispatch;
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
@@ -1618,6 +1620,8 @@ impl Host {
                 host.wake_ready().await;
             }
             let mut completion_tx = Some(completion_tx);
+            let automatic_compaction = matches!(&admitted.work, TurnWork::Compaction(_))
+                && compaction::is_automatic_turn(&worker_turn);
             let mut result = match admitted.work {
                 TurnWork::Conversation {
                     master,
@@ -1653,7 +1657,21 @@ impl Host {
                         result
                     }
                 }
-                TurnWork::Compaction(plan) => host.drive_compaction(admitted.opened, *plan).await,
+                TurnWork::Compaction(plan) => {
+                    let binding = admitted.opened.turn.view().state.binding().clone();
+                    let result = host.drive_compaction(admitted.opened, *plan).await;
+                    if result.is_err() {
+                        live::publish_compaction(
+                            &host.live_updates,
+                            &binding,
+                            live::CompactionItem::standalone(
+                                &binding.turn,
+                                grida_agent_master::compaction::CompactionActivityStatus::Failed,
+                            ),
+                        );
+                    }
+                    result
+                }
             };
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
             if settled || result.is_err() {
@@ -1685,7 +1703,13 @@ impl Host {
             )
             .await;
             if let Ok(outcome) = &result {
-                live::publish_lifecycle(&host.live_updates, &worker_session, &worker_turn, outcome);
+                live::publish_lifecycle(
+                    &host.live_updates,
+                    &worker_session,
+                    &worker_turn,
+                    outcome,
+                    automatic_compaction,
+                );
             }
             if let Some(completion_tx) = completion_tx {
                 let _ = completion_tx.send(result);
@@ -1696,7 +1720,7 @@ impl Host {
             } else if suspended {
                 host.kick_stopped(worker_session, worker_turn).await;
             }
-        };
+        });
         self.workers.fetch_add(1, Ordering::Relaxed);
         let lifetime = WorkerLifetime {
             workers: self.workers.clone(),
@@ -1719,6 +1743,7 @@ impl Host {
             Active {
                 turn,
                 admitted: false,
+                queued_steer: None,
                 handle: handle.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,
@@ -1925,14 +1950,36 @@ impl Host {
                     }
                     _ => unreachable!("resume launch selected"),
                 };
-                let history = self
-                    .provider_history(session.clone(), Some(turn.clone()), side)
-                    .await?;
                 let inputs = self
                     .store
                     .turn_submissions(session.clone(), turn.clone())
                     .await?;
                 let input = subagents::assignment_input(&inputs, subagent.is_some())?;
+                #[derive(Deserialize)]
+                struct CapturedSettings {
+                    configuration: ConfigurationSnapshot,
+                }
+                if is_stored_input(&input.payload)
+                    && decode_input::<CapturedSettings>(input)?
+                        .configuration
+                        .captured_retired_input_cap()
+                    && self
+                        .store
+                        .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                            Ok(grida_agent_master::has_legacy_conversation_checkpoint(
+                                state,
+                            ))
+                        })
+                        .await?
+                {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "retired_input_cap_requires_restart",
+                    ));
+                }
+                let history = self
+                    .provider_history(session.clone(), Some(turn.clone()), side)
+                    .await?;
                 (
                     WorkerClaim::Select(request),
                     Some(input.clone()),
@@ -2125,6 +2172,7 @@ impl Host {
         cancellation_only: bool,
         acceptance: Option<Acceptance>,
     ) -> Result<Option<Admitted>> {
+        let fresh = claim.lease.binding().epoch == 1;
         let activity_parent = self.order_admission(&claim, &prepared.messages).await;
         let permission_scope = if let Some(permissions) = sponsored_permissions {
             permissions.bind_claim(claim.lease.binding().clone())?;
@@ -2164,14 +2212,21 @@ impl Host {
             })
             .transpose()?
             .flatten();
-        let file = prepared
-            .retained_file
-            .take()
-            .map(|work| {
+        let fixed_image_binding = image.is_some()
+            || prepared
+                .image_generation
+                .as_ref()
+                .is_some_and(image_generation::Prepared::has_attachment);
+        let file = (!prepared.retained_files.is_empty())
+            .then(|| {
                 let storage = execution.retained_inputs.clone().ok_or_else(|| {
                     problem(ErrorKind::Unsupported, "file_attachment_unavailable")
                 })?;
-                retained_file::TurnFile::bind(storage, claim.lease.binding(), work)
+                retained_file::TurnFile::bind(
+                    storage,
+                    claim.lease.binding(),
+                    std::mem::take(&mut prepared.retained_files),
+                )
             })
             .transpose()?;
         let skill_reader = prepared
@@ -2392,6 +2447,15 @@ impl Host {
                 prepared.spending.as_ref().filter(|_| !cancellation_only),
             )?
         };
+        let raster_steer = if !fixed_image_binding
+            && provider
+                .capabilities(&prepared.config.model)
+                .is_ok_and(|capabilities| capabilities.input_modalities.contains(&Modality::Image))
+        {
+            execution.retained_inputs.clone()
+        } else {
+            None
+        };
         let spending_runtime = (legacy_subscription
             || (!cancellation_only && prepared.spending.is_some()))
         .then(|| {
@@ -2503,7 +2567,12 @@ impl Host {
         prior.extend(prepared.guidance);
         let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
-            .with_input_limit(prepared.limit);
+            .with_auto_compaction(prepared.context_limits.auto_compact.filter(|_| {
+                !prepared.subagent
+                    && prepared.goal.is_none()
+                    && prepared.effort.is_none()
+                    && !self.inference_only
+            }));
         if let Some(catalog) = discovery {
             master = master.with_discovery(catalog);
         }
@@ -2602,6 +2671,21 @@ impl Host {
                 None => (Inventory::new().snapshot(&[])?, BTreeMap::new()),
             };
             master = master.with_lifecycle_hooks(selected, inventory, grants);
+        }
+        if !closing
+            && !cancellation_only
+            && !prepared.subagent
+            && let Some(active) = self.work.lock().await.active.get_mut(session)
+            && &active.turn == turn
+        {
+            active.queued_steer = Some(queue_actions::QueueSteerTarget::with_raster(raster_steer));
+        }
+        if fresh
+            && !closing
+            && !cancellation_only
+            && let Some(skill) = prepared.skill_input
+        {
+            skill.publish(&self.live_updates, session, turn);
         }
         Ok(Some(Admitted {
             opened,
@@ -2807,26 +2891,7 @@ impl Host {
         }
         validate_prompt_parts(&parts)?;
         let cwd = session_configuration(session)?.cwd;
-        for part in &parts {
-            if let PromptPart::FileReference { reference } = part {
-                file_references::check_workspace_path(reference, &cwd)?;
-            }
-            if let PromptPart::SelectedImage { selection } = part {
-                selection.validate()?;
-                let path = Path::new(&selection.path);
-                if selection.source == ImageSource::Snapshot {
-                    images::check_snapshot_path(self.state_dir.as_deref(), path)?;
-                } else {
-                    if let Some(state) = &self.state_dir {
-                        crate::workspace::ProtectedRoots::new(vec![state.to_path_buf()])?
-                            .check(path)?;
-                    }
-                    if let Some(permissions) = &self.permissions {
-                        permissions.check_selected_image(path)?;
-                    }
-                }
-            }
-        }
+        self.check_attachment_paths(&parts, &cwd)?;
         let execution = self.execution()?;
         let selection = self.capture_chat_selection(
             session,
@@ -2836,6 +2901,7 @@ impl Host {
             selection_goal,
         )?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
+        let context_limits = execution.context_limits(&configuration);
         let child_work = subagent.is_some();
         let unavailable_library_selection_requested =
             allow_library_selection && !execution.tool_result_images;
@@ -2920,11 +2986,19 @@ impl Host {
                 .desktop_image_generation
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::references);
-        let guidance = if child_work {
+        let mut initial_instructions = grida_agent_master::CORE_INSTRUCTIONS.to_owned();
+        let guidance = if child_work || self.inference_only {
             None
         } else {
+            let root = self.guidance_scope(session)?;
+            if root.is_some() {
+                initial_instructions.push_str("\n\n");
+                initial_instructions
+                    .push_str(grida_agent_master::conversation_seed::PROJECT_INSTRUCTIONS_POLICY);
+            }
             skills::capture_guidance(
-                self.guidance_scope(session)?,
+                root,
+                self.instruction_directory().to_path_buf(),
                 &parts,
                 optional_skills.clone(),
             )
@@ -2941,52 +3015,9 @@ impl Host {
         } else {
             Some(skills::capture_listing(self.guidance_scope(session)?, optional_skills).await?)
         };
-        let parts = if parts.iter().any(|part| {
-            matches!(
-                part,
-                PromptPart::Image { .. }
-                    | PromptPart::SelectedImage { .. }
-                    | PromptPart::File { .. }
-            )
-        }) {
-            if parts.iter().any(|part| {
-                matches!(
-                    part,
-                    PromptPart::Image { .. } | PromptPart::SelectedImage { .. }
-                )
-            }) && !self.accepts_images()
-            {
-                return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));
-            }
-            let storage = execution
-                .retained_inputs
-                .clone()
-                .ok_or_else(|| problem(ErrorKind::Unsupported, "file_attachment_unavailable"))?;
-            let cwd = session_configuration(session)?.cwd;
-            let session = session.session.clone();
-            let input = id.clone();
-            tokio::task::spawn_blocking(move || {
-                parts
-                    .into_iter()
-                    .map(|part| match part {
-                        PromptPart::Image { image } => {
-                            storage.retain_prompt_image(&session, &cwd, &input, image)
-                        }
-                        PromptPart::SelectedImage { selection } => {
-                            storage.retain_prompt_image(&session, &cwd, &input, selection.read()?)
-                        }
-                        PromptPart::File { file } => Ok(PromptPart::RetainedFile {
-                            work: storage.retain_file(&session, &cwd, &input, file)?,
-                        }),
-                        other => Ok(other),
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })
-            .await
-            .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))??
-        } else {
-            parts
-        };
+        let parts = self
+            .retain_prompt_attachments(&session.session, &cwd, &id, parts)
+            .await?;
         let allow_attachment_reference = desktop_image_generation.is_some()
             && self.supports_attachment_reference()
             && self
@@ -3016,7 +3047,7 @@ impl Host {
             id,
             payload: StoredPrompt {
                 preceding_turn: preceding_turn.filter(|_| !child_work),
-                initial_instructions: Some(grida_agent_master::CORE_INSTRUCTIONS.to_owned()),
+                initial_instructions: Some(initial_instructions),
                 shell_exploration: !child_work,
                 editor_instructions: None,
                 question_instructions: (questions && !child_work)
@@ -3040,6 +3071,7 @@ impl Host {
                 spending,
                 parts,
                 configuration,
+                context_limits: Some(context_limits),
                 max_output_tokens: execution.config.max_output_tokens,
                 max_steps: Some(if child_work {
                     grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT
@@ -3119,13 +3151,14 @@ impl Host {
         let effort;
         let delegation;
         let worker;
-        let mut retained_file = None;
+        let mut retained_files = Vec::new();
         let skills;
         let project_instructions;
+        let skill_input;
         let (
             messages,
             operating_regime,
-            limit,
+            context_limits,
             questions,
             question_batches,
             allow_wakeups,
@@ -3199,11 +3232,15 @@ impl Host {
                     ));
                 }
                 if !cancellation_only {
-                    retained_file = stored.parts.iter().find_map(|part| match part {
-                        PromptPart::RetainedFile { work } => Some(work.clone()),
-                        _ => None,
-                    });
-                    if retained_file.is_some() && subagent_profile.is_some() {
+                    retained_files = stored
+                        .parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            PromptPart::RetainedFile { work } => Some(work.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    if !retained_files.is_empty() && subagent_profile.is_some() {
                         return Err(problem(
                             ErrorKind::InvalidState,
                             "retained_file_scope_mismatch",
@@ -3526,12 +3563,31 @@ impl Host {
                     .guidance
                     .as_ref()
                     .and_then(|g| g.project_instructions())
-                    .map(str::to_owned);
+                    .map(std::borrow::Cow::into_owned);
                 let guidance = stored
                     .guidance
                     .as_ref()
                     .map(|guidance| guidance.message(&input.id))
                     .transpose()?;
+                let selected = stored
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                // Attachment links arrive with transcript replay. Publishing a
+                // text-only update first would replace the complete client preview.
+                skill_input = if selected.is_empty()
+                    || stored.parts.iter().any(attachment_batch::is_attachment)
+                {
+                    None
+                } else {
+                    Some(live::SkillInput {
+                        input: input.id.clone(),
+                        message: prompt_message_id(&input.id)?,
+                        text: message_context::skill_input_text(&stored.parts),
+                        display_parts: message_context::display_parts(&stored.parts, &selected),
+                    })
+                };
                 if guidance.is_some() {
                     config.instructions.push_str("\n\n");
                     config.instructions.push_str(crate::skills::GUIDANCE_POLICY);
@@ -3578,7 +3634,11 @@ impl Host {
                 (
                     messages,
                     stored.operating_regime,
-                    stored.configuration.defaults.context.max_input_tokens,
+                    if side {
+                        Default::default()
+                    } else {
+                        stored.context_limits.unwrap_or_default()
+                    },
                     stored.questions,
                     stored.question_batches,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
@@ -3660,8 +3720,8 @@ impl Host {
             subagent,
             operating_regime,
             messages,
-            retained_file,
-            limit,
+            retained_files,
+            context_limits,
             questions,
             question_batches,
             allow_wakeups,
@@ -3674,6 +3734,7 @@ impl Host {
             image_generation,
             guidance,
             project_instructions,
+            skill_input,
             skills,
             goal,
             completion_checks,
@@ -4046,27 +4107,7 @@ impl Host {
     }
 
     pub async fn configuration_inspect(&self) -> Result<ConfigurationInspection> {
-        let mut inspection = self.with_configuration(Configuration::inspect).await?;
-        inspection.exact_input_counting = self.execution.as_ref().is_some_and(|execution| {
-            matches!(&execution.authorization.credential, Credential::Http(transport) if transport.supports_exact_input_counting())
-        });
-        Ok(inspection)
-    }
-
-    pub async fn configuration_update(
-        &self,
-        expected: Option<Fingerprint>,
-        change: SettingChange,
-    ) -> Result<ConfigurationSnapshot> {
-        self.owned_control(move |host| async move {
-            let admission = host.configuration_admission.clone().lock_owned().await;
-            host.with_configuration(move |configuration| {
-                let _admission = admission;
-                configuration.update(expected, change)
-            })
-            .await
-        })
-        .await
+        self.with_configuration(Configuration::inspect).await
     }
 
     pub async fn configuration_reload(
@@ -4231,6 +4272,24 @@ impl From<TurnLinkCursor> for GatewayChildBillingRef {
 }
 
 impl Execution {
+    fn context_limits(
+        &self,
+        configuration: &ConfigurationSnapshot,
+    ) -> grida_agent_master::compaction::ContextLimits {
+        let model_window =
+            self.context_window_tokens
+                .or_else(|| match &self.authorization.credential {
+                    Credential::Http(transport) => {
+                        transport.verified_context_window(&self.config.model)
+                    }
+                    _ => None,
+                });
+        grida_agent_master::compaction::ContextLimits::resolve(
+            &configuration.defaults(),
+            model_window,
+        )
+    }
+
     /// A retained receipt without a selector predates runtime model bindings.
     /// Compare it with the historical mapping of the same connection type.
     fn matches_model_binding(&self, captured: Option<&SupervisedModel>) -> bool {
@@ -4379,9 +4438,7 @@ impl Execution {
                     PROVIDER_LIMITS,
                     image_resolver,
                 )?;
-                Arc::new(if options.llama_cpp_input_count {
-                    provider.with_llama_cpp_input_count()?
-                } else if compatible_tool_images {
+                Arc::new(if compatible_tool_images {
                     provider.with_retained_png_tool_results()
                 } else {
                     provider
@@ -4616,6 +4673,7 @@ impl Execution {
             }
         };
         let questions = Arc::new(questions::QuestionAccess::new()?);
+        let provider_id = binding.provider.clone();
         let authorization = Arc::new(ExecutionAuthority {
             inference: inference.clone(),
             questions: questions.clone(),
@@ -4640,6 +4698,8 @@ impl Execution {
         Ok(Self {
             configuration,
             model_binding: None,
+            context_window_tokens: None,
+            provider_id,
             owner,
             runtime,
             gateway_billing: true,
@@ -4740,16 +4800,16 @@ async fn drive(
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let initial = observer.snapshot();
     let binding = initial.state.binding().clone();
+    let activity_order = ordering.clone();
     let mut ordering =
         activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
     let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
     drop(initial);
     let mut publish = |update, observer: &agent_kit_runtime::TurnObserver| {
-        if let TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. } = &update
+        if let TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. } =
+            &update
             && !observer.inspect_operation(operation, |record| {
-                !matches!(&record.record.input, agent_kit_core::turn::OperationInput::Inference(request)
-                    if request.request().messages.first().is_some_and(|message|
-                        message.role == Role::System && message.provenance.source == "approval-review"))
+                live::publishes_operation(&record.record.input)
             })
         {
             return;
@@ -4758,6 +4818,9 @@ async fn drive(
         ordering.update(&update);
         if let Some(live) = &mut live {
             live.update(&update);
+            if let TurnUpdate::Snapshot(view) = &update {
+                live.compactions(&view.state, &activity_order);
+            }
         }
         let _ = updates.send(update);
     };
@@ -4923,22 +4986,17 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 }
 
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
-    let mut uploads = 0;
-    let mut files = 0;
-    let mut references = 0;
+    attachment_batch::check_count(parts)?;
+    message_context::validate_client_display_parts(parts)?;
     for part in parts {
         match part {
-            PromptPart::Image { .. } => uploads += 1,
             PromptPart::SelectedImage { selection } => {
                 selection.validate()?;
-                uploads += 1;
             }
-            PromptPart::File { .. } => files += 1,
             PromptPart::FileReference { reference } => {
                 reference
                     .validate()
                     .map_err(|code| problem(ErrorKind::InvalidInput, code))?;
-                references += 1;
             }
             PromptPart::RetainedImage { .. } | PromptPart::PreparedImage { .. } => {
                 return Err(problem(
@@ -4954,21 +5012,6 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
             }
             _ => {}
         }
-    }
-    if uploads > 1 {
-        return Err(problem(ErrorKind::LimitExceeded, "image_count_limit"));
-    }
-    if references > file_references::MAX_REFERENCES {
-        return Err(problem(
-            ErrorKind::LimitExceeded,
-            "file_reference_count_limit",
-        ));
-    }
-    if files > 1 || files > 0 && uploads > 0 {
-        return Err(problem(
-            ErrorKind::LimitExceeded,
-            "file_attachment_count_limit",
-        ));
     }
     validate_prompt_record(parts)
 }

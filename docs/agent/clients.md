@@ -126,10 +126,14 @@ disposition when output remains available.
 After an output failure, use the accepted identifiers to inspect retained state.
 An uncertain outcome requires reconciliation before repeating effects.
 
-Use `run --questions` to enable structured questions in an embedded run. When
-an answer is needed, the process verifies suspension and returns `input_required`
-with the session, turn, and pending question identities. A capable service client
-can answer the retained question through the same state directory.
+Use `run --questions` for single-question requests with JSON Lines schema
+version 1, or `run --questions-v2` for batches with schema version 2. When a
+required answer is pending, the process verifies suspension and returns
+`input_required` with the session, turn, and pending question identities.
+Reopen the session through an ACP client using the same state directory.
+Use `questions` and `answer-question` for single questions, or negotiate
+`questions-v2` and `answer-question-v2` to list and answer a batch.
+[Grida Agent CLI question formats](../cli/agent.md#choose-a-question-format)
 
 If a granted launch profile requires human approval for a tool action, the
 same exit code identifies the retained approval. Only a host-authorized
@@ -662,13 +666,14 @@ crash left behind before it serves. A parent can have eight side chats open
 (`side_chat_scope_limit`); closing one makes room. Bringing an answer into the
 parent is up to the client.
 
-## Set the context input limit
+## Set context size and compaction
 
-In Grida Desktop, edit the workspace's `config.toml` while Desktop is closed.
-Reopen the workspace to load the new limit. [Change agent settings](./settings.md)
+Agent context settings come from the user-wide `~/.grida/config.toml`.
+Set an absolute `GRIDA_HOME` to use a different Grida home. Edits take effect
+at startup. [Change agent settings](./settings.md)
 
-A trusted ACP client that negotiates the configuration operations can inspect,
-set, reset, and reload the limit. [Agent configuration](../reference/agent-configuration.md#managed-changes)
+A trusted ACP client can negotiate inspection and reload of the active model
+window and compaction threshold. [Agent configuration](../reference/agent-configuration.md#client-operations)
 
 ## Attach a PNG to a message
 
@@ -806,7 +811,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/history`, `fork`, `revise`                                               | Browse retained message anchors, branch a chat, or replace an earlier text message.                       |
 | `co.grida/session/compact`                                                                 | Summarize earlier model context and keep the original transcript available.                               |
 | `co.grida/session/skills`                                                                  | List available skills for this chat and select a versioned reference for a prompt.                        |
-| `co.grida/config/inspect`, `update`, `reload`                                              | Inspect, change, or reload the host defaults.                                                             |
+| `co.grida/config/inspect`, `reload`                                                        | Inspect or reload the user-wide agent settings.                                                           |
 | `co.grida/session/wakeups`, `cancel-wakeup`, `recover-wakeup`, `continue-cancelled-wakeup` | Allow one check-in on an Act submission or goal start, then inspect, cancel, restore or continue past it. |
 | `co.grida/session/processes`                                                               | List a chat's long-running command processes, stop them, and receive the list when it changes.            |
 
@@ -887,10 +892,8 @@ refresh the catalog and select it again. Skills guide the task within its
 existing permissions.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
-their captured defaults. An explicit hard context-input cap requires supported
-counting for the complete request. A remote counter receives the prepared input.
-If counting is unavailable or the input exceeds the cap, the turn records a
-failure before generation. [Agent configuration](../reference/agent-configuration.md).
+their captured defaults. The model window and automatic compaction threshold
+guide when the agent summarizes earlier context. [Agent configuration](../reference/agent-configuration.md).
 
 ### Use a chat command
 
@@ -937,13 +940,15 @@ identified submit. An identified submit reports the same accepted input as
 queued while the summary runs. The host keeps the most recent turn verbatim
 and preserves queue order and input settings. If the summary attempt fails,
 work can continue with the previous context. Standard ACP `session/prompt`
-still waits for its user turn to finish. Automatic compaction uses the size
-of earlier text. For supported direct OpenAI Responses models, it can also
-use a previous request's reported input count and the verified model window.
+still waits for its user turn to finish. Automatic compaction uses a
+compatible provider measurement and estimates the context that measurement
+didn't cover. During a turn it can also summarize earlier completed tool
+exchanges while retaining the current user messages and later exchanges.
 A provider's explicit context-limit result can also trigger compaction before
 the next eligible message on the same connection and model. The failed turn
 remains in the transcript and is not replayed. The provider can still report a
-context limit on a later request.
+context limit on a later request. Both forms of compaction preserve the
+visible transcript.
 
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,

@@ -136,7 +136,7 @@ impl SqliteStore {
                 return Err(error(ErrorKind::Conflict, "session_turn_active"));
             }
             let queued: Option<String> = transaction.query_row(
-                "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order LIMIT 1",
+                "SELECT q.id FROM runnable_queue AS q WHERE q.session=?1 ORDER BY q.queue_order LIMIT 1",
                 [id.as_str()], |row| row.get(0),
             ).optional().map_err(database_error)?;
             if queued.as_deref() != head.as_ref().map(ChangeId::as_str) {

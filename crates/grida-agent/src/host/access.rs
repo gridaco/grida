@@ -573,6 +573,7 @@ mod tests {
             Active {
                 turn: TurnId::new("settled-turn").unwrap(),
                 admitted: true,
+                queued_steer: None,
                 handle: cleanup.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,

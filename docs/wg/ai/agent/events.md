@@ -84,7 +84,8 @@ facts it needs.
 
 ### Turn settled
 
-A turn reached its final, verified outcome.
+A chat turn or a manual compaction requested as a standalone task reached
+its final, verified outcome.
 
 | Field     | Meaning                               |
 | --------- | ------------------------------------- |
@@ -103,6 +104,13 @@ A turn reached its final, verified outcome.
 The outcome vocabulary is closed for a given protocol revision and may grow in
 a later one. Growth is the reason for the exhaustiveness and skew rules in
 [When to notify](#when-to-notify).
+
+### Automatic compaction settled
+
+Context maintenance initiated by the host reached a final outcome. The fact
+carries the session, maintenance turn and settlement outcome. An installed
+summary appears in the transcript. The chat turn that follows publishes its
+own settlement when it ends.
 
 ### Approval required
 
@@ -168,9 +176,9 @@ an open view. A host with separate workspace workers can use one
 subscription per worker. Each worker checks session ownership before
 delivery.
 
-An attention consumer needs only two facts, a verified settlement
-with its outcome or an outstanding approval wait. Both carry the chat
-and turn identity. The host may project those facts alone. A consumer
+An attention consumer can act on a verified turn settlement, an outstanding
+approval wait, or a registered question. All carry the chat and turn
+identity. The host may project just the facts a consumer needs. A consumer
 that needs to render Stop or Send reads the
 [session status](./components.md#session-driver-state). Event delivery is
 read-only and grants no authority to start a turn or answer approval.
@@ -198,15 +206,16 @@ A host SHOULD additionally pin the table row-for-row with a contract
 test in its own tree, so the doc and the behavior can be diffed by
 eye.
 
-| Fact                      | Notify?                                                          |
-| ------------------------- | ---------------------------------------------------------------- |
-| Question asked            | Yes, while the question remains open outside the focused chat.   |
-| Approval required         | Yes — highest value; the agent is stalled on the user.           |
-| Turn settled, `succeeded` | Yes — "done, come look."                                         |
-| Turn settled, `failed`    | Yes — the turn ended in failure; the user must decide what next. |
-| Turn settled, `uncertain` | Yes — the outcome needs review before any work is repeated.      |
-| Turn settled, `cancelled` | Never — the user did this themselves.                            |
-| Outcome or fact not known | Never — version skew stays silent rather than notifying wrongly. |
+| Fact                         | Notify?                                                          |
+| ---------------------------- | ---------------------------------------------------------------- |
+| Question asked               | Yes, while the question remains open outside the focused chat.   |
+| Approval required            | Yes — highest value; the agent is stalled on the user.           |
+| Turn settled, `succeeded`    | Yes — "done, come look."                                         |
+| Turn settled, `failed`       | Yes — the turn ended in failure; the user must decide what next. |
+| Turn settled, `uncertain`    | Yes — the outcome needs review before any work is repeated.      |
+| Turn settled, `cancelled`    | Never — the user did this themselves.                            |
+| Automatic compaction settled | Never, including on failure.                                     |
+| Outcome or fact not known    | Never — version skew stays silent rather than notifying wrongly. |
 
 For a successful turn, the notification uses the chat title and a short
 excerpt from that turn’s saved final response. Each has its own fallback.
@@ -229,10 +238,11 @@ The gate:
   it is not.
 
 Focus gating belongs to the consumer. Authorized attention facts can
-arrive for a chat whose view is closed. For a question in a known workspace
-chat, Desktop checks whether a focused window is actually displaying that
-chat. A different chat or a hidden side tab in the same window still gets a
-notification. A discarded side chat has no destination and stays silent.
+arrive for a chat whose view is closed. For a completed turn or a question
+in a known workspace chat, Desktop checks whether a focused window is
+actually displaying that chat. Viewing a different chat in the same window
+still allows a notification. Questions in hidden side tabs can notify while
+the side chat remains open.
 
 ### Click-to-attend
 

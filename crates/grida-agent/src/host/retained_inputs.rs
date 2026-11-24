@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — owner-scoped retained inputs and working copies.
 
 use super::{
+    PromptPart,
     images::{
         ImageUpload, MAX_IMAGE_BYTES, NAME, RetainedRaster, asset_ref, media, retained_raster,
         retained_unavailable,
@@ -9,7 +10,9 @@ use super::{
     retained_file::FileUpload,
 };
 use crate::file_tools::ImageCapture;
-use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof, WorkingCopyReceipt};
+use crate::scratch::{
+    AssetRef, PendingInputAsset, ScratchLimits, ScratchScope, WorkingCopyProof, WorkingCopyReceipt,
+};
 use crate::workspace::ProtectedRoots;
 use agent_kit_core::messages::MediaRef;
 use agent_kit_core::{ArtifactId, ChangeId, ErrorKind, Fingerprint, Result, SessionId, WaitId};
@@ -38,25 +41,60 @@ pub(super) struct RetainedInputs {
 }
 
 impl RetainedInputs {
-    pub(super) fn retain_prompt_image(
+    pub(super) fn retain_prompt_parts(
         &self,
         session: &SessionId,
         cwd: &Path,
         input: &ChangeId,
+        parts: Vec<PromptPart>,
+    ) -> Result<Vec<PromptPart>> {
+        self.with_intake_scope(session, cwd, |scope| {
+            let result = parts
+                .into_iter()
+                .enumerate()
+                .map(|(index, part)| match part {
+                    PromptPart::Image { image } => {
+                        Self::retain_prompt_image(scope, input, index, image)
+                    }
+                    PromptPart::File { file } => Self::retain_file(scope, input, index, file)
+                        .map(|work| PromptPart::RetainedFile { work }),
+                    other => Ok(other),
+                })
+                .collect::<Result<Vec<_>>>();
+            if result.is_err() {
+                for pending in scope
+                    .pending_input_assets()?
+                    .iter()
+                    .filter(|item| &item.input == input)
+                {
+                    scope.resolve_pending_input_asset(pending, false)?;
+                }
+            }
+            result
+        })
+    }
+
+    fn retain_prompt_image(
+        scope: &mut ScratchScope,
+        input: &ChangeId,
+        index: usize,
         upload: ImageUpload,
-    ) -> Result<super::PromptPart> {
+    ) -> Result<PromptPart> {
         let Some(source) = upload.source.as_ref() else {
-            return Ok(super::PromptPart::RetainedImage {
-                asset: self.retain_image(session, cwd, input, upload)?,
+            return Ok(PromptPart::RetainedImage {
+                asset: Self::retain_part(
+                    scope,
+                    input,
+                    SELECTED_IMAGE,
+                    Fingerprint::of(&(input, index, upload.digest))?,
+                    NAME,
+                    &upload.bytes,
+                )?,
             });
         };
         let source_digest: [u8; 32] = Sha256::digest(&source.bytes).into();
-        let identity = Fingerprint::of(&(input, source_digest, &source.name, &source.selection))?;
-        let id = uuid::Uuid::from_bytes(
-            identity.bytes()[..16]
-                .try_into()
-                .expect("fingerprint prefix"),
-        );
+        let identity =
+            Fingerprint::of(&(input, index, source_digest, &source.name, &source.selection))?;
         let original_name = match source.mime.as_str() {
             "image/png" => "source.png",
             "image/jpeg" => "source.jpg",
@@ -64,29 +102,71 @@ impl RetainedInputs {
             "image/gif" => "source.gif",
             _ => return Err(retained_unavailable()),
         };
+        let original = Self::retain_part(
+            scope,
+            input,
+            "input/raster/",
+            identity,
+            original_name,
+            &source.bytes,
+        )?;
+        let prepared = Self::retain_part(
+            scope,
+            input,
+            "input/raster-prepared/",
+            identity,
+            NAME,
+            &upload.bytes,
+        )?;
+        Ok(PromptPart::PreparedImage {
+            image: Box::new(RetainedRaster {
+                original,
+                prepared,
+                mime_type: source.mime.clone(),
+                name: source.name.clone(),
+                preparation: source.preparation.clone(),
+                selection: source.selection.clone(),
+            }),
+        })
+    }
+
+    fn retain_part(
+        scope: &mut ScratchScope,
+        input: &ChangeId,
+        namespace: &str,
+        identity: Fingerprint,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<AssetRef> {
+        let id = uuid::Uuid::from_bytes(
+            identity.bytes()[..16]
+                .try_into()
+                .expect("fingerprint prefix"),
+        );
+        let id = ArtifactId::new(format!("{namespace}{id}"))?;
+        scope.mark_input_asset_pending(input, &id)?;
+        scope.retain(id, 1, name, bytes)
+    }
+
+    pub(super) fn pending_input_assets(
+        &self,
+        session: &SessionId,
+        cwd: &Path,
+    ) -> Result<Vec<PendingInputAsset>> {
+        self.with_intake_scope(session, cwd, |scope| scope.pending_input_assets())
+    }
+
+    pub(super) fn finish_input_assets(
+        &self,
+        session: &SessionId,
+        cwd: &Path,
+        decisions: Vec<(PendingInputAsset, bool)>,
+    ) -> Result<()> {
         self.with_intake_scope(session, cwd, |scope| {
-            let original = scope.retain(
-                ArtifactId::new(format!("input/raster/{id}"))?,
-                1,
-                original_name,
-                source.bytes.as_slice(),
-            )?;
-            let prepared = scope.retain(
-                ArtifactId::new(format!("input/raster-prepared/{id}"))?,
-                1,
-                NAME,
-                upload.bytes.as_slice(),
-            )?;
-            Ok(super::PromptPart::PreparedImage {
-                image: Box::new(RetainedRaster {
-                    original,
-                    prepared,
-                    mime_type: source.mime.clone(),
-                    name: source.name.clone(),
-                    preparation: source.preparation.clone(),
-                    selection: source.selection.clone(),
-                }),
-            })
+            for (record, keep) in decisions {
+                scope.resolve_pending_input_asset(&record, keep)?;
+            }
+            Ok(())
         })
     }
     pub(super) fn retirement_identity(
@@ -120,17 +200,6 @@ impl RetainedInputs {
                 "attachment_storage_unsupported",
             ))
         }
-    }
-
-    pub(super) fn retain_image(
-        &self,
-        session: &SessionId,
-        cwd: &Path,
-        input: &ChangeId,
-        upload: ImageUpload,
-    ) -> Result<AssetRef> {
-        let identity = Fingerprint::of(&(input, upload.digest))?;
-        self.retain_png(session, cwd, SELECTED_IMAGE, identity, &upload.bytes)
     }
 
     pub(super) fn retain_library_image(
@@ -221,28 +290,23 @@ impl RetainedInputs {
         })
     }
 
-    pub(super) fn retain_file(
-        &self,
-        session: &SessionId,
-        cwd: &Path,
+    fn retain_file(
+        scope: &mut ScratchScope,
         input: &ChangeId,
+        index: usize,
         upload: FileUpload,
     ) -> Result<WorkingCopyReceipt> {
-        self.with_intake_scope(session, cwd, |scope| {
-            let identity = Fingerprint::of(&("retained-file", input, &upload.name, upload.digest))?;
-            let id = uuid::Uuid::from_bytes(
-                identity.bytes()[..16]
-                    .try_into()
-                    .expect("fingerprint prefix"),
-            );
-            let asset = scope.retain(
-                ArtifactId::new(format!("input/{id}"))?,
-                1,
-                &upload.name,
-                upload.bytes.as_slice(),
-            )?;
-            Ok(scope.materialize(&asset)?.receipt().clone())
-        })
+        let identity =
+            Fingerprint::of(&("retained-file", input, index, &upload.name, upload.digest))?;
+        let asset = Self::retain_part(
+            scope,
+            input,
+            "input/",
+            identity,
+            &upload.name,
+            &upload.bytes,
+        )?;
+        Ok(scope.materialize(&asset)?.receipt().clone())
     }
 
     fn with_intake_scope<T>(

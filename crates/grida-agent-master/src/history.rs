@@ -119,6 +119,14 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
             output.push(note);
         }
     }
+    if let Some(compacted) = crate::compaction::inline_context(state)
+        && let Some(last) = output
+            .iter()
+            .rposition(|record| compacted.covered.contains(&message(record).id))
+    {
+        output[last] = HistoryRecord::Message(compacted.summary);
+        output.retain(|record| !compacted.covered.contains(&message(record).id));
+    }
     output
 }
 

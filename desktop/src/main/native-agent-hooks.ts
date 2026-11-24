@@ -11,6 +11,10 @@ import {
   readGlobalConfig,
   parseGlobalConfig,
 } from "./native-agent-files";
+import {
+  configurationErrorMessage,
+  type NativeAgentConfig,
+} from "./native-agent-config";
 import type { NativeWorkspaceSelection } from "./native-agent-permissions";
 import type {
   NativeGlobalHookInspection,
@@ -64,7 +68,8 @@ export class NativeAgentHooks {
   private constructor(
     private readonly directory: string,
     private readonly workspace: string,
-    private readonly selected: readonly Stored[]
+    private readonly selected: readonly Stored[],
+    private readonly config?: Pick<NativeAgentConfig, "create" | "check">
   ) {}
 
   static async open(
@@ -84,7 +89,8 @@ export class NativeAgentHooks {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message === "native_hooks_review_required"
+        (error.message === "native_hooks_review_required" ||
+          configurationErrorMessage(error.message))
       )
         throw error;
       throw new Error("native_hooks_configuration_invalid");
@@ -92,10 +98,13 @@ export class NativeAgentHooks {
   }
 
   /** Settings owns global source inspection; no workspace registry is read. */
-  static settings(directory: string): NativeAgentHooks {
+  static settings(
+    directory: string,
+    config?: Pick<NativeAgentConfig, "create" | "check">
+  ): NativeAgentHooks {
     if (!path.isAbsolute(directory) || path.normalize(directory) !== directory)
       throw invalid();
-    return new NativeAgentHooks(directory, "", []);
+    return new NativeAgentHooks(directory, "", [], config);
   }
 
   get configPath(): string {
@@ -103,6 +112,7 @@ export class NativeAgentHooks {
   }
 
   async configuration(): Promise<NativeGlobalHookInspection> {
+    const configDiagnostics = (await this.config?.check()) ?? [];
     try {
       const source = await this.readSource();
       const trusted = await this.trustedRevisions();
@@ -114,6 +124,7 @@ export class NativeAgentHooks {
           trusted: trusted.has(hook.revision),
         })),
         diagnostics: [],
+        ...(configDiagnostics.length && { configDiagnostics }),
         activation: "new_connections",
       };
     } catch (error) {
@@ -125,6 +136,7 @@ export class NativeAgentHooks {
         ),
         hooks: [],
         diagnostics: [hookDiagnostic(error)],
+        ...(configDiagnostics.length && { configDiagnostics }),
         activation: "new_connections",
       };
     }
@@ -193,19 +205,12 @@ export class NativeAgentHooks {
   }
 
   /** Create the editable global file, without executing or trusting any hook. */
-  async ensureConfig(): Promise<string> {
-    await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
-    await sourceDirectory(this.directory);
-    try {
-      await fs.writeFile(
-        this.configPath,
-        "schema_version = 1\n\n# Configure global hooks with [[hooks]].\n",
-        { flag: "wx", mode: 0o600 }
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
-    await boundedFile(this.configPath, MAX_FILE, false, false, false, true);
+  async ensureConfig(
+    check: () => void = () => {},
+    signal?: AbortSignal
+  ): Promise<string> {
+    if (!this.config) throw new Error("global_config_writer_unavailable");
+    await this.config.create(check, signal);
     return this.configPath;
   }
 
@@ -396,7 +401,7 @@ export class NativeAgentHooks {
   private async readSource(): Promise<{ exists: boolean; hooks: Stored[] }> {
     const bytes = await readGlobalConfig(this.directory);
     if (bytes === null) return { exists: false, hooks: [] };
-    const { table: value } = parseGlobalConfig(bytes);
+    const value = parseGlobalConfig(bytes);
     const entries = value.hooks ?? [];
     if (!Array.isArray(entries) || entries.length > 8)
       throw new Error("native_hooks_count_invalid");
@@ -626,11 +631,9 @@ function overlaps(left: string, right: string): boolean {
 }
 function hookDiagnostic(error: unknown): string {
   const code = error instanceof Error ? error.message : "";
+  const configDiagnostic = configurationErrorMessage(code);
+  if (configDiagnostic) return configDiagnostic;
   switch (code) {
-    case "native_hooks_toml_invalid":
-      return "config.toml is not valid UTF-8 TOML. Correct its syntax and reload.";
-    case "native_hooks_schema_invalid":
-      return "Use schema_version = 1, ordered [[hooks]] tables, and [desktop] for Desktop preferences.";
     case "native_hooks_count_invalid":
       return "Configure at most eight hooks.";
     case "native_hooks_fields_invalid":

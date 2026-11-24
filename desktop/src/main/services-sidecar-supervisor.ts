@@ -13,14 +13,12 @@ import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
-import { home } from "@grida/home";
 import { SidecarLogWriter } from "./sidecar-log";
-import { EDITOR_BASE_URL } from "../env";
+import type { DesktopProfile } from "./desktop-profile";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
 import { ProviderNetworkHost } from "./provider-network-host";
 import { ServicesSidecarSocketHost } from "./services-sidecar-socket-host";
 import { SidecarSandboxPolicy } from "./sidecar-sandbox-policy";
-import { DesktopMediaRoot } from "./media-root";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
@@ -39,6 +37,22 @@ export type ServicesSidecarInfo = {
 };
 
 type ServicesSidecarMode = "disabled" | "native-chat";
+type SidecarProfile = Pick<
+  DesktopProfile,
+  | "agentData"
+  | "catalogueDirectory"
+  | "configHome"
+  | "editorBaseUrl"
+  | "isPackaged"
+  | "mediaRoot"
+  | "nativeChat"
+  | "projectsRoot"
+  | "providerHome"
+  | "resourcesPath"
+  | "temp"
+  | "userData"
+  | "userHome"
+>;
 
 const STARTUP_TIMEOUT_MS = 15_000;
 const BACKOFF_INITIAL_MS = 250;
@@ -51,6 +65,7 @@ export type NativeChatPaths = Readonly<{
   /** Electron's browser profile, which holds the native chat store. */
   desktopUserDataPath: string;
   providerHome: string;
+  configHome: string;
   mediaRoot: string;
 }>;
 
@@ -58,7 +73,6 @@ export class ServicesSidecarSupervisor {
   private openAiModels?: NativeOpenAiModels;
   private servicesStarted = false;
   private nativeChat?: NativeChatPaths;
-  private ordinaryNativeChat = false;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
   private nextGeneration = 0;
@@ -75,35 +89,13 @@ export class ServicesSidecarSupervisor {
   private nativeSandbox?: RetainedServiceSandbox;
   private sandboxReady = false;
   private workspaceCatalog?: string;
-  private catalogueDirectory?: string;
   private protectedStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
   private endpointConsent?: ProviderEndpointConsent;
   private endpointTransport: MediaTransport.Client | null = null;
-  private readonly networkAuthority = new ProviderNetworkAuthority(
-    new URL(EDITOR_BASE_URL).origin
-  );
-
-  // The agent's data dir: the canonical Grida home + the "agent" component
-  // (~/.grida/agent). Resolved ONCE so the sandbox write-allowlist and the
-  // sidecar's `--user-data` argv cannot diverge (GRIDA-SEC-004). Uses
-  // os.homedir() (== app.getPath("home")) so it is safe to compute at module
-  // construction, before Electron is ready. This secret-state path stays
-  // separate from Electron's app.getPath("userData") browser profile; the
-  // app-managed media root below is resolved and sandboxed independently.
-  private readonly user_data_path =
-    NativeDesktopProfile.agentData() ?? home.join("agent");
-  // GRIDA-SEC-014 — one path fact for custody, sidecar argv and command denies.
-  private readonly provider_home =
-    NativeDesktopProfile.agentData() ?? home.dir();
-  private readonly media_root = DesktopMediaRoot.current();
-
-  // Durable sidecar log (~/.grida/agent/logs/sidecar.log) — the on-disk
-  // trace a packaged-app incident needs (the console is gone by the time
-  // anyone looks).
-  private readonly log = new SidecarLogWriter(
-    path.join(this.user_data_path, "logs")
-  );
+  private readonly editorOrigin: string;
+  private readonly networkAuthority: ProviderNetworkAuthority;
+  private readonly log: SidecarLogWriter;
 
   /** One statement per event: mirror to the console AND the durable log so
    * a lifecycle line can never land console-only. */
@@ -119,7 +111,10 @@ export class ServicesSidecarSupervisor {
     this.log.write(stream, line);
   }
 
-  constructor() {
+  constructor(private readonly profile: SidecarProfile) {
+    this.editorOrigin = new URL(profile.editorBaseUrl).origin;
+    this.networkAuthority = new ProviderNetworkAuthority(this.editorOrigin);
+    this.log = new SidecarLogWriter(path.join(profile.agentData, "logs"));
     app.once("will-quit", () => {
       this.isShuttingDown = true;
       if (this.restartTimer) {
@@ -130,21 +125,15 @@ export class ServicesSidecarSupervisor {
     });
   }
 
-  async start(
-    workspaceCatalog?: string,
-    catalogueDirectory?: string
-  ): Promise<ServicesSidecarInfo> {
+  async start(workspaceCatalog?: string): Promise<ServicesSidecarInfo> {
     if (this.isShuttingDown) throw new Error("services_sidecar_shutting_down");
     if (
       (workspaceCatalog &&
         (!this.nativeChat || !RetainedServiceSandbox.isSupportedPlatform())) ||
-      (this.sandboxReady &&
-        (workspaceCatalog !== this.workspaceCatalog ||
-          catalogueDirectory !== this.catalogueDirectory))
+      (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
     )
       throw new Error("workspace_catalog_scope_invalid");
     this.workspaceCatalog = workspaceCatalog;
-    this.catalogueDirectory = catalogueDirectory;
     this.servicesStarted = true;
     if (this.info) return this.info.connection;
     if (this.restartTimer) {
@@ -152,8 +141,10 @@ export class ServicesSidecarSupervisor {
       this.restartTimer = null;
     }
     if (!this.sandboxReady) {
-      if (catalogueDirectory)
-        await mkdir(catalogueDirectory, { recursive: true, mode: 0o700 });
+      await mkdir(this.profile.catalogueDirectory, {
+        recursive: true,
+        mode: 0o700,
+      });
       await this.initSandbox();
     }
     return await this.spawn();
@@ -163,18 +154,18 @@ export class ServicesSidecarSupervisor {
   selectNativeChat(ordinary = false): NativeChatPaths {
     if (
       !app.hasSingleInstanceLock() ||
-      (this.nativeChat && ordinary !== this.ordinaryNativeChat) ||
+      this.profile.nativeChat !== (ordinary ? "ordinary" : "preview") ||
       this.servicesStarted ||
       this.isShuttingDown
     ) {
       throw new Error("native_chat_selection_unavailable");
     }
-    this.ordinaryNativeChat = ordinary;
     return (this.nativeChat ??= Object.freeze({
-      userDataPath: this.user_data_path,
-      desktopUserDataPath: app.getPath("userData"),
-      providerHome: this.provider_home,
-      mediaRoot: this.media_root,
+      userDataPath: this.profile.agentData,
+      desktopUserDataPath: this.profile.userData,
+      providerHome: this.profile.providerHome,
+      configHome: this.profile.configHome,
+      mediaRoot: this.profile.mediaRoot,
     }));
   }
 
@@ -232,7 +223,7 @@ export class ServicesSidecarSupervisor {
 
   nativeByokSettings(openAiProject = false) {
     return {
-      credentialHome: this.provider_home,
+      credentialHome: this.profile.providerHome,
       network: () =>
         ProviderNetworkHost.nativeProviderNetwork(
           this.networkAuthority,
@@ -274,7 +265,7 @@ export class ServicesSidecarSupervisor {
     organizationId?: number,
     signal?: AbortSignal
   ): Promise<NativeGatewayConnection> {
-    const origin = new URL(EDITOR_BASE_URL).origin;
+    const origin = this.editorOrigin;
     const [network, jobNetwork] = await Promise.all([
       ProviderNetworkHost.nativeProviderNetwork(
         this.networkAuthority,
@@ -329,15 +320,39 @@ export class ServicesSidecarSupervisor {
   private async initSandbox(): Promise<void> {
     if (this.sandboxReady) return;
     const chat = this.nativeChat;
+    const preview = chat && this.profile.nativeChat === "preview";
+    if (preview)
+      NativeDesktopProfile.assertPreviewIsolation(
+        app,
+        path.dirname(this.profile.userData)
+      );
+    const protectedRoots = preview
+      ? NativeDesktopProfile.protectedRoots(app)
+      : NativeDesktopProfile.installedRootsForDevelopment(app, this.profile);
+    // Ordinary development launches execute private copies beside chat state.
+    // Protect those copies without taking away the sidecar's other file roots.
+    const developmentRuntime =
+      !this.profile.isPackaged && this.profile.nativeChat === "ordinary"
+        ? [this.profile.resourcesPath]
+        : [];
+    this.protectedStateRoots = [
+      ...(protectedRoots?.canonicalPaths() ?? []),
+      ...developmentRuntime,
+    ];
+    const chatState = path.join(
+      this.profile.userData,
+      NativeDesktopProfile.chatStateDirectory
+    );
+    const endpointConsent = ProviderEndpointConsent.directory(
+      this.profile.userData
+    );
     if (!RetainedServiceSandbox.isSupportedPlatform()) {
       if (chat) throw new Error("native_retained_sidecar_sandbox_unavailable");
       this.protectedFileRoots = [
-        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
-        ProviderEndpointConsent.directory(app.getPath("userData")),
-        path.join(
-          app.getPath("userData"),
-          NativeDesktopProfile.chatStateDirectory
-        ),
+        ...this.protectedStateRoots,
+        this.profile.catalogueDirectory,
+        endpointConsent,
+        chatState,
       ];
       // Existing Windows file/media services have no native confinement claim.
       if (process.platform !== "win32")
@@ -348,55 +363,31 @@ export class ServicesSidecarSupervisor {
       this.sandboxReady = true;
       return;
     }
-    let protectedPolicyRoots: readonly string[] = [];
-    if (chat && !this.ordinaryNativeChat && NativeDesktopProfile.selected()) {
-      // GRIDA-SEC-004 — the preview profile's retained service stays out of
-      // the installed Desktop data and Grida homes.
-      const installed = NativeDesktopProfile.protectedRoots(app);
-      if (installed.overlaps(path.dirname(app.getPath("userData"))))
-        throw new Error("native_desktop_profile_invalid");
-      // The sidecar cannot stat the denied lexical symlink. Main resolves it
-      // before confinement, while the file registry rechecks target aliases.
-      this.protectedStateRoots = installed.canonicalPaths();
-      protectedPolicyRoots = [
-        ...installed.metadataPaths(),
-        ...this.protectedStateRoots,
-      ];
-    }
-    const nativeStateRoot =
-      chat && this.ordinaryNativeChat
-        ? path.join(
-            chat.desktopUserDataPath,
-            NativeDesktopProfile.chatStateDirectory
-          )
-        : (chat?.desktopUserDataPath ??
-          path.join(
-            app.getPath("userData"),
-            NativeDesktopProfile.chatStateDirectory
-          ));
+    const nativeStateRoot = preview ? this.profile.userData : chatState;
     this.protectedFileRoots = [
       ...new Set([
         ...this.protectedStateRoots,
-        ...(this.catalogueDirectory ? [this.catalogueDirectory] : []),
+        this.profile.catalogueDirectory,
         nativeStateRoot,
-        ProviderEndpointConsent.directory(app.getPath("userData")),
+        endpointConsent,
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
       ]),
     ];
     const policy = SidecarSandboxPolicy.build({
-      userData: this.user_data_path,
-      providerRoot: path.join(this.provider_home, "providers"),
-      mediaRoot: this.media_root,
+      userData: this.profile.agentData,
+      providerRoot: path.join(this.profile.providerHome, "providers"),
+      mediaRoot: this.profile.mediaRoot,
       desktopStateRoot: nativeStateRoot,
       protectedStateRoots: [
-        ...protectedPolicyRoots,
-        ProviderEndpointConsent.directory(app.getPath("userData")),
+        ...(protectedRoots?.metadataPaths() ?? []),
+        ...developmentRuntime,
+        endpointConsent,
       ],
-      catalogueDirectory: this.catalogueDirectory,
+      catalogueDirectory: this.profile.catalogueDirectory,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
-      home: app.getPath("home"),
+      home: this.profile.userHome,
     });
     this.nativeSandbox = new RetainedServiceSandbox({
       network: {
@@ -456,31 +447,30 @@ export class ServicesSidecarSupervisor {
     const mode = this.nativeChat ? "native-chat" : "disabled";
     const args = [
       scriptPath,
-      `--user-data=${this.user_data_path}`,
-      `--provider-home=${this.provider_home}`,
-      `--media-root=${this.media_root}`,
-      ...(this.catalogueDirectory
-        ? [`--model-catalogue=${this.catalogueDirectory}`]
-        : []),
+      `--user-data=${this.profile.agentData}`,
+      `--provider-home=${this.profile.providerHome}`,
+      `--media-root=${this.profile.mediaRoot}`,
+      `--model-catalogue=${this.profile.catalogueDirectory}`,
       `--agent=${mode}`,
-      ...(this.ordinaryNativeChat ? ["--ordinary-native-chat-services=1"] : []),
+      ...(this.nativeChat && this.profile.nativeChat === "ordinary"
+        ? ["--ordinary-native-chat-services=1"]
+        : []),
       ...(this.workspaceCatalog
         ? [`--workspace-catalog=${this.workspaceCatalog}`]
         : []),
       ...this.protectedFileRoots.map((root) => `--protected-file-root=${root}`),
       // GRIDA-SEC-004 — host-injected managed root for the auto-create flow.
       // A visible, Finder-navigable location (files stay visible); the sidecar
-      // may only mint project folders INSIDE this root. `documents` needs a
-      // ready app, which holds at spawn time (post `app.whenReady`).
-      `--projects-root=${path.join(app.getPath("documents"), "Grida Projects")}`,
-      `--editor-base-url=${EDITOR_BASE_URL}`,
+      // may only mint project folders INSIDE this root.
+      `--projects-root=${this.profile.projectsRoot}`,
+      `--editor-base-url=${this.profile.editorBaseUrl}`,
       // GRIDA-SEC-004 — only native retained-service confinement supplies this fact.
       `--sandbox-enforced=${supportedSandbox ? "1" : "0"}`,
     ];
     const nativePlan = sandbox?.prepare(process.execPath, args, process, {
-      state: this.user_data_path,
-      providerHome: this.provider_home,
-      media: this.media_root,
+      state: this.profile.agentData,
+      providerHome: this.profile.providerHome,
+      media: this.profile.mediaRoot,
     });
     if (generation !== this.nextGeneration || this.isShuttingDown) {
       nativePlan?.release?.();
@@ -505,10 +495,10 @@ export class ServicesSidecarSupervisor {
       // process facts, never ambient provider keys, shell startup or proxy state.
       const childEnv: NodeJS.ProcessEnv = {
         ELECTRON_RUN_AS_NODE: "1",
-        HOME: app.getPath("home"),
-        TMPDIR: app.getPath("temp"),
-        TMP: app.getPath("temp"),
-        TEMP: app.getPath("temp"),
+        HOME: this.profile.userHome,
+        TMPDIR: this.profile.temp,
+        TMP: this.profile.temp,
+        TEMP: this.profile.temp,
         LANG: "C",
         LC_ALL: "C",
         ...(process.platform === "win32" &&
@@ -587,7 +577,7 @@ export class ServicesSidecarSupervisor {
         if (!this.isCurrentGeneration(child, generation) || resolved) return;
         daemonSocketHost.markReady(readyPort);
         const connection = { port: daemonPort, password };
-        const origin = new URL(EDITOR_BASE_URL).origin;
+        const origin = this.editorOrigin;
         this.endpointTransport = new MediaTransport.Client({
           base_url: MediaTransport.baseUrl(daemonPort),
           password,
@@ -692,7 +682,7 @@ export class ServicesSidecarSupervisor {
       return this.endpointTransport.providers;
     };
     this.endpointConsent = await ProviderEndpointConsent.open({
-      directory: ProviderEndpointConsent.directory(app.getPath("userData")),
+      directory: ProviderEndpointConsent.directory(this.profile.userData),
       configuration: {
         list: () => transport().list_endpoints(),
         set: (config) => transport().set_endpoint(config),
@@ -760,14 +750,20 @@ export class ServicesSidecarSupervisor {
 let supervisor: ServicesSidecarSupervisor | undefined;
 
 function sidecar(): ServicesSidecarSupervisor {
-  return (supervisor ??= new ServicesSidecarSupervisor());
+  if (!supervisor) throw new Error("services_sidecar_profile_unavailable");
+  return supervisor;
+}
+
+export function configureServicesSidecar(profile: SidecarProfile): void {
+  if (supervisor)
+    throw new Error("services_sidecar_profile_already_configured");
+  supervisor = new ServicesSidecarSupervisor(profile);
 }
 
 export function startServicesSidecar(
-  workspaceCatalog?: string,
-  catalogueDirectory?: string
+  workspaceCatalog?: string
 ): Promise<ServicesSidecarInfo> {
-  return sidecar().start(workspaceCatalog, catalogueDirectory);
+  return sidecar().start(workspaceCatalog);
 }
 
 export function selectNativeChat(ordinary = false): NativeChatPaths {

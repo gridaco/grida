@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { NativeChatMessage } from "@grida/desktop-bridge";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -6,6 +6,147 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 
 describe("NativeTurnActivity", () => {
+  it.each(["Steer with these images.", ""])(
+    "renders retained previews for a steered input with caption %j",
+    (text) => {
+      const load = vi.fn<(token: string) => Promise<Blob>>();
+      const [block] = turn_activity.group(
+        [
+          {
+            messageId: "request",
+            role: "user",
+            text: "Start the turn.",
+            turnId: "turn",
+            activityOrder: 1,
+          },
+          {
+            messageId: "progress",
+            role: "assistant",
+            text: "Working on it.",
+            turnId: "turn",
+            activityOrder: 2,
+          },
+          {
+            messageId: "steering",
+            role: "user",
+            text,
+            turnId: "turn",
+            activityOrder: 3,
+            attachments: [
+              {
+                name: "first.png",
+                mimeType: "image/png",
+                previewId: "first-selector",
+              },
+              {
+                name: "second.webp",
+                mimeType: "image/webp",
+                previewId: "second-selector",
+              },
+            ],
+          },
+        ],
+        [{ turnId: "turn", status: null, startedAtMs: 0 }],
+        { turnId: "turn" }
+      );
+      if (block.kind !== "turn") throw new Error("expected_turn");
+      const html = renderToStaticMarkup(
+        <NativeTurnActivity
+          block={block}
+          loadAttachmentPreview={load}
+          renderMessage={(message) => (
+            <p key={message.messageId}>{message.text}</p>
+          )}
+        />
+      );
+      const first = html.indexOf('title="Preview first.png"');
+      const second = html.indexOf('title="Preview second.webp"');
+      expect(first).toBeGreaterThan(html.indexOf("Working on it."));
+      expect(second).toBeGreaterThan(first);
+      expect(html).not.toContain("Preview unavailable");
+      expect(html).not.toContain("-selector");
+      expect(load).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps inline compactions with the rest of the turn's work", () => {
+    const work: turn_activity.Item[] = [
+      {
+        kind: "compaction",
+        compaction: {
+          id: "first",
+          status: "succeeded",
+          automatic: true,
+          activityOrder: 1,
+        },
+      },
+      {
+        kind: "commentary",
+        message: {
+          messageId: "middle",
+          role: "assistant",
+          text: "Checking the second file.",
+          turnId: "t",
+          activityOrder: 2,
+        },
+      },
+      {
+        kind: "compaction",
+        compaction: {
+          id: "second",
+          status: "succeeded",
+          automatic: true,
+          activityOrder: 3,
+        },
+      },
+    ];
+    const render = (
+      finished: boolean,
+      compactionDurations?: ReadonlyMap<string, number>,
+      visibleItems = work
+    ) =>
+      renderToStaticMarkup(
+        <NativeTurnActivity
+          block={{
+            kind: "turn",
+            turnId: "t",
+            requests: [],
+            finished,
+            outcome: finished ? "succeeded" : null,
+            durationMs: null,
+            work: visibleItems,
+            answers: finished
+              ? [
+                  {
+                    messageId: "final",
+                    role: "assistant",
+                    text: "Done.",
+                    turnId: "t",
+                  },
+                ]
+              : [],
+          }}
+          compactionDurations={compactionDurations}
+          renderMessage={(message) => (
+            <p key={message.messageId}>{message.text}</p>
+          )}
+        />
+      );
+    const live = render(false, new Map([["second", 2000]]));
+    const narration = live.indexOf("Checking the second file.");
+    expect(live.indexOf("Context compacted")).toBeLessThan(narration);
+    expect(live.indexOf("Context compacted · 2s")).toBeGreaterThan(narration);
+    const replay = render(true);
+    expect(replay).toContain('data-state="collapsed"');
+    expect(replay).not.toContain("Context compacted");
+    expect(replay).not.toContain("Checking the second file.");
+    expect(replay).toContain("Done.");
+
+    const compactionOnly = render(true, undefined, [work[0]]);
+    expect(compactionOnly).toContain('aria-expanded="false"');
+    expect(compactionOnly).not.toContain("Context compacted");
+  });
+
   it.each([
     {
       from: "openai/gpt-6.2-astra",

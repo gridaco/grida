@@ -54,6 +54,28 @@ describe("AgentComposerEditSession", () => {
     expect(session.owns("queued", "chat")).toBe(false);
   });
 
+  it.each([{ type: "doc", content: [] }, null])(
+    "restores the saved checkout document and keeps the ordinary draft",
+    (document) => {
+      const { session, original, state, editor } = fixture();
+      expect(
+        session.sync(
+          {
+            id: "checkout",
+            text: "Original queued caption",
+            savedDocument: { document },
+          },
+          "chat",
+          editor
+        )
+      ).toBe("changed");
+      expect(state.document).toBe(document);
+      expect(session.document("chat", state.document)).toBe(original);
+      expect(session.sync(undefined, "chat", editor)).toBe("changed");
+      expect(state.document).toBe(original);
+    }
+  );
+
   it("waits for the editor before capturing or replacing a draft", () => {
     const { session, original, state, editor } = fixture();
     state.ready = false;

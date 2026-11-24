@@ -429,7 +429,10 @@ export function NativeChatHeader({
                     Copy
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
-                    <DropdownMenuSubContent className="w-48">
+                    <DropdownMenuSubContent
+                      sideOffset={8}
+                      className="w-max max-w-(--radix-dropdown-menu-content-available-width)"
+                    >
                       <DropdownMenuItem
                         onSelect={() =>
                           void copyChatValue(entry.sessionId, "Chat ID copied")

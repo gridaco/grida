@@ -7,18 +7,30 @@ use agent_kit_core::messages::{
     Content, OutcomeStatus, ProviderEvidence, Role, SearchAction, SearchStatus, ToolCall,
     ToolResult, UrlCitation,
 };
-use agent_kit_core::turn::{OperationOutcome, TurnBinding, TurnState};
-use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
+use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnBinding, TurnState};
+use agent_kit_core::{ChangeId, Envelope, MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
+use grida_agent_master::compaction::{self, CompactionActivityStatus};
 use grida_agent_master::questions::QuestionReply;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
+
+/// Streaming and retained presentation use the same visible operations.
+pub(super) fn publishes_operation(input: &OperationInput) -> bool {
+    !matches!(input, OperationInput::Inference(request)
+        if request.request().messages.first().is_some_and(|message|
+            message.role == Role::System
+                && (message.provenance.source == "approval-review"
+                    || message.id.as_str() == "compaction/instructions")))
+}
 
 #[derive(Clone)]
 pub(crate) enum LiveUpdate {
     Text(LiveText),
     Activity(LiveActivity),
+    Compaction(LiveCompaction),
     HostedSearch {
         session: SessionId,
         turn: TurnId,
@@ -29,6 +41,78 @@ pub(crate) enum LiveUpdate {
     },
     Lifecycle(Lifecycle),
     Processes(LiveProcesses),
+}
+
+/// Transcript presentation of one compaction, independent of turn settlement.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CompactionItem {
+    pub id: String,
+    pub status: CompactionActivityStatus,
+    pub automatic: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished_at_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_order: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+impl CompactionItem {
+    pub(crate) fn standalone(turn: &TurnId, status: CompactionActivityStatus) -> Self {
+        Self {
+            id: format!("context-compaction/{turn}"),
+            status,
+            automatic: super::compaction::is_automatic_turn(turn),
+            started_at_ms: None,
+            finished_at_ms: None,
+            activity_order: None,
+            summary: None,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct LiveCompaction {
+    pub session: SessionId,
+    pub turn: TurnId,
+    pub item: CompactionItem,
+}
+
+pub(super) fn publish_compaction(
+    sender: &broadcast::Sender<LiveUpdate>,
+    binding: &TurnBinding,
+    item: CompactionItem,
+) {
+    let _ = sender.send(LiveUpdate::Compaction(LiveCompaction {
+        session: binding.session.clone(),
+        turn: binding.turn.clone(),
+        item,
+    }));
+}
+
+pub(super) fn compaction_items(
+    state: &TurnState,
+    mut position: impl FnMut(&str) -> Option<u64>,
+) -> Vec<CompactionItem> {
+    compaction::inline_compaction_activity(state)
+        .into_iter()
+        .map(|item| {
+            let id = item.id(&state.binding().turn);
+            let activity_order = position(&id);
+            CompactionItem {
+                id,
+                status: item.status,
+                automatic: true,
+                started_at_ms: item.started_at_ms,
+                finished_at_ms: item.finished_at_ms,
+                activity_order,
+                summary: None,
+            }
+        })
+        .collect()
 }
 
 /// A chat's complete process list after it changed.
@@ -60,6 +144,7 @@ pub(crate) struct Lifecycle {
 #[derive(Clone)]
 pub(crate) enum LifecycleFact {
     Settled(OutcomeStatus),
+    AutomaticCompactionSettled(OutcomeStatus),
     ApprovalRequired(WaitId),
     QuestionAsked(WaitId),
 }
@@ -69,11 +154,15 @@ pub(super) fn publish_lifecycle(
     session: &SessionId,
     turn: &TurnId,
     result: &RunResult,
+    automatic_compaction: bool,
 ) {
     if sender.receiver_count() == 0 {
         return;
     }
     let fact = match result {
+        RunResult::Settled(outcome) if automatic_compaction => {
+            LifecycleFact::AutomaticCompactionSettled(outcome.status)
+        }
         RunResult::Settled(outcome) => LifecycleFact::Settled(outcome.status),
         RunResult::InputRequired(pending) => {
             let Some(approval) = pending.approvals.first() else {
@@ -94,6 +183,10 @@ pub(super) fn publish_lifecycle(
 pub(crate) enum LiveTextKind {
     Assistant(Vec<UrlCitation>),
     QuestionReply(Vec<QuestionReply>),
+    SkillInput {
+        input: ChangeId,
+        display_parts: Vec<super::message_context::DisplayPart>,
+    },
 }
 
 #[derive(Clone)]
@@ -107,6 +200,35 @@ pub(crate) struct LiveText {
     pub kind: LiveTextKind,
 }
 
+pub(super) struct SkillInput {
+    pub input: ChangeId,
+    pub message: MessageId,
+    pub text: String,
+    pub display_parts: Vec<super::message_context::DisplayPart>,
+}
+
+impl SkillInput {
+    pub(super) fn publish(
+        self,
+        sender: &broadcast::Sender<LiveUpdate>,
+        session: &SessionId,
+        turn: &TurnId,
+    ) {
+        let _ = sender.send(LiveUpdate::Text(LiveText {
+            session: session.clone(),
+            turn: turn.clone(),
+            message: self.message,
+            offset: 0,
+            replace: true,
+            text: self.text.into(),
+            kind: LiveTextKind::SkillInput {
+                input: self.input,
+                display_parts: self.display_parts,
+            },
+        }));
+    }
+}
+
 pub(super) struct Publisher {
     sender: broadcast::Sender<LiveUpdate>,
     binding: TurnBinding,
@@ -114,6 +236,13 @@ pub(super) struct Publisher {
     calls: BTreeMap<ToolCallId, (MessageId, ToolCall)>,
     finished: BTreeSet<ToolCallId>,
     announced_questions: BTreeSet<WaitId>,
+    compaction_status: BTreeMap<String, CompactionActivityStatus>,
+    compaction_checkpoint: Option<Envelope>,
+    compaction_admitted: bool,
+}
+
+fn admits_compaction(state: &TurnState) -> bool {
+    state.controls().admits_work() && !state.is_suspended() && state.outcome().is_none()
 }
 
 impl Publisher {
@@ -124,6 +253,12 @@ impl Publisher {
             offsets: BTreeMap::new(),
             calls: BTreeMap::new(),
             finished: BTreeSet::new(),
+            compaction_checkpoint: state.checkpoint().cloned(),
+            compaction_admitted: admits_compaction(state),
+            compaction_status: compaction::inline_compaction_activity(state)
+                .into_iter()
+                .map(|item| (item.id(&state.binding().turn), item.status))
+                .collect(),
             // A resumed worker can inherit unanswered questions. Those are
             // visible in its snapshot and have no new registration to announce.
             announced_questions: state
@@ -132,6 +267,35 @@ impl Publisher {
                 .filter(|wait| wait.is_pending() && super::questions::is_question(wait))
                 .map(|wait| wait.id.clone())
                 .collect(),
+        }
+    }
+
+    pub(super) fn compactions(
+        &mut self,
+        state: &TurnState,
+        ordering: &super::activity_order::State,
+    ) {
+        let admitted = admits_compaction(state);
+        let checkpoint = state.checkpoint();
+        if self.compaction_checkpoint.as_ref() == checkpoint && self.compaction_admitted == admitted
+        {
+            return;
+        }
+        self.compaction_checkpoint = checkpoint.cloned();
+        self.compaction_admitted = admitted;
+        let items = compaction_items(state, |_| None);
+        let latest_success = items
+            .iter()
+            .rposition(|item| item.status == CompactionActivityStatus::Succeeded);
+        for (index, mut item) in items.into_iter().enumerate() {
+            if self.compaction_status.insert(item.id.clone(), item.status) != Some(item.status) {
+                item.activity_order =
+                    ordering.record_event(&self.binding.session, &self.binding.turn, &item.id);
+                if Some(index) == latest_success {
+                    item.summary = compaction::inline_summary(state);
+                }
+                publish_compaction(&self.sender, &self.binding, item);
+            }
         }
     }
 

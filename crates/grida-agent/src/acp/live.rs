@@ -36,10 +36,15 @@ pub(super) async fn forward(
                     let visible = {
                         let state = sessions.lock().unwrap();
                         state.can_deliver(&update.session)
-                            && (!matches!(&update.kind, LiveTextKind::QuestionReply(_))
-                                || state
+                            && match &update.kind {
+                                LiveTextKind::Assistant(_) => true,
+                                LiveTextKind::QuestionReply(_) => state
                                     .negotiated
-                                    .contains(super::extensions::QUESTION_BATCH_LIST))
+                                    .contains(super::extensions::QUESTION_BATCH_LIST),
+                                LiveTextKind::SkillInput { .. } => state
+                                    .negotiated
+                                    .contains(super::extensions::MESSAGE_CONTEXT),
+                            }
                     };
                     if !visible {
                         continue;
@@ -47,7 +52,9 @@ pub(super) async fn forward(
                     let mut offset = update.offset;
                     let mut replace = update.replace;
                     let mut text = update.text.as_ref();
-                    while !text.is_empty() {
+                    while !text.is_empty()
+                        || (replace && matches!(&update.kind, LiveTextKind::SkillInput { .. }))
+                    {
                         let end = text.floor_char_boundary(text.len().min(CHUNK_BYTES));
                         let (part, remaining) = text.split_at(end);
                         let chunk = ContentChunk::new(part.to_owned().into())
@@ -69,6 +76,16 @@ pub(super) async fn forward(
                                 if replace {
                                     metadata["questionReplies"] =
                                         question_replies_metadata(replies);
+                                }
+                                SessionUpdate::UserMessageChunk(chunk)
+                            }
+                            LiveTextKind::SkillInput {
+                                input,
+                                display_parts,
+                            } => {
+                                metadata["inputId"] = json!(input);
+                                if replace {
+                                    metadata["displayParts"] = json!(display_parts);
                                 }
                                 SessionUpdate::UserMessageChunk(chunk)
                             }
@@ -198,6 +215,26 @@ pub(super) async fn forward(
                     )
                     .await?;
                 }
+                Ok(LiveUpdate::Compaction(update)) => {
+                    if !sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::extensions::compaction::ITEMS)
+                    {
+                        continue;
+                    }
+                    send(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &update.session,
+                        ContentChunk::new("".to_owned().into()),
+                        super::extensions::compaction::ITEMS,
+                        json!({"turnId": update.turn, "item": update.item}),
+                    )
+                    .await?;
+                }
                 Ok(LiveUpdate::Lifecycle(update)) => {
                     if !lifecycle_enabled {
                         continue;
@@ -205,6 +242,9 @@ pub(super) async fn forward(
                     let metadata = match update.fact {
                         LifecycleFact::Settled(status) => {
                             json!({"kind": "settled", "turnId": update.turn, "status": status})
+                        }
+                        LifecycleFact::AutomaticCompactionSettled(status) => {
+                            json!({"kind": "automatic_compaction_settled", "turnId": update.turn, "status": status})
                         }
                         LifecycleFact::ApprovalRequired(wait) => {
                             json!({"kind": "approval_required", "turnId": update.turn, "waitId": wait})

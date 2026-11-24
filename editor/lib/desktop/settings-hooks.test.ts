@@ -76,7 +76,42 @@ describe("SettingsHooks.Controller", () => {
     expect(controller.read()).toMatchObject({
       loading: false,
       action: null,
-      error: "Couldn't read the hook configuration.",
+      error: "Couldn't read config.toml.",
+    });
+  });
+  it.each([
+    { outcome: "opens", openerFailed: false },
+    { outcome: "fails to open", openerFailed: true },
+  ])("reports the created file when it $outcome", async ({ openerFailed }) => {
+    const api = native();
+    api.inspect.mockResolvedValueOnce({ ...inspection(), exists: false });
+    if (openerFailed)
+      api.open_config.mockRejectedValueOnce(new Error("no default app"));
+    const controller = new SettingsHooks.Controller(() => api);
+    await controller.refresh();
+    expect(controller.read().inspection?.exists).toBe(false);
+
+    await controller.openConfig();
+
+    expect(api.open_config).toHaveBeenCalledOnce();
+    expect(controller.read().inspection?.exists).toBe(true);
+    expect(controller.read().error).toBe(
+      openerFailed ? "Couldn't open config.toml." : null
+    );
+  });
+  it("clears the previous file state when a fresh inspection fails", async () => {
+    const api = native();
+    const controller = new SettingsHooks.Controller(() => api);
+    await controller.refresh();
+    expect(controller.read().inspection?.exists).toBe(true);
+    api.inspect.mockRejectedValueOnce(new Error("inspection unavailable"));
+
+    await controller.refresh();
+
+    expect(controller.read()).toMatchObject({
+      inspection: null,
+      loading: false,
+      error: "Couldn't read config.toml.",
     });
   });
   it("ignores an inspection that settles after the panel is disposed", async () => {

@@ -31,6 +31,7 @@ pub struct FileUpload {
     pub(super) name: String,
     pub(super) bytes: Vec<u8>,
     pub(super) digest: [u8; 32],
+    pub(super) source: Option<(super::SelectedImage, usize)>,
 }
 
 impl std::fmt::Debug for FileUpload {
@@ -43,6 +44,47 @@ impl std::fmt::Debug for FileUpload {
 }
 
 impl FileUpload {
+    pub(crate) fn byte_len(&self) -> usize {
+        self.source
+            .as_ref()
+            .map_or(self.bytes.len(), |(_, size)| *size)
+    }
+
+    pub(crate) fn staged(selection: super::SelectedImage, size: usize) -> Result<Self> {
+        selection.validate()?;
+        Self::validate_name(&selection.name)?;
+        if selection.source != super::ImageSource::Snapshot {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "selected_file_snapshot_required",
+            ));
+        }
+        if size > MAX_FILE_BYTES {
+            return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
+        }
+        let mut file = Self::with_bytes(&selection.name, Vec::new());
+        file.digest = selection.sha256;
+        file.source = Some((selection, size));
+        Ok(file)
+    }
+
+    pub(super) fn read_staged(mut self) -> Result<Self> {
+        if let Some((source, size)) = self.source.take() {
+            let bytes = super::selected_file::read_selected(
+                Path::new(&source.path),
+                MAX_FILE_BYTES,
+                "selected_file_unavailable",
+                "selected_file_changed",
+                "file_size_limit",
+            )?;
+            if bytes.len() != size || <[u8; 32]>::from(Sha256::digest(&bytes)) != self.digest {
+                return Err(problem(ErrorKind::Conflict, "selected_file_changed"));
+            }
+            self.bytes = bytes;
+        }
+        Ok(self)
+    }
+
     pub(crate) fn decode(name: &str, data: &str) -> Result<Self> {
         Self::validate_name(name)?;
         if data.len() > MAX_FILE_BYTES.div_ceil(3) * 4 {
@@ -115,12 +157,13 @@ impl FileUpload {
             },
             digest: Sha256::digest(&bytes).into(),
             bytes,
+            source: None,
         }
     }
 
     pub(super) fn matches(&self, asset: &AssetRef) -> bool {
         self.name == asset.name()
-            && self.bytes.len() as u64 == asset.size()
+            && self.byte_len() as u64 == asset.size()
             && &self.digest == asset.digest()
     }
 }
@@ -145,7 +188,7 @@ pub(super) fn media(asset: &AssetRef) -> Result<MediaRef> {
 pub(super) struct TurnFile {
     storage: Arc<RetainedInputs>,
     turn: TurnBinding,
-    work: WorkingCopyReceipt,
+    work: Vec<WorkingCopyReceipt>,
     grants: GrantSelection,
     definition: ToolDefinition,
 }
@@ -154,12 +197,52 @@ impl TurnFile {
     pub(super) fn bind(
         storage: Arc<RetainedInputs>,
         turn: &TurnBinding,
-        work: WorkingCopyReceipt,
+        work: Vec<WorkingCopyReceipt>,
     ) -> Result<Arc<Self>> {
-        if work.asset().owner() != &turn.session || work.asset().size() > MAX_FILE_BYTES as u64 {
+        if work.is_empty()
+            || work.iter().any(|entry| {
+                entry.asset().owner() != &turn.session
+                    || entry.asset().size() > MAX_FILE_BYTES as u64
+            })
+        {
             return Err(denied());
         }
-        let digest = Fingerprint::of(&(&turn.session, &turn.turn, &work))?;
+        let multiple = work.len() > 1;
+        let description = if multiple {
+            let files = work
+                .iter()
+                .map(|entry| format!("{} ({})", entry.asset().name(), entry.asset().id()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "Inspect one file attached to this task. Attachments in input order: {files}. Returns the verified size and SHA-256. Request a text excerpt only if needed."
+            )
+        } else {
+            "Inspect the file attached to this task. Returns its verified size and SHA-256. Request a text excerpt only if needed. Binary content is not returned.".to_owned()
+        };
+        let input = if multiple {
+            let ids = work
+                .iter()
+                .map(|entry| entry.asset().id())
+                .collect::<Vec<_>>();
+            json!({
+                "type":"object", "properties":{
+                    "attachment_id":{"type":"string","enum":ids},
+                    "include_text":{"type":"boolean"}
+                },
+                "required":["attachment_id"], "additionalProperties":false
+            })
+        } else {
+            json!({
+                "type":"object", "properties":{"include_text":{"type":"boolean"}},
+                "additionalProperties":false
+            })
+        };
+        let digest = if let [file] = work.as_slice() {
+            Fingerprint::of(&(&turn.session, &turn.turn, file))?
+        } else {
+            Fingerprint::of(&(&turn.session, &turn.turn, &work))?
+        };
         let binding =
             uuid::Uuid::from_bytes(digest.bytes()[..16].try_into().expect("fingerprint prefix"));
         Ok(Arc::new(Self {
@@ -176,13 +259,10 @@ impl TurnFile {
             },
             definition: ToolDefinition {
                 id: ToolId::new("inspect_retained_file")?,
-                version: 1,
-                description: "Inspect the file attached to this task. Returns its verified size and SHA-256. Request a text excerpt only if needed. Binary content is not returned.".into(),
-                input: InputFormat::Json(json!({
-                    "type":"object", "properties":{"include_text":{"type":"boolean"}},
-                    "additionalProperties":false
-                })),
-                max_input_bytes: 64,
+                version: if multiple { 2 } else { 1 },
+                description,
+                input: InputFormat::Json(input),
+                max_input_bytes: if multiple { 256 } else { 64 },
                 max_output_bytes: 16 * 1024,
                 recovery: RecoveryKind::Unavailable,
             },
@@ -203,9 +283,9 @@ impl TurnFile {
         Ok(())
     }
 
-    fn read(&self) -> BoxFuture<'static, Result<Vec<u8>>> {
+    fn read(&self, work: &WorkingCopyReceipt) -> BoxFuture<'static, Result<Vec<u8>>> {
         let storage = self.storage.clone();
-        let work = self.work.clone();
+        let work = work.clone();
         Box::pin(async move {
             tokio::task::spawn_blocking(move || storage.read_file(&work))
                 .await
@@ -214,8 +294,28 @@ impl TurnFile {
     }
 
     pub(super) fn check(&self) -> BoxFuture<'static, Result<()>> {
-        let read = self.read();
-        Box::pin(async move { read.await.map(|_| ()) })
+        let reads = self
+            .work
+            .iter()
+            .map(|work| self.read(work))
+            .collect::<Vec<_>>();
+        Box::pin(async move {
+            for read in reads {
+                read.await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn selected(&self, request: &Inspect) -> Result<&WorkingCopyReceipt> {
+        match (&request.attachment_id, self.work.as_slice()) {
+            (None, [work]) => Ok(work),
+            (Some(id), work) if work.len() > 1 => work
+                .iter()
+                .find(|entry| entry.asset().id().as_str() == id)
+                .ok_or_else(invalid_inspection),
+            _ => Err(invalid_inspection()),
+        }
     }
 }
 
@@ -244,7 +344,7 @@ impl Tool for TurnFile {
     }
 
     fn validate(&self, arguments: &ToolArguments) -> Result<()> {
-        request(arguments).map(|_| ())
+        self.selected(&request(arguments)?).map(|_| ())
     }
 
     fn invoke(
@@ -254,8 +354,10 @@ impl Tool for TurnFile {
     ) -> BoxFuture<'_, ToolOutcome> {
         Box::pin(async move {
             let result = async {
-                let include_text = request(invocation.arguments())?.include_text;
-                let bytes = self.read().await?;
+                let request = request(invocation.arguments())?;
+                let work = self.selected(&request)?;
+                let include_text = request.include_text;
+                let bytes = self.read(work).await?;
                 let text = include_text
                     .then(|| std::str::from_utf8(&bytes).ok())
                     .flatten()
@@ -264,20 +366,23 @@ impl Tool for TurnFile {
                             .all(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t'))
                     });
                 let excerpt = text.map(|text| &text[..text.floor_char_boundary(MAX_EXCERPT_BYTES)]);
-                let digest = self
-                    .work
+                let digest = work
                     .asset()
                     .digest()
                     .iter()
                     .map(|byte| format!("{byte:02x}"))
                     .collect::<String>();
+                let mut structured = json!({
+                    "name": work.asset().name(), "bytes": bytes.len(), "sha256": digest,
+                    "text": excerpt, "textRequested": include_text,
+                });
+                if self.work.len() > 1 {
+                    structured["attachmentId"] = json!(work.asset().id());
+                }
                 Ok::<_, agent_kit_core::Error>(ToolOutcome {
                     status: OutcomeStatus::Succeeded,
                     content: Vec::new(),
-                    structured: Some(json!({
-                        "name": self.work.asset().name(), "bytes": bytes.len(), "sha256": digest,
-                        "text": excerpt, "textRequested": include_text,
-                    })),
+                    structured: Some(structured),
                     receipt: None,
                     truncated: text
                         .zip(excerpt)
@@ -301,19 +406,21 @@ impl Tool for TurnFile {
 struct Inspect {
     #[serde(default)]
     include_text: bool,
+    attachment_id: Option<String>,
 }
 
 fn request(arguments: &ToolArguments) -> Result<Inspect> {
-    let invalid = || {
-        problem(
-            ErrorKind::InvalidInput,
-            "retained_file_inspection_arguments",
-        )
-    };
     let ToolArguments::Json(value) = arguments else {
-        return Err(invalid());
+        return Err(invalid_inspection());
     };
-    serde_json::from_value(value.clone()).map_err(|_| invalid())
+    serde_json::from_value(value.clone()).map_err(|_| invalid_inspection())
+}
+
+fn invalid_inspection() -> agent_kit_core::Error {
+    problem(
+        ErrorKind::InvalidInput,
+        "retained_file_inspection_arguments",
+    )
 }
 
 fn denied() -> agent_kit_core::Error {

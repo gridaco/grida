@@ -293,7 +293,7 @@ extensions produce a defined fallback or unavailable outcome.
 | Capability family  | Additional semantics                                                                                                                                                                                                                                                                         |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Durable sessions   | Identified acceptance, retry reconciliation, snapshots/cursors, queue and steering controls, verified pause/resume/settlement, history derivation, child-session controls. Product-owned goal payloads and host timer operations use these mechanisms. Reuse equivalent standard operations. |
-| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration binding](./rust-config.md) owns the field semantics.                                                                                                                                         |
+| Host configuration | User-wide default inspection and revision-checked reload. The [configuration binding](./rust-config.md) owns the field semantics.                                                                                                                                                            |
 | Client surfaces    | Resource access or editor actions missing from standard ACP, plus optional structured view data. Each action has a capability schema and required authority. The adapter preserves call and endpoint correlation. Domain fields follow the capability. Pure styling requires no operation.   |
 
 These families group the extensions. None enables every listed action as one
@@ -473,6 +473,11 @@ include `modelId` on each of `current` and `latest`. The transcript window's
 model captured for the input the turn claimed, including inputs accepted into
 the queue. Later chat selections and auxiliary model calls have their own
 scope. The host omits `modelId` when a turn has no captured foreground model.
+
+Each transcript turn can also report `contextWindowTokens`, the resolved
+window captured for that turn, and `contextTokens`, the latest reported
+foreground context size. A summary call's usage is separate. Treat absent
+values as unknown.
 
 Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
 `plan` or `act` when submitting, enqueueing, starting a goal, or revising
@@ -705,6 +710,70 @@ admission or host restart, without accepting more work. Reusing a request ID wit
 a different action is refused. The general `replace` operation retains its
 whole-input behavior; it is not a fallback for caption editing.
 
+### Check out, reinsert, and steer queued work
+
+A private stdio client can negotiate `co.grida/session/queue-actions` version 1.
+Snapshot returns `checkoutable` and `steerable` for the observed queue rows.
+A session with a checked-out item also returns `queueCheckout` with its
+`checkoutId` and `inputId`. Reattaching can observe the checkout and the retained
+input without admitting it. The checkout remains open until it is reinserted.
+When both queue actions and queued image chunks are negotiated, pass
+`checkoutId` in place of `expectedSessionRevision` to `queued-message` and
+`read-queued-input-image-chunk` with the original `inputId`. The read requires
+the exact open checkout in the attached session and grants no access to a
+source path.
+
+| Method suffix after `_co.grida/session/` | Parameters                                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `queue-checkout`                         | `sessionId`, `requestId`, `expectedSessionRevision`, and `inputId`.                                   |
+| `queue-reinsert`                         | `sessionId`, `requestId`, `checkoutId`, optional `text` and negotiated `attachments`.                 |
+| `steer-queued`                           | `task` naming the exact running turn at the observed session and control revisions, and `inputId`.    |
+| `queue-action-receipt`                   | `sessionId` and `requestId`. Returns `receipt`, or null when no action committed under that identity. |
+
+Checkout wins against admission at the observed revision and takes the item out
+of the runnable queue. The session can hold one checkout. Its ID is the
+checkout's request ID. It reserves the original position and capacity while
+other messages can run or reorder. Reinserting without `text` and `attachments`
+restores the original input. A supplied `text` uses the same retained-part and settings
+rules as `replace-text`, with a fresh immutable input identity. Reinsertion
+requires the open checkout and tolerates intervening queue activity. It follows
+ordinary admission and respects an explicit queue pause.
+
+Clients that negotiate [ordered attachment intake](#ordered-attachment-intake)
+can also supply `attachments` to `queue-reinsert`. Its entries name selected inputs or a
+`{ "kind": "keep", "index": 0 }` member of the exact checkout. The
+negotiated checkout read identifies these members in `attachmentIndexes`,
+aligned with the attachment blocks in the returned editable prompt. That
+prompt contains authored text and attachments. The host carries other
+captured context forward. Indices are zero-based and belong to that checkout.
+List the kept and new inputs in
+their desired order. An empty list removes every attachment. An omitted
+list keeps the old attachments. An omitted `text` keeps the old text when
+the list is supplied. Omit both to restore the original input.
+
+The host verifies additions against the captured model and input scope, and
+commits the revised input as a single replacement at the reserved position.
+A refusal leaves the checkout open. An exact retry of Save checks its
+committed ordered intent before it reopens a selected source. Keeping an
+existing member uses its retained identity and issues no new read grant.
+
+A queued steer transfers an eligible input to the named running turn and
+appends its user contribution in one commit. A conflict leaves the source
+queued. It uses the turn's captured model, permissions, and effort and keeps
+any Goal's objective and allowance. A Plan turn stays read-only. Inputs queued
+for Plan, Ultra, or a Goal start retain their own turn. A file or folder
+reference transfers as a reference. Raster input requires verified retained
+bytes for every image and compatible turn capabilities. Input with a turn-bound file or
+other incompatible capability stays queued.
+
+The action receipt carries `sessionId`, `requestId`, `sessionRevision`, and
+`inputId`. The receipt lookup identifies `action` as `checkout`, `reinsert`, or
+`steer` and includes the applicable `checkoutId` or `turnId`. An exact retry
+observes the committed receipt even after the checkout closes, the reinserted
+message runs, or the addressed turn settles. Reusing the request ID with
+changed intent is refused. Receipt lookup uses the authorized attached session
+and works after reconnect or restart. It makes no new change.
+
 Private stdio clients can negotiate `co.grida/session/updates` version 1.
 Already attached sessions then receive standard `session/update` assistant
 chunks for identified submissions, queued work, and resumed turns. The
@@ -735,12 +804,35 @@ marks an action whose output goes to a filter. The shell's exit status then
 describes the pipeline and may reflect only the filter. Treat missing or
 unrecognized metadata as a generic command activity.
 
+Private stdio clients can negotiate `co.grida/session/compaction-items`
+version 1 for transcript presentation. Live `session/update` notifications
+carry an empty assistant chunk with
+`_meta["co.grida/session/compaction-items"] = {turnId, item}`. Paginated
+transcript turn records expose the same items in `compactions`. An item has
+an `id` unique within the session, an `automatic` flag, and a `status` of
+`running`, `succeeded`, or `failed`. It can include `startedAtMs`,
+`finishedAtMs`, and the first-publication `activityOrder` within the owning
+turn. A live completion can carry a summary. A page carries the latest summary
+in the turn's existing `compaction` field for the most recent matching
+successful item. Merge live updates and replay by item identity. Show a
+successful marker once per installed summary. An unsuccessful item clears
+the running status.
+
 Negotiated private stdio lifecycle updates use
 `_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
 `turnId` and `waitId` of a registered question on this attached session. Both
 question styles can raise it. Consumers deduplicate the identity and read the
 current question through the authorized questions operation. An empty or
 expired result needs no attention. Older consumers ignore unknown fact kinds.
+
+A `settled` fact carries `turnId` and `status` for an ordinary turn or a
+manual compaction that ran as a standalone task. An
+`automatic_compaction_settled` fact carries the same fields for host-triggered
+context maintenance. Both use `succeeded`, `failed`, `uncertain`, or
+`cancelled`. The automatic fact describes the maintenance turn's outcome.
+An installed summary is available in the transcript, and the chat turn that
+follows has its own settlement. The lifecycle stream does not replay either
+fact after reconnecting.
 
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                           |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -779,7 +871,7 @@ had its end read. Its `_meta["co.grida/session/processes"]` holds the complete
 `processes` list. After missed live updates the host sends the current list.
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
-the prompt. Standalone and project skills use `grida-skill:<name>@<revision>`.
+the prompt. Standalone, personal, and project skills use `grida-skill:<name>@<revision>`.
 An extension skill uses `grida-skill:<extension>/<name>@<revision>`. Use the
 URI returned by the catalog to select that revision. A client can also name an
 extension skill before it has a turn-specific catalog. For example,
@@ -788,20 +880,65 @@ skill only if the attached Act turn captures a Browser grant. Acceptance pins
 the resolved revision, and input inspection returns its complete URI. A bare
 ACP skill URI still requires a revision. The catalog returns metadata and omits
 local paths and bodies. A stale or unavailable selection rejects the input
-before inference. Use a new submission or
-queued replacement to change skills for accepted work. Steering keeps the
-active turn's captured guidance.
+before inference.
+
+An authored text part may also contain a bare `$skill-name`. During prompt
+acceptance the host captures it only if one eligible source supplies that
+name. A structured selection takes priority for the same name. Repeated plain
+mentions are captured once, up to the per-input skill limit. Unknown or
+ambiguous names remain text. The authored text and accepted skill versions
+are both retained. A new submission or a full queued replacement can select
+different skills. Text-only queue edits preserve captured guidance. A queued
+input with captured skills runs as its own turn. Steering keeps the active
+turn's captured guidance.
 
 Standalone bundled skills are available to every session. Project discovery
-reads only the explicitly readable primary root supplied by the host. A bare
-name looks in `.agents/skills` before `.claude/skills` and standalone bundled
-skills. Extension entries carry their own identity through selection and read.
-A qualified name selects an eligible owner directly. A bare name shared by
-multiple extensions needs qualification when no project or standalone entry
-resolves it. An accepted input retains its
-chosen skill bodies and any root `AGENTS.md` guidance. The `input` operation
-reports selected skill versions and the project instruction revision when
-present. These sources supply model context without changing tool permissions.
+reads the explicitly readable primary root supplied by the host. Personal
+discovery reads the local user's `$HOME/.agents/skills` directly. The catalog
+lists eligible same-named sources separately. An explicit name supplied with
+`grida-agent run --skill` selects a valid project skill (`.agents/skills`,
+then `.claude/skills`), followed by a personal skill and then a bundled skill.
+An explicit versioned link binds the source and revision. Workspace links also
+bind the discovered root identity. Qualified extension names keep their
+existing ownership and eligibility checks.
+
+An accepted input retains its chosen skill bodies and applicable project
+`AGENTS.md` guidance. The host starts with the pinned, readable primary root.
+A trusted launch can select an absolute starting path within that root.
+The source-built `serve` launcher takes `--cwd` with an explicit
+`--permission-profile`, and profiled `run` uses its existing `--cwd`. ACP
+session workspace identity and tool grants stay at the admitted root.
+Desktop and TUI start at the selected folder by default.
+
+The host loads only the chain from the admitted root to the starting
+directory. It skips missing or blank files, caps the combined document contents
+at 32 KiB, and bounds the captured paths separately. Each source carries its
+workspace-relative path, subtree, revision, and contents. The closest applicable `AGENTS.md`
+takes precedence within its subtree, and explicit chat instructions take
+precedence over project guidance. Before work extends beyond the captured
+chain, the agent checks applicable files via the turn's existing workspace
+tools. These later reads enter the turn as tool results. A command's working
+directory applies to that command.
+
+The host loads current files at new input acceptance. Queueing, retry, and
+recovery reuse the accepted capture, including for earlier root-only records.
+Automatic approval review takes captured guidance as evidence. A request that
+exceeds the review budget can require manual approval.
+The `input` operation reports selected skill versions and the accepted project
+instruction revision. With `co.grida/session/message-context` negotiated, live user updates, input
+inspection, queued inspection and transcript windows return host-owned
+`displayParts` entries of kind `skill`, version `1`, with `name`, `source`,
+`uri` and optional `extension` in `data`. They use the accepted input and the
+authored user message. Live user updates for inputs without attachments
+include the accepted `inputId` and put the display parts on the initial
+replacement chunk. Inputs with attachments use the complete transcript
+projection for the authored message. Clients reserve this kind for host output.
+Skill selection supplies model context under the existing turn permissions.
+
+The Desktop launcher also queries metadata before chat creation. The native
+reader takes either the fixed personal scope and bundled catalog, or that
+scope plus one launcher-admitted, identity-checked workspace root. This query
+reads no provider credentials or conversation state.
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
 and optional `seed` provenance. The basis carries `view`, `tail` and a
@@ -842,6 +979,25 @@ setup. An exact bare `/compact` or `/fork` in `session/prompt` runs the same
 host control and returns its result under the negotiated key in `_meta`.
 Identified control requests support exact retries across reconnects.
 
+An attached client can negotiate `co.grida/session/compact/start` version 1
+and call `_co.grida/session/compact/start` with `{sessionId, requestId}`.
+The reply reports admission while the compaction worker continues:
+
+- `{requestId, status: "admitted", turnId}` identifies the durable manual
+  compaction turn. An exact retry returns the same admission even after the
+  turn settles or the client reconnects. The receipt describes the
+  original admission. Use the recovery operation for an interrupted turn.
+- `{requestId, status: "no_change", turnId: null}` reports that the host found
+  no history to compact. The request has no durable turn. Use a fresh
+  request ID for a later compaction after this reply.
+- `compaction_admission_pending` means the same request is still awaiting
+  durable admission. Retry with its original request ID.
+
+Read the current session snapshot after admission and use the existing
+compaction items and lifecycle events to observe progress and settlement.
+Clients that need the outcome as a reply can use
+`_co.grida/session/compact` with its original capability.
+
 Compaction starts from an idle session with open admission and an empty queue.
 It owns a real turn that can be paused or stopped. New queued input remains
 accepted. Standard load and history anchors keep the original transcript.
@@ -859,6 +1015,47 @@ new control uses a refreshed snapshot and a fresh request identity. Late
 steering that loses the terminal race returns an explicit conflict, leaving the
 client free to keep its draft or submit another task.
 
+A conversation checkpoint created under a retired workspace input cap returns
+`retired_input_cap_requires_restart` before Resume claims the turn. Stop
+remains available, and the client can accept a fresh message afterward.
+
+### Ordered attachment intake
+
+Private stdio clients can negotiate `co.grida/session/attachment-batches`
+version 1 with the existing per-kind capabilities. Submit and Enqueue accept
+`attachments` as an ordered array of up to eight entries alongside prompt
+text. Each entry is one of the following.
+
+- `{ "kind": "image", "selection": { … } }` uses the selected raster
+  descriptor below. Source files and prepared derivatives are retained
+  separately. Total original raster bytes are limited to 64 MiB per batch.
+- `{ "kind": "file", "name": "notes.txt", "data": "…" }` carries
+  standard base64. Each file is limited to 256 KiB. Inline file data in the
+  entire batch is limited to 384 KiB before encoding.
+- `{ "kind": "staged_file", "selection": { … }, "size": 262144 }`
+  names one file in the protected launcher snapshot directory. The
+  descriptor must declare `source: "snapshot"`. The host rechecks the
+  exact digest and byte count and enforces the same 256 KiB per-file limit.
+  This permits larger batches within the existing ACP frame limit.
+- `{ "kind": "reference", "reference": { … } }` describes one file or
+  folder by `name`, absolute `path` and optional `workspacePath`,
+  `mimeType`, `size` and `preview`. The host records the path and grants
+  no access.
+
+Use one intake form per request. A batch with legacy selected-file,
+selected-image, embedded-resource or ACP image blocks is refused. Existing
+text and mode restrictions apply. The host accepts one input after all
+members are prepared, and no turn sees part of a refused batch. New scratch
+assets are marked pending until native admission is confirmed. On
+interruption, later intake reconciles their ownership against durable
+accepted inputs before allocating additional assets.
+
+Each retained file has a distinct selection identity even when filenames
+match. For a turn with multiple retained files, `inspect_retained_file`
+requires an `attachment_id` from the turn's offered file list.
+
+### Single-attachment intake
+
 Private stdio advertises `promptCapabilities.image` on declared image-capable
 native profiles on macOS and Linux, including the subscription composition.
 `session/prompt`, Submit, Enqueue, and
@@ -868,8 +1065,10 @@ base64 encoding. The host checks decoded image bounds and rejects the full input
 image cannot be accepted. Readback identifies the image with a text marker.
 Only the original digest and identity are in conversation records. Resume
 verifies the exact retained bytes before dispatch. A fork or compaction can
-omit earlier image content and records that omission. Image steering, earlier
-message replacement, and shared WebSocket intake are unavailable.
+omit earlier image content and records that omission. The direct steer operation
+accepts no image blocks. Eligible retained images can move through the private
+queued-steer operation above. Earlier-message replacement with images and
+shared WebSocket image intake are unavailable.
 
 For an explicitly selected local raster, negotiate
 `co.grida/session/selected-image` version 1. Submit, Enqueue and Goal Start accept one
@@ -1029,6 +1228,8 @@ request. Pause holds the retry and Stop closes it. The value is absent when
 there is no current retry. An eligible pre-execution failure can reserve this
 retry, including a connection refusal verified by the direct HTTP host.
 
+### Questions and answers
+
 Clients negotiate both `co.grida/session/questions-v2` and
 `co.grida/session/answer-question-v2` with capability value `1` to enable
 question batches on newly accepted input. A connection advertising only the
@@ -1072,9 +1273,16 @@ negotiated `co.grida/session/questions-v2`. The first chunk carries
 negotiated window or update metadata, with `skipped: true` when applicable.
 Retained singleton reply chunks keep their window metadata
 `questionReply: {waitId, question}`. Quoted markup in ordinary chat stays
-ordinary text. An embedded `run --questions` exits with `input_required`,
-code `6`, and the pending question entries when it needs answers. An
-unanswered optional batch permits success.
+ordinary text.
+
+Embedded `run --questions` enables the singleton tools and emits
+`schema_version` 1 on both JSON Lines records. Pending question entries
+keep the v1 shape. The standalone `run --questions-v2` flag enables the
+batch tools and emits `schema_version` 2 on both records. Pending batch
+entries use the v2 shape and require the v2 ACP methods when the session is
+reopened. Either mode exits with `input_required`, code `6`, and the
+pending question entries when it needs an answer. Unanswered optional
+questions permit success.
 
 ### Temporary side chats
 
@@ -1971,6 +2179,12 @@ the original connection and the native host checks the returned binding.
 
 Every successful ordinary selection response carries the same model and a supervisor-local
 `routeId` UUID. The `kind` determines the remaining fields.
+Provider descriptors can include `contextWindowTokens`, a positive safe
+integer for the resolved model binding. For a reused launch, the host
+already has the corresponding private `--supervised-context-window-tokens`
+value when supplied by the supervisor. This capacity affects compaction and
+usage reporting. The captured connection, credential and model continue to
+govern execution.
 
 Private supervisors can independently negotiate
 `co.grida/provider/prediction-route: 1`. A [composer prediction](#composer-predictions)
@@ -2015,14 +2229,11 @@ Clients without this extension retain the single-provider launch contract.
 
 ### Configuration operations
 
-The `co.grida/config/*` operations are client features: a person's own tooling
-inspects, sets, resets and reloads defaults through them. Configuration
-inspection reports `exact_input_counting` for the selected provider profile.
-The flag describes a supported counting route. Each prepared request must
-still return an exact count before an explicit limit can be used. Clients can
-also reload a revision written by a person. Accepted inputs from earlier
-hosts may retain settings-file authority through recovery.
-[Agent configuration](./rust-config.md#agent-edits)
+Trusted clients can negotiate `co.grida/config/inspect` and
+`co.grida/config/reload` to inspect the active context settings or load a
+revision of the global configuration file. Already accepted inputs keep
+their captured settings.
+[Agent configuration](./rust-config.md#shared-host-operations)
 
 ## Compatibility acceptance
 

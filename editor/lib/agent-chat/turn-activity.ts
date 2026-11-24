@@ -1,6 +1,7 @@
 import { isSameDay } from "date-fns";
 import type {
   NativeChatActivity,
+  NativeChatCompaction,
   NativeChatMessage,
   NativeChatTurn,
   NativeChatTurnRecord,
@@ -22,6 +23,7 @@ export namespace turn_activity {
 
   export type Item =
     | Readonly<{ kind: "commentary"; message: NativeChatMessage }>
+    | Readonly<{ kind: "compaction"; compaction: NativeChatCompaction }>
     | Readonly<{
         kind: "activity";
         key: string;
@@ -46,12 +48,13 @@ export namespace turn_activity {
 
   export type Block =
     | Readonly<{ kind: "message"; message: NativeChatMessage }>
-    /** Earlier context was summarized here; the turn added no messages. */
+    /** Standalone compaction settled without adding a user or agent message. */
     | Readonly<{
         kind: "compaction";
         turnId: string;
-        summary: string;
-        automatic: boolean;
+        compactionId: string;
+        summary?: string;
+        failed?: true;
       }>
     | Readonly<{
         kind: "turn";
@@ -84,10 +87,18 @@ export namespace turn_activity {
   ): Block[] {
     const known = new Map(records.map((record) => [record.turnId, record]));
     const order = new Map(records.map((record, at) => [record.turnId, at]));
-    // Compaction turns add no messages; each is placed before the first
-    // message of a later turn, in history order.
+    const turnsWithMessages = new Set(
+      messages.map((message) => message.turnId)
+    );
+    // Standalone compaction has no messages in its turn.
     const compactions = records.flatMap((record, at) =>
-      record.compaction ? [{ at, record, compaction: record.compaction }] : []
+      turnsWithMessages.has(record.turnId)
+        ? []
+        : completedCompactions(record, true).map((compaction) => ({
+            at,
+            record,
+            compaction,
+          }))
     );
     const blocks: Block[] = [];
     const placeCompactionsBefore = (position: number) => {
@@ -96,8 +107,9 @@ export namespace turn_activity {
         blocks.push({
           kind: "compaction",
           turnId: record.turnId,
+          compactionId: compaction.id,
           summary: compaction.summary,
-          automatic: compaction.automatic,
+          ...(compaction.status === "failed" && { failed: true }),
         });
       }
     };
@@ -113,6 +125,9 @@ export namespace turn_activity {
       const turnId = first.turnId;
       const position = turnId === undefined ? undefined : order.get(turnId);
       if (position !== undefined) placeCompactionsBefore(position);
+      // The currently observed turn may stream messages before its first page.
+      else if (turnId !== undefined && current?.turnId === turnId)
+        placeCompactionsBefore(Number.POSITIVE_INFINITY);
       if (!turnId) {
         previousModel = undefined;
         previousTurn = undefined;
@@ -192,12 +207,58 @@ export namespace turn_activity {
           record?.settledAtMs !== undefined
             ? record.settledAtMs - record.startedAtMs
             : null,
-        work: items(rest.filter((message) => !answers.includes(message))),
+        work: [
+          ...items(rest.filter((message) => !answers.includes(message))),
+          ...completedCompactions(record).map((compaction) => ({
+            kind: "compaction" as const,
+            compaction,
+          })),
+        ],
         answers,
       });
     }
     placeCompactionsBefore(Number.POSITIVE_INFINITY);
     return blocks;
+  }
+
+  function completedCompactions(
+    record: NativeChatTurnRecord | undefined,
+    includeManualFailures = false
+  ): NativeChatCompaction[] {
+    if (record?.compactions?.length)
+      return record.compactions.filter(
+        (item) =>
+          item.status === "succeeded" ||
+          (includeManualFailures && !item.automatic && item.status === "failed")
+      );
+    return record?.compaction
+      ? [{ ...record.compaction, id: record.turnId, status: "succeeded" }]
+      : [];
+  }
+
+  /** A received start can precede the first observation of that turn. */
+  export function compacting(
+    records: readonly NativeChatTurnRecord[],
+    current:
+      | Pick<NativeChatTurn, "turnId" | "disposition" | "paused" | "cancelled">
+      | null
+      | undefined,
+    pausing?: string | null
+  ): boolean {
+    if (
+      current &&
+      (current.disposition !== "running" ||
+        current.paused ||
+        current.cancelled ||
+        current.turnId === pausing)
+    )
+      return false;
+    return records.some(
+      (record) =>
+        record.status === null &&
+        (!current || record.turnId === current.turnId) &&
+        record.compactions?.some((item) => item.status === "running")
+    );
   }
 
   function startsNewTimeGroup(previous: NativeChatTurnRecord, atMs: number) {
@@ -210,18 +271,26 @@ export namespace turn_activity {
   }
 
   /**
-   * The context size the provider reported for the latest turn, when known.
-   * A compaction's own model call summarizes the chat and says nothing about
-   * the context after it, so a later compaction leaves the size unknown until
-   * the next turn reports.
+   * The latest reported foreground context and the window captured with it.
+   * Old standalone compaction records can contain the summary model's usage.
    */
   export function measuredContext(
     records: readonly NativeChatTurnRecord[]
-  ): number | undefined {
+  ): { tokens: number; window?: number } | undefined {
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
-      if (record.compaction) return undefined;
-      if (record.contextTokens !== undefined) return record.contextTokens;
+      const compacted = record.compactions?.length
+        ? record.compactions.some((item) => item.status === "succeeded")
+        : Boolean(record.compaction);
+      if (
+        record.contextTokens !== undefined &&
+        (!compacted || record.modelId !== undefined)
+      )
+        return {
+          tokens: record.contextTokens,
+          window: record.contextWindowTokens,
+        };
+      if (compacted) return undefined;
     }
     return undefined;
   }
@@ -230,7 +299,11 @@ export namespace turn_activity {
   export function items(messages: readonly NativeChatMessage[]): Item[] {
     const result: Item[] = [];
     for (const message of messages) {
-      if (message.text.trim()) result.push({ kind: "commentary", message });
+      if (
+        message.text.trim() ||
+        (message.role === "user" && message.attachments?.length)
+      )
+        result.push({ kind: "commentary", message });
       if (!message.activity?.length) continue;
       const last = result.at(-1);
       if (last?.kind === "activity")
@@ -248,6 +321,46 @@ export namespace turn_activity {
     return result;
   }
 
+  type ParentAtom = Readonly<{
+    key: string;
+    order: number | undefined;
+    item:
+      | Extract<Item, { kind: "commentary" | "compaction" }>
+      | Readonly<{ kind: "call"; call: NativeChatActivity }>;
+  }>;
+
+  function anchorCompactions(atoms: readonly ParentAtom[]): ParentAtom[] {
+    const ordinary = atoms.filter(({ item }) => item.kind !== "compaction");
+    const markers = atoms
+      .filter(({ item }) => item.kind === "compaction")
+      .sort((a, b) => a.order! - b.order!);
+    const insertions = new Map<number, ParentAtom[]>();
+    for (const marker of markers) {
+      const preceding = ordinary.findLastIndex(
+        ({ order }) => order !== undefined && order < marker.order!
+      );
+      const following = ordinary.findIndex(
+        ({ order }) => order !== undefined && order > marker.order!
+      );
+      const index =
+        following > preceding
+          ? following
+          : following === -1 && preceding >= 0
+            ? preceding + 1
+            : ordinary.length;
+      const at = insertions.get(index) ?? [];
+      at.push(marker);
+      insertions.set(index, at);
+    }
+    return [
+      ...ordinary.flatMap((atom, index) => [
+        ...(insertions.get(index) ?? []),
+        atom,
+      ]),
+      ...(insertions.get(ordinary.length) ?? []),
+    ];
+  }
+
   /**
    * Merge first-publication facts before the final grouping of consecutive
    * calls. Inputs may contain earlier groups; each call keeps its own order.
@@ -258,16 +371,13 @@ export namespace turn_activity {
     events: readonly NativeSubagentLifecycleEvent[],
     turnId: string
   ): Timeline {
-    type Atom = Readonly<{
-      key: string;
-      order: number | undefined;
-      item:
-        | Extract<Item, { kind: "commentary" }>
-        | Readonly<{ kind: "call"; call: NativeChatActivity }>;
-    }>;
-    const parent = new Map<string, Atom>();
+    const parent = new Map<string, ParentAtom>();
+    const unplacedCompactions = new Map<
+      string,
+      Extract<Item, { kind: "compaction" }>
+    >();
     let parentConflict = false;
-    const put = (atom: Atom) => {
+    const put = (atom: ParentAtom) => {
       const previous = parent.get(atom.key);
       if (
         previous?.order !== undefined &&
@@ -290,6 +400,12 @@ export namespace turn_activity {
             item.message.turnId === turnId ? order(item.message) : undefined,
           item,
         });
+      } else if (item.kind === "compaction") {
+        const { compaction } = item;
+        const position = order(compaction);
+        if (position !== undefined)
+          put({ key: `compaction:${compaction.id}`, order: position, item });
+        else unplacedCompactions.set(compaction.id, item);
       } else {
         for (const call of item.calls)
           put({
@@ -300,10 +416,13 @@ export namespace turn_activity {
       }
     }
     const parentOrders = [...parent.values()].map((atom) => atom.order);
+    const knownOrders = parentOrders.filter(
+      (position) => position !== undefined
+    );
+    const parentComparable =
+      !parentConflict && new Set(knownOrders).size === knownOrders.length;
     const parentComplete =
-      !parentConflict &&
-      parentOrders.every((value) => value !== undefined) &&
-      new Set(parentOrders).size === parentOrders.length;
+      parentComparable && knownOrders.length === parentOrders.length;
     const children = new Map<string, NativeSubagentLifecycleEvent>();
     const conflicts = new Set<string>();
     for (const event of events) {
@@ -349,15 +468,24 @@ export namespace turn_activity {
     const unplaced = [...children.values()]
       .filter((event) => !placedIds.has(event.eventId))
       .sort((a, b) => a.atMs - b.atMs || a.eventId.localeCompare(b.eventId));
+    let parentAtoms = [...parent.values()];
+    // A missing position for later work can leave a known compaction without
+    // a globally sortable timeline. Its comparable neighbours can still place it.
+    if (
+      !parentComplete &&
+      parentComparable &&
+      parentAtoms.some(({ item }) => item.kind === "compaction")
+    )
+      parentAtoms = anchorCompactions(parentAtoms);
     const atoms: (
-      | Atom
+      | ParentAtom
       | Readonly<{
           key: string;
           order: number;
           item: Extract<TimelineItem, { kind: "subagent" }>;
         }>
     )[] = [
-      ...parent.values(),
+      ...parentAtoms,
       ...placed.map((event) => ({
         key: event.eventId,
         order: event.activityOrder!,
@@ -384,6 +512,8 @@ export namespace turn_activity {
           calls: [item.call],
         });
     }
+    for (const [id, item] of unplacedCompactions)
+      if (!parent.has(`compaction:${id}`)) result.push(item);
     return { work: result, unplaced };
   }
 

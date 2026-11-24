@@ -21,6 +21,70 @@ const prompt = (mimeType = "image/jpeg", size = 3) => ({
 });
 
 describe("NativeQueuedMessages", () => {
+  it("publishes checked-out attachment indexes only in negotiated edit scope", () => {
+    const messages = new NativeQueuedMessages();
+    const input = { ...prompt(), attachmentIndexes: [0] };
+    expect(
+      messages.describe("chat", 1, "queued", input).attachmentIndexes
+    ).toBeUndefined();
+    expect(
+      messages.describe("chat", "checkout", "queued", input, true, true)
+        .attachmentIndexes
+    ).toEqual([0]);
+    expect(
+      messages.describe(
+        "chat",
+        "checkout",
+        "queued",
+        { inputId: "queued", prompt: [], attachmentIndexes: [] },
+        true,
+        true
+      ).attachmentIndexes
+    ).toEqual([]);
+    for (const attachmentIndexes of [undefined, [], [1], [0, 0], ["0"]])
+      expect(() =>
+        messages.describe(
+          "chat",
+          "checkout",
+          "queued",
+          { ...input, attachmentIndexes },
+          true,
+          true
+        )
+      ).toThrow("queued_message_unavailable");
+    expect(() =>
+      messages.describe("chat", 1, "queued", input, true, true)
+    ).toThrow("queued_message_unavailable");
+  });
+  it("keeps retained skill selections out of file previews and edit indexes", () => {
+    const messages = new NativeQueuedMessages();
+    const input = prompt();
+    expect(
+      messages.describe(
+        "chat",
+        "checkout",
+        "queued",
+        {
+          ...input,
+          prompt: [
+            input.prompt[0],
+            {
+              type: "resource_link",
+              name: "slides",
+              uri: `grida-skill:slides@${"a".repeat(64)}`,
+            },
+            input.prompt[1],
+          ],
+          attachmentIndexes: [0],
+        },
+        true,
+        true
+      )
+    ).toMatchObject({
+      attachmentIndexes: [0],
+      attachments: [{ name: "original.jpg", mimeType: "image/jpeg", size: 3 }],
+    });
+  });
   it("publishes text edit eligibility only for a negotiated replacement host", () => {
     const messages = new NativeQueuedMessages();
     const input = { ...prompt(), textOnly: false, textEditable: true };

@@ -85,8 +85,8 @@ importers:
         specifier: link:../packages/grida-desktop-bridge
         version: link:../packages/grida-desktop-bridge
       '@grida/fx':
-        specifier: 0.12.0
-        version: 0.12.0
+        specifier: 0.13.0
+        version: 0.13.0
       '@grida/home':
         specifier: link:../packages/grida-home
         version: link:../packages/grida-home
@@ -138,9 +138,6 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.3.0
-      toml-eslint-parser:
-        specifier: 1.0.3
-        version: 1.0.3
       ts-node:
         specifier: ^10.0.0
         version: 10.9.2(@types/node@24.12.2)(typescript@6.0.3)
@@ -342,30 +339,30 @@ packages:
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
 
-  '@grida/fx-darwin-arm64@0.12.0':
-    resolution: {integrity: sha512-mD6DLEDY+YJuHxd8stP5RMMKtkmCm6qOGnuKE2RLLwArfQ381fbQn4vwsz4UDufflEF945sM3kusMV7SV7Ha1A==}
+  '@grida/fx-darwin-arm64@0.13.0':
+    resolution: {integrity: sha512-q1zwjF7pjahtPc6jkRk8rO+02wbxzHYhZT59g0p37NvlfrleGkRrCJHddiSt3phS8Ni24ylGIrE+xQVRRCLrLg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@grida/fx-darwin-x64@0.12.0':
-    resolution: {integrity: sha512-GOIkQSvdtPa17wA6tPDe/igo3d2SCPUJUNleB3YI9hCigLrV5EeEW9/51WZifa9T9NDQvLQmLA3cdkRPiBx2BA==}
+  '@grida/fx-darwin-x64@0.13.0':
+    resolution: {integrity: sha512-EsL1pt7XIe/Mm6GNS7Vsz42qsnZAaY3AeP9ukXLgqQPmBjt8hombcpsp7HyPeRB8pzvWs+CM2b99hvrjBeO74w==}
     cpu: [x64]
     os: [darwin]
 
-  '@grida/fx-linux-arm64-gnu@0.12.0':
-    resolution: {integrity: sha512-IXSNNORNOAbeLTUVBJPxpPivMz/ASFZHBbdlVFcMDjEuWqPSiqENJExeQlE4gp63b9DA6uJZiRgvBz548K4Ebg==}
+  '@grida/fx-linux-arm64-gnu@0.13.0':
+    resolution: {integrity: sha512-eC8G4L5HHdUKKUTQOY9BZPlCsO1EjC8eA+NHZjnR9e7tt/5ETMpgjI5WgwUVnEEZgL9p1IVEhM/wffsubBoc9w==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@grida/fx-linux-x64-gnu@0.12.0':
-    resolution: {integrity: sha512-yQzTaS4Gxpi9I4BZjcSzOGAkN50UXXsn3PGTdruIdNS2mFeMN8y6RuQFywYf8J2dPE2zOd8GioAis6MGh5sFCA==}
+  '@grida/fx-linux-x64-gnu@0.13.0':
+    resolution: {integrity: sha512-jiFnLL2NyCsB2a9tq5UmiNfxe1fN05wTRPC6AcKmKrpG7G99ONEb7sz9o+GHy1QH18/6ghjusyI5XXDCZ+guRw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@grida/fx@0.12.0':
-    resolution: {integrity: sha512-NiVrX9kV/aW5bh9LDDrp/tirGUYkGToQLSSvwfRSdNi3Xv3dTXlfhiLVYlDxvRX61Df8qbuAbML8Fv4yShgn3A==}
+  '@grida/fx@0.13.0':
+    resolution: {integrity: sha512-Ulakzp5HhBXawkqztQlau0ySzGhb2a8TZYP8f1mWLvZhfG8yBTE4x8RoUKBjkp8vU//IetECALM+SrqRe0/xSw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1450,10 +1447,6 @@ packages:
   eslint-scope@5.1.1:
     resolution: {integrity: sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw==}
     engines: {node: '>=8.0.0'}
-
-  eslint-visitor-keys@5.0.1:
-    resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
   esrecurse@4.3.0:
     resolution: {integrity: sha512-KmfKL3b6G+RXvP8N1vr3Tq1kL/oCFgn2NYXEtqP8/L3pKapUA4G8cFVaoF3SU323CD4XypR/ffioHmkti6/Tag==}
@@ -2669,10 +2662,6 @@ packages:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
     engines: {node: '>=8.0'}
 
-  toml-eslint-parser@1.0.3:
-    resolution: {integrity: sha512-A5F0cM6+mDleacLIEUkmfpkBbnHJFV1d2rprHU2MXNk7mlxHq2zGojA+SRvQD1RoMo9gqjZPWEaKG4v1BQ48lw==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
 
@@ -3419,24 +3408,24 @@ snapshots:
 
   '@gar/promisify@1.1.3': {}
 
-  '@grida/fx-darwin-arm64@0.12.0':
+  '@grida/fx-darwin-arm64@0.13.0':
     optional: true
 
-  '@grida/fx-darwin-x64@0.12.0':
+  '@grida/fx-darwin-x64@0.13.0':
     optional: true
 
-  '@grida/fx-linux-arm64-gnu@0.12.0':
+  '@grida/fx-linux-arm64-gnu@0.13.0':
     optional: true
 
-  '@grida/fx-linux-x64-gnu@0.12.0':
+  '@grida/fx-linux-x64-gnu@0.13.0':
     optional: true
 
-  '@grida/fx@0.12.0':
+  '@grida/fx@0.13.0':
     optionalDependencies:
-      '@grida/fx-darwin-arm64': 0.12.0
-      '@grida/fx-darwin-x64': 0.12.0
-      '@grida/fx-linux-arm64-gnu': 0.12.0
-      '@grida/fx-linux-x64-gnu': 0.12.0
+      '@grida/fx-darwin-arm64': 0.13.0
+      '@grida/fx-darwin-x64': 0.13.0
+      '@grida/fx-linux-arm64-gnu': 0.13.0
+      '@grida/fx-linux-x64-gnu': 0.13.0
 
   '@hono/node-server@1.19.14(hono@4.12.23)':
     dependencies:
@@ -4528,8 +4517,6 @@ snapshots:
     dependencies:
       esrecurse: 4.3.0
       estraverse: 4.3.0
-
-  eslint-visitor-keys@5.0.1: {}
 
   esrecurse@4.3.0:
     dependencies:
@@ -5724,10 +5711,6 @@ snapshots:
   to-regex-range@5.0.1:
     dependencies:
       is-number: 7.0.0
-
-  toml-eslint-parser@1.0.3:
-    dependencies:
-      eslint-visitor-keys: 5.0.1
 
   tr46@0.0.3: {}
 

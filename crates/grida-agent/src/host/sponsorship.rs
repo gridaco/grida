@@ -1024,9 +1024,8 @@ impl Host {
             None
         };
         let tools = inventory.snapshot(&authority.tools.keys().cloned().collect::<Vec<_>>())?;
-        let mut master = Master::new(prepared.config, provider, tools, authority)?
-            .with_history(history)
-            .with_input_limit(prepared.limit);
+        let mut master =
+            Master::new(prepared.config, provider, tools, authority)?.with_history(history);
         if let Some(selected) = prepared.lifecycle_hooks {
             let (inventory, grants) = match hooks {
                 Some(hooks) => (hooks.inventory()?, hooks.grants()),
@@ -1888,15 +1887,11 @@ pub(super) mod tests {
         host.shutdown().await.unwrap();
         drop(host);
 
-        let reopened = Host::open_supervised(
-            &state,
-            options(),
-            crate::SupervisedProvider::default(),
-            None,
-        )
-        .unwrap()
-        .with_subagents()
-        .without_goal_sponsorship();
+        let reopened =
+            Host::open_supervised(&state, options(), crate::SupervisedProvider::default())
+                .unwrap()
+                .with_subagents()
+                .without_goal_sponsorship();
         let before = reopened.store.inspect(child.clone()).await.unwrap();
         reopened.check_execution(&before).await.unwrap();
         let observed = reopened.resume_receipt(request).await.unwrap().unwrap();

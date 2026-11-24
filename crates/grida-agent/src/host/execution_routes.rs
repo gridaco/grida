@@ -35,6 +35,17 @@ fn route_changed() -> Error {
 }
 
 impl Host {
+    /// Supply the launch model's context capacity from the private supervisor.
+    pub fn with_supervised_context_window(mut self, window: NonZeroU64) -> Result<Self> {
+        let execution = self
+            .execution
+            .as_mut()
+            .and_then(Arc::get_mut)
+            .ok_or_else(route_changed)?;
+        execution.context_window_tokens = Some(window);
+        Ok(self)
+    }
+
     pub(crate) fn attach_routes(
         &self,
         supervisor: SupervisedProvider,
@@ -253,7 +264,7 @@ impl Host {
                 ))
             }
         };
-        let (id, mut execution) = match descriptor {
+        let (id, mut execution, context_window_tokens) = match descriptor {
             ProviderRoute::Launch { model, .. }
                 if model == expected_model && model == routes.launch.config.model =>
             {
@@ -266,6 +277,7 @@ impl Host {
                 model,
                 endpoint,
                 protocol,
+                context_window_tokens,
                 max_output_tokens,
                 credential_home,
                 configured_endpoint_key,
@@ -313,13 +325,14 @@ impl Host {
                     }
                     _ => None,
                 };
-                (route_id, execution)
+                (route_id, execution, context_window_tokens)
             }
             ProviderRoute::Gateway {
                 route_id,
                 model,
                 endpoint,
                 scope,
+                context_window_tokens,
                 max_output_tokens,
                 gateway_billing,
             } if model == expected_model => {
@@ -341,7 +354,7 @@ impl Host {
                     retained.clone(),
                 )?;
                 execution.gateway_billing = gateway_billing;
-                (route_id, execution)
+                (route_id, execution, context_window_tokens)
             }
             ProviderRoute::Chatgpt {
                 wire_model,
@@ -350,6 +363,7 @@ impl Host {
                 model,
                 endpoint,
                 scope,
+                context_window_tokens,
             } if model == expected_model => {
                 let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
                     &endpoint,
@@ -364,6 +378,7 @@ impl Host {
                 (
                     route_id,
                     Execution::new_chatgpt(model, connection, retained.clone())?,
+                    context_window_tokens,
                 )
             }
             _ => return Err(route_changed()),
@@ -380,6 +395,8 @@ impl Host {
             host.host_tools = None;
         }
         host.route_id = Some(id);
+        execution.context_window_tokens =
+            context_window_tokens.filter(|window| window.get() <= 9_007_199_254_740_991);
         execution.retained_inputs = retained;
         host.execution = Some(Arc::new(execution));
         Ok(host)

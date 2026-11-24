@@ -22,44 +22,66 @@ pub(crate) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
 
+#[derive(Clone, Copy)]
+pub(crate) enum QueueReadBasis<'a> {
+    Waiting(SessionRevision),
+    Checkout(&'a ChangeId),
+}
+
 impl Host {
-    /// Inspect an exact waiting input without claiming it or granting access to
-    /// paths named in its prompt. A newer queue view retires this observation.
+    /// Preview a waiting or checked-out input at its exact retained identity.
     pub(crate) async fn queued_message_parts(
         &self,
         session: &SessionId,
         input: &ChangeId,
-        expected: SessionRevision,
-    ) -> Result<Vec<PromptPart>> {
+        basis: QueueReadBasis<'_>,
+    ) -> Result<(
+        Vec<PromptPart>,
+        bool,
+        Vec<super::message_context::DisplayPart>,
+    )> {
         let view = self
             .inspect(session.clone())
             .await
             .map_err(|_| queued_image_unavailable())?;
-        if view.revision != expected {
-            return Err(queued_image_unavailable());
+        let selected = match basis {
+            QueueReadBasis::Waiting(expected) if view.revision == expected => view
+                .queued
+                .iter()
+                .find(|row| &row.input.id == input && row.disposition == InputDisposition::Queued),
+            QueueReadBasis::Checkout(id) => view.checkout.as_ref().filter(|row| {
+                &row.input.id == input
+                    && matches!(&row.disposition, InputDisposition::CheckedOut { checkout } if checkout == id)
+            }),
+            _ => None,
         }
-        let selected = view
-            .queued
-            .iter()
-            .find(|row| &row.input.id == input && row.disposition == InputDisposition::Queued)
-            .ok_or_else(queued_image_unavailable)?;
+        .ok_or_else(queued_image_unavailable)?;
+        let editable = super::queued_text::text_editable(&selected.input);
         decode_input::<StoredPrompt>(&selected.input)
-            .map(|prompt| prompt.parts)
+            .map(|prompt| {
+                let skills = prompt
+                    .guidance
+                    .as_ref()
+                    .map(crate::skills::CapturedGuidance::selected)
+                    .unwrap_or_default();
+                let display = super::message_context::display_parts(&prompt.parts, &skills);
+                (prompt.parts, editable, display)
+            })
             .map_err(|_| queued_image_unavailable())
     }
 
     /// Read one bounded chunk from an original retained by this exact queued
-    /// input. Membership and revision are checked around the byte read.
+    /// input. Membership and the observed basis are checked around the byte read.
     pub(crate) async fn read_queued_input_image_chunk(
         &self,
         session: SessionId,
         input: ChangeId,
-        expected: SessionRevision,
+        basis: QueueReadBasis<'_>,
         attachment: ArtifactId,
         offset: usize,
     ) -> Result<(String, usize, Vec<u8>, Option<usize>)> {
         let media = self
-            .queued_image_reference(&session, &input, expected, &attachment)
+            .queued_image_reference(&session, &input, basis, &attachment)
             .await?;
         let selected = media.clone();
         let state_dir = self
@@ -81,7 +103,7 @@ impl Host {
         .map_err(|_| queued_image_unavailable())?
         .map_err(|_| queued_image_unavailable())?;
         if self
-            .queued_image_reference(&session, &input, expected, &attachment)
+            .queued_image_reference(&session, &input, basis, &attachment)
             .await?
             != media
             || offset >= bytes.len()
@@ -103,10 +125,10 @@ impl Host {
         &self,
         session: &SessionId,
         input: &ChangeId,
-        expected: SessionRevision,
+        basis: QueueReadBasis<'_>,
         attachment: &ArtifactId,
     ) -> Result<MediaRef> {
-        let parts = self.queued_message_parts(session, input, expected).await?;
+        let (parts, _, _) = self.queued_message_parts(session, input, basis).await?;
         let mut selected = None;
         for part in parts {
             let media = match part {

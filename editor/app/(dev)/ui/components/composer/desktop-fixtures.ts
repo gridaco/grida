@@ -119,7 +119,6 @@ export namespace DesktopComposerFixtures {
       id: string;
       text: string;
       attachments?: readonly NativeChatMessageAttachment[];
-      unavailable?: boolean;
     } & Pick<NativeChatQueueItem, "goalStart" | "operatingRegime" | "effort">
   >;
   export const queue: readonly Queued[] = [
@@ -133,9 +132,9 @@ export namespace DesktopComposerFixtures {
       attachments: [image],
     },
     {
-      id: "unavailable",
-      text: "A queued message whose preview became unavailable",
-      unavailable: true,
+      id: "file-only",
+      text: "",
+      attachments: [file],
     },
   ];
   export async function readImage(previewId: string): Promise<Blob> {

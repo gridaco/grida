@@ -709,7 +709,8 @@ async fn title_server(state: &Path, endpoint: &Endpoint) -> (Child, String) {
             "--chat-titles",
         ])
         .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN)
-        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL)
+        .env("HOME", state);
     configured(&mut command, state, &endpoint.url);
     spawn_shared_server(command).await
 }
@@ -733,10 +734,14 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
             json!({"sessionId":session,"prompt":[{"type":"text","text":text}]}),
         )
     };
-    let (id, request) = prompt(3, "Help me plan our spring collection launch.");
+    let (id, request) = prompt(3, "Use $slides to plan our spring collection launch.");
     let reply = ws_rpc(&mut client, id, "session/prompt", request).await;
     assert_eq!(reply["result"]["stopReason"], "end_turn");
-    endpoint.request().await;
+    let work = endpoint.request().await;
+    assert!(
+        work.to_string()
+            .contains("Today this is Grida's only slide format")
+    );
     let title = endpoint.title_request().await;
     assert!(
         title.to_string().contains("spring collection launch"),
@@ -745,6 +750,12 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
     assert!(
         title["tools"].as_array().is_none_or(Vec::is_empty),
         "a title request offers no tools: {title}"
+    );
+    assert!(
+        !title
+            .to_string()
+            .contains("Today this is Grida's only slide format"),
+        "a title request reads the authored text without loading a skill: {title}"
     );
     let mut attempt = 10;
     let titled = timeout(WAIT, async {

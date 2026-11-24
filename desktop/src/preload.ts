@@ -20,6 +20,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { MediaTransport } from "@grida/ai-host/media-transport";
 import { FileReferenceRequest } from "./bridge/file-reference-request";
 import { SelectedImageRequest } from "./bridge/selected-image-request";
+import { AttachmentBatchRequest } from "./bridge/attachment-batch-request";
 import { NativeChatInvoke } from "./bridge/native-chat-invoke";
 import { catalogWorkspaceId } from "./bridge/chat-catalog-route";
 import {
@@ -179,11 +180,12 @@ async function observeChatCatalog(
 
 // Same-document navigation can commit before the outgoing React tree unmounts.
 // Main already owns retirement of the old attachments and guests.
+function workspaceRoute(): boolean {
+  return location.pathname === "/desktop/workspace";
+}
+
 function nativeChatRoute(): boolean {
-  return (
-    location.pathname === "/desktop/workspace" ||
-    location.pathname === "/desktop/file"
-  );
+  return workspaceRoute() || location.pathname === "/desktop/file";
 }
 
 function selectedDocumentRoute(): boolean {
@@ -517,23 +519,27 @@ ipcRenderer.on(IPC_CHANNELS.BROWSER_PRESENT_PAGE, (_event, raw: unknown) => {
     for (const handler of browserPresentationHandlers) handler(request);
 });
 const automationFileHandlers = new Set<
-  (request: { path: string; expiresAtMs: number }) => void
+  (request: { path: string; expiresAtMs: number; viewId?: number }) => void
 >();
 ipcRenderer.on(
   IPC_CHANNELS.WORKSPACE_OPEN_AUTOMATION_FILE,
   (_event, raw: unknown) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
-    const { path, expiresAtMs } = raw as Record<string, unknown>;
+    const { path, expiresAtMs, viewId } = raw as Record<string, unknown>;
     if (
-      Object.keys(raw).length !== 2 ||
+      Object.keys(raw).length !== (viewId === undefined ? 2 : 3) ||
       !NativeEditorSurfaces.isPath(path) ||
       typeof expiresAtMs !== "number" ||
       !Number.isSafeInteger(expiresAtMs) ||
-      expiresAtMs <= Date.now()
+      expiresAtMs <= Date.now() ||
+      (viewId !== undefined &&
+        (typeof viewId !== "number" ||
+          !Number.isSafeInteger(viewId) ||
+          viewId < 1))
     )
       return;
     for (const handler of automationFileHandlers)
-      handler({ path, expiresAtMs });
+      handler({ path, expiresAtMs, viewId });
   }
 );
 window.addEventListener("pagehide", () => {
@@ -587,8 +593,10 @@ const bridge: DesktopBridge = {
     utilities: {
       version: DesktopBrowser.Utilities.VERSION,
       find: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FIND, request),
-      stopFind: (request) =>
-        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP_FIND, request),
+      stopFind: async (request) => {
+        if (workspaceRoute())
+          await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP_FIND, request);
+      },
       getZoom: (request) =>
         ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_ZOOM, request),
       setZoom: (request) =>
@@ -657,7 +665,7 @@ const bridge: DesktopBridge = {
     snapshot: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
     detach: async (attachmentId) => {
-      if (location.pathname === "/desktop/workspace")
+      if (workspaceRoute())
         await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_DETACH, attachmentId);
     },
     create: (request) =>
@@ -673,8 +681,10 @@ const bridge: DesktopBridge = {
     focus: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS, request),
     reserveMount: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RESERVE_MOUNT, request),
-    setActive: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ACTIVE, request),
+    setActive: async (request) => {
+      if (request.active || workspaceRoute())
+        await ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ACTIVE, request);
+    },
     close: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request),
     openExternal: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, request),
@@ -782,6 +792,8 @@ const bridge: DesktopBridge = {
       return location.href === href ? target : null;
     },
     list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    skills: (workspaceId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SKILLS, workspaceId),
     acceptsAutomaticApprovalReview: () =>
       location.pathname === "/desktop/workspace" ||
       location.pathname === "/desktop/welcome"
@@ -896,6 +908,12 @@ const bridge: DesktopBridge = {
         IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
         attachmentId,
         command,
+        requestId
+      ),
+    startCompaction: (attachmentId, requestId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_START_COMPACTION,
+        attachmentId,
         requestId
       ),
     prepareRevision: (attachmentId, observationId, messageId) =>
@@ -1182,6 +1200,21 @@ const bridge: DesktopBridge = {
           webUtils.getPathForFile(each)
         )
       ),
+    acceptsAttachments: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_ATTACHMENTS),
+    submitAttachments: async (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_ATTACHMENTS,
+        attachmentId,
+        {
+          ...input,
+          attachments: await AttachmentBatchRequest.prepare(
+            input.attachments,
+            (file) => webUtils.getPathForFile(file),
+            false
+          ),
+        }
+      ),
     predictPrompt: (attachmentId, observationId) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_PREDICT_PROMPT,
@@ -1271,6 +1304,55 @@ const bridge: DesktopBridge = {
         attachmentId,
         change
       ),
+    queueCheckout: {
+      checkout: (attachmentId, input) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_CHECKOUT,
+          attachmentId,
+          input
+        ),
+      reinsert: async (attachmentId, input) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_REINSERT,
+          attachmentId,
+          input.attachments === undefined
+            ? input
+            : {
+                ...input,
+                attachments: await AttachmentBatchRequest.prepare(
+                  input.attachments,
+                  (file) => webUtils.getPathForFile(file),
+                  true
+                ),
+              }
+        ),
+      read: (attachmentId, checkoutId, inputId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT,
+          attachmentId,
+          checkoutId,
+          inputId
+        ),
+      readAttachmentPreview: (attachmentId, checkoutId, previewId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT_PREVIEW,
+          attachmentId,
+          checkoutId,
+          previewId
+        ),
+      receipt: (attachmentId, requestId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_ACTION_RECEIPT,
+          attachmentId,
+          requestId
+        ),
+    },
+    steerQueued: (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_STEER_QUEUED,
+        attachmentId,
+        input
+      ),
     steer: (attachmentId, input) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
     goal: (attachmentId, observationId) =>
@@ -1357,7 +1439,12 @@ const bridge: DesktopBridge = {
       ),
     control: (attachmentId, control) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CONTROL, attachmentId, control),
-    subscribe: async (attachmentId, onUpdate, acceptsQuestionBatches) => {
+    subscribe: async (
+      attachmentId,
+      onUpdate,
+      acceptsQuestionBatches,
+      acceptsCompactionItems
+    ) => {
       if (nativeChatHandlers.size >= 8)
         throw new Error("native_chat_subscription_limit");
       const id = crypto.randomUUID();
@@ -1367,7 +1454,11 @@ const bridge: DesktopBridge = {
           IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
           attachmentId,
           id,
-          ...(acceptsQuestionBatches === true ? [true] : [])
+          ...(acceptsCompactionItems === true
+            ? [acceptsQuestionBatches === true, true]
+            : acceptsQuestionBatches === true
+              ? [true]
+              : [])
         );
         return id;
       } catch (error) {
@@ -1511,12 +1602,17 @@ const bridge: DesktopBridge = {
       ),
     automation: {
       version: 1,
-      publish: (snapshot, activePageId) =>
+      publish: (snapshot, activePageId, viewId) =>
         ipcRenderer.invoke(
           IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
           snapshot,
-          activePageId
+          activePageId,
+          viewId
         ),
+      retire: async (viewId) =>
+        workspaceRoute()
+          ? ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, viewId)
+          : false,
       onOpenFile: (handler) => {
         automationFileHandlers.add(handler);
         return () => {

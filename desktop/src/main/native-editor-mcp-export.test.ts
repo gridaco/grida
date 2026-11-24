@@ -163,7 +163,7 @@ function workbench() {
 }
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "correlates independent browser calls on the opt-in native export and revokes them with the owner",
+  "correlates independent browser calls and revokes the export when its workbench retires",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-browser-mcp-")
@@ -235,7 +235,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           },
         }
       );
-      expect(await owner!.publish(admitted.event, empty)).toBe(true);
+      expect(await owner!.publish(admitted.event, empty, 1)).toBe(true);
       let id = 0;
       const request = async (call?: { name: string; arguments: object }) => {
         const method = call ? "tools/call" : "tools/list";
@@ -315,8 +315,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         structuredContent: { closed: true },
       });
       expect(closeArguments).toEqual([{ target: visibleTarget }]);
-      admitted.sender.emit("did-start-navigation", { isMainFrame: true });
+      owner!.retireView(admitted.event, 1);
       expect(close).toHaveBeenCalledTimes(1);
+      expect(await owner!.publish(admitted.event, empty, 2)).toBe(false);
       expect(await invoke(secondUrl)).toMatchObject({
         isError: true,
         structuredContent: {

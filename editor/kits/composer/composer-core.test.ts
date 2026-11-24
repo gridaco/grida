@@ -77,6 +77,51 @@ describe("ComposerCore", () => {
     });
   });
 
+  it("lists exact skill choices separately from files and leaves shell and currency text alone", () => {
+    const project = {
+      id: "project-slides",
+      label: "slides",
+      source: "Project",
+    };
+    const personal = {
+      id: "personal-slides",
+      label: "slides",
+      source: "Personal",
+    };
+    const core = new ComposerCore({
+      skillMentions: [],
+      mentions: [{ id: "file", label: "slides.md" }],
+    });
+    core.inspectCursor("Use $sl", 7);
+    expect(core.getSnapshot().trigger).toMatchObject({
+      kind: "skill",
+      query: "sl",
+      items: [],
+    });
+    const models = { id: "models", label: "3d-models", source: "Bundled" };
+    core.setCatalog({ skillMentions: [project, personal, models] });
+    expect(core.getSnapshot().trigger).toMatchObject({
+      kind: "skill",
+      range: { from: 4, to: 7 },
+      items: [project, personal],
+    });
+    core.inspectCursor("$3d-models", 10);
+    expect(core.getSnapshot().trigger).toMatchObject({
+      kind: "skill",
+      query: "3d-models",
+      items: [models],
+    });
+    for (const literal of ["$100", "$1", "$PATH", "${HOME}", "a$slides"]) {
+      core.inspectCursor(literal, literal.length);
+      expect(core.getSnapshot().trigger).toBeNull();
+    }
+    core.inspectCursor("@sl", 3);
+    expect(core.getSnapshot().trigger).toMatchObject({
+      kind: "mention",
+      items: [{ id: "file" }],
+    });
+  });
+
   it("moves trigger index inside the core state", () => {
     const core = new ComposerCore({
       commands: [

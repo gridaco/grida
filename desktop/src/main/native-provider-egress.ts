@@ -70,7 +70,7 @@ export class NativeProviderEgress {
   static readonly cancelMethod = "_co.grida/provider/cancel";
 
   private readonly exchanges = new Map<string, Exchange>();
-  private readonly targets: Map<string, string>;
+  private readonly targets: Set<string>;
   private closed = false;
 
   constructor(
@@ -83,18 +83,14 @@ export class NativeProviderEgress {
     private readonly permission?: AbortSignal,
     private readonly wireModel?: string
   ) {
-    this.targets = providerTargets(
-      protocol,
-      endpoint,
-      model,
-      llamaCppInputCount
-    );
+    this.targets = new Set([
+      providerTarget(protocol, endpoint, model, llamaCppInputCount),
+    ]);
     if (gatewayCeilings) {
       if (protocol !== "openai-compatible" || llamaCppInputCount)
         throw new Error("native_gateway_ceiling_profile_invalid");
-      this.targets.set(
-        new URL(`${endpoint.replace(/\/$/, "")}/chat/completions/capped`).href,
-        "text/event-stream"
+      this.targets.add(
+        new URL(`${endpoint.replace(/\/$/, "")}/chat/completions/capped`).href
       );
     }
   }
@@ -150,21 +146,18 @@ export class NativeProviderEgress {
       this.exchanges.has(id) ||
       this.exchanges.size >= MAX_EXCHANGES ||
       typeof target !== "string" ||
+      !this.targets.has(target) ||
       !boundedInteger(timeoutMs, MAX_TIMEOUT_MS) ||
       !boundedInteger(maxResponseBytes, RESPONSE_LIMIT)
     )
       return { status: "unavailable" };
-    const accept = this.targets.get(target);
-    const headers = accept
-      ? providerHeaders(
-          this.protocol,
-          accept,
-          input.headers,
-          this.gatewayCeilings && target.endsWith("/chat/completions/capped")
-            ? true
-            : undefined
-        )
-      : undefined;
+    const headers = providerHeaders(
+      this.protocol,
+      input.headers,
+      this.gatewayCeilings && target.endsWith("/chat/completions/capped")
+        ? true
+        : undefined
+    );
     const initial = decode(input.initial);
     if (!headers || !initial) return { status: "unavailable" };
     const exchange: Exchange = {
@@ -281,7 +274,7 @@ export class NativeProviderEgress {
   }
 }
 
-function providerTargets(
+function providerTarget(
   protocol: Protocol,
   endpoint: string,
   model: string,
@@ -302,44 +295,29 @@ function providerTargets(
   )
     throw new Error("native_provider_input_count_unavailable");
   const prefix = base.pathname.replace(/\/$/, "");
-  const routes = new Map<string, string>();
   const target = (suffix: string) => {
     const next = new URL(base);
     next.pathname = `${prefix}/${suffix}`;
     return next;
   };
   if (protocol === "openai-compatible") {
-    routes.set(target("chat/completions").href, "text/event-stream");
-    if (llamaCppInputCount)
-      routes.set(
-        target("chat/completions/input_tokens").href,
-        "application/json"
-      );
-  } else if (protocol === "responses") {
-    routes.set(target("responses").href, "text/event-stream");
-    routes.set(target("responses/input_tokens").href, "application/json");
-  } else if (protocol === "chatgpt-subscription") {
+    return target("chat/completions").href;
+  }
+  if (protocol === "responses") return target("responses").href;
+  if (protocol === "chatgpt-subscription") {
     if (`${endpoint}/responses` !== CHATGPT_RESPONSES_URL)
       throw new Error("native_provider_subscription_endpoint_invalid");
-    routes.set(CHATGPT_RESPONSES_URL, "text/event-stream");
-  } else if (protocol === "anthropic") {
-    routes.set(target("messages").href, "text/event-stream");
-  } else {
-    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(model))
-      throw new Error("native_provider_model_invalid");
-    const next = target(`models/${model}:streamGenerateContent`);
-    next.searchParams.set("alt", "sse");
-    routes.set(next.href, "text/event-stream");
+    return CHATGPT_RESPONSES_URL;
   }
-  return routes;
+  if (protocol === "anthropic") return target("messages").href;
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(model))
+    throw new Error("native_provider_model_invalid");
+  const next = target(`models/${model}:streamGenerateContent`);
+  next.searchParams.set("alt", "sse");
+  return next.href;
 }
 
-function providerHeaders(
-  protocol: Protocol,
-  accept: string,
-  raw: unknown,
-  capped?: true
-) {
+function providerHeaders(protocol: Protocol, raw: unknown, capped?: true) {
   if (!Array.isArray(raw) || raw.length > (capped ? 5 : 4)) return;
   const credential =
     protocol === "anthropic"
@@ -369,7 +347,7 @@ function providerHeaders(
   }
   if (
     headers.get("content-type") !== "application/json" ||
-    headers.get("accept") !== accept ||
+    headers.get("accept") !== "text/event-stream" ||
     (capped && !validCostCeiling(headers.get("x-gg-max-cost-mills"))) ||
     (protocol === "anthropic" &&
       headers.get("anthropic-version") !== "2023-06-01") ||

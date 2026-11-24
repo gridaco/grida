@@ -14,13 +14,14 @@ covered_by:
   - editor/lib/desktop/window-content-state.test.ts
   - editor/lib/desktop/workspace-view-state.test.ts
   - editor/scaffolds/desktop/workbench/editor-group.test.ts
+  - editor/scaffolds/desktop/workbench/workspace-chat-workbench.test.ts
   - editor/scaffolds/desktop/workbench/workspace-surface-host.test.ts
 ---
 
 ## Behavior
 
 A normal cold launch restores the last focused window's content. It opens Home,
-the workspace workbench with its ordered real tabs, or the standalone `.canvas`
+the workspace workbench with its last chat's ordered tabs, or the standalone `.canvas`
 editor. The saved workspace ID and artifact paths must be revalidated through
 the Desktop workspace bridge before restoration.
 
@@ -40,10 +41,11 @@ implicit restoration.
    and relaunch it normally.
    - Expected: a brief **Restoring window…** state appears, then
      workspace A opens without a Welcome flash.
-3. In workspace A's workbench, open three artifacts, then activate the middle
-   tab. Quit and relaunch.
-   - Expected: workspace A opens with all three real tabs in the same order and
-     the middle tab active.
+3. In workspace A, start a chat and open three artifacts, then activate the
+   middle tab. Start another chat in the same workspace and open a different
+   artifact. Switch back to the first chat, quit, and relaunch.
+   - Expected: the first chat opens with its three tabs in the same order
+     and the middle tab active. Choosing the other chat restores its artifact.
 4. Open a temporary virtual tab while those artifacts remain open, quit, and
    relaunch.
    - Expected: the real artifacts reopen; the virtual tab is not persisted.
@@ -87,8 +89,8 @@ implicit restoration.
 
 ## Notes
 
-- This test covers the content of one focused window. Workspace tab continuity
-  uses its own saved state.
+- This test covers the content of one focused window. Each chat has its own
+  locally saved tab arrangement.
 - Signed-out startup still follows the existing Welcome sign-in gate. After
   authentication it lands on Welcome rather than revealing prior-account
   workspace context.

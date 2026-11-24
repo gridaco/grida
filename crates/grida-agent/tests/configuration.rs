@@ -1,231 +1,120 @@
-use agent_kit_core::ErrorKind;
-use grida_agent::configuration::Configuration;
-use grida_agent_master::configuration::SettingChange;
-use std::num::NonZeroU64;
+use agent_kit_core::{Error, ErrorKind};
+use grida_agent::configuration::{Configuration, GlobalConfigEdit, edit_global_config};
 use std::path::Path;
-use std::sync::Arc;
-use tempfile::TempDir;
-
-fn state() -> TempDir {
-    let directory = tempfile::tempdir().unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
-    }
-    directory
-}
 
 fn write(directory: &Path, text: &str) {
-    let path = directory.join("config.toml");
-    std::fs::write(&path, text).unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    }
-}
-
-fn set(value: u64) -> SettingChange {
-    SettingChange::SetContextMaxInputTokens {
-        value: NonZeroU64::new(value).unwrap(),
-    }
+    std::fs::write(directory.join("config.toml"), text).unwrap();
 }
 
 #[test]
-fn missing_file_uses_automatic_defaults_without_creating_configuration() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let inspection = configuration.inspect().unwrap();
-    assert!(inspection.file_revision.is_none());
-    assert!(
-        inspection
+fn missing_file_uses_defaults_without_creating_a_home_or_config() {
+    let temporary = tempfile::tempdir().unwrap();
+    let home = temporary.path().join("absent");
+    let configuration = Configuration::open(&home).unwrap();
+    let inspected = configuration.inspect().unwrap();
+    assert_eq!(inspected.path, home.join("config.toml"));
+    assert!(inspected.file_revision.is_none());
+    assert!(inspected.active.defaults().model_context_window.is_none());
+    assert!(inspected.file_diagnostic.is_none());
+    assert!(!home.exists());
+}
+
+#[test]
+fn reads_compaction_defaults_alongside_other_global_settings() {
+    let home = tempfile::tempdir().unwrap();
+    write(
+        home.path(),
+        r#"schema_version = 1
+model_context_window = 9007199254740991
+model_auto_compact_token_limit = 1024
+web_search = "automatic"
+typo = "private-value"
+[desktop]
+composer-predictions-enabled = false
+[[hooks]]
+enabled = false
+"#,
+    );
+    let configuration = Configuration::open(home.path()).unwrap();
+    let inspected = configuration.inspect().unwrap();
+    assert!(inspected.file_diagnostic.is_none());
+    assert_eq!(inspected.unknown_keys, ["typo"]);
+    assert_eq!(
+        serde_json::to_value(&inspected.active).unwrap()["defaults"]["model_context_window"]
+            .as_u64(),
+        Some(9_007_199_254_740_991)
+    );
+    assert_eq!(
+        inspected
             .active
-            .defaults
-            .context
-            .max_input_tokens
-            .is_none()
-    );
-    assert!(inspection.file_diagnostic.is_none());
-    configuration
-        .update(None, SettingChange::ResetContextMaxInputTokens)
-        .unwrap();
-    assert!(!directory.path().join("config.toml").exists());
-}
-
-#[test]
-fn changes_persist_and_captured_snapshots_stay_immutable() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let captured = configuration.snapshot().unwrap();
-    let changed = configuration.update(None, set(64000)).unwrap();
-    assert_eq!(
-        changed.defaults.context.max_input_tokens.unwrap().get(),
-        64000
-    );
-    assert!(captured.defaults.context.max_input_tokens.is_none());
-    assert_ne!(captured.identity, changed.identity);
-    drop(configuration);
-    let reopened = Configuration::open(directory.path()).unwrap();
-    assert_eq!(reopened.snapshot().unwrap(), changed);
-    let reset = reopened
-        .update(
-            changed.source_revision,
-            SettingChange::ResetContextMaxInputTokens,
-        )
-        .unwrap();
-    assert!(reset.defaults.context.max_input_tokens.is_none());
-}
-
-#[test]
-fn managed_changes_preserve_unrelated_comments_and_tables() {
-    let directory = state();
-    write(
-        directory.path(),
-        "# Personal defaults\nschema_version = 1\n\n# Context selection\n[context]\nmax_input_tokens = 32000\n",
-    );
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let before = configuration.snapshot().unwrap();
-    configuration
-        .update(before.source_revision, set(64000))
-        .unwrap();
-    let text = std::fs::read_to_string(directory.path().join("config.toml")).unwrap();
-    assert!(text.contains("# Personal defaults"));
-    assert!(text.contains("# Context selection"));
-    assert!(text.contains("max_input_tokens = 64000"));
-}
-
-#[test]
-fn inline_context_tables_remain_editable() {
-    let directory = state();
-    write(
-        directory.path(),
-        "schema_version = 1\ncontext = { max_input_tokens = 100 }\n",
-    );
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let before = configuration.snapshot().unwrap();
-    let changed = configuration
-        .update(before.source_revision, set(200))
-        .unwrap();
-    assert_eq!(
-        changed.defaults.context.max_input_tokens.unwrap().get(),
-        200
-    );
-    configuration
-        .update(
-            changed.source_revision,
-            SettingChange::ResetContextMaxInputTokens,
-        )
-        .unwrap();
-    assert!(
-        configuration
-            .snapshot()
+            .defaults()
+            .model_auto_compact_token_limit
             .unwrap()
-            .defaults
-            .context
-            .max_input_tokens
-            .is_none()
+            .get(),
+        1024
     );
 }
 
 #[test]
-fn invalid_startup_configuration_is_rejected_without_echoing_contents() {
-    let directory = state();
-    for text in [
-        "schema_version = 2\n",
-        "schema_version = 1\nunknown = 'private-value'\n",
-        "schema_version = 1\ncontext = 1\n",
-        "schema_version = 1\n[context]\nother = true\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 0\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = -1\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 'private-value'\n",
-        "schema_version = 1\n[context]\nmax_input_tokens = 1.5\n",
-        "private-value {{{",
-    ] {
-        write(directory.path(), text);
-        let error = Configuration::open(directory.path()).err().unwrap();
-        assert!(!error.to_string().contains("private-value"));
-    }
-}
-
-#[test]
-fn managed_and_manual_limits_remain_exact_in_javascript_clients() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let maximum = grida_agent_master::configuration::CONTEXT_MAX_INPUT_TOKENS.maximum;
-    assert_eq!(maximum, 9_007_199_254_740_991);
-    let accepted = configuration.update(None, set(maximum)).unwrap();
-    let json = serde_json::to_value(&accepted).unwrap();
-    assert_eq!(
-        json["defaults"]["context"]["max_input_tokens"].as_u64(),
-        Some(maximum)
-    );
-    assert_eq!(
-        configuration
-            .update(accepted.source_revision, set(maximum + 1))
-            .unwrap_err()
-            .code,
-        "config_value_out_of_range"
-    );
+fn invalid_configuration_reports_the_key_and_retains_the_active_capture() {
+    let home = tempfile::tempdir().unwrap();
     write(
-        directory.path(),
-        &format!(
-            "schema_version = 1\n[context]\nmax_input_tokens = {}\n",
-            maximum + 1
-        ),
+        home.path(),
+        "schema_version = 1\nmodel_context_window = 4096\n",
     );
-    assert_eq!(
-        configuration
-            .reload(configuration.inspect().unwrap().file_revision)
-            .unwrap_err()
-            .code,
-        "config_value_out_of_range"
-    );
-    assert_eq!(configuration.snapshot().unwrap(), accepted);
-}
-
-#[test]
-fn rejected_reload_retains_the_active_snapshot_and_reports_the_file() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
+    let configuration = Configuration::open(home.path()).unwrap();
     let before = configuration.snapshot().unwrap();
-    write(
-        directory.path(),
-        "schema_version = 1\n[context]\nmax_input_tokens = 0\n",
-    );
+    for (text, diagnostic) in [
+        ("schema_version = 2\n", "config_schema_unsupported"),
+        ("private-value {{{", "config_toml_invalid"),
+        (
+            "schema_version = 1\nmodel_context_window = 'private-value'\n",
+            "config_invalid_value_model_context_window",
+        ),
+        (
+            "schema_version = 1\nmodel_auto_compact_token_limit = 9007199254740992\n",
+            "config_invalid_value_model_auto_compact_token_limit",
+        ),
+    ] {
+        write(home.path(), text);
+        let inspection = configuration.inspect().unwrap();
+        assert_eq!(inspection.file_diagnostic.unwrap().code, diagnostic);
+        assert_eq!(
+            configuration
+                .reload(inspection.file_revision)
+                .unwrap_err()
+                .code,
+            diagnostic
+        );
+        assert_eq!(configuration.snapshot().unwrap(), before);
+    }
+    let file = home.path().join("config.toml");
+    std::fs::remove_file(&file).unwrap();
+    std::fs::create_dir(&file).unwrap();
     let inspection = configuration.inspect().unwrap();
-    assert_ne!(inspection.file_revision, before.source_revision);
+    assert_eq!(inspection.path, file);
+    assert_eq!(inspection.active, before);
     assert_eq!(
         inspection.file_diagnostic.unwrap().code,
-        "config_value_out_of_range"
+        "config_file_invalid"
+    );
+    assert!(inspection.file_revision.is_none());
+    assert_eq!(
+        Configuration::check(home.path()).unwrap_err().code,
+        "config_file_invalid"
     );
     assert_eq!(
-        configuration
-            .reload(inspection.file_revision)
-            .unwrap_err()
-            .code,
-        "config_value_out_of_range"
+        configuration.reload(None).unwrap_err().code,
+        "config_file_invalid"
     );
     assert_eq!(configuration.snapshot().unwrap(), before);
-}
+    std::fs::remove_dir(&file).unwrap();
 
-#[test]
-fn manual_edits_require_explicit_reload_and_stale_updates_preserve_them() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
-    let before = configuration.snapshot().unwrap();
     write(
-        directory.path(),
-        "schema_version = 1\n[context]\nmax_input_tokens = 4096\n",
+        home.path(),
+        "schema_version = 1\nmodel_context_window = 2048\n",
     );
-    assert_eq!(configuration.snapshot().unwrap(), before);
-    assert_eq!(
-        configuration
-            .update(before.source_revision, set(2048))
-            .unwrap_err()
-            .kind,
-        ErrorKind::Conflict
-    );
+    let inspection = configuration.inspect().unwrap();
     assert_eq!(
         configuration
             .reload(before.source_revision)
@@ -233,131 +122,289 @@ fn manual_edits_require_explicit_reload_and_stale_updates_preserve_them() {
             .kind,
         ErrorKind::Conflict
     );
-    let inspection = configuration.inspect().unwrap();
+    assert_eq!(configuration.snapshot().unwrap(), before);
     let active = configuration.reload(inspection.file_revision).unwrap();
-    assert_eq!(
-        active.defaults.context.max_input_tokens.unwrap().get(),
-        4096
-    );
-    assert_eq!(
-        configuration.inspect().unwrap().file_revision,
-        active.source_revision
-    );
+    assert_eq!(active.defaults().model_context_window.unwrap().get(), 2048);
+    assert_eq!(before.defaults().model_context_window.unwrap().get(), 4096);
 }
 
 #[test]
-fn competing_managed_writers_cannot_overwrite_the_same_revision() {
-    let directory = state();
-    let first = Arc::new(Configuration::open(directory.path()).unwrap());
-    let second = Arc::new(Configuration::open(directory.path()).unwrap());
-    let gate = Arc::new(std::sync::Barrier::new(2));
-    let left = {
-        let gate = Arc::clone(&gate);
-        std::thread::spawn(move || {
-            gate.wait();
-            first.update(None, set(100))
+fn creation_is_explicit_and_keeps_the_existing_file() {
+    let temporary = tempfile::tempdir().unwrap();
+    let home = temporary.path().join("new-home");
+    edit_global_config(&home, GlobalConfigEdit::Create, || Ok(())).unwrap();
+    let path = home.join("config.toml");
+    let created = std::fs::read_to_string(&path).unwrap();
+    assert!(created.contains("# model_auto_compact_token_limit"));
+    for existing in ["schema_version = 1\n# user edits\n", "unfinished TOML [["] {
+        write(&home, existing);
+        edit_global_config(&home, GlobalConfigEdit::Create, || {
+            panic!("no write needed")
         })
-    };
-    let right = std::thread::spawn(move || {
-        gate.wait();
-        second.update(None, set(200))
+        .unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), existing);
+    }
+}
+
+#[test]
+fn managed_edits_keep_comments_sibling_fields_and_formatting() {
+    let home = tempfile::tempdir().unwrap();
+    for desktop in [
+        "desktop = { 'composer-predictions-enabled' = false, sibling = 1 }",
+        "desktop.'composer-predictions-enabled' = false # Keep inline\r\ndesktop.sibling = 1",
+        "[desktop]\r\n'composer-predictions-enabled' = false # Keep inline\r\nsibling = 1",
+        "[desktop]\r\nsibling = 1",
+        "desktop = { sibling = 1 }",
+    ] {
+        let original = format!(
+            "\u{feff}# Agent configuration\r\nschema_version = 1\r\nmodel_context_window = 2048\r\nweb_search = 'disabled' # Search comment\r\n{desktop}\r\n"
+        );
+        write(home.path(), &original);
+        edit_global_config(
+            home.path(),
+            GlobalConfigEdit::SuggestedPrompts(true),
+            || Ok(()),
+        )
+        .unwrap();
+        edit_global_config(home.path(), GlobalConfigEdit::WebSearch(true), || Ok(())).unwrap();
+        let saved = std::fs::read_to_string(home.path().join("config.toml")).unwrap();
+        assert!(
+            saved.starts_with("\u{feff}# Agent configuration\r\n"),
+            "{saved:?}"
+        );
+        assert!(saved.contains("model_context_window = 2048"), "{saved:?}");
+        assert!(saved.contains("sibling = 1"), "{saved:?}");
+        assert!(saved.contains("# Search comment"), "{saved:?}");
+        assert_eq!(
+            saved.replace("\r\n", "").matches('\n').count(),
+            0,
+            "{saved:?}"
+        );
+        if desktop.contains("# Keep inline") {
+            assert!(saved.contains("# Keep inline"), "{saved:?}");
+        }
+        let parsed = saved
+            .trim_start_matches('\u{feff}')
+            .parse::<toml_edit::DocumentMut>()
+            .unwrap();
+        assert_eq!(parsed["web_search"].as_str(), Some("automatic"));
+        assert_eq!(
+            parsed["desktop"]
+                .as_table_like()
+                .unwrap()
+                .get("composer-predictions-enabled")
+                .and_then(toml_edit::Item::as_bool),
+            Some(true)
+        );
+    }
+}
+
+#[test]
+fn contention_revocation_and_manual_edits_never_overwrite_another_value() {
+    let home = tempfile::tempdir().unwrap();
+    let path = home.path();
+    let original = "schema_version = 1\nweb_search = \"disabled\"\n";
+    write(path, original);
+    edit_global_config(path, GlobalConfigEdit::WebSearch(true), || {
+        let busy = edit_global_config(path, GlobalConfigEdit::SuggestedPrompts(true), || Ok(()));
+        assert_eq!(busy.unwrap_err().code, "config_writer_busy");
+        Ok(())
+    })
+    .unwrap();
+    edit_global_config(path, GlobalConfigEdit::SuggestedPrompts(true), || Ok(())).unwrap();
+    let retained = std::fs::read_to_string(path.join("config.toml")).unwrap();
+    assert!(retained.contains("web_search = \"automatic\""));
+    assert!(retained.contains("composer-predictions-enabled = true"));
+    let revoked = edit_global_config(path, GlobalConfigEdit::WebSearch(false), || {
+        Err(Error::new(ErrorKind::Unavailable, "revoked"))
     });
-    let results = [left.join().unwrap(), right.join().unwrap()];
-    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
-    assert!(
-        results
-            .iter()
-            .find_map(|result| result.as_ref().err())
-            .is_some_and(|error| error.code == "config_writer_busy"
-                || error.code == "config_revision_changed")
-    );
-}
-
-#[test]
-fn values_outside_the_backing_format_are_rejected_without_writes() {
-    let directory = state();
-    let configuration = Configuration::open(directory.path()).unwrap();
+    assert_eq!(revoked.unwrap_err().code, "revoked");
     assert_eq!(
-        configuration.update(None, set(u64::MAX)).unwrap_err().code,
-        "config_value_out_of_range"
+        std::fs::read_to_string(path.join("config.toml")).unwrap(),
+        retained
     );
-    assert!(!directory.path().join("config.toml").exists());
-}
-
-#[test]
-fn oversized_files_are_bounded_before_parsing() {
-    let directory = state();
-    write(directory.path(), &format!("# {}", "x".repeat(65536)));
+    let conflict = edit_global_config(path, GlobalConfigEdit::WebSearch(false), || {
+        write(path, "schema_version = 1\n# manual edit\n");
+        Ok(())
+    });
+    assert_eq!(conflict.unwrap_err().kind, ErrorKind::Conflict);
     assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_file_too_large"
+        std::fs::read_to_string(path.join("config.toml")).unwrap(),
+        "schema_version = 1\n# manual edit\n"
     );
 }
 
 #[cfg(unix)]
 #[test]
-fn configuration_rejects_links_and_shared_permissions() {
-    use std::os::unix::fs::{PermissionsExt, symlink};
-    let directory = state();
-    let outside = state();
-    write(outside.path(), "schema_version = 1\n");
-    let path = directory.path().join("config.toml");
-    symlink(outside.path().join("config.toml"), &path).unwrap();
-    assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_file_invalid"
-    );
-    std::fs::remove_file(&path).unwrap();
-    std::fs::hard_link(outside.path().join("config.toml"), &path).unwrap();
-    assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_file_not_private"
-    );
-    std::fs::remove_file(&path).unwrap();
-    write(directory.path(), "schema_version = 1\n");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-    assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_file_not_private"
-    );
-    std::fs::remove_file(&path).unwrap();
-    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
-    assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_directory_not_private"
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn replaced_state_directory_is_rejected_before_any_write() {
-    let parent = state();
-    let original = parent.path().join("agent");
-    std::fs::create_dir(&original).unwrap();
+fn config_bytes_stay_in_private_staging_until_publication() {
     use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&original, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let configuration = Configuration::open(&original).unwrap();
-    std::fs::rename(&original, parent.path().join("retained")).unwrap();
-    std::fs::create_dir(&original).unwrap();
-    std::fs::set_permissions(&original, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let path = home.path();
+    let original = "schema_version = 1\n# private-config-marker\n";
+    write(path, original);
+    let staging = path.join(".config-staging");
+    let rejected = edit_global_config(path, GlobalConfigEdit::WebSearch(true), || {
+        let listed = std::fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            listed,
+            ["config.toml", "config.lock", ".config-staging"]
+                .map(std::ffi::OsString::from)
+                .into()
+        );
+        assert_eq!(
+            std::fs::metadata(&staging).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let staged = std::fs::read_dir(&staging)
+            .unwrap()
+            .filter(|entry| entry.as_ref().unwrap().file_name() != "write.lock")
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(staged.len(), 1);
+        assert_eq!(
+            std::fs::metadata(&staged[0]).unwrap().permissions().mode() & 0o077,
+            0
+        );
+        let bytes = std::fs::read_to_string(&staged[0]).unwrap();
+        assert!(bytes.contains("private-config-marker"));
+        assert!(bytes.contains("web_search = \"automatic\""));
+        assert_eq!(
+            std::fs::read_to_string(path.join("config.toml")).unwrap(),
+            original
+        );
+        Err(Error::new(ErrorKind::Unavailable, "revoked"))
+    });
+    assert_eq!(rejected.unwrap_err().code, "revoked");
     assert_eq!(
-        configuration.update(None, set(100)).unwrap_err().code,
-        "config_directory_changed"
+        std::fs::read_to_string(path.join("config.toml")).unwrap(),
+        original
     );
-    assert!(!original.join("config.toml").exists());
+    assert_eq!(
+        std::fs::read_dir(&staging)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        ["write.lock"]
+    );
 }
 
 #[cfg(unix)]
 #[test]
-fn linked_writer_lock_is_rejected_without_changing_the_target() {
-    let directory = state();
-    let outside = state();
-    let target = outside.path().join("target");
-    std::fs::write(&target, b"retained").unwrap();
-    std::os::unix::fs::symlink(&target, directory.path().join("config.lock")).unwrap();
+fn managed_writes_refuse_untrusted_staging_directories() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let home = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let staging = home.path().join(".config-staging");
+    let edit = || {
+        edit_global_config(home.path(), GlobalConfigEdit::Create, || {
+            panic!("unsafe staging must fail before write admission")
+        })
+        .unwrap_err()
+        .code
+    };
+
+    symlink(outside.path(), &staging).unwrap();
+    assert_eq!(edit(), "config_directory_invalid");
+    assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
+    std::fs::remove_file(&staging).unwrap();
+    std::fs::create_dir(&staging).unwrap();
+    std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(edit(), "config_staging_directory_unsafe");
+    assert!(!home.path().join("config.toml").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn global_configuration_allows_owner_writable_files_and_rejects_aliases() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let home = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(outside.path(), "schema_version = 1\n");
+    let source = outside.path().join("config.toml");
+    let path = home.path().join("config.toml");
+    symlink(&source, &path).unwrap();
+    assert!(Configuration::open(home.path()).is_err());
+    std::fs::remove_file(&path).unwrap();
+    std::fs::hard_link(&source, &path).unwrap();
+    assert!(Configuration::open(home.path()).is_err());
+    std::fs::remove_file(&path).unwrap();
+    write(home.path(), "schema_version = 1\n");
+    std::fs::set_permissions(home.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(Configuration::open(home.path()).is_ok());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o664)).unwrap();
+    assert!(Configuration::open(home.path()).is_err());
+}
+
+#[test]
+fn a_personalization_edit_preserves_an_independently_invalid_limit() {
+    let home = tempfile::tempdir().unwrap();
+    let text = "schema_version = 1\nmodel_context_window = 0\n";
+    write(home.path(), text);
+    edit_global_config(home.path(), GlobalConfigEdit::WebSearch(false), || Ok(())).unwrap();
+    let saved = std::fs::read_to_string(home.path().join("config.toml")).unwrap();
+    assert!(saved.starts_with(text));
+    assert!(saved.contains("web_search = \"disabled\""));
     assert_eq!(
-        Configuration::open(directory.path()).err().unwrap().code,
-        "config_file_invalid"
+        Configuration::open(home.path()).err().unwrap().code,
+        "config_invalid_value_model_context_window"
     );
-    assert_eq!(std::fs::read(&target).unwrap(), b"retained");
+}
+
+#[test]
+fn opens_an_existing_config_for_repair_without_taking_a_write_lock() {
+    let home = tempfile::tempdir().unwrap();
+    let config = home.path().join("config.toml");
+    let lock = home.path().join("config.lock");
+    let oversized = vec![b' '; 65 * 1024];
+    std::fs::write(&config, &oversized).unwrap();
+
+    edit_global_config(home.path(), GlobalConfigEdit::Create, || {
+        panic!("opening an existing file needs no write admission")
+    })
+    .unwrap();
+    assert!(!lock.exists());
+    assert_eq!(std::fs::read(&config).unwrap(), oversized);
+
+    write(home.path(), "schema_version = 1\n");
+    edit_global_config(home.path(), GlobalConfigEdit::WebSearch(false), || {
+        edit_global_config(home.path(), GlobalConfigEdit::Create, || {
+            panic!("opening an existing file needs no write admission")
+        })
+    })
+    .unwrap();
+}
+
+#[test]
+fn personalization_writes_refuse_to_replace_structured_content() {
+    let home = tempfile::tempdir().unwrap();
+    for (settings, edit) in [
+        (
+            "[web_search]\nuser_key = true\n",
+            GlobalConfigEdit::WebSearch(false),
+        ),
+        (
+            "web_search = { user_key = true }\n",
+            GlobalConfigEdit::WebSearch(false),
+        ),
+        (
+            "[desktop]\ncomposer-predictions-enabled = [true]\n",
+            GlobalConfigEdit::SuggestedPrompts(false),
+        ),
+    ] {
+        let text = format!("schema_version = 1\n{settings}");
+        write(home.path(), &text);
+        let error = edit_global_config(home.path(), edit, || {
+            panic!("invalid edits must not reach write admission")
+        })
+        .unwrap_err();
+        assert_eq!(error.code, "config_invalid_personalization");
+        assert_eq!(
+            std::fs::read_to_string(home.path().join("config.toml")).unwrap(),
+            text
+        );
+    }
 }

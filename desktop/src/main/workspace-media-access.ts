@@ -2,52 +2,47 @@
 import { app } from "electron";
 import path from "node:path";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
-import { home } from "@grida/home";
-import { DesktopMediaRoot } from "./media-root";
+import type { DesktopProfile } from "./desktop-profile";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeDocumentFiles } from "./native-document-files";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
-let workers: WorkspaceFileWorkers | undefined;
-
-export function nativeWorkspaceMedia() {
-  if (!NativeDesktopProfile.selected() || !nativeFilePlatform()) return;
-  return fileWorkers();
+export function nativeWorkspaceMedia(profile: DesktopProfile) {
+  if (profile.nativeChat !== "preview" || !nativeFilePlatform()) return;
+  return fileWorkers(profile.resourcesPath);
 }
 
 /** Ordinary Desktop uses a selected-file owner independently of its workspace registry. */
 export function ordinarySelectedSvgFiles(
+  profile: DesktopProfile,
   identityDirectory?: string,
   protectedPaths: readonly string[] = []
 ) {
-  if (
-    !nativeFilePlatform() ||
-    (!identityDirectory && !process.argv.includes("--disable-agent"))
-  )
+  if (!nativeFilePlatform() || (!identityDirectory && !profile.agentDisabled))
     return;
-  const userHome = app.getPath("home");
-  const gridaHome = home.dir();
-  const agentData = path.resolve(
-    NativeDesktopProfile.agentData() ?? path.join(gridaHome, "agent")
-  );
+  const agentData = path.resolve(profile.agentData);
   const { filesystem } = buildDaemonSandboxPolicy({
     user_data: agentData,
-    home: userHome,
+    home: profile.userHome,
   });
   return new NativeDocumentFiles(
     [
       ...protectedPaths,
+      ...(NativeDesktopProfile.installedRootsForDevelopment(
+        app,
+        profile
+      )?.metadataPaths() ?? []),
       ...filesystem.deny_read,
-      gridaHome,
+      profile.gridaHome,
       agentData,
-      app.getPath("userData"),
-      app.getPath("sessionData"),
-      DesktopMediaRoot.current(),
-      path.dirname(NativeDesktopProfile.resourcesPath(app)),
+      profile.userData,
+      profile.sessionData,
+      profile.mediaRoot,
+      path.dirname(profile.resourcesPath),
     ],
-    userHome,
-    fileWorkers(),
+    profile.userHome,
+    fileWorkers(profile.resourcesPath),
     identityDirectory
   );
 }
@@ -57,35 +52,38 @@ function nativeFilePlatform(): boolean {
   return process.platform === "darwin";
 }
 
-function fileWorkers(): WorkspaceFileWorkers {
-  if (workers) return workers;
-  const owner = new WorkspaceFileWorkers(
-    NativeDesktopProfile.resourcesPath(app)
-  );
-  workers = owner;
+function fileWorkers(resourcesPath: string): WorkspaceFileWorkers {
+  const owner = new WorkspaceFileWorkers(resourcesPath);
   app.once("will-quit", () => owner.close());
   return owner;
 }
 
 /** Initialized by Main after acquiring the native profile's instance lock. */
-export function nativeWorkspaceCatalog() {
-  const agentData = NativeDesktopProfile.agentData();
+export function nativeWorkspaceCatalog(profile: DesktopProfile) {
+  const agentData = profile.agentDataOverride;
   if (!agentData || !path.isAbsolute(agentData))
     throw new Error("workspace_catalog_profile_invalid");
   const { filesystem } = buildDaemonSandboxPolicy({
     user_data: agentData,
-    home: app.getPath("home"),
+    home: profile.userHome,
   });
+  const appProtection = [
+    ...filesystem.deny_read,
+    agentData,
+    profile.temp,
+    profile.mediaRoot,
+    ...(profile.isPackaged ? [path.dirname(profile.resourcesPath)] : []),
+  ];
   return new NativeWorkspaceCatalog({
-    browserData: app.getPath("userData"),
-    projectsRoot: path.join(app.getPath("documents"), "Grida Projects"),
+    browserData: profile.userData,
+    projectsRoot: profile.projectsRoot,
     protectedPaths: [
-      ...filesystem.deny_read,
+      ...appProtection,
       ...NativeDesktopProfile.protectedRoots(app).metadataPaths(),
-      agentData,
-      app.getPath("temp"),
-      DesktopMediaRoot.current(),
-      ...(app.isPackaged ? [path.dirname(process.resourcesPath)] : []),
+    ],
+    launchProtectedPaths: [
+      ...appProtection,
+      ...NativeDesktopProfile.launchProtectedRoots(app).metadataPaths(),
     ],
   });
 }

@@ -45,7 +45,6 @@ import {
   type DropMode,
   type MockItem,
 } from "./demo-data";
-import { DemoAttachmentCard } from "./demo-attachment-card";
 import { FileSidebar } from "./demo-file-sidebar";
 import { type DemoMessage, MessageLog } from "./demo-message-log";
 
@@ -243,13 +242,7 @@ function DemoComposerInput({
         }}
       >
         <ComposerTriggerMenu />
-        <ComposerAttachmentCards
-          className="flex-nowrap items-end gap-2.5 overflow-x-auto overscroll-x-contain px-2.5 pt-2.5 pb-0.5 [scrollbar-width:none] [&>[data-composer-attachment]]:shrink-0"
-          onRemoveAttachment={onRemoveAttachment}
-          renderAttachment={(attachment, { remove }) => (
-            <DemoAttachmentCard attachment={attachment} onRemove={remove} />
-          )}
-        />
+        <ComposerAttachmentCards onRemoveAttachment={onRemoveAttachment} />
         <ComposerContent
           onSubmitRequest={requestSubmit}
           placeholder="Type / for commands"

@@ -168,6 +168,8 @@ pub struct ReplayTurn {
     /// records, such as context compaction, so a client can still show it.
     /// Absent for turns with records.
     pub silent_account: Option<Envelope>,
+    /// This turn installed an actual replacement of earlier model context.
+    pub context_replaced: bool,
     /// The window includes the turn's newest record. False when a newer
     /// window holds the rest of the turn.
     pub tail: bool,
@@ -240,8 +242,9 @@ impl SqliteStore {
                 };
                 let mut query = connection
                     .prepare(
-                        "SELECT ordinal,id,head,started_ms,settled_ms,stored_bytes FROM turns
-                         WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+                        "SELECT ordinal,id,head,started_ms,settled_ms,stored_bytes,
+                                EXISTS(SELECT 1 FROM context_replacements WHERE turn_ordinal=turns.ordinal)
+                         FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
                          ORDER BY ordinal DESC LIMIT ?4",
                     )
                     .map_err(database_error)?;
@@ -297,6 +300,7 @@ impl SqliteStore {
                         settled_ms,
                         context_tokens: context_tokens(&state),
                         silent_account,
+                        context_replaced: row.get(6).map_err(database_error)?,
                         tail: before.is_none(),
                     };
                     if let Some(before) = window.collect(Some(facts), records, before, measure)? {
@@ -977,19 +981,17 @@ fn projection_limit() -> agent_kit_core::Error {
     error(ErrorKind::LimitExceeded, "history_projection_limit")
 }
 
-/// A turn's context size: within a turn the context only grows from call to
-/// call, so its largest reported model call is its final context.
+/// Context size from the last inference that contributed to published history.
+/// Internal calls and earlier, larger requests do not measure the active context.
 fn context_tokens(state: &TurnState) -> Option<u64> {
+    let published = state
+        .history()
+        .records()
+        .iter()
+        .map(|HistoryRecord::Message(message)| message);
     state
-        .operations()
-        .values()
-        .filter_map(|operation| match operation.outcome() {
-            Some(agent_kit_core::turn::OperationOutcome::Inference(outcome)) => {
-                outcome.context_tokens()
-            }
-            _ => None,
-        })
-        .max()
+        .latest_published_inference(published)
+        .and_then(|(_, outcome)| outcome.context_tokens())
 }
 
 /// A turn's stored size: its head, parts and distinct messages.

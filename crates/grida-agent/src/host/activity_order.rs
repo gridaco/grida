@@ -628,6 +628,7 @@ fn retained_public_facts(state: &agent_kit_core::turn::TurnState) -> Vec<String>
             state
                 .operations()
                 .values()
+                .filter(|operation| super::live::publishes_operation(&operation.record.input))
                 .filter_map(|operation| match operation.outcome() {
                     Some(OperationOutcome::Inference(outcome)) => Some(outcome.messages.iter()),
                     _ => None,

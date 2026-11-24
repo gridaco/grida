@@ -7,9 +7,11 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { App, BrowserWindowConstructorOptions } from "electron";
-import { NativeDesktopProfile } from "./main/native-desktop-profile";
+const desktopLaunch = vi.hoisted(() => ({
+  nativeChat: "disabled" as "disabled" | "ordinary",
+}));
 
-const { browserWindowInstances } = vi.hoisted(() => ({
+const { browserWindowInstances, loadURL, showErrorBox } = vi.hoisted(() => ({
   browserWindowInstances: [] as Array<{
     options: BrowserWindowConstructorOptions;
     webContents: {
@@ -18,7 +20,10 @@ const { browserWindowInstances } = vi.hoisted(() => ({
       setWindowOpenHandler: ReturnType<typeof vi.fn>;
     };
     loadURL: ReturnType<typeof vi.fn>;
+    once: ReturnType<typeof vi.fn>;
   }>,
+  loadURL: vi.fn<(url: string) => Promise<void>>(async () => undefined),
+  showErrorBox: vi.fn<(title: string, message: string) => void>(),
 }));
 
 vi.mock("electron", () => ({
@@ -31,9 +36,14 @@ vi.mock("electron", () => ({
         }
       ),
       setWindowOpenHandler: vi.fn<(handler: unknown) => void>(),
+      isLoadingMainFrame: () => false,
     };
-    loadURL = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+    loadURL = vi.fn<(url: string) => Promise<void>>((url) => loadURL(url));
     center = vi.fn<() => void>();
+    close = vi.fn<() => void>();
+    show = vi.fn<() => void>();
+    isDestroyed = () => false;
+    isVisible = () => false;
     once =
       vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
 
@@ -50,6 +60,7 @@ vi.mock("electron", () => ({
       workArea: { x: 0, y: 0, width: 1728, height: 1117 },
     })),
   },
+  dialog: { showErrorBox },
   shell: { openExternal: vi.fn<(url: string) => Promise<void>>() },
 }));
 vi.mock("./main/ipc-handlers", () => ({
@@ -58,7 +69,7 @@ vi.mock("./main/ipc-handlers", () => ({
 vi.mock("./branding", () => ({
   RUNTIME_APP_ICON: { png: "icon.png", ico: "icon.ico" },
 }));
-vi.mock("./env", () => ({ IS_DEV: false }));
+vi.mock("./env", () => ({ IS_DEV: false, DESKTOP_LAUNCH: desktopLaunch }));
 
 import {
   create_desktop_window,
@@ -84,10 +95,32 @@ it("loads the LLM Providers hash when opening a new Settings window", () => {
   );
 });
 
+it("keeps a new hosted window hidden until the renderer paints", () => {
+  const window = create_desktop_window({
+    base_url: BASE,
+    urlPath: "/desktop/settings",
+  });
+  const native = browserWindowInstances.at(-1);
+  expect(native?.options.show).toBe(false);
+  expect(window.show).not.toHaveBeenCalled();
+  expect(native?.once).toHaveBeenCalledWith(
+    "ready-to-show",
+    expect.any(Function)
+  );
+  const ready = native?.once.mock.calls[0]?.[1];
+  ready?.();
+  expect(window.show).toHaveBeenCalledOnce();
+});
+
+it("reports an initial load failure instead of leaving a hidden window open", async () => {
+  loadURL.mockRejectedValueOnce(new Error("network unavailable"));
+  const window = create_desktop_window({ base_url: BASE });
+  await vi.waitFor(() => expect(showErrorBox).toHaveBeenCalledOnce());
+  expect(window.close).toHaveBeenCalledOnce();
+  expect(window.show).not.toHaveBeenCalled();
+});
+
 it("offers a separate preload capability for native document chat", () => {
-  const selection = vi
-    .spyOn(NativeDesktopProfile, "ordinaryChat")
-    .mockReturnValue(false);
   const app = { getVersion: () => "1.0.0" } as App;
   const common = { app, base_url: BASE, doc_id: "selected", native: true };
   open_document_window(common);
@@ -104,13 +137,10 @@ it("offers a separate preload capability for native document chat", () => {
     "--grida-native-document=selected",
     "--grida-native-document-chat=selected",
   ]);
-  selection.mockRestore();
 });
 
 it("passes the ordinary workspace-only chat scope to a deck window", () => {
-  const selection = vi
-    .spyOn(NativeDesktopProfile, "ordinaryChat")
-    .mockReturnValueOnce(true);
+  desktopLaunch.nativeChat = "ordinary";
   const app = { getVersion: () => "1.0.0" } as App;
   try {
     open_canvas_window({ app, base_url: BASE, workspace_id: "workspace" });
@@ -118,7 +148,7 @@ it("passes the ordinary workspace-only chat scope to a deck window", () => {
       browserWindowInstances.at(-1)?.options.webPreferences?.additionalArguments
     ).toEqual(["--grida-version=1.0.0", "--grida-native-workspace-chat=1"]);
   } finally {
-    selection.mockRestore();
+    desktopLaunch.nativeChat = "disabled";
   }
 });
 

@@ -4,7 +4,7 @@ use super::*;
 
 const TRANSCRIPT: &str = "co.grida/session/transcript-window";
 
-async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
+pub(super) async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
     let mut command = executable();
     command
         .args(["serve", "--stdio", "--state-dir"])
@@ -17,7 +17,8 @@ async fn start(state: &Path, endpoint: &str, model: &str) -> StdioClient {
             "--credential-env",
             "GRIDA_AGENT_PROCESS_TEST_KEY",
         ])
-        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL)
+        .env("GRIDA_HOME", fixture_config_home(state));
     let mut client = StdioClient::from_child(
         command
             .stdin(Stdio::piped())

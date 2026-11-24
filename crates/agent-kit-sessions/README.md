@@ -14,6 +14,14 @@ and assigns a fresh immutable identity to the revised content. Withdrawal keeps
 the input's recorded disposition. Reordering supplies the complete current queue
 order. Claim and edit cannot both win the same session revision.
 
+A queue checkout holds one input outside runnable admission and reserves its
+position and capacity. One checkout can remain open per session. Restoring
+it returns the original input. Saving revised content accepts a new immutable
+input in the reserved position. Both consume the checkout and retain a receipt.
+A transfer consumes a waiting input and appends the supplied contribution to
+the exact running turn in one transaction. The original turn claim and its
+selected inputs remain the authority for resuming that turn.
+
 History contributions use an explicit turn, control revision and history
 position. A response can resolve its interaction and append correlated history
 in the same transaction. The consumer validates response meaning and chooses

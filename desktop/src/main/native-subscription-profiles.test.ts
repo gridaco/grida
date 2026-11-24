@@ -1586,7 +1586,10 @@ async function subscriptionDesktop() {
   const accountHttp = vi.fn<typeof fetch>(async () => {
     throw new Error("fixture forbids account network requests");
   });
-  sidecar.selectNativeChat.mockReturnValue(source);
+  sidecar.selectNativeChat.mockReturnValue({
+    ...source,
+    configHome: source.providerHome,
+  });
   sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
     userDataPath: source.userDataPath,
     network: { prepare, getSubscriptionModels: getModels },
@@ -1618,7 +1621,10 @@ async function subscriptionDesktop() {
         fetch: accountHttp,
       }),
       resources!,
-      [source.userDataPath, source.providerHome],
+      {
+        workspace: [source.userDataPath, source.providerHome],
+        launch: [source.userDataPath],
+      },
       { openExternal: browser, modelCatalogue }
     );
   };

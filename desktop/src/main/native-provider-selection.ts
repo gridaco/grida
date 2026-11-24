@@ -2,6 +2,7 @@
 import {
   allowsLlamaCppInputCounting,
   isValidEndpointProviderId,
+  resolveEndpointModel,
   type EndpointProviderConfig,
 } from "@grida/ai-host";
 import { bundledModelCatalogue, ChatModels } from "@grida/ai/catalogue";
@@ -33,6 +34,7 @@ export namespace NativeProviderSelection {
       | "model"
       | "wireModel"
       | "imageInput"
+      | "contextWindowTokens"
       | "maxOutputTokens"
       | "reasoning"
       | "credentialHome"
@@ -131,6 +133,7 @@ export namespace NativeProviderSelection {
       model,
       wireModel: binding.wireModel,
       imageInput: binding.imageInput,
+      contextWindowTokens: binding.contextWindow,
       maxOutputTokens: binding.maxOutputTokens,
       credentialHome: home,
       subagents: true,
@@ -140,8 +143,7 @@ export namespace NativeProviderSelection {
         isCurrent: () => custody.isCurrent(network),
         prepare: (url, headers) => {
           if (
-            (url !== target &&
-              (!isOpenAiProject || url !== `${target}/input_tokens`)) ||
+            url !== target ||
             !/^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
           )
             return null;
@@ -170,10 +172,8 @@ export namespace NativeProviderSelection {
     if (!config || !isValidEndpointProviderId(config.id))
       throw new Error("native_provider_endpoint_unavailable");
     const model = modelId ?? config.default_model_id ?? config.models[0]?.id;
-    if (
-      model === undefined ||
-      !config.models.some((entry) => entry.id === model)
-    )
+    const selected = config.models.find((entry) => entry.id === model);
+    if (model === undefined || !selected)
       throw new Error("native_provider_model_unavailable");
     const endpoint = config.base_url;
     const target = URL.parse(endpoint);
@@ -206,13 +206,11 @@ export namespace NativeProviderSelection {
       : undefined;
     const network = await settings.network(config.id, endpoint);
     target.pathname = `${target.pathname.replace(/\/$/, "")}/chat/completions`;
-    const countTarget = llamaCppInputCount
-      ? `${target.href}/input_tokens`
-      : undefined;
     return {
       provider: "openai-compatible",
       endpoint,
       model,
+      contextWindowTokens: resolveEndpointModel(selected).contextWindow,
       configuredEndpointId: config.id,
       ...(llamaCppInputCount && { llamaCppInputCount }),
       ...(credentialHome && {
@@ -225,7 +223,7 @@ export namespace NativeProviderSelection {
             ? custody.isCurrent(network)
             : (network.isCurrent?.() ?? true),
         prepare: (url, headers) =>
-          (url === target.href || url === countTarget) &&
+          url === target.href &&
           (hasKey
             ? /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
             : !headers.has("authorization"))

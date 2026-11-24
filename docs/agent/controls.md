@@ -43,10 +43,13 @@ correction at its next decision. For example, “Keep the first slide and revise
 the second one” belongs in the current turn if the agent is still editing the
 deck.
 
-**Steer** is not offered for a message queued with **Plan**, with **Ultra**
-effort, as a goal, or with an attachment; those wait for their own turn. If
-the turn ends before your correction arrives, its text returns to the
-composer as an unsent draft.
+**Steer** addresses the running turn you see. An eligible image or file
+reference goes with the message. Steered images can be previewed alongside
+the turn's other activity, including after reopening the chat. If the turn
+finishes or cannot accept the message, the action leaves it in the queue.
+A message queued with **Plan**, **Ultra**, or a new **Goal** keeps its own turn.
+Steering an active Plan keeps it read-only, and steering a Goal leaves its
+objective in place.
 
 ## Queue work for later
 
@@ -65,17 +68,30 @@ thumbnail when its preview is available.
 Opening this preview leaves the message in the queue and does not edit it.
 
 Before a waiting message starts, drag it, or open its **…** menu and choose
-**Move up** or **Move down**, to reorder it. Choose **…** → **Edit** to load its
-text into the main composer. The message stays queued and is marked **Editing**.
-Choose **Save changes** or press Enter to replace its text; its other options
-stay the same. **Cancel** or Escape leaves it unchanged. Your unsent draft,
-attachments and selected modes return when editing ends. If saving fails, your
-edit stays in the composer to retry. Steering is unavailable while the composer
-holds an edit. On a supported Desktop runtime, messages with images or files
-can also be edited: only their text changes, and you can clear the caption
-while keeping the attachment. The attached content, captured settings and queue
-position stay the same. Older runtimes offer editing for plain text only.
-Goals cannot be edited; remove the queued goal and send a new one instead.
+**Move up** or **Move down**, to reorder it. Choose **…** → **Edit** to
+take that message out of the runnable queue and open it in the composer.
+Other waiting messages can run while you edit. Add or remove attachment cards
+in the same composer. **Send** or Enter returns the revised message
+to its reserved position among the remaining items with its captured settings.
+
+Escape restores the original message. **⌘Z** undoes edits and,
+at the start of the edit's history, also restores the original to the queue.
+Your ordinary draft, attachments, and selected modes come back when editing
+ends. If confirmation is interrupted, use **Retry** to check the outcome.
+When you reopen a chat with an unfinished edit, choose **Continue editing**
+or **Restore original**. A queued Goal can be removed and sent again with a
+revised objective.
+
+Press ↑ in an empty composer to open the most recent waiting message when
+it is editable. Use **Send** to return your revision or Escape to restore the
+original.
+
+When the queue is empty, ↑ recalls a sent prompt. If you already staged a file,
+↑ copies only the text from the waiting or sent message into the current draft.
+If that message contains only an attachment, ↑ leaves the draft as it is.
+While the field contains text, ↑ and ↓ move the caret as usual.
+Use **⌘Z** to undo a recall. Undo and redo also work
+after Send and for changes to a staged file in a text-free draft.
 
 If the current turn asks a question, answer it in its card. Use Shift+Enter
 to add a line in a custom answer. For a set of questions, use the arrows around
@@ -98,6 +114,17 @@ the turn ends. A separate queued message leaves the questions open.
 
 Your answers appear with their questions. Open **Worked for …** on a finished
 turn to read the exchange again.
+
+## Compact context
+
+Send `/compact` in an idle chat with an open, empty queue to summarize earlier
+model context. The command clears as it is sent. The transcript shows
+**Compacting context**, then the result. Once compaction starts, you can send
+a follow-up and it waits in the queue. The original conversation stays in the
+transcript.
+
+If the chat cannot confirm the start, **Retry compaction** checks the same
+request while preserving your next draft.
 
 ## Pause, resume, or move on
 
@@ -148,6 +175,9 @@ typing while it checks. Once that send is accounted for, you can send the
 next draft. A confirmed refusal also offers **Edit** to restore the message
 into an empty composer, or **Dismiss** to continue with your current draft.
 
+When a send with attachments is accepted, reopening the chat shows that
+message in the transcript or queue and restores any newer unsent draft.
+
 If the agent process ended during a turn, the chat can show that the turn was
 interrupted. Review any partial work, then choose **End interrupted turn** to
 settle it, or **Finish ending turn** if it was already stopping. This keeps
@@ -191,10 +221,15 @@ controls live separately in the workspace's **Processes** tab.
 ## Return to background work
 
 With system notifications turned on, Desktop tells you when a workspace chat
-finishes, fails or ends with an uncertain result while its window is out of
-focus. When a turn succeeds, the notification shows the chat title and a short
+finishes, fails or ends with an uncertain result while you’re away from that
+chat. This includes viewing another chat in the same project. When a turn
+succeeds, the notification shows the chat title and a short
 excerpt from the final reply. If the chat has no title, it shows **Grida
 Agent**. If the reply has no preview text, it shows **Turn completed**.
+
+Automatic compaction stays silent in system notifications. The following
+reply can still notify you. When you run `/compact` yourself, Desktop can
+notify you when it finishes.
 
 When a question arrives in another chat or side tab, the notification shows
 its chat title and question. The system’s notification settings control where

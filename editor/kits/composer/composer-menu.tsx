@@ -3,6 +3,7 @@
 import {
   createContext,
   type HTMLAttributes,
+  type MouseEvent,
   type ReactNode,
   type Ref,
   useContext,
@@ -37,11 +38,29 @@ const Anchor = createContext<HTMLElement | null>(null);
 export function ComposerMenuAnchor({
   children,
   className,
+  onClick,
   onPointerDown,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
   const { editor } = useComposerInternals();
+  const focusDraft = (event: MouseEvent<HTMLDivElement>) => {
+    const { currentTarget, target } = event;
+    if (
+      !editor?.isEditable ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      !(target instanceof Element) ||
+      !currentTarget.contains(target)
+    )
+      return;
+    const control = target.closest(
+      "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu], [data-composer-formatting]"
+    );
+    if (control && currentTarget.contains(control)) return;
+    event.preventDefault();
+    editor.commands.focus("end");
+  };
   return (
     <Anchor.Provider value={anchor}>
       <div
@@ -51,21 +70,17 @@ export function ComposerMenuAnchor({
         data-composer-menu-anchor
         onPointerDown={(event) => {
           onPointerDown?.(event);
-          const { currentTarget, target } = event;
+          focusDraft(event);
+        }}
+        onClick={(event) => {
+          onClick?.(event);
+          // Clicks without pointer-down also activate the composer surface.
           if (
-            !editor?.isEditable ||
-            event.defaultPrevented ||
-            event.button !== 0 ||
-            !(target instanceof Element) ||
-            !currentTarget.contains(target)
+            !editor?.view.hasFocus() &&
+            event.currentTarget.ownerDocument.getSelection()?.isCollapsed !==
+              false
           )
-            return;
-          const control = target.closest(
-            "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu], [data-composer-formatting]"
-          );
-          if (control && currentTarget.contains(control)) return;
-          event.preventDefault();
-          editor.commands.focus("end");
+            focusDraft(event);
         }}
       >
         {children}
@@ -283,7 +298,13 @@ export function ComposerTriggerMenu({
         }}
       >
         <CommandList
-          aria-label={trigger.kind === "command" ? "Commands" : "Mentions"}
+          aria-label={
+            trigger.kind === "command"
+              ? "Commands"
+              : trigger.kind === "skill"
+                ? "Skills"
+                : "Mentions"
+          }
           className="max-h-64 scroll-py-1 p-1 outline-none"
         >
           <CommandGroup className="p-0">
@@ -323,13 +344,23 @@ export function ComposerTriggerMenu({
                       forces the title to give up space.) */}
                   <span className="flex w-full min-w-0 items-baseline gap-2">
                     <span className="shrink-0 font-mono text-muted-foreground">
-                      {trigger.kind === "command" ? "/" : "@"}
+                      {trigger.kind === "command"
+                        ? "/"
+                        : trigger.kind === "skill"
+                          ? "$"
+                          : "@"}
                     </span>
                     <span className="max-w-full shrink-0 truncate font-normal">
                       {trigger.kind === "command"
                         ? (item as ComposerCommand).title
                         : (item as ComposerMention).label}
                     </span>
+                    {trigger.kind === "skill" &&
+                      (item as ComposerMention).source && (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {(item as ComposerMention).source}
+                        </span>
+                      )}
                     {description && (
                       <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
                         {description}

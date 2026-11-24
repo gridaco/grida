@@ -17,12 +17,24 @@ Pass `--initial-title "Draft comparison"` to `grida agent run` to give the
 chat a provisional title when its first message is accepted. ACP clients
 can read the saved title with `session/list` for that workspace.
 
-With `grida agent run --questions`, an answer-dependent question returns
-`input_required` and exit code 6. The JSON Lines result identifies the turn
-and question. An optional question can expire when the agent finishes its
-work. Interactive clients using `grida agent serve --stdio` can answer an open
-question and read running and input-needed indicators through the
-[workspace chat catalog](../agent/clients.md#connect-an-acp-client).
+## Choose a question format
+
+Pass one of the question flags per run.
+
+- `grida agent run --questions` enables single-question requests. The command
+  writes JSON Lines with `schema_version` 1. Pending question entries have
+  top-level `question` and `options` fields.
+- `grida agent run --questions-v2` enables question batches. The command writes
+  JSON Lines with `schema_version` 2. Each pending batch contains a nested
+  `questions` array. If your script reads batch output from Grida 0.8.0, switch
+  to `--questions-v2` and accept schema version 2.
+
+In either format, a required question returns `input_required` and exit code 6.
+The result identifies the session, turn, and pending questions.
+An unanswered optional question expires when the turn ends.
+
+An ACP client can reopen the session and answer pending questions using the
+matching methods. [Connect an ACP client](../agent/clients.md#connect-an-acp-client)
 
 For setup, commands, exit codes, and the available client controls, see
 [Connect an agent client](../agent/clients.md#use-your-grida-login).

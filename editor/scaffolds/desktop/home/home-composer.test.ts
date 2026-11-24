@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import {
+  ComposerDrafts,
+  type ComposerDraftBlob,
+  type ComposerDraftBlobs,
+} from "@/lib/agent-chat/composer-drafts";
 import type { Workspace } from "@/lib/desktop/bridge";
 import { imagesMessageContext } from "@/lib/desktop/images-message-context";
 import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
@@ -41,6 +45,16 @@ function memoryStorage(): Storage {
   };
 }
 
+function memoryBlobs() {
+  const entries = new Map<string, ComposerDraftBlob>();
+  const store: ComposerDraftBlobs = {
+    get: async (key) => entries.get(key) ?? null,
+    put: async (key, value) => void entries.set(key, value),
+    delete: async (key) => void entries.delete(key),
+  };
+  return { entries, store };
+}
+
 function fullAccess() {
   const review = {
     reviewId: "review",
@@ -68,6 +82,146 @@ const fastPreview = {
 } as const satisfies HomeComposer.CapabilityPreview;
 
 describe("HomeComposer", () => {
+  it("restores the whole failed image request when the recovery lookup is still pending", async () => {
+    const storage = memoryStorage();
+    const blobs = memoryBlobs();
+    const composer = new HomeComposer(new ComposerDrafts(storage, blobs.store));
+    const { host } = setup();
+    vi.mocked(host.stash).mockReturnValue(false);
+    const source = composer.draftFor(workspace.id);
+    const document = { text: input.text };
+    const first = new File(["first"], "same.png", { type: "image/png" });
+    const second = new File(["second"], "same.png", { type: "image/png" });
+    composer.transfer({
+      resources: [first, second].map((file) => ({ kind: "file", file })),
+    });
+    expect(
+      composer.capture(input, document, host, { ...source, read: () => null })
+    ).toBe(true);
+    await vi.waitFor(() => expect(composer.read().busy).toBe(false));
+    const stored = blobs.store.get.bind(blobs.store);
+    const read = Promise.withResolvers<void>();
+    vi.spyOn(blobs.store, "get").mockImplementation(async (key) => {
+      if (key === `${source.key}:outgoing`) await read.promise;
+      return stored(key);
+    });
+    const reopened = new HomeComposer(new ComposerDrafts(storage, blobs.store));
+    reopened.recoverDraft(source.key, () => false);
+    const editor = vi.fn<(document: unknown) => boolean>(() => true);
+    const editing = reopened.restoreCaptured(editor);
+    expect(editor).not.toHaveBeenCalled();
+    read.resolve();
+    expect(await editing).toBe(true);
+    expect(editor).toHaveBeenCalledExactlyOnceWith(document);
+    expect(reopened.read().attachments.map(({ input }) => input)).toEqual([
+      expect.objectContaining({ file: first }),
+      expect.objectContaining({ file: second }),
+    ]);
+  });
+
+  it("keeps the original image cache if copying the failed request cannot be persisted", async () => {
+    const storage = memoryStorage();
+    const blobs = memoryBlobs();
+    const composer = new HomeComposer(new ComposerDrafts(storage, blobs.store));
+    const { host } = setup();
+    vi.mocked(host.stash).mockReturnValue(false);
+    const source = composer.draftFor(workspace.id);
+    const document = { text: input.text };
+    const image = new File(["img"], "same.png", { type: "image/png" });
+    const put = blobs.store.put.bind(blobs.store);
+    vi.spyOn(blobs.store, "put").mockImplementation(async (key, value) => {
+      if (key === `${source.key}:outgoing`) throw new Error("disk full");
+      return put(key, value);
+    });
+    composer.transfer({ resources: [{ kind: "file", file: image }] });
+    expect(
+      composer.capture(input, document, host, { ...source, read: () => null })
+    ).toBe(true);
+    await vi.waitFor(() => expect(composer.read().busy).toBe(false));
+    expect(blobs.entries.has(HomeComposer.key)).toBe(true);
+    const reopened = new HomeComposer(new ComposerDrafts(storage, blobs.store));
+    reopened.recoverDraft(source.key, () => false);
+    expect(await reopened.restoreCaptured(() => true)).toBe(true);
+    expect(reopened.read().attachments[0]?.input).toMatchObject({
+      file: image,
+    });
+  });
+
+  it.each([false, true])(
+    "retires only the submitted text from the recovery cache, with an identical next draft: %s",
+    async (typedAgain) => {
+      const storage = memoryStorage();
+      const drafts = new ComposerDrafts(storage, null);
+      const composer = new HomeComposer(drafts);
+      const { host } = setup();
+      vi.mocked(host.stash).mockReturnValue(false);
+      const source = composer.draftFor(workspace.id);
+      const document = { text: input.text };
+      const documentKey = ComposerDrafts.prefix + source.key;
+      drafts.write(source.key, document);
+      const submitted = storage.getItem(documentKey)!;
+      composer.transfer({
+        resources: [
+          {
+            kind: "file",
+            file: new File(["image"], "image.png", { type: "image/png" }),
+          },
+        ],
+      });
+      expect(
+        composer.capture(input, document, host, { ...source, read: () => null })
+      ).toBe(true);
+      await vi.waitFor(() => expect(composer.read().busy).toBe(false));
+      if (typedAgain) drafts.write(source.key, structuredClone(document));
+      else storage.setItem(documentKey, submitted);
+
+      const reopenedDrafts = new ComposerDrafts(storage, null);
+      const reopened = new HomeComposer(reopenedDrafts);
+      reopened.recoverDraft(source.key, () => false);
+      expect(reopened.read().draftKey).toBe(source.key);
+      expect(reopenedDrafts.read(source.key)).toEqual(
+        typedAgain ? document : null
+      );
+      expect(reopened.read().outgoing).toMatchObject({
+        status: "failed",
+        handedOff: false,
+      });
+    }
+  );
+
+  it("refuses to send if the submitted text cannot leave the active draft cache", () => {
+    const storage = memoryStorage();
+    const drafts = new ComposerDrafts(storage, null);
+    const composer = new HomeComposer(drafts);
+    const { host } = setup();
+    const source = composer.draftFor(workspace.id);
+    const document = { text: input.text };
+    const image = new File(["image"], "one.png", { type: "image/png" });
+    drafts.write(source.key, document);
+    composer.transfer({ resources: [{ kind: "file", file: image }] });
+    const removeItem = storage.removeItem.bind(storage);
+    vi.spyOn(storage, "removeItem").mockImplementation((key) => {
+      if (key === ComposerDrafts.prefix + source.key)
+        throw new Error("storage unavailable");
+      removeItem(key);
+    });
+
+    expect(() =>
+      composer.capture(input, document, host, {
+        ...source,
+        read: () => document,
+      })
+    ).toThrow("Couldn't send from Home. Your draft is still here.");
+    expect(composer.read().attachments[0]?.input).toMatchObject({
+      file: image,
+    });
+    expect(composer.read().outgoing).toBeNull();
+    expect(host.stash).not.toHaveBeenCalled();
+    expect(new ComposerDrafts(storage, null).read(source.key)).toEqual(
+      document
+    );
+  });
+
   it("recovers captured content and attachment metadata after reload before handoff", async () => {
     const storage = memoryStorage();
     const drafts = new ComposerDrafts(storage, null);
@@ -105,14 +259,14 @@ describe("HomeComposer", () => {
     expect(reloaded.read().outgoing).toBeNull();
     reloaded.recoverDraft(source.key, () => false);
     expect(reloaded.read()).toMatchObject({
-      attachment: null,
+      attachments: [],
       outgoing: { status: "failed", retryable: false, handedOff: false },
     });
     expect(reloadedDrafts.read(source.key)).toEqual(following);
     reloaded.retryCaptured(host);
     expect(host.stash).not.toHaveBeenCalled();
     const editor = vi.fn<(document: unknown) => boolean>(() => false);
-    expect(reloaded.restoreCaptured(editor)).toBe(false);
+    expect(await reloaded.restoreCaptured(editor)).toBe(false);
     expect(editor).toHaveBeenCalledExactlyOnceWith(submitted);
     expect(reloadedDrafts.read(source.key)).toEqual(following);
 
@@ -149,17 +303,27 @@ describe("HomeComposer", () => {
   );
 
   it("exposes only opening status on Home and hands the whole message to the workspace", async () => {
-    const { composer, host } = setup();
+    const { composer, drafts, host } = setup();
     const target = Promise.withResolvers<Workspace>();
     vi.mocked(host.defaultWorkspace).mockReturnValue(target.promise);
-    const file = new File(["notes"], "notes.txt");
-    composer.transfer({ resources: [{ kind: "file", file }] });
+    const first = new File(["notes"], "notes.txt");
+    const second = new File(["image"], "photo.png", { type: "image/png" });
+    composer.transfer({ resources: [{ kind: "file", file: first }] });
+    composer.transfer({ resources: [{ kind: "file", file: second }] });
+    const source = composer.draftFor(workspace.id);
+    const submitted = { text: input.text };
+    const following = { text: "The next draft is separate" };
+    drafts.write(source.key, submitted);
 
     expect(
-      composer.capture({ ...input, target: null }, { text: input.text }, host)
+      composer.capture({ ...input, target: null }, submitted, host, {
+        ...source,
+        read: () => drafts.read(source.key),
+      })
     ).toBe(true);
+    drafts.write(source.key, following);
     expect(composer.read()).toMatchObject({
-      attachment: null,
+      attachments: [],
       busy: true,
     });
     expect(composer.read().outgoing).toEqual({ status: "opening" });
@@ -172,10 +336,17 @@ describe("HomeComposer", () => {
       workspace.id,
       expect.objectContaining({
         text: input.text,
-        attachment: { kind: "file", file },
+        attachments: [
+          { kind: "file", file: first },
+          { kind: "file", file: second },
+        ],
         requestId: expect.any(String),
       })
     );
+    const handedOff = vi.mocked(host.stash).mock.calls[0][1];
+    handedOff.transferNextDraft?.({ store: drafts, key: "workspace:draft" });
+    expect(drafts.read("workspace:draft")).toEqual(following);
+    expect(await drafts.readAttachmentBatch(HomeComposer.key)).toBeNull();
   });
 
   it("recovers a refused rich request only when the editor accepts its exact document", async () => {
@@ -197,15 +368,15 @@ describe("HomeComposer", () => {
       })
     );
     const occupied = vi.fn<(document: unknown) => boolean>(() => false);
-    expect(composer.restoreCaptured(occupied)).toBe(false);
+    expect(await composer.restoreCaptured(occupied)).toBe(false);
     expect(occupied).toHaveBeenCalledExactlyOnceWith(rich);
-    expect(composer.read().attachment).toBeNull();
+    expect(composer.read().attachments).toEqual([]);
 
     const empty = vi.fn<(document: unknown) => boolean>(() => true);
-    expect(composer.restoreCaptured(empty)).toBe(true);
+    expect(await composer.restoreCaptured(empty)).toBe(true);
     expect(empty).toHaveBeenCalledExactlyOnceWith(rich);
     expect(composer.read().outgoing).toBeNull();
-    expect(composer.read().attachment?.file).toBe(file);
+    expect(composer.read().attachments[0]?.input).toMatchObject({ file });
   });
 
   it("retries the same captured Home request and moves only the latest next draft once", async () => {
@@ -299,7 +470,7 @@ describe("HomeComposer", () => {
         handedOff: true,
       })
     );
-    expect(composer.restoreCaptured(() => true)).toBe(false);
+    expect(await composer.restoreCaptured(() => true)).toBe(false);
     composer.discardCaptured();
     expect(composer.read().outgoing).toMatchObject({ handedOff: true });
     composer.retryCaptured(host);
@@ -336,8 +507,7 @@ describe("HomeComposer", () => {
       await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
       // The person intentionally types the very same message again after push.
       const next = structuredClone(first);
-      drafts.write(source.key, next);
-      source.onWrite(next);
+      source.onWrite(next, drafts.write(source.key, next));
 
       const later = new ComposerDrafts(storage, null);
       if (editedHomeAgain) later.write(source.key, structuredClone(first));
@@ -385,6 +555,35 @@ describe("HomeComposer", () => {
     expect(drafts.read(source.key)).toBeNull();
   });
 
+  it("moves the old Home follow-up without overwriting a newer Home visit during cleanup", async () => {
+    const disk = memoryStorage();
+    const home = new HomeComposer(new ComposerDrafts(disk, null));
+    const source = home.draftFor(workspace.id);
+    const { host } = setup();
+    let live: unknown = null;
+    expect(
+      home.capture(input, { text: input.text }, host, {
+        ...source,
+        read: () => live,
+      })
+    ).toBe(true);
+    await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
+    live = { text: "First follow-up" };
+    source.onWrite(live, source.store.write(source.key, live));
+    const newer = { text: "Started in a separate Home visit" };
+    new ComposerDrafts(disk, null).write(source.key, newer);
+    live = { text: "Last edit from the first visit" };
+    home.flushNextDraft();
+
+    const target = new ComposerDrafts(disk, null);
+    vi.mocked(host.stash).mock.calls[0][1].transferNextDraft!({
+      store: target,
+      key: "workspace:new",
+    });
+    expect(target.read("workspace:new")).toEqual(live);
+    expect(new ComposerDrafts(disk, null).read(source.key)).toEqual(newer);
+  });
+
   it.each([false, true])(
     "keeps an occupied workspace draft and retires the follow-up copy, with later Home edits: %s",
     async (editedHomeAgain) => {
@@ -403,7 +602,10 @@ describe("HomeComposer", () => {
       live = { text: "The next message" };
       home.flushNextDraft();
       const target = new ComposerDrafts(disk, null);
-      target.write("workspace:new", { text: "Already writing here" });
+      target.write("workspace:new", null);
+      new ComposerDrafts(disk, null).write("workspace:new", {
+        text: "Already writing here",
+      });
       const request = vi.mocked(host.stash).mock.calls[0][1];
       const key = `desktop-home:followup:${request.requestId}`;
       expect(new ComposerDrafts(disk, null).read(key)).toBeTruthy();
@@ -438,8 +640,7 @@ describe("HomeComposer", () => {
       })
     ).toBe(true);
     await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
-    source.store.write(source.key, next);
-    source.onWrite(next);
+    source.onWrite(next, source.store.write(source.key, next));
     const target = new ComposerDrafts(null, null);
     vi.mocked(host.stash).mock.calls[0][1].transferNextDraft!({
       store: target,
@@ -646,6 +847,7 @@ describe("HomeComposer", () => {
         "chosen",
         expect.objectContaining({
           text,
+          initialWorkbenchPath: "pitch 2.canvas",
           messageContext: {
             modelText: expect.stringContaining(
               '"pitch 2.canvas". Edit that deck and keep its visual system.'
@@ -774,7 +976,7 @@ describe("HomeComposer", () => {
     });
     expect(request).not.toHaveProperty("effort");
     expect(request.attachment?.file).toBe(file);
-    expect(composer.read().attachment).toBeNull();
+    expect(composer.read().attachments).toEqual([]);
     expect(composer.read().plan).toBe(false);
     expect(composer.read().permissionMode).toBe("restricted");
   });
@@ -1036,7 +1238,7 @@ describe("HomeComposer", () => {
       ).rejects.toThrow("Write a message");
       expect(host.stash).not.toHaveBeenCalled();
       expect(host.open).not.toHaveBeenCalled();
-      expect(composer.read().attachment).toEqual({ kind, file });
+      expect(composer.read().attachments[0]?.input).toMatchObject({ file });
     }
   );
 
@@ -1138,7 +1340,7 @@ describe("HomeComposer", () => {
     expect(composer.read()).toMatchObject({
       busy: false,
       plan: true,
-      attachment: { file },
+      attachments: [{ input: { file } }],
     });
     expect(drafts.read(HomeComposer.key)).toEqual({ text: "unsent" });
   });
@@ -1173,24 +1375,33 @@ describe("HomeComposer", () => {
     );
   });
 
-  it("keeps Goal and attachment mutually exclusive and handles single-file intake", () => {
+  it("appends attachments in gesture order and removes only the selected card", () => {
     const { composer } = setup();
     const file = new File(["text"], "a.txt");
     composer.selectGoal(true);
     composer.transfer({ resources: [{ kind: "file", file }] });
-    expect(composer.read().attachment).toBeNull();
+    expect(composer.read().attachments).toEqual([]);
     composer.selectGoal(false);
     composer.transfer({ resources: [{ kind: "file", file }] });
     composer.selectGoal(true);
     expect(composer.read().goal).toBe(false);
+    const duplicateName = new File(["different"], "a.txt");
+    const folder = new File([], "assets");
     composer.transfer({
       resources: [
-        { kind: "file", file },
-        { kind: "file", file },
+        { kind: "directory", file: folder },
+        { kind: "file", file: duplicateName },
       ],
     });
-    expect(composer.read().notice).toBe("Attach one file at a time.");
-    expect(composer.read().attachment?.file).toBe(file);
+    const staged = composer.read().attachments;
+    expect(staged.map((entry) => entry.card.name)).toEqual([
+      "a.txt",
+      "assets",
+      "a.txt",
+    ]);
+    expect(new Set(staged.map((entry) => entry.id)).size).toBe(3);
+    composer.removeAttachment(staged[0].id);
+    expect(composer.read().attachments).toEqual([staged[1], staged[2]]);
   });
 
   it("restores draft modes and image bytes through the existing draft store", async () => {
@@ -1204,9 +1415,12 @@ describe("HomeComposer", () => {
     });
     const restored = new HomeComposer(drafts);
     await restored.restore();
-    expect(restored.read()).toMatchObject({ plan: true, attachment: { file } });
-    restored.removeAttachment();
-    expect(await drafts.readAttachment(HomeComposer.key)).toBeNull();
+    expect(restored.read()).toMatchObject({
+      plan: true,
+      attachments: [{ input: { file } }],
+    });
+    restored.removeAttachment(restored.read().attachments[0].id);
+    expect(await drafts.readAttachmentBatch(HomeComposer.key)).toBeNull();
   });
 
   it("awaits attachment restoration before submitting and freezes staged intent meanwhile", async () => {
@@ -1229,7 +1443,7 @@ describe("HomeComposer", () => {
     composer.transfer({
       resources: [{ kind: "file", file: new File(["late"], "late.txt") }],
     });
-    composer.removeAttachment();
+    composer.removeAttachment("late");
     expect(host.stash).not.toHaveBeenCalled();
     disk.resolve({ kind: "image", name: file.name, file });
     await sending;
@@ -1266,7 +1480,7 @@ describe("HomeComposer", () => {
     composer.transfer({ resources: [{ kind: "file", file }] });
     disk.resolve(null);
     await restore;
-    expect(composer.read().attachment?.file).toBe(file);
+    expect(composer.read().attachments[0]?.input).toMatchObject({ file });
   });
 });
 

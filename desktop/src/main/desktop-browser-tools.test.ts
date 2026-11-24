@@ -1,8 +1,12 @@
 // GRIDA-SEC-004 / GRIDA-SEC-016 — exact renderer publication and tooling lease.
+import { EventEmitter } from "node:events";
 import type { IpcMainInvokeEvent } from "electron";
 import { expect, it, vi } from "vitest";
 import { DesktopBrowserTools } from "./desktop-browser-tools";
-import type { DesktopBrowserHost } from "./browser-host";
+import type {
+  BrowserAutomationScope,
+  DesktopBrowserHost,
+} from "./browser-host";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import type { ObservedWorkbenchDocument } from "./browser-automation";
@@ -35,16 +39,20 @@ function workbench() {
     url: "https://grida.co/desktop/workspace?id=5bd8f11d11d7effe",
     send: vi.fn<(channel: string, payload: unknown) => void>(),
   };
-  const sender = {
+  const sender = Object.assign(new EventEmitter(), {
     mainFrame: frame,
     isDestroyed: () => false,
     isLoadingMainFrame: () => false,
-  };
+  });
   return {
     frame,
     sender,
     event: { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent,
   };
+}
+
+function liveWorkspace({ live }: BrowserAutomationScope) {
+  return { current: live };
 }
 
 it("projects the current workbench and binds requests to their exact publication", async () => {
@@ -59,6 +67,7 @@ it("projects the current workbench and binds requests to their exact publication
     }),
   };
   const host = {
+    automationWorkspace: liveWorkspace,
     automationWorkbenchPages: vi.fn<() => (typeof page)[]>(() => [page]),
     presentWorkbenchAutomationPage: vi.fn<
       DesktopBrowserHost["presentWorkbenchAutomationPage"]
@@ -130,6 +139,7 @@ it("projects the current workbench and binds requests to their exact publication
 
 it("routes a workspace file and a hosted universal link through their own openers", async () => {
   const host = {
+    automationWorkspace: liveWorkspace,
     openWorkbenchAutomationPage: vi.fn<() => { snapshot(): { id: string } }>(
       () => ({
         snapshot: () => ({ id: pageId }),
@@ -186,6 +196,68 @@ it("routes a workspace file and a hosted universal link through their own opener
   expect(view.frame.send).toHaveBeenCalledTimes(1);
   expect(host.openWorkbenchAutomationPage).toHaveBeenCalledTimes(1);
   lease.close();
+});
+
+it("rejects retired view publications and actions even in the same frame and URL", async () => {
+  const host = {
+    automationWorkspace: liveWorkspace,
+  };
+  const tools = new DesktopBrowserTools(host as unknown as DesktopBrowserHost);
+  const { event, frame } = workbench();
+  const lease = () => tools.lease(event.sender, event.senderFrame!, () => {});
+  const target = { kind: "file", path: file };
+  expect(tools.publish(event, snapshot, null, 1)).toBe(true);
+  const first = lease();
+  await expect(
+    first.invoke("surface_open", { target }, signal)
+  ).resolves.toMatchObject({ data: { presentation: "requested" } });
+  expect(frame.send).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+    path: file,
+    expiresAtMs: expect.any(Number),
+    viewId: 1,
+  });
+  expect(tools.retire(event, 1)).toBe(true);
+  expect(tools.publish(event, snapshot, null, 1)).toBe(false);
+  expect(tools.publish(event, snapshot, null)).toBe(false);
+  expect(tools.publish(event, snapshot, null, 2)).toBe(true);
+  expect(tools.retire(event, 1)).toBe(true);
+  expect(lease().ready()).toBe(true);
+  expect(first.ready()).toBe(false);
+  await expect(
+    first.invoke("surface_open", { target }, signal)
+  ).resolves.toEqual({ disposition: "not_dispatched", error: "owner_revoked" });
+  expect(frame.send).toHaveBeenCalledTimes(1);
+});
+
+it("pins a tool lease to its exact Browser owner through same-frame reattachment", async () => {
+  const { event } = workbench();
+  let attachment = Symbol();
+  const host = {
+    automationWorkspace: ({ live }: BrowserAutomationScope) => {
+      const captured = attachment;
+      return { current: () => captured === attachment && live() };
+    },
+    automationWorkbenchPages: vi.fn<
+      DesktopBrowserHost["automationWorkbenchPages"]
+    >(() => []),
+  };
+  const tools = new DesktopBrowserTools(host as unknown as DesktopBrowserHost);
+  expect(tools.publish(event, snapshot, null, 1)).toBe(true);
+  const first = tools.lease(event.sender, event.senderFrame!, () => {});
+  expect(first.ready()).toBe(true);
+  attachment = Symbol();
+  const replacement = tools.lease(event.sender, event.senderFrame!, () => {});
+  expect(replacement.ready()).toBe(true);
+  expect(first.workbench?.tabs()).toBeNull();
+  expect(first.workbench?.show({ kind: "tab", tabId: pageId }, false)).toEqual({
+    disposition: "not_dispatched",
+    error: "owner_revoked",
+  });
+  await expect(first.invoke("surface_list_open", {}, signal)).resolves.toEqual({
+    disposition: "not_dispatched",
+    error: "owner_revoked",
+  });
+  expect(host.automationWorkbenchPages).not.toHaveBeenCalled();
 });
 
 it("discards the selected FX sample when selection leaves and returns to the same tab", async () => {

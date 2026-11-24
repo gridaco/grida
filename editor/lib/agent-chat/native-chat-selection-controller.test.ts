@@ -7,6 +7,7 @@ import type {
   NativeChatSelectionTarget,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
+import { ComposerDraftBinding } from "./composer-draft-binding";
 import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { WorkspaceOpening } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
@@ -1752,26 +1753,26 @@ describe("incomplete draft creation settings recovery", () => {
 
   it("keeps the composer bound to its original draft until the destination document has committed", async () => {
     const f = await setup();
-    const { ComposerDraftBinding } = await import("./composer-draft-binding");
     const binding = new ComposerDraftBinding();
-    binding.restored(f.key);
-    let document: unknown = { text: "Keep this draft" };
+    let document: unknown | null = null;
+    const editor: ComposerDraftBinding.Editor = {
+      ready: true,
+      readDocument: () => document,
+      clearForHistory: () => {
+        document = null;
+      },
+      restoreDocument: (saved) => {
+        document = saved;
+        return true;
+      },
+    };
+    binding.restore({ key: f.key, store: f.store }, editor);
     const seen: { key: string; document: unknown; destination: unknown }[] = [];
-    // Match the composer's switch/restore/write behavior outside a Send.
     const unsubscribe = f.controller.subscribe(() => {
       const draft = f.controller.composerDraft();
       if (!draft) return;
-      const meeting = binding.meet(draft.key, draft.promotedFrom);
-      if (meeting !== "held") {
-        const saved = draft.store.read(draft.key);
-        if (
-          meeting === "switch" ||
-          JSON.stringify(saved) !== JSON.stringify(document)
-        )
-          document = saved ?? { text: "" };
-        binding.restored(draft.key);
-      }
-      if (binding.held === draft.key) draft.store.write(draft.key, document);
+      binding.restore(draft, editor);
+      binding.retain(draft, document);
       seen.push({
         key: draft.key,
         document,

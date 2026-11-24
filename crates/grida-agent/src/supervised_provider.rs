@@ -10,6 +10,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
 use reqwest::{Url, header::HeaderMap};
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
@@ -501,6 +502,7 @@ pub(crate) enum ProviderRoute {
         model: agent_kit_core::ModelId,
         endpoint: String,
         protocol: crate::ProviderProtocol,
+        context_window_tokens: Option<NonZeroU64>,
         max_output_tokens: Option<u64>,
         credential_home: Option<std::path::PathBuf>,
         configured_endpoint_key: Option<String>,
@@ -516,6 +518,7 @@ pub(crate) enum ProviderRoute {
         model: agent_kit_core::ModelId,
         endpoint: String,
         scope: String,
+        context_window_tokens: Option<NonZeroU64>,
         max_output_tokens: Option<u64>,
         #[serde(default)]
         gateway_billing: bool,
@@ -528,5 +531,6 @@ pub(crate) enum ProviderRoute {
         model: agent_kit_core::ModelId,
         endpoint: String,
         scope: String,
+        context_window_tokens: Option<NonZeroU64>,
     },
 }

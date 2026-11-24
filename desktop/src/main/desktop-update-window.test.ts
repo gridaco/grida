@@ -7,6 +7,7 @@ const mock = await vi.hoisted(async () => {
   class Window extends EventEmitter {
     url = "";
     closed = false;
+    visible = false;
     webContents = Object.assign(new EventEmitter(), {
       setWindowOpenHandler:
         vi.fn<(handler: () => { action: string }) => void>(),
@@ -19,11 +20,14 @@ const mock = await vi.hoisted(async () => {
     }
 
     removeMenu = vi.fn<() => void>();
-    show = vi.fn<() => void>();
+    show = vi.fn<() => void>(() => {
+      this.visible = true;
+    });
     loadURL = vi.fn<(url: string) => Promise<void>>(async (url) => {
       this.url = url;
     });
     isDestroyed = () => this.closed;
+    isVisible = () => this.visible;
     destroy = () => {
       this.closed = true;
       this.emit("closed");
@@ -60,7 +64,7 @@ it("runs only the fixed actions offered by the current local document", async ()
     title: "Update",
     message: "<script>remote()</script>",
     detail: "Installed version: 0.7.0",
-    actions: ["retry"],
+    action: "retry",
   });
   const [native] = windows;
   expect(native.options).toMatchObject({
@@ -77,7 +81,7 @@ it("runs only the fixed actions offered by the current local document", async ()
   expect(html).toContain('<div class="symbol" aria-hidden="true"><svg');
   expect(html).toContain("&lt;script&gt;remote()&lt;/script&gt;");
   expect(html).toMatch(
-    /<\/main>\s*<footer class="footer"><nav .*?>Retry<\/a><\/nav><div class="detail">Installed version: 0\.7\.0<\/div><\/footer>/
+    /<\/main>\s*<footer class="footer"><div class="primary"><a [^>]+>Retry<\/a><\/div><div class="detail">Installed version: 0\.7\.0<\/div><\/footer>/
   );
   expect(html).not.toContain("<script>");
   expect(native.webContents.setWindowOpenHandler.mock.calls[0][0]()).toEqual({
@@ -101,18 +105,20 @@ it("runs only the fixed actions offered by the current local document", async ()
     title: "Ready",
     message: "Version 0.8.0 is ready to install.",
     detail: "Installed version: 0.7.0",
-    actions: ["restart", "download"],
+    action: "restart",
+    installerLink: true,
   });
   expect(windows).toHaveLength(1);
   const current = native.url;
   const readyHtml = decodeURIComponent(current);
   expect(readyHtml).toMatch(
-    /<h1>Ready<\/h1>\s*<p>Version 0\.8\.0 is ready to install\.<\/p>\s*<\/main>\s*<footer class="footer"><nav/
+    /<h1 id="update-status">Ready<\/h1>\s*<p>Version 0\.8\.0 is ready to install\.<\/p>\s*<\/main>\s*<footer class="footer"><div class="primary">/
   );
+  expect(readyHtml).not.toContain('role="progressbar"');
   expect(readyHtml).toContain(
-    '<div class="detail">Installed version: 0.7.0 · <a href="https://desktop-update.invalid/download" data-action="download">Download installer</a></div>'
+    '<div class="detail">Installed version: 0.7.0</div><a href="https://desktop-update.invalid/download" data-action="download">Download installer</a>'
   );
-  expect(readyHtml).not.toContain('class="secondary-actions"');
+  expect(native.show).toHaveBeenCalledOnce();
   native.url = previous;
   native.navigate("https://desktop-update.invalid/restart");
   expect(action).toHaveBeenCalledTimes(1);
@@ -121,6 +127,29 @@ it("runs only the fixed actions offered by the current local document", async ()
   expect(action).toHaveBeenLastCalledWith("restart");
   native.navigate("https://desktop-update.invalid/download");
   expect(action).toHaveBeenLastCalledWith("download");
+});
+
+it("shows indeterminate progress without reloading an unchanged view", async () => {
+  const window = new DesktopUpdateWindow(
+    vi.fn<(action: DesktopUpdateWindow.Action) => void>(),
+    vi.fn<() => void>()
+  );
+  const view = {
+    title: "Downloading update…",
+    busy: true,
+    installerLink: true,
+  };
+  await window.show(view);
+  await window.show(view);
+
+  const [native] = windows;
+  const html = decodeURIComponent(native.url);
+  expect(html).toContain(
+    '<div class="activity" role="progressbar" aria-labelledby="update-status"></div>'
+  );
+  expect(html).toContain('data-action="download"');
+  expect(html).not.toContain('class="primary"');
+  expect(native.loadURL).toHaveBeenCalledOnce();
 });
 
 it("reports a user close separately from Main dismissing the window", async () => {

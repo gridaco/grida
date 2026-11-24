@@ -17,11 +17,17 @@ import {
   BrowserPreview,
 } from "@/lib/desktop/browser-open-context";
 import type { SubagentPlacement } from "@/scaffolds/desktop/workbench/subagent-placement";
+import {
+  NativeChatDemoPanelLayout,
+  NativeChatDemoPanels,
+} from "../native-chat/panels";
+import { NativeChatWorkspaceFixture } from "../native-chat/workspace-fixture";
 import { DesktopChatFixture } from "./desktop-chat-fixture";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import type { DesktopRequestFixture } from "./desktop-request-fixture";
 
+const subscribeStatic = () => () => {};
 const sideChats = { present() {}, withdraw() {} };
 const suggestionPreferences = {
   get: async () => ({ enabled: true, revision: 1 }),
@@ -33,20 +39,48 @@ const inlineSubagents: SubagentPlacement = {
 };
 
 export function DesktopComposerDemo({
-  scenario = "text",
+  scenario: initialScenario = "text",
   queued = false,
+  showcase = false,
 }: {
   scenario?: conversations.Scenario;
   queued?: boolean;
+  showcase?: boolean;
 }) {
-  const [fixture, setFixture] = useState(
-    () => new DesktopChatFixture(scenario, queued)
+  const [root, setRoot] = useState(
+    () => new DesktopChatFixture(initialScenario, queued)
   );
-  const [streaming, setStreaming] = useState(scenario === "streaming");
+  const workspace = useMemo(
+    () => (showcase ? new NativeChatWorkspaceFixture(root) : null),
+    [root, showcase]
+  );
+  const panels = useMemo(
+    () => (workspace ? new NativeChatDemoPanels() : null),
+    [workspace]
+  );
+  const fixture = useSyncExternalStore(
+    workspace?.subscribe ?? subscribeStatic,
+    workspace?.read ?? (() => root),
+    () => root
+  );
+  const scenario = fixture.scenario;
+  const [openCount, setOpenCount] = useState(0);
+  const [reopenedSession, setReopenedSession] = useState<string>();
+  const [streaming, setStreaming] = useState(initialScenario === "streaming");
   const running = useSyncExternalStore(
     fixture.subscribeRunning,
     fixture.readRunning,
     fixture.readRunning
+  );
+  const replyHeld = useSyncExternalStore(
+    fixture.subscribeRunning,
+    fixture.readReplyHeld,
+    fixture.readReplyHeld
+  );
+  const canFinishReply = useSyncExternalStore(
+    fixture.subscribeRunning,
+    fixture.canFinishReply,
+    fixture.canFinishReply
   );
   const [narrow, setNarrow] = useState(scenario === "multiple-questions");
   const selected = useSyncExternalStore(
@@ -64,7 +98,13 @@ export function DesktopComposerDemo({
     fixture.compaction.read,
     fixture.compaction.read
   );
-  const question = scenario === "question";
+  const question =
+    scenario === "question" ||
+    (showcase &&
+      (scenario === "blocking-question" ||
+        scenario === "question-batch" ||
+        scenario === "multiple-questions"));
+  const attachments = scenario === "attachments";
   const webPreview = scenario === "web-preview";
   const previews = useMemo(
     () =>
@@ -95,16 +135,54 @@ export function DesktopComposerDemo({
   }, [fixture, scenario, streaming]);
 
   const reset = () => {
-    fixture.resetRequests();
-    setFixture(new DesktopChatFixture(scenario, queued));
-    setStreaming(scenario === "streaming");
+    if (workspace) workspace.resetRequests();
+    else fixture.resetRequests();
+    setRoot(new DesktopChatFixture(initialScenario, queued));
+    setReopenedSession(undefined);
+    setStreaming(initialScenario === "streaming");
     setOpenRequest(null);
   };
+
+  const pane = (
+    <NativeAgentPane
+      key={`${root.sessionId}:${openCount}`}
+      bridge={workspace?.bridge ?? fixture.bridge}
+      workingDirectory={showcase ? "/Gallery project" : undefined}
+      readWorkspaceDirectory={workspace?.readdir}
+      predictionPreferences={
+        scenario === "suggested-prompt" ? suggestionPreferences : undefined
+      }
+      initialSession={reopenedSession ?? root.sessionId}
+      editorSurfaces={
+        scenario === "svg-selection" ? fixture.editorSurfaces : undefined
+      }
+      sideChatPlacement={panels?.sideChats ?? sideChats}
+      libraryRequestSource={
+        queued || showcase || scenario === "library-request"
+          ? fixtures.libraryRequestSource
+          : undefined
+      }
+      subagentPlacement={
+        panels?.subagents ??
+        (scenario === "subagents" ? inlineSubagents : undefined)
+      }
+      autofocus={showcase}
+    />
+  );
 
   return (
     <TooltipProvider>
       <div data-testid="desktop-composer-playground" className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {showcase && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fixture.updateProjectSkill()}
+            >
+              Update project skill
+            </Button>
+          )}
           {webPreview && (
             <>
               <Button
@@ -115,18 +193,18 @@ export function DesktopComposerDemo({
               >
                 Finish reply
               </Button>
-              {openRequest && (
-                <span
-                  role="status"
-                  className="min-w-0 break-all text-muted-foreground"
-                >
-                  {openRequest.destination === "system"
-                    ? "System browser requested for"
-                    : "Workbench browser requested for"}{" "}
-                  {openRequest.url}
-                </span>
-              )}
             </>
+          )}
+          {openRequest && (
+            <span
+              role="status"
+              className="min-w-0 break-all text-muted-foreground"
+            >
+              {openRequest.destination === "system"
+                ? "System browser requested for"
+                : "Workbench browser requested for"}{" "}
+              {openRequest.url}
+            </span>
           )}
           {(scenario === "question" || scenario === "streaming") && (
             <label className="flex items-center gap-2">
@@ -142,7 +220,7 @@ export function DesktopComposerDemo({
               Streaming
             </label>
           )}
-          {(question || scenario === "multiple-questions") && (
+          {(showcase || question || scenario === "multiple-questions") && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -164,7 +242,7 @@ export function DesktopComposerDemo({
               Slide item selected
             </label>
           )}
-          {queued && (
+          {queued && fixture === root && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -174,7 +252,7 @@ export function DesktopComposerDemo({
               Running turn
             </label>
           )}
-          {(scenario === "text" || question) && (
+          {(showcase || scenario === "text" || question || attachments) && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -205,6 +283,51 @@ export function DesktopComposerDemo({
               </Button>
             </>
           )}
+          {showcase && !question && (
+            <>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={replyHeld}
+                  onChange={(event) =>
+                    fixture.setReplyHeld(event.target.checked)
+                  }
+                />
+                Hold replies
+              </label>
+              {canFinishReply && replyHeld && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fixture.finishReply}
+                  >
+                    Finish reply
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={fixture.failReply}
+                  >
+                    Fail reply
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+          {(showcase || attachments) && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={submission.pending}
+              onClick={() => {
+                setReopenedSession(fixture.sessionId);
+                setOpenCount((current) => current + 1);
+              }}
+            >
+              Reopen chat
+            </Button>
+          )}
           {question && (
             <Button
               size="sm"
@@ -227,7 +350,7 @@ export function DesktopComposerDemo({
               disconnect={() => fixture.disconnect()}
             />
           )}
-          {scenario === "compaction" && (
+          {(scenario === "compaction" || (showcase && compaction.pending)) && (
             <Button
               size="sm"
               variant="outline"
@@ -250,33 +373,15 @@ export function DesktopComposerDemo({
                 : "h-[min(42rem,80vh)] min-h-[36rem]"
           }`}
         >
-          <BrowserOpen value={webPreview ? openWeb : null}>
-            <BrowserPreview value={webPreview ? previews : null}>
-              <NativeAgentPane
-                key={fixture.sessionId}
-                bridge={fixture.bridge}
-                predictionPreferences={
-                  scenario === "suggested-prompt"
-                    ? suggestionPreferences
-                    : undefined
-                }
-                initialSession={fixture.sessionId}
-                editorSurfaces={
-                  scenario === "svg-selection"
-                    ? fixture.editorSurfaces
-                    : undefined
-                }
-                sideChatPlacement={sideChats}
-                libraryRequestSource={
-                  scenario === "library-request"
-                    ? fixtures.libraryRequestSource
-                    : undefined
-                }
-                subagentPlacement={
-                  scenario === "subagents" ? inlineSubagents : undefined
-                }
-                autofocus={false}
-              />
+          <BrowserOpen value={showcase || webPreview ? openWeb : null}>
+            <BrowserPreview value={showcase || webPreview ? previews : null}>
+              {panels ? (
+                <NativeChatDemoPanelLayout host={panels}>
+                  {pane}
+                </NativeChatDemoPanelLayout>
+              ) : (
+                pane
+              )}
             </BrowserPreview>
           </BrowserOpen>
         </div>

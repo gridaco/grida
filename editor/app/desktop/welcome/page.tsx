@@ -59,6 +59,7 @@ import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
 import { AgentPermissionConfirmation } from "@/scaffolds/desktop/shared/agent-permission-confirmation";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
+import { useSkillMentions } from "@/scaffolds/desktop/shared/use-skill-mentions";
 import { useWorkspaceFileMentions } from "@/scaffolds/desktop/shared/use-workspace-file-mentions";
 import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace-canvas-creation";
 import {
@@ -245,6 +246,7 @@ function WelcomeSurface({
 }) {
   const router = useRouter();
   const bridge = useDesktopBridge();
+  const supportsAttachmentBatches = !!bridge?.nativeChat?.submitAttachments;
   const [composer] = useState(() => new HomeComposer());
   const staged = useSyncExternalStore(
     composer.subscribe,
@@ -280,8 +282,6 @@ function WelcomeSurface({
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
   const [openingFolder, setBusy] = useState(false);
-  const busy =
-    openingFolder || staged.busy || staged.permissionBusy || !!staged.outgoing;
   const {
     acceptsAutomaticApprovalReview,
     defaultsToAutomaticReview,
@@ -344,6 +344,13 @@ function WelcomeSurface({
         welcome_message.pending(workspaceId)?.message.requestId === requestId
     );
   }, [composer, composerDraft.key]);
+  const draftReady = staged.draftKey === composerDraft.key;
+  const busy =
+    !draftReady ||
+    openingFolder ||
+    staged.busy ||
+    staged.permissionBusy ||
+    !!staged.outgoing;
   const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
   const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
     null
@@ -351,9 +358,13 @@ function WelcomeSurface({
   const defaultWorkspaceRead = useRef<Promise<Workspace | null> | null>(null);
   const destination = target ?? defaultWorkspace;
   const mentions = useWorkspaceFileMentions(destination?.id);
+  const skillMenu = useSkillMentions(
+    bridge?.nativeChat?.skills,
+    destination?.id
+  );
   const catalog = useMemo<ComposerCatalog>(
-    () => ({ commands: [], mentions }),
-    [mentions]
+    () => ({ commands: [], mentions, skillMentions: skillMenu.mentions }),
+    [mentions, skillMenu.mentions]
   );
   // Keep the Images picks while browsing other presets.
   const [pickedRefs, setPickedRefs] = useState<
@@ -609,7 +620,10 @@ function WelcomeSurface({
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
   const submission = useCallback(
-    (text: string): HomeComposer.Input => {
+    (
+      text: string,
+      skills?: HomeComposer.Input["skills"]
+    ): HomeComposer.Input => {
       const template = pickedTemplate;
       const workflowReferences = selectedWorkflows?.map(
         ({ number, showcase }) => ({
@@ -630,16 +644,29 @@ function WelcomeSurface({
         text.trim() ||
         template ||
         messageContext?.displayParts.length ||
-        composer.read().attachment;
+        skills?.length ||
+        composer.read().attachments.length;
       if (hasRequest) {
         const chat = getDesktopBridge()?.nativeChat;
         if (!chat)
           throw new Error(
             "Chat isn't available in this version of Grida Desktop."
           );
+        if (skills?.length && (!chat.skills || !chat.submitInRegime))
+          throw new Error(
+            "Skill selection is unavailable on this Desktop connection."
+          );
+        if (skills?.length && composer.read().goal)
+          throw new Error(
+            "Send skill selections in a new chat turn before starting a goal."
+          );
         if ((template || messageContext) && !chat.submitMessage)
           throw new Error(
             "Update Grida Desktop to send this request. Your draft is still here."
+          );
+        if (composer.read().attachments.length > 1 && !chat.submitAttachments)
+          throw new Error(
+            "Update Grida Desktop to attach multiple files. Your draft is still here."
           );
       }
       return {
@@ -649,6 +676,7 @@ function WelcomeSurface({
         target: destination,
         references: [],
         messageContext,
+        ...(skills?.length && { skills }),
         ...(template && {
           template: {
             name: template.name,
@@ -684,30 +712,41 @@ function WelcomeSurface({
       error instanceof Error ? error.message : "Couldn't start a session."
     );
 
-  const capture = (text: string, document: unknown) => {
+  const capture = (
+    text: string,
+    document: unknown,
+    skills?: HomeComposer.Input["skills"]
+  ) => {
     try {
-      return composer.capture(submission(text), document, submissionHost, {
-        ...composerDraft,
-        read: () =>
-          editorRef.current?.draftKey === composerDraft.key
-            ? editorRef.current.readDocument()
-            : undefined,
-      });
+      return composer.capture(
+        submission(text, skills),
+        document,
+        submissionHost,
+        {
+          ...composerDraft,
+          read: () =>
+            editorRef.current?.draftKey === composerDraft.key
+              ? editorRef.current.readDocument()
+              : undefined,
+        }
+      );
     } catch (error) {
       reportSubmitError(error);
       return false;
     }
   };
 
-  const restoreOutgoing = () => {
-    const editor = editorRef.current;
+  const restoreOutgoing = async () => {
+    const draftKey = editorRef.current?.draftKey;
     if (
-      !editor ||
-      !composer.restoreCaptured((document) =>
-        document == null
+      !draftKey ||
+      !(await composer.restoreCaptured((document) => {
+        const editor = editorRef.current;
+        if (editor?.draftKey !== draftKey) return false;
+        return document == null
           ? editor.readDocument() == null
-          : editor.restoreDocument(document)
-      )
+          : editor.restoreDocument(document);
+      }))
     )
       toast.error(
         "Keep or clear your current text before restoring the earlier draft."
@@ -770,8 +809,11 @@ function WelcomeSurface({
 
   // The whole Home window accepts external files/folders through the same
   // intake as the editor. The shared drop zone consumes each gesture once.
-  const transferAttachment = (event: ComposerTransfer.Event) => {
-    if (!busy) composer.transfer(event);
+  const transferAttachment = (
+    event: Pick<ComposerTransfer.Event, "resources">
+  ) => {
+    if (!busy)
+      composer.transfer(event, supportsAttachmentBatches ? undefined : 1);
   };
 
   return (
@@ -977,7 +1019,18 @@ function WelcomeSurface({
                         );
                       },
                     }}
-                    draft={composerDraft}
+                    draft={draftReady ? composerDraft : undefined}
+                    history={{
+                      previous: () => [],
+                      retainSent: true,
+                      attachments: composer.historyAttachments,
+                      disabled:
+                        busy ||
+                        !!staged.outgoing ||
+                        !!pickedTemplate ||
+                        !!selectedWorkflows?.length ||
+                        !!(showImages && pickedRefs.length),
+                    }}
                     draftRef={(editor) => {
                       editorRef.current =
                         editor?.readDocument && editor.restoreDocument
@@ -990,10 +1043,11 @@ function WelcomeSurface({
                     }}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
+                    onSkillMenuOpen={skillMenu.refresh}
                     className={docked ? "shadow-xl" : undefined}
                     onCapture={capture}
-                    onSubmit={(text) =>
-                      composer.submit(submission(text), submissionHost)
+                    onSubmit={(text, _document, skills) =>
+                      composer.submit(submission(text, skills), submissionHost)
                     }
                     onSubmitError={reportSubmitError}
                     awaitSubmission
@@ -1006,39 +1060,27 @@ function WelcomeSurface({
                       selectedWorkflows?.length ||
                       (showImages && pickedRefs.length > 0)
                         ? "Send"
-                        : pickedTemplate || staged.attachment
+                        : pickedTemplate || staged.attachments.length
                           ? "Start"
                           : "Open workspace"
                     }
                     autofocus
                     onAttachmentTransfer={transferAttachment}
-                    attachments={
-                      staged.attachment && (
+                    attachments={staged.attachments.map(
+                      ({ id, card, input }) => (
                         <NativeAttachmentCard
-                          name={staged.attachment.file.name}
-                          size={
-                            staged.attachment.kind === "directory"
-                              ? undefined
-                              : staged.attachment.file.size
+                          key={id}
+                          name={
+                            input ? card.name : `${card.name} (attach again)`
                           }
-                          png={staged.attachment.file.type === "image/png"}
-                          mimeType={
-                            staged.attachment.kind === "directory"
-                              ? "inode/directory"
-                              : staged.attachment.file.type
-                          }
-                          preview={
-                            staged.attachment.kind === "file" &&
-                            /^image\/(png|jpeg|webp|gif)$/.test(
-                              staged.attachment.file.type
-                            )
-                              ? staged.attachment.file
-                              : null
-                          }
-                          onRemove={composer.removeAttachment}
+                          size={card.size}
+                          png={card.mimeType === "image/png"}
+                          mimeType={card.mimeType}
+                          preview={input?.kind === "image" ? input.file : null}
+                          onRemove={() => composer.removeAttachment(id)}
                         />
                       )
-                    }
+                    )}
                     actions={{
                       files: {
                         disabled: busy || staged.goal,
@@ -1071,7 +1113,7 @@ function WelcomeSurface({
                       goal: {
                         offered: !!bridge?.nativeChat?.startGoal,
                         active: staged.goal,
-                        disabled: busy || !!staged.attachment,
+                        disabled: busy || !!staged.attachments.length,
                         removeDisabled: busy,
                         onChange: composer.selectGoal,
                       },
@@ -1140,29 +1182,35 @@ function WelcomeSurface({
                   <input
                     ref={filePicker}
                     type="file"
+                    multiple={supportsAttachmentBatches}
                     className="hidden"
                     aria-label="Attach file"
                     onChange={(event) => {
-                      const file = event.currentTarget.files?.[0];
-                      if (file)
-                        composer.transfer({
-                          resources: [{ kind: "file", file }],
-                        });
+                      const files = Array.from(event.currentTarget.files ?? []);
+                      transferAttachment({
+                        resources: files.map((file) => ({
+                          kind: "file",
+                          file,
+                        })),
+                      });
                       event.currentTarget.value = "";
                     }}
                   />
                   <input
                     ref={imagePicker}
                     type="file"
+                    multiple={supportsAttachmentBatches}
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     className="hidden"
                     aria-label="Attach image"
                     onChange={(event) => {
-                      const file = event.currentTarget.files?.[0];
-                      if (file)
-                        composer.transfer({
-                          resources: [{ kind: "file", file }],
-                        });
+                      const files = Array.from(event.currentTarget.files ?? []);
+                      transferAttachment({
+                        resources: files.map((file) => ({
+                          kind: "file",
+                          file,
+                        })),
+                      });
                       event.currentTarget.value = "";
                     }}
                   />

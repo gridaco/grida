@@ -10,7 +10,11 @@ const nativeChat = allChannels.filter((channel) =>
 const nativeExternal = allChannels.filter((channel) =>
   channel.startsWith("grida:native-external:")
 );
-const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
+const workbenchPublication: readonly IpcChannel[] = [
+  IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+  IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
+  IPC_CHANNELS.WORKSPACE_RETIRE_VIEW,
+];
 const documentFiles = [IPC_CHANNELS.DOCUMENT_READ, IPC_CHANNELS.DOCUMENT_WRITE];
 
 describe("ipc_admission", () => {
@@ -80,7 +84,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
-          channel !== workspacePublish &&
+          !workbenchPublication.includes(channel) &&
           !channel.startsWith("grida:welcome:chat-") &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
@@ -310,6 +314,17 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("allows querying skills only from the Home and workspace composers", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_SKILLS;
+    expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    expect(allowedFor("main", "/desktop/file")).not.toContain(channel);
+    expect(allowedFor("main", "/desktop/settings")).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+  });
+
   it("admits requested Library selection only in the main workspace", () => {
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION,
@@ -355,7 +370,10 @@ describe("ipc_admission", () => {
       allowedFor("main", "/desktop/welcome").filter((allowed) =>
         nativeChat.includes(allowed)
       )
-    ).toEqual([IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW]);
+    ).toEqual([
+      IPC_CHANNELS.NATIVE_CHAT_SKILLS,
+      IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW,
+    ]);
   });
 
   it("admits notification focus consumption only in the main workspace", () => {
@@ -432,19 +450,19 @@ describe("ipc_admission", () => {
   });
 
   it("admits independent workbench publication only from the main workspace route", () => {
-    expect(allowedFor("main", "/desktop/workspace")).toContain(
-      workspacePublish
-    );
-    for (const route of [
-      "/desktop/file",
-      "/desktop/settings",
-      "/desktop/workspace/extra",
-    ]) {
-      expect(allowedFor("main", route)).not.toContain(workspacePublish);
+    for (const channel of workbenchPublication) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/file",
+        "/desktop/settings",
+        "/desktop/workspace/extra",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
     }
-    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
-      workspacePublish
-    );
   });
 
   it("keeps durable media capabilities exclusive to the exact Tools route", () => {

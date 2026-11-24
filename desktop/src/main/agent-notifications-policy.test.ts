@@ -20,6 +20,7 @@ const settled = (
   status: Extract<NativeChatLifecycle, { kind: "settled" }>["status"]
 ): NativeChatLifecycle => ({
   kind: "settled",
+  session: { id: "chat" },
   sessionId: "chat",
   turnId: "turn",
   status,
@@ -51,6 +52,19 @@ describe("agent_notifications.decideNative — when to notify (RFC events §when
   it("is silent on a cancelled turn — the user did it themselves", () => {
     expect(agent_notifications.decideNative(settled("cancelled"))).toBeNull();
   });
+
+  it.each(["succeeded", "failed", "uncertain", "cancelled"] as const)(
+    "is silent when automatic compaction settles as %s",
+    (status) => {
+      expect(
+        agent_notifications.decideNative({
+          ...settled(status),
+          kind: "automatic_compaction_settled",
+          status,
+        })
+      ).toBeNull();
+    }
+  );
 
   it("bounds the notification excerpt without splitting a Unicode character", () => {
     const text = "🌱".repeat(181);

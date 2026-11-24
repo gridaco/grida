@@ -213,9 +213,9 @@ export function estimateContextBreakdown(
 }
 
 export type ContextUsage = {
-  /** Estimated visible transcript tokens. */
+  /** Reported context size, or estimated visible transcript tokens. */
   usedTokens: number;
-  /** Model context window from the catalog (0 when unknown). */
+  /** Resolved context window (0 when unknown). */
   maxTokens: number;
   /** `usedTokens / maxTokens` in [0, 1]; 0 when the window is unknown. */
   percent: number;
@@ -234,9 +234,8 @@ export type ContextUsage = {
 
 /**
  * Compute everything the meter needs: the estimated context ring %, visible
- * role breakdown, and provider-reported last-turn usage. `contextWindow` is
- * the model's limit (from `@grida/ai/catalogue`); pass 0/undefined when unknown
- * — `percent` is then 0 and the view hides itself.
+ * role breakdown, and provider-reported last-turn usage. Pass the captured
+ * context window or the selected model's known capacity.
  */
 export function computeContextUsage(
   messages: readonly MessageLike[],
@@ -255,13 +254,14 @@ export function computeContextUsage(
   const visible =
     estimated.user + estimated.assistant + estimated.tools + estimated.other;
   const measured = measuredTokens !== undefined && measuredTokens > 0;
-  const usedTokens = measured ? Math.max(measuredTokens, visible) : visible;
-  const breakdown = measured
-    ? {
-        ...estimated,
-        other: estimated.other + (usedTokens - visible),
-      }
-    : estimated;
+  const usedTokens = measured ? measuredTokens : visible;
+  // Full transcript history may exceed the material sent after compaction.
+  // Its per-role estimate cannot describe the smaller reported request.
+  const breakdown = !measured
+    ? estimated
+    : usedTokens >= visible
+      ? { ...estimated, other: estimated.other + usedTokens - visible }
+      : { user: 0, assistant: 0, tools: 0, other: usedTokens };
   const maxTokens = contextWindow ?? 0;
   // Clamp to the documented [0, 1] contract; estimates can still exceed a
   // catalog window for stale model metadata or oversized local transcripts.

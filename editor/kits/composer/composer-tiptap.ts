@@ -5,6 +5,7 @@ import {
   Node,
   PasteRule,
   getMarkRange,
+  getSchema,
   mergeAttributes,
   posToDOMRect,
   type JSONContent,
@@ -17,12 +18,17 @@ import type {
   MarkType,
   Node as ProseMirrorNode,
   ResolvedPos,
+  Schema,
 } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { chatWebLinkIcon } from "@/components/chat-web-link";
+import { chatWebLinkIcon } from "../../components/chat-web-link";
+import {
+  ComposerTiptapHistory,
+  parseComposerPrompt,
+} from "./composer-tiptap-history";
 import {
   ComposerCore,
   type ComposerCommand,
@@ -76,6 +82,8 @@ const ComposerMentionNode = Node.create({
       id: { default: "" },
       label: { default: "" },
       kind: { default: "" },
+      sigil: { default: "@" },
+      source: { default: "" },
       path: { default: "" },
       payload: { default: "" },
     };
@@ -92,13 +100,14 @@ const ComposerMentionNode = Node.create({
         "data-composer-mention": HTMLAttributes.id,
         "data-composer-chip": "mention",
         class: "composer-chip composer-mention",
+        ...(HTMLAttributes.source && { title: HTMLAttributes.source }),
       }),
-      `@${HTMLAttributes.label || HTMLAttributes.id}`,
+      `${HTMLAttributes.sigil === "$" ? "" : "@"}${HTMLAttributes.label || HTMLAttributes.id}`,
     ];
   },
 
   renderText({ node }) {
-    return `@${node.attrs.label || node.attrs.id}`;
+    return `${node.attrs.sigil === "$" ? "$" : "@"}${node.attrs.label || node.attrs.id}`;
   },
 });
 
@@ -291,7 +300,16 @@ const markdown = new MarkdownSerializer(
       state.text(`/${node.attrs.id}`, false);
     },
     composerMention(state, node) {
-      state.text(`@${node.attrs.label || node.attrs.id}`, false);
+      const label = node.attrs.label || node.attrs.id;
+      if (node.attrs.sigil === "$") {
+        const target = composerLinkDestination(node.attrs.id).replaceAll(
+          /[()]/g,
+          (character) => (character === "(" ? "%28" : "%29")
+        );
+        state.text(`[$${state.esc(label)}](${target})`, false);
+      } else {
+        state.text(`@${label}`, false);
+      }
     },
     composerFileReference(state, node) {
       state.text(node.attrs.name || node.attrs.path, false);
@@ -303,6 +321,12 @@ const markdown = new MarkdownSerializer(
 
 export namespace ComposerTiptap {
   const selecting = new WeakSet<Editor>();
+  let markdownSchema: Schema | undefined;
+
+  export function markdownDocument(text: string): JSONContent | undefined {
+    markdownSchema ??= getSchema(extensions({ placeholder: "" }));
+    return parseComposerPrompt(markdownSchema, text)?.toJSON();
+  }
 
   export function extensions(input: { placeholder: string }) {
     return [
@@ -364,6 +388,7 @@ export namespace ComposerTiptap {
         node.type.name === "orderedList" ||
         node.type.name === "blockquote" ||
         node.type.name === "codeBlock" ||
+        (node.type.name === "composerMention" && node.attrs.sigil === "$") ||
         hasMarkdownMark(node);
       return !formatted;
     });
@@ -514,7 +539,15 @@ export namespace ComposerTiptap {
         return true;
       }
 
-      if (input.event.key === "Enter" && !input.event.shiftKey) {
+      if (
+        !event.shiftKey &&
+        (event.key === "Enter" ||
+          (trigger.kind === "skill" &&
+            event.key === "Tab" &&
+            !event.altKey &&
+            !event.ctrlKey &&
+            !event.metaKey))
+      ) {
         if (!input.editor) return false;
         input.event.preventDefault();
         selectTriggerItem(
@@ -527,6 +560,10 @@ export namespace ComposerTiptap {
       }
     }
 
+    if (!trigger && editor && ComposerTiptapHistory.keyDown(editor, event)) {
+      event.preventDefault();
+      return true;
+    }
     if (input.event.key !== "Enter") return false;
 
     if (input.event.shiftKey) {
@@ -577,7 +614,12 @@ export namespace ComposerTiptap {
           insertCommand(editor, trigger.range, command);
         }
       } else {
-        insertMention(editor, trigger.range, item as ComposerMention);
+        insertMention(
+          editor,
+          trigger.range,
+          item as ComposerMention,
+          trigger.kind === "skill" ? "$" : "@"
+        );
       }
       // Refresh immediately: a second selection must not reuse a menu captured
       // by a previous render, even before React receives the editor update.
@@ -617,7 +659,8 @@ export namespace ComposerTiptap {
     editor: Editor,
     text: string,
     maxBytes: number,
-    placement: "paragraph" | "inline" = "paragraph"
+    placement: "paragraph" | "inline" = "paragraph",
+    onHistoryChange?: (forward: boolean) => void
   ): boolean {
     if (editor.isDestroyed || !text) return false;
     const empty = hasEmptyParagraph(editor);
@@ -637,6 +680,9 @@ export namespace ComposerTiptap {
 
     const lines = text.split("\n");
     const end = doc.content.size;
+    const history = onHistoryChange
+      ? ComposerTiptapHistory.for(editor)
+      : undefined;
     const chain = editor.chain();
     let insertAt: number | { from: number; to: number } = empty
       ? { from: 0, to: end }
@@ -656,7 +702,14 @@ export namespace ComposerTiptap {
       content: line ? [{ type: "text", text: line }] : [],
     }));
     if (paragraphs.length > 0) chain.insertContentAt(insertAt, paragraphs);
-    return chain.focus("end").run();
+    if (history && onHistoryChange)
+      chain.command(({ tr }) => {
+        if (tr.docChanged) history.recordEffect(tr, onHistoryChange);
+        return true;
+      });
+    const appended = chain.focus("end").run();
+    if (appended) history?.closeGroup();
+    return appended;
   }
 
   export function toDocument(json: JSONContent): ComposerDocument.Root {
@@ -691,7 +744,8 @@ export namespace ComposerTiptap {
   function insertMention(
     editor: Editor,
     range: { from: number; to: number },
-    mention: ComposerMention
+    mention: ComposerMention,
+    sigil: "@" | "$"
   ): void {
     editor
       .chain()
@@ -702,6 +756,7 @@ export namespace ComposerTiptap {
           type: "composerMention",
           attrs: {
             ...mention,
+            sigil,
             payload: encodePayload(mention.payload),
           },
         },
@@ -750,6 +805,7 @@ export namespace ComposerTiptap {
           type: "mention",
           id,
           label: readString(node.attrs?.label) || id,
+          ...(node.attrs?.sigil === "$" && { sigil: "$" as const }),
           kind: readString(node.attrs?.kind) || undefined,
           path: readString(node.attrs?.path) || undefined,
           payload: decodePayload(node.attrs?.payload),

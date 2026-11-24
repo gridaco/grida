@@ -30,8 +30,8 @@ import {
 import {
   isDesktopVoiceReady,
   type DesktopVoiceSettings,
+  type NativeChatSkill,
 } from "@grida/desktop-bridge";
-import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
 import { servicesSidecarClient } from "./services-sidecar-client";
 import {
@@ -73,7 +73,7 @@ import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
-import { DesktopMediaRoot } from "./media-root";
+import type { DesktopProfile } from "./desktop-profile";
 import {
   NativeChatIpc,
   type ActiveNativeChat,
@@ -93,17 +93,11 @@ import type { NativeArchives } from "./native-archives";
 import type { NativeChatSelections } from "./native-chat-selections";
 import type { VoiceService } from "./voice";
 
-// `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
-// build-time constant once at module init rather than per call.
-const EDITOR_ORIGIN = (() => {
-  try {
-    return new URL(EDITOR_BASE_URL).origin;
-  } catch {
-    return "";
-  }
-})();
-
 type RegisterIpcHandlersOptions = {
+  profile: Pick<
+    DesktopProfile,
+    "editorBaseUrl" | "mediaRoot" | "nativeChat" | "resourcesPath"
+  >;
   browser_history?: BrowserHistory;
   browser_downloads?: BrowserDownloads;
   on_browser_tools?: (tools: DesktopBrowserTools) => void;
@@ -136,6 +130,9 @@ type RegisterIpcHandlersOptions = {
     workspaceId: string
   ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
+  native_chat_skills?: (
+    workspaceId?: string
+  ) => Promise<readonly NativeChatSkill[]>;
   supports_automatic_approval_review?: () => Promise<boolean>;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
@@ -149,8 +146,13 @@ type RegisterIpcHandlersOptions = {
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
     event: IpcMainInvokeEvent,
-    snapshot: unknown
+    snapshot: unknown,
+    viewId?: number
   ) => Promise<boolean>;
+  retire_workspace_surfaces?: (
+    event: IpcMainInvokeEvent,
+    viewId: number
+  ) => void;
   native_chatgpt_oauth?: Pick<
     ChatGptOAuthCoordinator,
     "connect" | "cancel" | "status" | "signOut"
@@ -165,8 +167,9 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const editorOrigin = new URL(options.profile.editorBaseUrl).origin;
   const mediaHost = new DesktopMediaHost({
-    root: DesktopMediaRoot.current(),
+    root: options.profile.mediaRoot,
     reveal: (nativePath) => shell.showItemInFolder(nativePath),
     openFolder: async (nativePath) => {
       const error = await shell.openPath(nativePath);
@@ -188,17 +191,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }),
     history: options.browser_history,
     downloads: options.browser_downloads,
-    editorOrigin: EDITOR_ORIGIN,
+    editorOrigin,
     admitWindow: (window) => options.resolve_ipc_role(window) === "main",
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
-  const fx = new FxExtension(() => app, servicesSidecarClient);
+  const fx = new FxExtension(options.profile, () => app, servicesSidecarClient);
   const browserTools = new DesktopBrowserTools(browserHost, fx.viewer);
   const fxFiles = fx.files(browserTools);
   options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
-    EDITOR_ORIGIN,
+    editorOrigin,
     (sender, workspaceId, profileId) => {
       const window = admittedWindow(sender);
       return window
@@ -280,11 +283,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     options.native_chat_selections,
     browserTools,
     options.resolve_welcome_chat_workspace,
-    options.personalization
+    options.personalization,
+    options.native_chat_skills
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
-    EDITOR_ORIGIN,
+    editorOrigin,
     (sender) => admittedWindow(sender) !== null,
     () => {
       const owner = options.native_external_agent;
@@ -316,7 +320,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         !window ||
         window.webContents !== event.sender ||
         event.senderFrame !== event.sender.mainFrame ||
-        !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(senderUrl, editorOrigin) ||
         !role ||
         !pathname ||
         !ipc_admission.allows({
@@ -589,6 +593,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       (await catalogIpc.pickerPage(event, cursor)) ??
       nativeChat.list(event, cursor)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_SKILLS, (event, ...args: unknown[]) => {
+    if (args.length > 1) throw new Error("native_chat_skills_invalid");
+    return nativeChat.skills(event, args[0]);
+  });
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)
   );
@@ -679,6 +687,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
     (event, id: string, command: unknown, requestId: unknown) =>
       nativeChat.runCommand(event, id, command, requestId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_START_COMPACTION,
+    (event, id: string, requestId: unknown) =>
+      nativeChat.startCompaction(event, id, requestId)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
@@ -859,7 +872,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       selectionRevision?: unknown,
       editorContextId?: unknown,
       editorToolContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -872,7 +886,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         selectionRevision,
         editorContextId,
         editorToolContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(
@@ -898,7 +913,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       selectionRevision?: unknown,
       editorContextId?: unknown,
       editorToolContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -911,7 +927,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         selectionRevision,
         editorContextId,
         editorToolContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
@@ -948,7 +965,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       selectionRevision?: unknown,
       editorContextId?: unknown,
-      webSearch?: unknown
+      webSearch?: unknown,
+      skills?: unknown
     ) =>
       nativeChat.submitWithLibrarySelection(
         event,
@@ -959,7 +977,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         selectionRevision,
         editorContextId,
-        webSearch
+        webSearch,
+        skills
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
@@ -1004,6 +1023,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE_REFERENCE,
     (event, id: string, input: unknown) =>
       nativeChat.submitFileReference(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_ATTACHMENTS, (event) =>
+    nativeChat.acceptsAttachments(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_ATTACHMENTS,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitAttachments(event, id, input)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
@@ -1100,6 +1127,36 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, change: unknown) =>
       nativeChat.editQueue(event, id, change)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_CHECKOUT,
+    (event, id: string, input: unknown) =>
+      nativeChat.checkoutQueued(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_REINSERT,
+    (event, id: string, input: unknown) =>
+      nativeChat.reinsertQueued(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT,
+    (event, id: string, checkout: unknown, input: unknown) =>
+      nativeChat.readQueueCheckout(event, id, checkout, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT_PREVIEW,
+    (event, id: string, checkout: unknown, preview: unknown) =>
+      nativeChat.readQueueCheckoutPreview(event, id, checkout, preview)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_ACTION_RECEIPT,
+    (event, id: string, request: unknown) =>
+      nativeChat.queueActionReceipt(event, id, request)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STEER_QUEUED,
+    (event, id: string, input: unknown) =>
+      nativeChat.steerQueued(event, id, input)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_STEER, (event, id: string, input: unknown) =>
     nativeChat.steer(event, id, input)
   );
@@ -1186,8 +1243,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       event,
       id: string,
       subscription: string,
-      acceptsQuestionBatches?: unknown
-    ) => nativeChat.subscribe(event, id, subscription, acceptsQuestionBatches)
+      acceptsQuestionBatches?: unknown,
+      acceptsCompactionItems?: unknown
+    ) =>
+      nativeChat.subscribe(
+        event,
+        id,
+        subscription,
+        acceptsQuestionBatches,
+        acceptsCompactionItems
+      )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, (event, subscription: string) =>
     nativeChat.unsubscribe(event, subscription)
@@ -1217,7 +1282,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isDestroyed() ||
         frame !== sender.mainFrame ||
         options.resolve_ipc_role(window) !== role ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         result.canceled ||
         result.filePaths.length !== 1
       )
@@ -1238,10 +1303,29 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
-    (event, snapshot: unknown, activePageId: unknown) =>
-      admittedWindow(event.sender) !== null &&
-      browserTools.publish(event, snapshot, activePageId)
+    (event, snapshot: unknown, activePageId: unknown, viewId?: unknown) => {
+      if (
+        !admittedWindow(event.sender) ||
+        !browserTools.publish(event, snapshot, activePageId, viewId)
+      )
+        return false;
+      if (typeof viewId === "number")
+        void options
+          .publish_workspace_surfaces?.(event, snapshot, viewId)
+          .catch(() => false);
+      return true;
+    }
   );
+  guarded(IPC_CHANNELS.WORKSPACE_RETIRE_VIEW, (event, viewId: unknown) => {
+    if (
+      !admittedWindow(event.sender) ||
+      typeof viewId !== "number" ||
+      !browserTools.retire(event, viewId)
+    )
+      return false;
+    options.retire_workspace_surfaces?.(event, viewId);
+    return true;
+  });
   guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {
     if (typeof root !== "string" || !root || Buffer.byteLength(root) > 4096)
@@ -1367,7 +1451,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isDestroyed() ||
         frame !== sender.mainFrame ||
         options.resolve_ipc_role(window) !== "main" ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         (owner && !owner(window, frame.url))
       )
         throw new Error(unavailable);
@@ -1495,7 +1579,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         if (
           role &&
           pathname &&
-          ipc_sender.isAllowed(url, EDITOR_ORIGIN) &&
+          ipc_sender.isAllowed(url, editorOrigin) &&
           ipc_admission.allows({
             role,
             pathname,
@@ -1613,7 +1697,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return windowRequest(
         event,
         "personalization settings denied",
-        (_signal, check) => personalization.setPersonalization(change, check),
+        (signal, check) =>
+          personalization.setPersonalization(change, check, signal),
         (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
       );
     }
@@ -1636,25 +1721,40 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return windowRequest(
         event,
         "composer predictions settings denied",
-        (_signal, check) => personalization.set(enabled, check),
+        (signal, check) => personalization.set(enabled, check, signal),
         (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
       );
     }
   );
-  guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, (event, ...args: unknown[]) =>
-    globalHooksOwner(event, args).configuration()
-  );
-  guarded(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD, (event, ...args: unknown[]) =>
-    globalHooksOwner(event, args).configuration()
-  );
+  const inspectGlobalHooks = (
+    event: IpcMainInvokeEvent,
+    ...args: unknown[]
+  ) => {
+    const owner = globalHooksOwner(event, args);
+    return windowRequest(
+      event,
+      "global config read denied",
+      () => owner.configuration(),
+      (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+    );
+  };
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, inspectGlobalHooks);
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD, inspectGlobalHooks);
   guarded(
     IPC_CHANNELS.GLOBAL_HOOKS_OPEN_CONFIG,
     async (event, ...args: unknown[]) => {
       const owner = globalHooksOwner(event, args);
-      const file = await owner.ensureConfig();
-      globalHooksOwner(event);
-      if (await shell.openPath(file))
-        throw new Error("native_hooks_open_config_failed");
+      return windowRequest(
+        event,
+        "global config open denied",
+        async (signal, check) => {
+          const file = await owner.ensureConfig(check, signal);
+          check();
+          if (await shell.openPath(file))
+            throw new Error("native_hooks_open_config_failed");
+        },
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
     }
   );
   guarded(
@@ -1684,8 +1784,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       globalHooksOwner(event);
       if (result.response !== 1) return null;
       await owner.trust(review);
-      globalHooksOwner(event);
-      return owner.configuration();
+      return inspectGlobalHooks(event);
     }
   );
 
@@ -1901,7 +2000,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isLoadingMainFrame() ||
         frame !== sender.mainFrame ||
         admittedWindow(sender) !== window ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        !ipc_sender.isAllowed(frame.url, editorOrigin) ||
         ipc_sender.pathname(frame.url) !== "/desktop/tools"
       )
         throw new Error("media-save-copy-unavailable");
@@ -1933,17 +2032,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_STATE, (event) =>
-    computeNavigationState(event.sender)
+    computeNavigationState(event.sender, editorOrigin)
   );
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_BACK, (event) => {
     const history = event.sender.navigationHistory;
-    if (desktopNavigationTarget(history, -1)) history.goToOffset(-1);
+    if (desktopNavigationTarget(history, -1, editorOrigin))
+      history.goToOffset(-1);
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD, (event) => {
     const history = event.sender.navigationHistory;
-    if (desktopNavigationTarget(history, 1)) history.goToOffset(1);
+    if (desktopNavigationTarget(history, 1, editorOrigin))
+      history.goToOffset(1);
   });
 
   guarded(
@@ -2072,20 +2173,24 @@ function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {
 /** Resolve the exact history step that this Desktop window can take. */
 function desktopNavigationTarget(
   history: WebContents["navigationHistory"],
-  offset: -1 | 1
+  offset: -1 | 1,
+  editorOrigin: string
 ): string | null {
   // Chromium's goBack/goForward may skip intervening entries. Use the same
   // exact offset for the snapshot and the action, and recheck it on invoke.
   if (!history.canGoToOffset(offset)) return null;
   const url = history.getEntryAtIndex(history.getActiveIndex() + offset)?.url;
-  return url && ipc_sender.isAllowed(url, EDITOR_ORIGIN) ? url : null;
+  return url && ipc_sender.isAllowed(url, editorOrigin) ? url : null;
 }
 
-export function computeNavigationState(wc: WebContents): NavigationState {
+function computeNavigationState(
+  wc: WebContents,
+  editorOrigin: string
+): NavigationState {
   const history = wc.navigationHistory;
-  const back = desktopNavigationTarget(history, -1);
-  const forward = desktopNavigationTarget(history, 1);
-  const home = `${EDITOR_ORIGIN}/desktop/welcome`;
+  const back = desktopNavigationTarget(history, -1, editorOrigin);
+  const forward = desktopNavigationTarget(history, 1, editorOrigin);
+  const home = `${editorOrigin}/desktop/welcome`;
   return {
     can_go_back: back !== null,
     can_go_forward: forward !== null,
@@ -2110,13 +2215,16 @@ export function computeNavigationState(wc: WebContents): NavigationState {
  * deliver a final event after the renderer process has gone away
  * (Chromium's teardown ordering is not deterministic).
  */
-export function attachNavigationEvents(window: BrowserWindow): void {
+export function attachNavigationEvents(
+  window: BrowserWindow,
+  editorOrigin: string
+): void {
   const wc = window.webContents;
   let last: NavigationState | null = null;
   let lastUrl: string | undefined;
   const publish = () => {
     if (wc.isDestroyed()) return;
-    const next = computeNavigationState(wc);
+    const next = computeNavigationState(wc, editorOrigin);
     const url = wc.getURL();
     // Route subscribers also revoke document-scoped owners. Publish a URL
     // change even when the back/forward booleans happen to remain identical.

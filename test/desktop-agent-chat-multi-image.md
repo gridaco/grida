@@ -4,20 +4,19 @@ title: Attach multiple images in one agent turn
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, multimodal, vision]
-status: deprecated
+status: untested
 severity: medium
 date: 2026-06-07
-updated: 2026-11-13
+updated: 2026-11-24
 automatable: false
 covered_by:
-  - editor/kits/composer/composer-transfer.test.ts
+  - crates/grida-agent/tests/process/attachment_batches.rs
 ---
 
 ## Behavior
 
 Several images can be attached to a single message — by dropping multiple files
-at once, or by pasting/dropping repeatedly before sending. Each becomes its own
-thumbnail chip and provider-native `file` part, so the model can compare them in
+at once, or by pasting/dropping repeatedly before sending. Each gets a thumbnail card and its own provider image part, so the model can compare them in
 one turn. Removing one chip (hover ✕) leaves the others intact.
 
 ## Steps
@@ -33,24 +32,9 @@ one turn. Removing one chip (hover ✕) leaves the others intact.
 5. Type "compare these images" and send.
    - Expected: the reply references the remaining two images distinctly,
      confirming both reached the model in one turn.
-
-## Notes
-
-- `InputResourceRouter.prepareBatch` prepares each provider rendition and raw
-  scratch body in attachment order under a bounded draft-retention budget.
-  `InputResourceRouter.lower` emits the provider `file` parts plus the admitted
-  scratch seed and ordered descriptors. If a chip is removed, retained twins
-  are re-evaluated against the current submit-time scratch capacity.
-- When the scratch budget permits, each original is staged as its own operable
-  copy. A provider-capable image remains available for perception if its
-  optional scratch copy cannot be admitted.
-- Automated routing tests cover aggregate-budget arbitration: scratch-only
-  resources reserve capacity before optional raster twins, and remaining
-  provider-capable rasters fall back in attachment order. This manual case
-  verifies the multi-gesture, card-removal, and model-comparison behavior.
-- Chips + remove come from the composer kit's `ComposerAttachmentCards`.
-- Watch the context meter: several inlined images add up — large sets can
-  approach the context window (and are re-sent each turn until the deferred
-  blob-store lands).
-
-- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.
+   - Expected: both images display in the transcript and open fullscreen.
+6. While a turn is running, send another message with two images. With that
+   message at the head of the queue, choose **Steer**.
+   - Expected: both images display with the message inside the running turn.
+     After the turn settles, reopen the chat and expand its activity. Both
+     images still display in the same place and open fullscreen.

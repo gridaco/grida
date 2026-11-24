@@ -9,10 +9,12 @@ export {
 export {
   ComposerAttachmentCard,
   ComposerAttachmentCards,
+  ComposerAttachmentStrip,
   ComposerTriggerMenu,
 } from "./composer-defaults";
 
 export { ComposerTransfer } from "./composer-transfer";
+export { ComposerHistory } from "./composer-history";
 export { Dictation } from "./dictation";
 
 export {

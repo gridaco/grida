@@ -26,13 +26,20 @@ const STOP_TIMEOUT: Duration = Duration::from_secs(8);
 /// against a forgotten process.
 pub const MAX_RUN_TIMEOUT: Duration = Duration::from_secs(4 * 60 * 60);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunQuestions {
+    Disabled,
+    Singleton,
+    Batch,
+}
+
 pub struct RunOptions {
     pub cwd: PathBuf,
     pub session: Option<SessionId>,
     pub prompt: Option<String>,
     pub input_png: Option<PathBuf>,
     pub skills: Vec<crate::skills::SkillReference>,
-    pub questions: bool,
+    pub questions: RunQuestions,
     /// The reasoning level for the run's turn. The host falls back to the
     /// model's default when the model does not declare that level.
     pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
@@ -99,7 +106,7 @@ pub async fn run_with_file(
 /// Run with an optional file and a catalog title for the first accepted input.
 pub async fn run_with_input(
     host: &Host,
-    options: RunOptions,
+    mut options: RunOptions,
     input_file: Option<PathBuf>,
     initial_title: Option<String>,
     signal: impl Future<Output = Result<()>>,
@@ -107,8 +114,15 @@ pub async fn run_with_input(
     let result = if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"))
     } else {
-        match host.clone().with_headless_guidance(&options.cwd) {
-            Ok(scoped) => run_once(&scoped, options, input_file, initial_title, signal).await,
+        match host
+            .clone()
+            .with_headless_run_workspace(&options.cwd, options.session.as_ref())
+            .await
+        {
+            Ok((scoped, workspace)) => {
+                options.cwd = workspace;
+                run_once(&scoped, options, input_file, initial_title, signal).await
+            }
             Err(error) => Err(error),
         }
     };
@@ -148,8 +162,15 @@ async fn serve_stdio(
 ) -> Result<u8> {
     let supervised = provider.is_some();
     let side_chats = Arc::new(crate::host::side_chats::SideChats::default());
+    // Keep the connection's async state on the heap before polling the
+    // shutdown race on the executable's main thread.
+    let connection = Box::pin(acp::serve_stdio_with_side_chats(
+        host.clone(),
+        provider,
+        side_chats.clone(),
+    ));
     tokio::select! {
-        result = acp::serve_stdio_with_side_chats(host.clone(), provider, side_chats.clone()) => match result {
+        result = connection => match result {
             Ok(()) => {}
             Err(acp::ServeError::Shutdown(error)) => return Err(error),
             Err(acp::ServeError::Protocol(error)) => {
@@ -176,6 +197,10 @@ async fn run_once(
     initial_title: Option<String>,
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
+    let schema_version = match options.questions {
+        RunQuestions::Disabled | RunQuestions::Singleton => 1,
+        RunQuestions::Batch => 2,
+    };
     let deadline = tokio::time::Instant::now() + options.timeout;
     tokio::pin!(signal);
     let mut accepted = tokio::select! {
@@ -187,7 +212,7 @@ async fn run_once(
         }
     };
     write_record(&json!({
-        "schema_version": 1,
+        "schema_version": schema_version,
         "kind": "accepted",
         "session_id": accepted.session,
         "turn_id": accepted.turn,
@@ -225,7 +250,7 @@ async fn run_once(
         Err(error) => return Err(error),
     };
     let mut finished = json!({
-        "schema_version": 1,
+        "schema_version": schema_version,
         "kind": "finished",
         "session_id": accepted.session,
         "turn_id": accepted.turn,
@@ -317,8 +342,8 @@ async fn admit_run(
             id: change_id()?,
             session,
             parts,
-            questions: options.questions,
-            question_batches: options.questions,
+            questions: options.questions != RunQuestions::Disabled,
+            question_batches: options.questions == RunQuestions::Batch,
             operating_regime: None,
             effort: None,
             reasoning: options.reasoning,

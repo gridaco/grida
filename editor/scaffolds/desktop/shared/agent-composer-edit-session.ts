@@ -2,13 +2,19 @@
 export class AgentComposerEditSession {
   private active: {
     id: string;
-    owner: string | number | undefined;
+    owner: unknown;
     document: unknown | null;
   } | null = null;
 
   sync(
-    edit: Readonly<{ id: string; text: string }> | undefined,
-    owner: string | number | undefined,
+    edit:
+      | Readonly<{
+          id: string;
+          text: string;
+          savedDocument?: Readonly<{ document: unknown | null }>;
+        }>
+      | undefined,
+    owner: unknown,
     editor: AgentComposerEditSession.Editor,
     ownerDraftRestored = false
   ): "unchanged" | "pending" | "changed" | "rejected" {
@@ -34,13 +40,18 @@ export class AgentComposerEditSession {
     if (edit) {
       const document = editor.readDocument();
       editor.clear();
-      const loaded = editor.restoreDocument({
+      const original = {
         type: "doc",
         content: edit.text.split("\n").map((text) => ({
           type: "paragraph",
           content: text ? [{ type: "text", text }] : [],
         })),
-      });
+      };
+      const saved = edit.savedDocument;
+      const loaded =
+        saved?.document === null ||
+        (saved !== undefined && editor.restoreDocument(saved.document)) ||
+        editor.restoreDocument(original);
       if (!loaded) {
         editor.clear();
         if (document !== null) editor.restoreDocument(document);
@@ -53,13 +64,13 @@ export class AgentComposerEditSession {
   }
 
   /** Autosave always sees the ordinary draft while the editor holds an edit. */
-  document(owner: string | number | undefined, current: unknown | null) {
+  document(owner: unknown, current: unknown | null) {
     return this.active && Object.is(this.active.owner, owner)
       ? this.active.document
       : current;
   }
 
-  owns(id: string, owner: string | number | undefined): boolean {
+  owns(id: string, owner: unknown): boolean {
     return this.active?.id === id && Object.is(this.active.owner, owner);
   }
 }

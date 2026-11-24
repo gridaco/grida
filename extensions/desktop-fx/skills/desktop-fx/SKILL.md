@@ -43,6 +43,26 @@ A registered route identifies a plan or saved run on that project's current
 service. Verify the viewer's subject and selection before using its presentation
 API. A restarted service or a different project requires a fresh binding.
 
+## Control a run and inspect attempts
+
+Identify the run by its recorded ID, exact `WORKFLOW_ID/NAME`, or attempt
+folder. Use `grida-fx inspect RUN --control --json` to identify the active
+invocation, then `grida-fx pause RUN --invocation ID --wait --json` to
+request a durable pause. Active steps may still finish while the status is
+`pausing`. Verify `paused` and `cleanup: complete` before reporting that
+execution has paused.
+
+`grida-fx resume RUN` continues the same attempt from its saved context.
+`grida-fx rerun RUN` starts a new numbered attempt under the same run ID
+with fresh reviews. For live resume or rerun, supply `--live` and the
+applicable current spending approval.
+
+A run ID or name selects the latest attempt. Use
+`grida-fx inspect RUN --history --json` to list attempts and
+`grida-fx inspect RUN --attempt N` to inspect an earlier one. The local
+viewer offers attempt history and run controls. Restart a running FX service
+after upgrading so it loads the new viewer.
+
 ## Single image
 
 FX can also generate one PNG from text with `grida-fx call image.generate`.

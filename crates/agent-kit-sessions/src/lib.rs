@@ -71,6 +71,10 @@ pub enum InputDisposition {
     Superseded { replacement: ChangeId },
     /// Removed from the queue before any turn selected it.
     Withdrawn,
+    /// Held outside runnable admission in its original queue position.
+    CheckedOut { checkout: ChangeId },
+    /// Contributed to an active turn's history instead of starting new work.
+    Transferred { turn: TurnId },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +156,23 @@ pub enum SessionControl {
     WithdrawQueued { input: ChangeId },
     /// Put exactly the queued inputs in this order.
     ReorderQueued { inputs: Vec<ChangeId> },
+    /// Remove a waiting input from admission and reserve its queue position.
+    /// The enclosing control's request ID identifies the checkout.
+    CheckoutQueued { input: ChangeId },
+    /// Restore a checkout at its reserved position. No replacement restores
+    /// the original input. The checkout identity is the precondition.
+    ReinsertQueued {
+        checkout: ChangeId,
+        replacement: Option<Submission>,
+    },
+    /// Transfer a waiting input to the exact running turn, appending the
+    /// supplied history contribution in the same transaction.
+    TransferQueued {
+        input: ChangeId,
+        turn: TurnId,
+        expected: ControlRevision,
+        records: Vec<HistoryRecord>,
+    },
     /// Append records to the active turn's history, provided its history has
     /// not moved past the expected position.
     AppendHistory {
@@ -197,8 +218,9 @@ pub enum SessionControl {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-/// A session control, conditional on the session revision. An exact retry
-/// returns the original receipt.
+/// A session control, conditional on the session revision except for
+/// reinsertion, which consumes an exact checkout. An exact retry returns
+/// the original receipt.
 pub struct ControlRequest {
     pub id: ChangeId,
     pub session: SessionId,
@@ -215,9 +237,21 @@ pub struct ControlReceipt {
     pub revision: SessionRevision,
     /// The turn journal's receipt when the control changed a turn.
     pub turn: Option<CommitReceipt>,
+    /// The result of a queue checkout, reinsertion or transfer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_action: Option<QueueAction>,
     /// The new driver-state revision when the control changed driver state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub driver_state_revision: Option<DriverStateRevision>,
+}
+
+/// Durable correlation between a queue control and its affected input.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum QueueAction {
+    CheckedOut { input: ChangeId },
+    Reinserted { checkout: ChangeId, input: ChangeId },
+    Transferred { input: ChangeId, turn: TurnId },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -258,8 +292,11 @@ pub struct SessionView {
     #[serde(default, skip_serializing_if = "DriverStateSnapshot::is_initial")]
     pub driver_state: DriverStateSnapshot,
     pub admission_paused: bool,
-    /// Queued inputs in queue order.
+    /// Runnable queued inputs in queue order.
     pub queued: Vec<InputView>,
+    /// One recoverable checkout, excluded from the runnable queue.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkout: Option<InputView>,
     /// The active turn, while one is unsettled.
     pub current: Option<TurnView>,
     /// The most recently created turn, whether or not it settled.

@@ -10,6 +10,8 @@ use serde_json::{Map, Value};
 pub(crate) const MAX_BYTES: usize = 16 * 1024;
 const MAX_PARTS: usize = 16;
 const MAX_DEPTH: usize = 8;
+// GRIDA-SEC-007: accepted skill provenance is projected by the host.
+const SKILL_DISPLAY_KIND: &str = "skill";
 pub(super) const SUPPLIED_SOURCE: &str = "native-client-with-message-context";
 
 /// The client supplies an inference view and an opaque presentation view.
@@ -76,6 +78,66 @@ pub(crate) fn context(parts: &[PromptPart]) -> Option<&MessageContext> {
         PromptPart::MessageContext { context } => Some(context),
         _ => None,
     })
+}
+
+/// The accepted skill descriptor supplies its own display part. The client
+/// supplies ordinary supplemental context through a separate input part.
+pub(crate) fn display_parts(
+    parts: &[PromptPart],
+    skills: &[crate::skills::SkillDescription],
+) -> Vec<DisplayPart> {
+    let mut display = context(parts)
+        .into_iter()
+        .flat_map(|context| &context.display_parts)
+        .filter(|part| part.kind != SKILL_DISPLAY_KIND)
+        .cloned()
+        .collect::<Vec<_>>();
+    display.extend(skills.iter().map(|skill| {
+        let mut data = serde_json::json!({
+            "name": skill.name,
+            "source": skill.source,
+            "uri": skill.uri,
+        })
+        .as_object()
+        .expect("skill display object")
+        .clone();
+        if let Some(extension) = &skill.extension {
+            data.insert("extension".into(), Value::String(extension.clone()));
+        }
+        DisplayPart {
+            kind: SKILL_DISPLAY_KIND.into(),
+            version: 1,
+            data,
+        }
+    }));
+    display
+}
+
+/// The text the person authored on an input that also selected a skill.
+pub(super) fn skill_input_text(parts: &[PromptPart]) -> String {
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            PromptPart::Text { text: authored } => text.push_str(authored),
+            PromptPart::ResourceLink { .. } => {
+                text.push_str(&serde_json::to_string(part).expect("serializable reference"))
+            }
+            _ => {}
+        }
+    }
+    text
+}
+
+pub(super) fn validate_client_display_parts(parts: &[PromptPart]) -> Result<()> {
+    if context(parts).is_some_and(|context| {
+        context
+            .display_parts
+            .iter()
+            .any(|part| part.kind == SKILL_DISPLAY_KIND)
+    }) {
+        return Err(problem(ErrorKind::InvalidInput, "message_context_invalid"));
+    }
+    Ok(())
 }
 
 pub(super) fn validate_parts(parts: &[PromptPart]) -> Result<()> {

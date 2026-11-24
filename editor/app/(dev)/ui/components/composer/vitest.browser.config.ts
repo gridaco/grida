@@ -15,11 +15,13 @@ export default defineConfig(async () => {
     // Next normally replaces this optional image configuration at build time.
     define: { "process.env.__NEXT_IMAGE_OPTS": "undefined" },
     optimizeDeps: {
+      entries: ["app/**/composer/*.browser.tsx"],
       include: [
         "motion/react",
         "deep-equal",
         "react/jsx-runtime",
         "next/image",
+        "next/link",
         "react/jsx-dev-runtime",
         "react",
         "react-dom",

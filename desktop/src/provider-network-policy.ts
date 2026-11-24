@@ -287,9 +287,7 @@ export namespace ProviderNetworkPolicy {
         [...headers.keys()].some((name) => !OPENAI_PROJECT_HEADERS.has(name)) ||
         !(
           (method === "GET" && url.href === OPENAI_MODELS_URL) ||
-          (method === "POST" &&
-            (url.href === `${OPENAI_API_BASE}/responses` ||
-              url.href === `${OPENAI_API_BASE}/responses/input_tokens`))
+          (method === "POST" && url.href === `${OPENAI_API_BASE}/responses`)
         ))
     )
       throw new Error("OpenAI project request is not allowed");

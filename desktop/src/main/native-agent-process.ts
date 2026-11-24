@@ -10,7 +10,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { promisify } from "node:util";
-import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
+import {
+  NativeChatSkills,
+  type NativeChatSkill,
+  type NativeEditorSurfaceSnapshot,
+} from "@grida/desktop-bridge";
 import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
@@ -18,6 +22,7 @@ import { NativeAgentBackgroundProcesses } from "./native-agent-background-proces
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
+import { nativeAgentErrorCode } from "./native-agent-config";
 import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
@@ -29,6 +34,7 @@ import {
 } from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
 import { NativeFileReference } from "./native-file-reference";
+import { NativeAttachmentBatch } from "./native-attachment-batch";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -60,7 +66,7 @@ const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
 const EDITOR_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
-const readAgentHelp = promisify(execFile);
+const execAgent = promisify(execFile);
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
@@ -81,6 +87,7 @@ const QUESTION_ADMISSION_METHODS = new Set([
   "_co.grida/goal/start",
 ]);
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
+export const COMPACTION_ITEMS = "co.grida/session/compaction-items";
 export const PREDICT_PROMPT = "co.grida/session/predict-prompt";
 const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
@@ -108,6 +115,8 @@ export type NativeAgentLaunch = {
   model: string;
   wireModel?: string;
   imageInput?: boolean;
+  /** Total context capacity for this resolved model binding. */
+  contextWindowTokens?: number;
   maxOutputTokens?: number;
   compatibleOutputLimitField?: "max-tokens";
   llamaCppInputCount?: true;
@@ -117,7 +126,7 @@ export type NativeAgentLaunch = {
   configuredEndpointKey?: string;
   /** Main-owned settings identity, including anonymous configured endpoints. */
   configuredEndpointId?: string;
-  workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
+  configHome?: string;
   hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
   inputRouteConnectionId?: string | null;
@@ -215,16 +224,19 @@ export class NativeAgentProcess {
   private librarySelection = false;
   private fileInput = false;
   private fileReference = false;
+  private attachmentBatches = false;
   private inputImages = false;
   private toolImages = false;
   private inputImageChunks = false;
   private queuedMessages = false;
+  private queueActions = false;
   private queuedTextReplacement = false;
   private selectedImage = false;
   private agentEffort = false;
   private historyRevision = false;
   private transcriptWindow = false;
   private activityOrder = false;
+  private compactionItems = false;
   private optionalQuestions = false;
   private questionBatches = false;
   private reconsiderDenials = false;
@@ -285,8 +297,7 @@ export class NativeAgentProcess {
     private readonly onSessionUpdate?: (params: unknown) => void,
     permissions?: Readonly<{
       askRoots: ReadonlyMap<string, string>;
-      settingsRoot?: string;
-      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[3];
+      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[2];
     }>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
@@ -301,7 +312,6 @@ export class NativeAgentProcess {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
         permissions.askRoots,
-        permissions.settingsRoot,
         permissions.scopedAccess
       );
     }
@@ -309,9 +319,7 @@ export class NativeAgentProcess {
     this.exited = new Promise((resolve) => {
       child.once("close", (code, signal) => {
         this.observedExit = true;
-        const diagnostic = /^grida-agent: ([a-z0-9_]{1,96})$/m.exec(
-          diagnostics
-        )?.[1];
+        const diagnostic = nativeAgentErrorCode(diagnostics);
         this.fail(new Error(diagnostic ?? "native_agent_disconnected"));
         resolve({ code, signal });
       });
@@ -322,15 +330,14 @@ export class NativeAgentProcess {
       this.disconnect("native_agent_output_failed")
     );
     child.stdout.on("data", (chunk: Buffer) => this.receive(chunk));
-    // Capture only a bounded prefix and project fixed host error codes.
+    // Retain the last bounded diagnostics so fatal codes survive config warnings.
     child.stderr.on("error", () =>
       this.disconnect("native_agent_diagnostics_failed")
     );
     child.stderr.on("data", (chunk: Buffer) => {
-      if (diagnostics.length < 4096)
-        diagnostics += chunk
-          .subarray(0, 4096 - diagnostics.length)
-          .toString("utf8");
+      diagnostics = (
+        diagnostics + chunk.subarray(-4096).toString("utf8")
+      ).slice(-4096);
     });
   }
 
@@ -362,6 +369,19 @@ export class NativeAgentProcess {
 
   get acceptsActivityOrder(): boolean {
     return this.connected && this.activityOrder;
+  }
+
+  get acceptsCompactionStart(): boolean {
+    return (
+      this.connected &&
+      this.commandCapabilities.has(
+        NativeAgentCommands.compactionStartCapability
+      )
+    );
+  }
+
+  get acceptsCompactionItems(): boolean {
+    return this.connected && this.compactionItems;
   }
 
   get acceptsCatalogQuery(): boolean {
@@ -412,6 +432,10 @@ export class NativeAgentProcess {
     return this.connected && this.fileReference;
   }
 
+  get acceptsAttachmentBatches(): boolean {
+    return this.connected && this.attachmentBatches;
+  }
+
   get acceptsInputImages(): boolean {
     return this.connected && this.inputImages;
   }
@@ -426,6 +450,10 @@ export class NativeAgentProcess {
 
   get acceptsQueuedMessages(): boolean {
     return this.connected && this.queuedMessages;
+  }
+
+  get acceptsQueueActions(): boolean {
+    return this.connected && this.queueActions;
   }
 
   get acceptsQueuedTextReplacement(): boolean {
@@ -577,7 +605,7 @@ export class NativeAgentProcess {
     ].join("/");
     const cached = this.approvalProbes.get(installed);
     if (cached?.identity === identity) return cached.supported;
-    const supported: Promise<ReadonlySet<string>> = readAgentHelp(
+    const supported: Promise<ReadonlySet<string>> = execAgent(
       executable,
       ["serve", "--help"],
       {
@@ -607,6 +635,45 @@ export class NativeAgentProcess {
       });
     this.approvalProbes.set(installed, { identity, supported });
     return supported;
+  }
+
+  /** Read the native skill catalog without opening storage or a model route. */
+  static async skills(
+    resourcesPath: string,
+    workspace?: Readonly<{
+      root: string;
+      device: string;
+      inode: string;
+      bundledFx: boolean;
+    }>
+  ): Promise<readonly NativeChatSkill[]> {
+    const args = ["skills"];
+    if (workspace) {
+      args.push(
+        "--workspace-root",
+        workspace.root,
+        "--workspace-device",
+        workspace.device,
+        "--workspace-inode",
+        workspace.inode
+      );
+      if (workspace.bundledFx) args.push("--bundled-fx");
+    }
+    try {
+      const { stdout } = await execAgent(this.executable(resourcesPath), args, {
+        env: {},
+        timeout: 5000,
+        killSignal: "SIGKILL",
+        maxBuffer: FRAME_LIMIT,
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      const skills = NativeChatSkills.catalog(JSON.parse(stdout));
+      if (!skills) throw new Error("native_chat_skills_invalid_response");
+      return skills;
+    } catch {
+      throw new Error("native_chat_skills_unavailable");
+    }
   }
 
   /** Metadata-only ACP host. Its client has no provider route or editor capabilities. */
@@ -679,14 +746,13 @@ export class NativeAgentProcess {
       ...options,
       imageGeneration,
     });
-    if (options.workspaceConfiguration && !options.providerNetwork)
-      throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.providerNetwork)
       throw new Error("native_agent_subagent_transport_unavailable");
     for (const directory of [
       options.resourcesPath,
       options.stateDirectory,
       options.processCwd,
+      options.configHome,
     ]) {
       if (directory !== undefined && !path.isAbsolute(directory)) {
         throw new Error("native_agent_absolute_directory_required");
@@ -759,6 +825,11 @@ export class NativeAgentProcess {
     }
     if (options.maxOutputTokens !== undefined)
       args.push("--max-output-tokens", String(options.maxOutputTokens));
+    if (providerEgress && options.contextWindowTokens !== undefined)
+      args.push(
+        "--supervised-context-window-tokens",
+        String(options.contextWindowTokens)
+      );
     if (options.compatibleOutputLimitField !== undefined)
       args.push(
         "--compatible-output-limit-field",
@@ -771,14 +842,6 @@ export class NativeAgentProcess {
     if (options.reasoning) args.push("--reasoning");
     if (imageGeneration)
       args.push("--desktop-image-generation", imageGeneration.binding);
-    if (options.workspaceConfiguration) {
-      args.push(
-        "--workspace-configuration",
-        options.workspaceConfiguration.directory,
-        "--workspace-configuration-epoch",
-        options.workspaceConfiguration.epoch
-      );
-    }
     if (options.configuredEndpointKey !== undefined)
       args.push(
         "--supervised-configured-endpoint-key",
@@ -811,6 +874,7 @@ export class NativeAgentProcess {
     if (scopedAccess?.commandEscalation)
       args.push("--allow-reviewed-command-retry");
     const environment = nativeEnvironment();
+    if (options.configHome) environment.GRIDA_HOME = options.configHome;
     if (options.mcp) {
       if (!options.workspace || !options.gatewayScope)
         throw new Error("native_desktop_mcp_gateway_workspace_required");
@@ -833,12 +897,6 @@ export class NativeAgentProcess {
       permissionProfile && {
         askRoots: permissionProfile.askRoots,
         scopedAccess,
-        // The host keeps the agent settings file in the workspace
-        // configuration folder, or in its own state folder.
-        settingsRoot: await fs.promises.realpath(
-          options.workspaceConfiguration?.directory ??
-            permissionProfile.stateDirectory
-        ),
       },
       providerEgress,
       imageGeneration,
@@ -918,13 +976,16 @@ export class NativeAgentProcess {
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
                 [NativeFileReference.capability]: 1,
+                [NativeAttachmentBatch.capability]: 1,
                 [NativeInputImages.capability]: 1,
                 [NativeInputImages.chunkCapability]: 1,
                 [NativeToolImages.capability]: 1,
                 [NativeQueuedMessages.capability]: 1,
+                [NativeQueuedMessages.actionsCapability]: 1,
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
+                [COMPACTION_ITEMS]: 1,
                 [CATALOG_QUERY]: 1,
                 [QUESTION_BATCHES.list]: 1,
                 [QUESTION_BATCHES.answer]: 1,
@@ -961,6 +1022,7 @@ export class NativeAgentProcess {
         !!permissionProfile &&
         advertised?.[NativeAgentPermissions.reconsideration] === 1;
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.compactionItems = advertised?.[COMPACTION_ITEMS] === 1;
       processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
       processOwner.optionalQuestions =
         advertised?.["co.grida/session/optional-questions"] === 1;
@@ -1025,6 +1087,8 @@ export class NativeAgentProcess {
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.fileReference =
         advertised?.[NativeFileReference.capability] === 1;
+      processOwner.attachmentBatches =
+        advertised?.[NativeAttachmentBatch.capability] === 1;
       processOwner.inputImages =
         advertised?.[NativeInputImages.capability] === 1;
       processOwner.inputImageChunks =
@@ -1032,6 +1096,8 @@ export class NativeAgentProcess {
       processOwner.toolImages = advertised?.[NativeToolImages.capability] === 1;
       processOwner.queuedMessages =
         advertised?.[NativeQueuedMessages.capability] === 1;
+      processOwner.queueActions =
+        advertised?.[NativeQueuedMessages.actionsCapability] === 1;
       processOwner.queuedTextReplacement =
         advertised?.[NativeQueuedMessages.replaceTextCapability] === 1;
       processOwner.selectedImage =

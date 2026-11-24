@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   CompactionNotice,
@@ -26,9 +27,14 @@ function ComposerExamples() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Composer playground</h1>
         <p className="text-sm text-muted-foreground">
-          Dictation uses your browser’s speech recognition, which may send audio
-          to its speech service. When recognition is unavailable, the playground
-          inserts a labeled sample transcript.
+          For complete chat scenarios, open the{" "}
+          <Link
+            href="/ui/components/native-chat"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Native Chat playground
+          </Link>
+          .
         </p>
       </header>
       <Example id="question-batch" title="Question batch">
@@ -80,9 +86,21 @@ function ComposerExamples() {
         <PreviewRefreshDemo />
       </Example>
       <Example id="message-queue" title="Message queue">
+        <p className="text-sm text-muted-foreground">
+          Choose Edit from a message’s menu, then use Send to put the revision
+          back in the queue or press Escape to restore the original. Move the
+          sample image to the top and choose Steer to see it in the
+          conversation.
+        </p>
         <DesktopComposerDemo queued />
       </Example>
       <Example id="attachments" title="Attachments">
+        <p className="text-sm text-muted-foreground">
+          Drop two images, add a caption, and turn on Hold submission before
+          sending. Type your next draft while the send waits. Accept the send or
+          refuse it and retry from the message. Reopen chat to see the accepted
+          images in the transcript and continue your next draft.
+        </p>
         <DesktopComposerDemo scenario="attachments" />
       </Example>
       <Example id="long-paste" title="Long pasted text">
@@ -102,15 +120,12 @@ function ComposerExamples() {
       </Example>
       <Example id="compaction" title="Compaction">
         <div className="flex flex-col gap-4 rounded-xl border bg-background p-4">
-          <CompactionNotice
-            auto
-            summary="The gallery handout is for a self-guided tour."
-          />
+          <CompactionNotice summary="The gallery handout is for a self-guided tour." />
           <CompactionProgress />
         </div>
         <p className="text-sm text-muted-foreground">
-          To try the full flow, send <code>/compact</code> below and select
-          Finish compaction.
+          Send <code>/compact</code> below. Send a follow-up while the summary
+          is running, then select Finish compaction to start that message.
         </p>
         <DesktopComposerDemo scenario="compaction" />
       </Example>

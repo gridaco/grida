@@ -7,6 +7,7 @@ import { NativeAgentChat } from "./native-agent-chat";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
+  COMPACTION_ITEMS,
   NativeAgentProcess,
   PREDICT_PROMPT,
   QUESTION_BATCHES,
@@ -96,6 +97,75 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("queries skill metadata without starting ACP, storage, or a provider", async () => {
+    const revision = "a".repeat(64);
+    const skill = {
+      name: "slides",
+      description: "Make a deck",
+      source: "personal",
+      revision,
+      uri: `grida-skill:slides@${revision}`,
+    };
+    const test = fixture(
+      "",
+      1,
+      undefined,
+      false,
+      `
+      const args=process.argv.slice(2);
+      const root=require('node:path').dirname(__dirname);
+      const expected=process.argv.includes('--workspace-root')
+        ? ['skills','--workspace-root',root,'--workspace-device','101','--workspace-inode','202','--bundled-fx']
+        : ['skills'];
+      if (JSON.stringify(args) !== JSON.stringify(expected) || process.env.GRIDA_HOME || process.env.OPENAI_API_KEY)
+        process.exit(2);
+      fs.writeSync(1, JSON.stringify({skills:[${JSON.stringify(skill)}]}));
+      process.exit(0);
+    `
+    );
+    try {
+      await expect(NativeAgentProcess.skills(test.root)).resolves.toEqual([
+        skill,
+      ]);
+      await expect(
+        NativeAgentProcess.skills(test.root, {
+          root: fs.realpathSync(test.root),
+          device: "101",
+          inode: "202",
+          bundledFx: true,
+        })
+      ).resolves.toEqual([skill]);
+      expect(fs.existsSync(test.options.stateDirectory)).toBe(false);
+    } finally {
+      test.close();
+    }
+  });
+
+  it("passes the global home to the native host and surfaces bounded config errors", async () => {
+    const test = fixture(
+      "",
+      1,
+      undefined,
+      false,
+      `
+      if (process.argv.some(arg => arg.startsWith('--workspace-configuration'))) process.exit(2);
+      if (!process.env.GRIDA_HOME?.endsWith('/agent-config')) process.exit(2);
+      fs.writeSync(2, 'grida-agent: config_invalid_value_model_context_window ("/private/config.toml")\\n');
+      process.exit(1);
+      `
+    );
+    try {
+      await expect(
+        NativeAgentProcess.start({
+          ...test.options,
+          configHome: path.join(test.root, "agent-config"),
+        })
+      ).rejects.toThrow(/^config_invalid_value_model_context_window$/);
+    } finally {
+      test.close();
+    }
+  });
+
   it("gates scoped requests on the installed executable and retries failed probes", async () => {
     const test = fixture(
       `
@@ -579,6 +649,133 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("lowers selections as exact skill resource links and uses only the host display projection live and in replay", async () => {
+    const capability = "co.grida/session/message-context";
+    const selection = {
+      name: "slides",
+      uri: `grida-skill:slides@${"a".repeat(64)}`,
+    };
+    const displayPart = {
+      kind: "skill",
+      version: 1,
+      data: { ...selection, source: "personal" },
+    };
+    const text = "Make a deck about tides for $100.";
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      const { inputId, prompt } = request.params;
+      if (request.method === '_co.grida/session/submit' || request.method === '_co.grida/session/enqueue') {
+        const empty = request.method.endsWith('/submit');
+        const expected = [...(empty ? [] : [{type:'text',text:${JSON.stringify(text)}}]), {type:'resource_link',...${JSON.stringify(selection)}}];
+        if (JSON.stringify(prompt) !== JSON.stringify(expected)) throw Error('incorrect skill resource link');
+        if (empty) send({method:'session/update',params:{sessionId:'chat',
+          _meta:{'co.grida/session/updates':{inputId,turnId:'turn',offsetBytes:0,replace:true,displayParts:[${JSON.stringify(displayPart)}]}},
+          update:{sessionUpdate:'user_message_chunk',messageId:'only-skill',content:{type:'text',text:''}}
+        }});
+        send({id:request.id,result:{sessionId:'chat',inputId,inputPosition:1,turnId:empty?'turn':null,disposition:empty?'claimed':'queued'}}); return;
+      }
+      if (request.method !== 'session/load') throw Error('unexpected fixture method');
+      const window='${TRANSCRIPT_WINDOW}',read=request.params._meta[window];
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:{[window]:{requestId:read.requestId,turnId:'turn',displayParts:[${JSON.stringify(displayPart)}]}},
+        update:{sessionUpdate:'user_message_chunk',messageId:'with-skill',content:{type:'text',text:${JSON.stringify(text)}}}
+      }});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, [capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const live: unknown[] = [];
+      chat.subscribe(session, (update) => live.push(update));
+      await expect(
+        chat.submit(
+          session,
+          "only-skill",
+          "",
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [selection]
+        )
+      ).resolves.toMatchObject({ inputId: "only-skill" });
+      expect(live).toEqual([
+        {
+          kind: "text",
+          role: "user",
+          text: "",
+          messageId: "only-skill",
+          inputId: "only-skill",
+          turnId: "turn",
+          offsetBytes: 0,
+          replace: true,
+          displayParts: [displayPart],
+        },
+      ]);
+      await expect(
+        chat.enqueue(
+          session,
+          "with-skill",
+          text,
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [selection]
+        )
+      ).resolves.toMatchObject({ inputId: "with-skill" });
+      expect(() =>
+        chat!.submit(
+          session,
+          "wrong-scope",
+          "Hello",
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [{ ...selection, workspaceId: "another-project" }]
+        )
+      ).toThrow("selected_skill_unavailable");
+      await expect(
+        chat.submitMessage(session, {
+          text,
+          inputId: "forged",
+          operatingRegime: "act",
+          messageContext: {
+            modelText: "Extra context",
+            displayParts: [displayPart],
+          },
+        })
+      ).rejects.toThrow("native_chat_message_context_invalid");
+      expect((await chat.transcriptPage(session)).messages).toEqual([
+        {
+          messageId: "with-skill",
+          turnId: "turn",
+          role: "user",
+          text,
+          displayParts: [displayPart],
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it("sends plain messages to older hosts without optional title or message context support", async () => {
     const test = fixture(
       `if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
@@ -709,6 +906,97 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           "native_chat_activity_order_invalid"
         );
         expect(live).toEqual([{ kind: "resync" }]);
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it.each([null, 1, 2])(
+    "preserves individual compactions in live and retained history when negotiated (%s)",
+    async (version) => {
+      const first = {
+        id: "compact/1",
+        status: "running",
+        automatic: true,
+        activityOrder: 2,
+        startedAtMs: 50,
+      };
+      const completed = { ...first, status: "succeeded", finishedAtMs: 60 };
+      const next = {
+        id: "compact/2",
+        status: "failed",
+        automatic: true,
+        activityOrder: 4,
+        startedAtMs: 80,
+        finishedAtMs: 90,
+      };
+      const legacy = { summary: "Earlier context", automatic: false };
+      const latest = { summary: "Retained context", automatic: true };
+      const test = fixture(
+        `
+        if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+        if (request.method !== 'session/load') throw Error('unexpected fixture method');
+        const window='${TRANSCRIPT_WINDOW}',compactions='${COMPACTION_ITEMS}', read=request.params._meta[window];
+        if (requested[compactions] !== 1) throw Error('missing optional capability');
+        const item=${JSON.stringify(first)},completed=${JSON.stringify(completed)},next=${JSON.stringify(next)};
+        const update=(item,sessionId='chat',text='')=>send({
+          method:'session/update',params:{sessionId,_meta:{[compactions]:{turnId:'turn',item}},
+          update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}
+        });
+        update(item,'other');
+        update(item,'chat','text does not carry compaction metadata');
+        update({...item,id: 'invalid id'});
+        update({...item,finishedAtMs:60});
+        update({...next,summary:'A failed operation did not install a summary'});
+        update(item);
+        update(completed);
+        update(next);
+        const turn={turnId:'turn',status:null,startedAtMs:40,compaction:${JSON.stringify(latest)},compactions:[completed,next]};
+        const historical={turnId:'historical',status:'succeeded',startedAtMs:1,compaction:${JSON.stringify(legacy)}};
+        send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[historical,turn]}}}});
+        `,
+        1,
+        { [TRANSCRIPT_WINDOW]: 1, [COMPACTION_ITEMS]: version }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const live: unknown[] = [];
+        chat.subscribe(session, (update) => live.push(update));
+        const page = await chat.transcriptPage(session);
+        expect(page.messages).toEqual([]);
+        expect(page.turns).toEqual([
+          {
+            turnId: "historical",
+            status: "succeeded",
+            startedAtMs: 1,
+            compaction: legacy,
+          },
+          {
+            turnId: "turn",
+            status: null,
+            startedAtMs: 40,
+            compaction: latest,
+            ...(version === 1 && {
+              compactions: [{ ...completed, summary: latest.summary }, next],
+            }),
+          },
+        ]);
+        expect(live).toEqual(
+          version === 1
+            ? [first, completed, next].map((item) => ({
+                kind: "compaction",
+                turnId: "turn",
+                item,
+              }))
+            : []
+        );
       } finally {
         await chat?.close();
         test.close();
@@ -1712,7 +2000,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
   it("retains an open launch exchange while the next model uses its own revocable network authority", async () => {
     const test = fixture(
       `
-      if (request.method === 'fixture/worker-request') {
+      if (request.method === 'fixture/argv') {
+        send({id:request.id,result:process.argv.slice(2)});
+      } else if (request.method === 'fixture/worker-request') {
         send({id: 'worker-' + request.id, ...request.params});
       } else if (String(request.id).startsWith('worker-')) {
         send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
@@ -1745,6 +2035,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       const endpoint = "http://127.0.0.1:2/v1";
       agent = await NativeAgentProcess.start({
         ...test.options,
+        contextWindowTokens: 131_072,
         providerNetwork: network("A"),
         lookupProviderRoute: async (id, model) => {
           const primary = id === null && model === test.options.model;
@@ -1756,6 +2047,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
                 provider: "openai-compatible",
                 model,
                 endpoint: primary ? test.options.endpoint : endpoint,
+                ...(primary ? {} : { contextWindowTokens: 65_536 }),
                 providerNetwork: network(primary ? "A" : "B"),
               },
             }),
@@ -1763,6 +2055,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         },
       });
       expect(agent.acceptsInputRoutes).toBe(true);
+      const args = (await agent.request("fixture/argv", {})) as string[];
+      expect(args[args.indexOf("--supervised-context-window-tokens") + 1]).toBe(
+        "131072"
+      );
       const worker = (method: string, params: Record<string, unknown>) =>
         agent!.request("fixture/worker-request", { method, params });
       const exchange = (params: Record<string, unknown>) =>
@@ -1800,6 +2096,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         protocol: "openai-compatible",
         model: "B",
         endpoint,
+        contextWindowTokens: 65_536,
       });
       expect(await open(next, test.options.endpoint, route.routeId)).toEqual({
         status: "unavailable",

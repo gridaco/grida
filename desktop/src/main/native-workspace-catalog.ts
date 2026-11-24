@@ -23,12 +23,14 @@ type Options = Readonly<{
   browserData: string;
   projectsRoot: string;
   protectedPaths: readonly string[];
+  launchProtectedPaths?: readonly string[];
 }>;
 
 export type NativeNestedDeckGrant = WorkspaceMediaGrant &
   Readonly<{
     parentWorkspaceId: string;
     parentIdentity: WorkspaceDirectoryIdentity;
+    launchProtected: readonly string[];
   }>;
 
 type ExternalAccess = Readonly<{
@@ -44,6 +46,7 @@ export class NativeWorkspaceCatalog {
   private readonly reader: WorkspaceCatalogReader;
   private readonly ready: Promise<void>;
   private readonly protectedPaths: readonly string[];
+  private readonly launchProtected: ProtectedRoots;
   private readonly ordinaryDenials: ProtectedRoots;
   private readonly externalScratch: string;
   private external?: ExternalOwner;
@@ -56,17 +59,19 @@ export class NativeWorkspaceCatalog {
 
   constructor(private readonly options: Options) {
     this.directory = NativeWorkspaceCatalog.directoryFor(options.browserData);
-    const ordinaryPaths = [
-      ...options.protectedPaths,
-      options.browserData,
-      path.dirname(this.directory),
-    ];
+    const catalogPaths = [options.browserData, path.dirname(this.directory)];
+    const ordinaryPaths = [...options.protectedPaths, ...catalogPaths];
     this.ordinaryDenials = new ProtectedRoots(ordinaryPaths);
     this.externalScratch = path.join(
       path.dirname(options.browserData),
       ".grida-external-scratch"
     );
     this.protectedPaths = [...ordinaryPaths, this.externalScratch];
+    this.launchProtected = new ProtectedRoots([
+      ...(options.launchProtectedPaths ?? options.protectedPaths),
+      ...catalogPaths,
+      this.externalScratch,
+    ]);
     this.scopes = new WorkspaceMediaRegistry(this.protectedPaths);
     this.reader = new WorkspaceCatalogReader(
       this.directory,
@@ -232,7 +237,11 @@ export class NativeWorkspaceCatalog {
   /** Resolve a nested bundle without granting the workspace which contains it. */
   nestedDeck(id: string, relativePath: string): Promise<NativeNestedDeckGrant> {
     return this.run(async () =>
-      NativeDeckGrant.nested(await this.resolveFileGrant(id), relativePath)
+      NativeDeckGrant.nested(
+        await this.resolveFileGrant(id),
+        relativePath,
+        this.launchProtected.metadataPaths()
+      )
     );
   }
 
@@ -352,7 +361,8 @@ export namespace NativeDeckGrant {
 
   export async function nested(
     parent: WorkspaceMediaGrant,
-    relativePath: string
+    relativePath: string,
+    launchProtected: readonly string[]
   ): Promise<NativeNestedDeckGrant> {
     if (
       Buffer.byteLength(relativePath) > 4096 ||
@@ -402,6 +412,7 @@ export namespace NativeDeckGrant {
       root,
       identity,
       protected: parent.protected,
+      launchProtected,
     };
   }
 }

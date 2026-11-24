@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use agent_kit_core::{ModelId, SessionId};
 use clap::{Arg, ArgAction, ArgMatches, Command as ClapCommand, parser::ValueSource};
+use grida_agent::process::RunQuestions;
 use unicode_general_category::{GeneralCategory, get_general_category};
 
 use crate::{Failure, FailureCode, Topic};
@@ -72,7 +73,7 @@ pub struct AgentRunArgs {
     pub input_png: Option<PathBuf>,
     pub input_file: Option<PathBuf>,
     pub skills: Vec<grida_agent::skills::SkillReference>,
-    pub questions: bool,
+    pub questions: RunQuestions,
     pub deadline_ms: u64,
 }
 
@@ -218,6 +219,7 @@ const BOOLEANS: &[&str] = &[
     "key-stdin",
     "stdio",
     "questions",
+    "questions-v2",
 ];
 const STRINGS: &[&str] = &[
     "storage",
@@ -581,6 +583,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
             "initial-title",
             "skill",
             "questions",
+            "questions-v2",
             "deadline-ms",
         ]);
     } else {
@@ -593,6 +596,12 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
     if tokens.seen("input-png") && tokens.seen("input-file") {
         return Err(Failure::usage());
     }
+    let questions = match (tokens.flag("questions"), tokens.flag("questions-v2")) {
+        (false, false) => RunQuestions::Disabled,
+        (true, false) => RunQuestions::Singleton,
+        (false, true) => RunQuestions::Batch,
+        (true, true) => return Err(Failure::usage()),
+    };
     let absolute = |name| {
         let value = PathBuf::from(tokens.required(name)?);
         value
@@ -634,7 +643,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
                     .map(grida_agent::skills::SkillReference::named)
                     .collect::<agent_kit_core::Result<_>>()
                     .map_err(|_| Failure::usage())?,
-                questions: tokens.flag("questions"),
+                questions,
                 deadline_ms: integer("deadline-ms", "120000", 600_000)?,
             }))
         } else {
@@ -997,6 +1006,38 @@ mod tests {
             ]))
             .is_err()
         );
+    }
+
+    #[test]
+    fn agent_run_selects_the_question_output_contract() {
+        let base = [
+            "agent",
+            "run",
+            "--provider=gg",
+            "--model=fixture",
+            STATE_DIR,
+            CWD,
+        ];
+        for (flag, expected) in [
+            (None, RunQuestions::Disabled),
+            (Some("--questions"), RunQuestions::Singleton),
+            (Some("--questions-v2"), RunQuestions::Batch),
+        ] {
+            let mut arguments = base.to_vec();
+            arguments.extend(flag);
+            let Command::Agent(AgentCommand {
+                action: AgentAction::Run(run),
+                ..
+            }) = parsed(&arguments).command
+            else {
+                panic!("expected agent run");
+            };
+            assert_eq!(run.questions, expected);
+        }
+
+        let mut conflicting = base.to_vec();
+        conflicting.extend(["--questions", "--questions-v2"]);
+        assert_eq!(parse(&args(&conflicting)).unwrap_err(), Failure::usage());
     }
 
     #[test]

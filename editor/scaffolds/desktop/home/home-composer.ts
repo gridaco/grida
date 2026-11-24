@@ -1,4 +1,5 @@
 import {
+  NATIVE_CHAT_MAX_ATTACHMENTS,
   parseNativeChatMessageContext,
   type DesktopNativeChat,
   type NativeChatEffort,
@@ -7,9 +8,10 @@ import {
   type NativeChatSpeed,
   type NativeChatTurnCapabilities,
 } from "@grida/desktop-bridge";
+import { AttachmentBatch } from "@/lib/agent-chat/attachment-batch";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { image_attachment_preview } from "@/lib/agent-chat/image-attachment-preview";
-import type { ComposerTransfer } from "@/kits/composer";
+import type { ComposerHistory, ComposerTransfer } from "@/kits/composer";
 import type { PermissionReviewProject } from "../shared/agent-permission-confirmation";
 import type { Workspace } from "@/lib/desktop/bridge";
 import { slidesTemplateMessageContext } from "@/lib/desktop/slides-message-context";
@@ -24,6 +26,7 @@ type CapturedRequest = {
   readonly id: string;
   readonly input: HomeComposer.Input;
   readonly document: unknown;
+  readonly documentRevision?: string;
   readonly access: NativeChatPermissionMode;
   readonly speed: HomeComposer.View["speed"];
   readonly recoveryKey?: string;
@@ -34,7 +37,7 @@ type CapturedRequest = {
   readonly source?: HomeComposer.DraftSource;
   readonly followup?: WelcomeFollowupDraft;
   handedOff?: boolean;
-  attachment: HomeComposer.Attachment | null;
+  attachments: AttachmentBatch.Draft;
   workspace?: Workspace;
 };
 
@@ -43,7 +46,9 @@ type RecoverableRequest = Readonly<{
   workspaceId?: string;
   text: string;
   document: unknown;
-  attachmentName?: string;
+  documentRevision?: string;
+  attachmentNames?: readonly string[];
+  attachmentIds?: readonly string[];
 }>;
 
 /** Unsent intent and the exact workspace chat reserved for its selected access. */
@@ -52,6 +57,7 @@ export class HomeComposer {
   private static readonly drafts = new ComposerDrafts();
   private listeners = new Set<() => void>();
   private attachmentRevision = 0;
+  private historyAttachmentRevision = 0;
   private restoration?: Promise<void>;
   private effortChosen = false;
   private effortInitialized = false;
@@ -83,7 +89,11 @@ export class HomeComposer {
     copy: WelcomeTemplate;
   }>;
   private captured?: CapturedRequest;
-  private recovery?: { key: string; request: RecoverableRequest };
+  private recovery?: {
+    key: string;
+    request: RecoverableRequest;
+    attachments?: Promise<AttachmentBatch.Draft | null>;
+  };
   private view: HomeComposer.View;
 
   constructor(readonly drafts = HomeComposer.drafts) {
@@ -99,9 +109,10 @@ export class HomeComposer {
       permissionError: null,
       plan: !!modes.plan,
       goal: !!modes.goal,
-      attachment: null,
+      attachments: AttachmentBatch.empty,
       notice: null,
       busy: false,
+      draftKey: null,
       outgoing: null,
     };
   }
@@ -118,10 +129,10 @@ export class HomeComposer {
     return {
       key,
       store: this.drafts,
-      onWrite: (document: unknown) => {
+      onWrite: (document: unknown, revision?: string) => {
         const capture = this.captured;
-        if (capture?.handedOff && capture.source?.key === key)
-          capture.followup?.save(document);
+        if (capture?.source?.key === key)
+          capture.followup?.observe(document, revision);
       },
     };
   }
@@ -132,26 +143,40 @@ export class HomeComposer {
 
   private async restoreAttachment(): Promise<void> {
     const revision = this.attachmentRevision;
-    const stored = await this.drafts.readAttachment(HomeComposer.key);
-    if (!stored || revision !== this.attachmentRevision) return;
-    const file =
-      stored.kind === "image" || stored.kind === "reference"
-        ? stored.file
-        : new File([stored.bytes], stored.name, {
-            type: stored.kind === "png" ? "image/png" : "",
-          });
-    const attachment: HomeComposer.Attachment = {
-      kind:
-        stored.kind === "reference" && stored.mimeType === "inode/directory"
-          ? "directory"
-          : "file",
-      file,
-    };
+    let attachments = await this.drafts.readAttachmentBatch(HomeComposer.key);
+    if (!attachments) {
+      const stored = await this.drafts.readAttachment(HomeComposer.key);
+      if (stored) {
+        const file =
+          stored.kind === "image" || stored.kind === "reference"
+            ? stored.file
+            : new File([stored.bytes], stored.name, {
+                type: stored.kind === "png" ? "image/png" : "",
+              });
+        attachments = [
+          HomeComposer.attachmentEntry({
+            kind:
+              stored.kind === "reference" &&
+              stored.mimeType === "inode/directory"
+                ? "directory"
+                : "file",
+            file,
+          }),
+        ];
+      } else {
+        const missing = await this.drafts.readMissingAttachment(
+          HomeComposer.key
+        );
+        if (missing) attachments = [HomeComposer.missingAttachment(missing)];
+      }
+    }
+    if (!attachments?.length || revision !== this.attachmentRevision) return;
     if (this.captured) {
-      this.captured.attachment ??= attachment;
+      if (!this.captured.attachments.length)
+        this.captured.attachments = attachments;
       this.update({ goal: false });
       this.showOutgoing(this.captured);
-    } else if (!this.recovery) this.update({ goal: false, attachment });
+    } else if (!this.recovery) this.update({ goal: false, attachments });
   }
 
   selectEffort = (effort: NativeChatEffort): void => {
@@ -338,9 +363,9 @@ export class HomeComposer {
   };
   selectGoal = (goal: boolean): void => {
     if (this.view.busy) return;
-    if (goal && this.view.attachment) {
+    if (goal && this.view.attachments.length) {
       this.update({
-        notice: "Send or remove the attachment before starting a goal.",
+        notice: "Send or remove the attachments before starting a goal.",
       });
       return;
     }
@@ -348,53 +373,84 @@ export class HomeComposer {
     this.saveModes();
   };
 
-  transfer = ({
-    resources,
-  }: Pick<ComposerTransfer.Event, "resources">): void => {
-    if (this.view.busy || !resources.length) return;
-    if (resources.length !== 1) {
-      this.update({ notice: "Attach one file at a time." });
-      return;
-    }
+  transfer = (
+    { resources }: Pick<ComposerTransfer.Event, "resources">,
+    maxAttachments = NATIVE_CHAT_MAX_ATTACHMENTS
+  ): void => {
+    if (this.view.busy || this.view.outgoing || !resources.length) return;
     if (this.view.goal) {
       this.update({ notice: "Remove the goal intent to attach a file." });
       return;
     }
-    const resource = resources[0];
-    this.attachmentRevision++;
-    this.update({ attachment: resource, notice: null });
-    this.storeAttachment(resource);
+    if (this.view.attachments.length + resources.length > maxAttachments) {
+      this.update({
+        notice:
+          maxAttachments === 1
+            ? "Update Grida Desktop to attach multiple files."
+            : `Attach up to ${maxAttachments} files or folders in one message.`,
+      });
+      return;
+    }
+    this.historyAttachmentRevision++;
+    this.setAttachments([
+      ...this.view.attachments,
+      ...resources.map(HomeComposer.attachmentEntry),
+    ]);
   };
 
-  private storeAttachment(resource: HomeComposer.Attachment): void {
-    const image =
-      resource.kind === "file" &&
-      /^image\/(png|jpeg|webp|gif)$/.test(resource.file.type);
-    void this.drafts.writeAttachment(
-      HomeComposer.key,
-      image
-        ? { kind: "image", name: resource.file.name, file: resource.file }
-        : {
-            kind: "reference",
-            name: resource.file.name,
-            file: resource.file,
-            mimeType:
-              resource.kind === "directory"
-                ? "inode/directory"
-                : resource.file.type,
-          }
+  private static attachmentEntry(
+    resource: HomeComposer.Attachment
+  ): AttachmentBatch.Entry {
+    const { kind, file } = resource;
+    if (kind === "file" && image_attachment_preview.selectedMediaType(file))
+      return AttachmentBatch.entry({ kind: "image", file });
+    const mimeType = kind === "directory" ? "inode/directory" : file.type;
+    return AttachmentBatch.entry(
+      { kind: "reference", file, mimeType },
+      {
+        name: file.name,
+        mimeType,
+        ...(kind === "file" && { size: file.size }),
+      }
     );
   }
 
-  removeAttachment = (): void => {
-    if (!this.view.busy) this.clearAttachment();
+  private static missingAttachment(name: string): AttachmentBatch.Entry {
+    return { id: crypto.randomUUID(), card: { name } };
+  }
+
+  private setAttachments(attachments: AttachmentBatch.Draft): void {
+    this.attachmentRevision++;
+    this.update({ attachments, notice: null });
+    void this.drafts.writeAttachmentBatch(
+      HomeComposer.key,
+      attachments.length ? attachments : null
+    );
+  }
+
+  removeAttachment = (id: string): void => {
+    if (this.view.busy) return;
+    this.historyAttachmentRevision++;
+    this.setAttachments(
+      this.view.attachments.filter((attachment) => attachment.id !== id)
+    );
   };
 
-  private clearAttachment(): void {
-    this.attachmentRevision++;
-    this.update({ attachment: null, notice: null });
-    void this.drafts.writeAttachment(HomeComposer.key, null);
-  }
+  private canReplaceHistoryAttachment = (attachment: object | null) =>
+    !this.view.busy && !this.view.outgoing && !(attachment && this.view.goal);
+
+  readonly historyAttachments: ComposerHistory.Attachments = {
+    read: () => (this.view.attachments.length ? this.view.attachments : null),
+    gestureRevision: () => this.historyAttachmentRevision,
+    canReplace: this.canReplaceHistoryAttachment,
+    replace: (value) => {
+      if (!this.canReplaceHistoryAttachment(value)) return false;
+      this.setAttachments(
+        (value as AttachmentBatch.Draft | null) ?? AttachmentBatch.empty
+      );
+      return true;
+    },
+  };
 
   private async prepareAccess(
     destination: HomeComposer.Destination,
@@ -560,13 +616,15 @@ export class HomeComposer {
       this.recovery
     )
       return false;
-    if (!this.hasRequest(input, this.view.attachment)) return undefined;
+    if (!this.hasRequest(input, this.view.attachments.length)) return undefined;
+    HomeComposer.selectedAttachments(this.view.attachments);
     this.checkMessageContext(input);
     const id = crypto.randomUUID();
     const captured: CapturedRequest = {
       id,
       input,
       document,
+      documentRevision: source?.store.documentRevision(source.key),
       access: this.view.permissionMode,
       speed: this.view.speed,
       effort:
@@ -576,7 +634,7 @@ export class HomeComposer {
       plan: this.view.plan,
       goal: this.view.goal,
       manualApproval: this.manualApproval,
-      attachment: this.view.attachment,
+      attachments: this.view.attachments,
       ...(source && {
         recoveryKey: this.recoveryKey(source.key),
         source,
@@ -584,22 +642,24 @@ export class HomeComposer {
       }),
     };
     this.keepRecovery(captured);
-    this.captured = captured;
     // Autosave may not see the editor clear before Home unmounts. Rotate the
     // submitted document now so even identical text typed next is a new draft.
-    source?.store.write(source.key, null);
+    try {
+      source?.store.checkpoint(source.key, null);
+    } catch (cause) {
+      this.clearRecovery(captured.recoveryKey);
+      throw new Error("Couldn't send from Home. Your draft is still here.", {
+        cause,
+      });
+    }
+    this.captured = captured;
     this.sendCaptured(captured, host);
     return true;
   }
 
   /** A navigation or reload can overtake the editor's last passive autosave. */
   flushNextDraft = (): void => {
-    const capture = this.captured;
-    if (!capture?.source) return;
-    const document = capture.source.read();
-    if (document === undefined) return;
-    if (capture.handedOff) capture.followup?.save(document, true);
-    else capture.source.store.write(capture.source.key, document);
+    this.captured?.followup?.flush();
   };
 
   retryCaptured(host: HomeComposer.Host): void {
@@ -614,12 +674,25 @@ export class HomeComposer {
     if (this.captured) return;
     const key = this.recoveryKey(draftKey);
     const request = this.readRecovery(key);
+    if (request?.documentRevision)
+      this.drafts.retireDocument(draftKey, request.documentRevision);
     const handedOff =
       request?.workspaceId &&
       ownsHandoff(request.workspaceId, request.requestId);
-    if (handedOff) this.clearRecovery(key);
-    this.recovery = request && !handedOff ? { key, request } : undefined;
+    if (handedOff) {
+      void this.retireSourceAttachments(request.attachmentIds);
+      this.clearRecovery(key);
+    }
+    const recovery = request && !handedOff ? { key, request } : undefined;
+    this.recovery =
+      recovery && recovery.request.attachmentNames?.length
+        ? {
+            ...recovery,
+            attachments: this.readRecoveryAttachments(key, recovery.request),
+          }
+        : recovery;
     this.update({
+      draftKey,
       outgoing: this.recovery
         ? {
             status: "failed",
@@ -631,29 +704,77 @@ export class HomeComposer {
     });
   }
 
-  /** Return a refused request to an empty editor, preserving any newer draft. */
-  restoreCaptured(restoreDocument: (document: unknown) => boolean): boolean {
-    const captured = this.captured;
-    const recovered = this.recovery?.request;
+  private async readRecoveryAttachments(
+    key: string,
+    request: RecoverableRequest
+  ): Promise<AttachmentBatch.Draft | null> {
+    const retained = await this.drafts
+      .readAttachmentBatch(key)
+      .catch(() => null);
+    const ids = request.attachmentIds;
+    if (!ids) return retained;
+    if (HomeComposer.matchesAttachments(retained, ids)) return retained;
+    // A reload or a refused write can interrupt the copy. Only the exact
+    // captured bytes still under the draft key belong to this request.
+    const source = await this.drafts
+      .readAttachmentBatch(HomeComposer.key)
+      .catch(() => null);
+    return HomeComposer.matchesAttachments(source, ids) ? source : null;
+  }
+
+  private static matchesAttachments(
+    entries: AttachmentBatch.Draft | null,
+    ids: readonly string[]
+  ): boolean {
+    return (
+      entries?.length === ids.length &&
+      entries.every((entry, index) => entry.id === ids[index])
+    );
+  }
+
+  private async retireSourceAttachments(ids: readonly string[] | undefined) {
+    if (!ids?.length) return;
+    const revision = this.attachmentRevision;
+    const attachments = await this.drafts
+      .readAttachmentBatch(HomeComposer.key)
+      .catch(() => null);
     if (
-      (!captured && !recovered) ||
-      captured?.handedOff ||
+      revision === this.attachmentRevision &&
+      HomeComposer.matchesAttachments(attachments, ids)
+    )
+      this.setAttachments(AttachmentBatch.empty);
+  }
+
+  /** Return a refused request to an empty editor, preserving any newer draft. */
+  async restoreCaptured(
+    restoreDocument: (document: unknown) => boolean
+  ): Promise<boolean> {
+    const { captured, recovery } = this;
+    const recovered = recovery?.request;
+    if ((!captured && !recovered) || this.view.busy || captured?.handedOff)
+      return false;
+    const attachments =
+      captured?.attachments ??
+      (await recovery?.attachments) ??
+      recovered?.attachmentNames?.map(HomeComposer.missingAttachment) ??
+      AttachmentBatch.empty;
+    if (
+      this.captured !== captured ||
+      this.recovery !== recovery ||
       this.view.busy ||
-      this.view.attachment
+      captured?.handedOff ||
+      this.view.attachments.length ||
+      !restoreDocument(captured ? captured.document : recovered?.document)
     )
       return false;
-    if (!restoreDocument(captured ? captured.document : recovered?.document))
-      return false;
-    const attachment = captured?.attachment ?? null;
-    if (attachment) this.storeAttachment(attachment);
-    this.clearRecovery(captured?.recoveryKey ?? this.recovery?.key);
+    this.setAttachments(attachments);
+    this.clearRecovery(captured?.recoveryKey ?? recovery?.key);
     this.captured = undefined;
     this.recovery = undefined;
     this.update({
-      attachment,
       outgoing: null,
-      notice: recovered?.attachmentName
-        ? `Attach ${recovered.attachmentName} again before sending.`
+      notice: attachments.some(({ input }) => !input)
+        ? "Attach the unavailable files again before sending."
         : null,
     });
     return true;
@@ -666,6 +787,10 @@ export class HomeComposer {
       this.view.busy
     )
       return;
+    void this.retireSourceAttachments(
+      this.captured?.attachments.map(({ id }) => id) ??
+        this.recovery?.request.attachmentIds
+    );
     this.clearRecovery(this.captured?.recoveryKey ?? this.recovery?.key);
     this.captured = undefined;
     this.recovery = undefined;
@@ -677,7 +802,11 @@ export class HomeComposer {
   }
 
   private readRecovery(key: string): RecoverableRequest | undefined {
-    const value = this.drafts.read(key) as Partial<RecoverableRequest> | null;
+    const value = this.drafts.read(key) as
+      | (Partial<RecoverableRequest> & {
+          attachmentName?: unknown;
+        })
+      | null;
     if (
       !value ||
       typeof value.requestId !== "string" ||
@@ -689,18 +818,44 @@ export class HomeComposer {
       typeof value.workspaceId !== "string"
     )
       return;
+    const {
+      requestId,
+      workspaceId,
+      text,
+      document,
+      documentRevision,
+      attachmentNames,
+      attachmentIds,
+      attachmentName,
+    } = value;
+    if (documentRevision !== undefined && typeof documentRevision !== "string")
+      return;
     if (
-      value.attachmentName !== undefined &&
-      typeof value.attachmentName !== "string"
+      attachmentNames !== undefined &&
+      (!Array.isArray(attachmentNames) ||
+        attachmentNames.length > NATIVE_CHAT_MAX_ATTACHMENTS ||
+        attachmentNames.some((name) => typeof name !== "string"))
     )
       return;
-    const { requestId, workspaceId, text, document, attachmentName } = value;
+    if (attachmentName !== undefined && typeof attachmentName !== "string")
+      return;
+    if (
+      attachmentIds !== undefined &&
+      (!Array.isArray(attachmentIds) ||
+        attachmentIds.length !== attachmentNames?.length ||
+        attachmentIds.some((id) => typeof id !== "string"))
+    )
+      return;
     return {
       requestId,
       workspaceId,
       text,
       document: document ?? null,
-      attachmentName,
+      documentRevision,
+      attachmentIds,
+      attachmentNames:
+        attachmentNames ??
+        (typeof attachmentName === "string" ? [attachmentName] : undefined),
     };
   }
 
@@ -716,7 +871,11 @@ export class HomeComposer {
         workspaceId: captured.workspace?.id ?? captured.input.target?.id,
         text: text.length > 1024 ? `${text.slice(0, 1024)}…` : text,
         document: captured.document,
-        attachmentName: captured.attachment?.file.name,
+        documentRevision: captured.documentRevision,
+        ...(captured.attachments.length && {
+          attachmentNames: captured.attachments.map(({ card }) => card.name),
+          attachmentIds: captured.attachments.map(({ id }) => id),
+        }),
       } satisfies RecoverableRequest);
     } catch (cause) {
       throw new Error(
@@ -727,7 +886,10 @@ export class HomeComposer {
   }
 
   private clearRecovery(key: string | undefined): void {
-    if (key) this.drafts.write(key, null);
+    if (key) {
+      this.drafts.write(key, null);
+      void this.drafts.writeAttachmentBatch(key, null);
+    }
   }
 
   private sendCaptured(captured: CapturedRequest, host: HomeComposer.Host) {
@@ -743,7 +905,7 @@ export class HomeComposer {
   private showOutgoing(captured: CapturedRequest, error?: string) {
     if (this.captured !== captured) return;
     this.update({
-      attachment: null,
+      attachments: AttachmentBatch.empty,
       notice: null,
       outgoing:
         error === undefined
@@ -757,17 +919,31 @@ export class HomeComposer {
     });
   }
 
-  private hasRequest(
-    input: HomeComposer.Input,
-    attachment: HomeComposer.Attachment | null
-  ) {
+  private hasRequest(input: HomeComposer.Input, attachmentCount: number) {
+    if (input.skills?.length) return true;
     return !!(
       input.text.trim() ||
       input.template ||
       input.references.length ||
       input.messageContext?.displayParts.length ||
-      attachment
+      attachmentCount
     );
+  }
+
+  private static selectedAttachments(
+    entries: AttachmentBatch.Draft
+  ): HomeComposer.Attachment[] {
+    return entries.map(({ input, card }) => {
+      if (input?.kind !== "image" && input?.kind !== "reference")
+        throw new Error(`Attach ${card.name} again before sending.`);
+      return {
+        kind:
+          input.kind === "reference" && input.mimeType === "inode/directory"
+            ? "directory"
+            : "file",
+        file: input.file,
+      };
+    });
   }
 
   private checkMessageContext(input: HomeComposer.Input) {
@@ -807,13 +983,26 @@ export class HomeComposer {
         return;
       }
       await this.restore();
-      if (captured?.attachment) {
+      if (captured?.attachments.length) {
         this.keepRecovery(captured);
-        void this.drafts.writeAttachment(HomeComposer.key, null);
+        if (captured.recoveryKey) {
+          try {
+            await this.drafts.writeAttachmentBatch(
+              captured.recoveryKey,
+              captured.attachments,
+              true
+            );
+            void this.drafts.writeAttachmentBatch(HomeComposer.key, null);
+          } catch {
+            // The draft still owns its durable attachments until handoff.
+          }
+        }
       }
       this.checkMessageContext(input);
       const intent = this.view;
-      const attachment = captured ? captured.attachment : intent.attachment;
+      const attachments = HomeComposer.selectedAttachments(
+        captured ? captured.attachments : intent.attachments
+      );
       const approval = this.approvedAccess;
       const workspace =
         captured?.workspace ?? input.target ?? (await host.defaultWorkspace());
@@ -823,7 +1012,7 @@ export class HomeComposer {
         captured.workspace = workspace;
         this.keepRecovery(captured);
       }
-      if (this.hasRequest(input, attachment)) {
+      if (this.hasRequest(input, attachments.length)) {
         if (captured && captured.access !== intent.permissionMode)
           throw new Error(
             "Your chat access changed. Restore the draft and check access before sending."
@@ -834,15 +1023,24 @@ export class HomeComposer {
           );
         const turnOptions = this.turnOptions(workspace.id, input.profileId);
         const contextRequested = input.messageContext || input.template;
-        const goal = captured ? captured.goal && !attachment : intent.goal;
+        const goal = captured
+          ? captured.goal && !attachments.length
+          : intent.goal;
+        if (goal && input.skills?.length)
+          throw new Error(
+            "Send skill selections in a new chat turn before starting a goal."
+          );
         if (contextRequested && goal && !input.text.trim())
           throw new Error("Write an objective before starting a goal.");
         if (
           contextRequested &&
-          attachment &&
+          attachments.length &&
           !input.text.trim() &&
-          (attachment.kind === "directory" ||
-            !image_attachment_preview.selectedMediaType(attachment.file))
+          attachments.some(
+            ({ kind, file }) =>
+              kind === "directory" ||
+              !image_attachment_preview.selectedMediaType(file)
+          )
         )
           throw new Error(
             "Write a message to send this attachment with the selected context."
@@ -869,7 +1067,12 @@ export class HomeComposer {
           : (welcome_message.compose({
               text: input.prompt,
               references: input.references,
-            }) ?? "Inspect the attached file.");
+            }) ??
+            (input.skills?.length && !attachments.length
+              ? ""
+              : attachments.length > 1
+                ? "Inspect the attachments."
+                : "Inspect the attached file."));
         const prepared =
           accessRequest && (await this.startApprovedChat(accessRequest));
         if (
@@ -883,6 +1086,11 @@ export class HomeComposer {
               }),
             }),
             ...(messageContext && { messageContext }),
+            ...(input.skills?.length && {
+              skills: input.skills,
+              document: captured?.document,
+            }),
+            ...(template && { initialWorkbenchPath: template.path }),
             profileId: prepared ? prepared.profileId : input.profileId,
             ...(prepared
               ? {
@@ -900,18 +1108,17 @@ export class HomeComposer {
               : "act",
             goal,
             ...(turnOptions && { turnOptions }),
-            ...(attachment && { attachment }),
+            ...(attachments.length === 1 && { attachment: attachments[0] }),
+            ...(attachments.length > 1 && { attachments }),
           })
         )
           throw new Error("Couldn't keep your message for the workspace.");
-        if (captured) captured.handedOff = true;
-        if (captured?.source) {
-          const { source } = captured;
-          const live = source.read();
-          captured.followup?.save(
-            live === undefined ? source.store.read(source.key) : live
-          );
+        if (captured) {
+          captured.handedOff = true;
+          if (captured.attachments.length)
+            void this.drafts.writeAttachmentBatch(HomeComposer.key, null);
         }
+        captured?.followup?.handoff();
         this.clearRecovery(captured?.recoveryKey);
       }
       host.open(workspace);
@@ -931,7 +1138,7 @@ export class HomeComposer {
   /** The workspace now owns the handed-off request. */
   accepted(): void {
     this.copiedTemplate = undefined;
-    this.clearAttachment();
+    if (!this.captured) this.setAttachments(AttachmentBatch.empty);
     this.resetPermissionMode();
     this.update({
       plan: false,
@@ -994,9 +1201,11 @@ export namespace HomeComposer {
     permissionError: string | null;
     plan: boolean;
     goal: boolean;
-    attachment: Attachment | null;
+    attachments: AttachmentBatch.Draft;
     notice: string | null;
     busy: boolean;
+    /** The draft key whose interrupted send has been reconciled. */
+    draftKey: string | null;
     /** The workspace chat owns message presentation. */
     outgoing:
       | Readonly<{ status: "opening" }>
@@ -1015,6 +1224,7 @@ export namespace HomeComposer {
     target: Workspace | null;
     references: readonly { title: string; url: string }[];
     messageContext?: WelcomeMessage["messageContext"];
+    skills?: WelcomeMessage["skills"];
     template?: Template;
   }>;
   export type DraftSource = Readonly<{

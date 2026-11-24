@@ -9,6 +9,7 @@ mod control_pair;
 pub mod deletion;
 pub mod driver;
 pub mod history;
+mod queue_actions;
 mod resume;
 mod schema;
 mod turn_layout;
@@ -493,7 +494,7 @@ impl SqliteStore {
                 &request.session,
                 "control",
                 &request.id,
-                Fingerprint::of(&request)?,
+                queue_actions::control_fingerprint(&request)?,
             )
         })
         .await
@@ -907,11 +908,13 @@ fn prepare_pending_claim(
                 session.driver_state.apply(change)?;
             }
             if let Some(input) = submission {
-                let waiting: bool = transaction.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
-                    [request.session.as_str()],
-                    |row| row.get(0),
-                ).map_err(database_error)?;
+                let waiting: bool = transaction
+                    .query_row(
+                        "SELECT EXISTS(SELECT 1 FROM runnable_queue WHERE session=?1)",
+                        [request.session.as_str()],
+                        |row| row.get(0),
+                    )
+                    .map_err(database_error)?;
                 if waiting {
                     return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
                 }
@@ -940,7 +943,10 @@ fn prepare_pending_claim(
                     InputDisposition::Claimed { .. } | InputDisposition::Completed { .. } => {
                         return Err(error(ErrorKind::Conflict, "input_already_claimed"));
                     }
-                    InputDisposition::Superseded { .. } | InputDisposition::Withdrawn => {
+                    InputDisposition::Superseded { .. }
+                    | InputDisposition::Withdrawn
+                    | InputDisposition::CheckedOut { .. }
+                    | InputDisposition::Transferred { .. } => {
                         return Err(error(ErrorKind::Conflict, "input_not_queued"));
                     }
                 }
@@ -1142,7 +1148,7 @@ impl SessionStore for SqliteStore {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
-            let fingerprint = Fingerprint::of(&request)?;
+            let fingerprint = queue_actions::control_fingerprint(&request)?;
             if let Some(receipt) = lookup_request(
                 &transaction,
                 &request.session,
@@ -1548,6 +1554,7 @@ fn apply_control(
     mut active: Option<TurnState>,
 ) -> Result<ControlReceipt> {
     let state_revision = session.driver_state.revision();
+    let mut queue_action = None;
     let action = match &request.action {
         SessionControl::PauseAdmission => {
             session.paused = true;
@@ -1587,6 +1594,61 @@ fn apply_control(
         SessionControl::ReorderQueued { inputs } => {
             reorder_queue(transaction, &request.session, inputs)?;
             None
+        }
+        SessionControl::CheckoutQueued { input } => {
+            queue_action = Some(queue_actions::checkout(
+                transaction,
+                &request.session,
+                input,
+                &request.id,
+            )?);
+            None
+        }
+        SessionControl::ReinsertQueued {
+            checkout,
+            replacement,
+        } => {
+            queue_action = Some(queue_actions::reinsert(
+                inner,
+                transaction,
+                &request.session,
+                &mut session,
+                checkout,
+                replacement.as_ref(),
+            )?);
+            None
+        }
+        SessionControl::TransferQueued {
+            input,
+            turn,
+            expected,
+            records,
+        } => {
+            if session.active_turn.as_ref() != Some(turn) {
+                return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
+            }
+            let state = loaded_turn(inner, &mut active, transaction, &request.session, turn)?;
+            if state.outcome().is_some()
+                || state.is_suspended()
+                || !state.controls().admits_work()
+                || !has_owner(inner, state.binding())?
+            {
+                return Err(error(ErrorKind::Conflict, "turn_not_running"));
+            }
+            if records.is_empty() {
+                return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
+            }
+            queue_action = Some(queue_actions::transfer(
+                transaction,
+                &request.session,
+                input,
+                turn,
+            )?);
+            Some((
+                turn,
+                *expected,
+                vec![JournalAction::AppendHistory(records.clone())],
+            ))
         }
         SessionControl::AppendHistory {
             turn,
@@ -1724,6 +1786,7 @@ fn apply_control(
         request: request.id.clone(),
         revision: session.revision,
         turn: turn_receipt,
+        queue_action,
         driver_state_revision: (state_revision != session.driver_state.revision())
             .then_some(session.driver_state.revision()),
     };
@@ -1756,7 +1819,9 @@ fn record_control(
     active: Option<TurnState>,
 ) -> Result<ControlReceipt> {
     let session = load_session(transaction, &request.session)?;
-    require_revision(&session, request.expected_revision)?;
+    if !matches!(request.action, SessionControl::ReinsertQueued { .. }) {
+        require_revision(&session, request.expected_revision)?;
+    }
     let receipt = apply_control(inner, transaction, request, session, active)?;
     save_request(
         transaction,
@@ -1844,9 +1909,9 @@ fn reorder_queue(
     if inputs.len() > MAX_PENDING_INPUTS as usize {
         return Err(error(ErrorKind::LimitExceeded, "session_queue_full"));
     }
-    let mut statement = transaction.prepare(
-        "SELECT id,queue_order FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
-    ).map_err(database_error)?;
+    let mut statement = transaction
+        .prepare("SELECT id,queue_order FROM runnable_queue WHERE session=?1 ORDER BY queue_order")
+        .map_err(database_error)?;
     let pending = statement
         .query_map([session.as_str()], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
@@ -1861,10 +1926,21 @@ fn reorder_queue(
     }
     // Move every queued order above the current ones first, so each row keeps
     // an order and no two rows share one at any step.
-    let shift = pending.last().map_or(0, |(_, order)| *order) + 1;
+    let maximum: i64 = transaction
+        .query_row(
+            "SELECT COALESCE(MAX(queue_order),0) FROM submissions WHERE session=?1",
+            [session.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(database_error)?;
+    let shift = maximum
+        .checked_add(1)
+        .filter(|shift| maximum.checked_add(*shift).is_some())
+        .ok_or_else(|| error(ErrorKind::LimitExceeded, "input_position_overflow"))?;
     transaction
         .execute(
-            "UPDATE submissions SET queue_order=queue_order+?2 WHERE session=?1 AND state='queued'",
+            "UPDATE submissions SET queue_order=queue_order+?2 WHERE session=?1
+             AND id IN (SELECT id FROM runnable_queue WHERE session=?1)",
             params![session.as_str(), shift],
         )
         .map_err(database_error)?;
@@ -1924,9 +2000,9 @@ fn session_view_from(
     session: SessionRecord,
     current: Option<TurnView>,
 ) -> Result<SessionView> {
-    let mut statement = connection.prepare(
-        "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
-    ).map_err(database_error)?;
+    let mut statement = connection
+        .prepare("SELECT id FROM runnable_queue WHERE session=?1 ORDER BY queue_order")
+        .map_err(database_error)?;
     let ids = statement
         .query_map([session_id.as_str()], |row| row.get::<_, String>(0))
         .map_err(database_error)?
@@ -1954,6 +2030,7 @@ fn session_view_from(
         )?),
         (None, _) => None,
     };
+    let checkout = queue_actions::open_checkout(connection, &session_id)?;
     Ok(SessionView {
         session: session_id,
         revision: session.revision,
@@ -1961,6 +2038,7 @@ fn session_view_from(
         driver_state: session.driver_state,
         admission_paused: session.paused,
         queued,
+        checkout,
         current,
         latest,
     })
@@ -2004,9 +2082,13 @@ fn find_input(
     session: &SessionId,
     id: &ChangeId,
 ) -> Result<Option<InputView>> {
-    let Some((position, bytes, fingerprint, state, turn, replacement)) = connection
+    let Some((position, bytes, fingerprint, state, turn, replacement, checkout, transfer)) = connection
         .query_row(
-            "SELECT position,payload,fingerprint,state,turn,replacement FROM submissions WHERE session=?1 AND id=?2",
+            "SELECT s.position,s.payload,s.fingerprint,s.state,s.turn,s.replacement,c.checkout,t.turn
+             FROM submissions AS s
+             LEFT JOIN queue_checkouts AS c ON c.session=s.session AND c.input=s.id
+             LEFT JOIN queue_transfers AS t ON t.session=s.session AND t.input=s.id
+             WHERE s.session=?1 AND s.id=?2",
             params![session.as_str(), id.as_str()],
             |row| {
                 Ok((
@@ -2016,6 +2098,8 @@ fn find_input(
                     row.get::<_, String>(3)?,
                     row.get::<_, Option<String>>(4)?,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
                 ))
             },
         )
@@ -2023,18 +2107,24 @@ fn find_input(
         .map_err(database_error)? else {
             return Ok(None);
         };
-    let disposition = match (state.as_str(), turn, replacement) {
-        ("queued", None, None) => InputDisposition::Queued,
-        ("claimed", Some(turn), None) => InputDisposition::Claimed {
+    let disposition = match (state.as_str(), turn, replacement, checkout, transfer) {
+        ("queued", None, None, None, None) => InputDisposition::Queued,
+        ("queued", None, None, Some(checkout), None) => InputDisposition::CheckedOut {
+            checkout: ChangeId::new(checkout)?,
+        },
+        ("claimed", Some(turn), None, None, None) => InputDisposition::Claimed {
             turn: TurnId::new(turn)?,
         },
-        ("completed", Some(turn), None) => InputDisposition::Completed {
+        ("completed", Some(turn), None, None, None) => InputDisposition::Completed {
             turn: TurnId::new(turn)?,
         },
-        ("superseded", None, Some(replacement)) => InputDisposition::Superseded {
+        ("superseded", None, Some(replacement), None, None) => InputDisposition::Superseded {
             replacement: ChangeId::new(replacement)?,
         },
-        ("withdrawn", None, None) => InputDisposition::Withdrawn,
+        ("withdrawn", None, None, None, None) => InputDisposition::Withdrawn,
+        ("withdrawn", None, None, None, Some(turn)) => InputDisposition::Transferred {
+            turn: TurnId::new(turn)?,
+        },
         _ => {
             return Err(error(
                 ErrorKind::InvalidState,
@@ -2215,6 +2305,23 @@ fn lookup_request<T: DeserializeOwned>(
         decode(&receipt)
     })
     .transpose()
+}
+
+fn retained_request<T: DeserializeOwned>(
+    connection: &Connection,
+    session: &SessionId,
+    kind: &str,
+    id: &ChangeId,
+) -> Result<Option<T>> {
+    let bytes: Option<Vec<u8>> = connection
+        .query_row(
+            "SELECT receipt FROM requests WHERE session=?1 AND kind=?2 AND id=?3",
+            params![session.as_str(), kind, id.as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(database_error)?;
+    bytes.as_deref().map(decode).transpose()
 }
 
 fn save_request(

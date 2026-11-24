@@ -12,7 +12,7 @@ transaction. Earlier turns are retained independently.
 ## Schema and opening
 
 The database carries this store's SQLite application identity and schema
-version 5. Opening an empty database installs the schema in one transaction.
+version 6. Opening an empty database installs the schema in one transaction.
 Opening a version 1 database verifies the original schema and owner profile,
 then adds the conversation catalog in one transaction. The upgrade recovers
 catalog membership from session configuration. Version 1 did not record
@@ -27,7 +27,11 @@ its initial snapshot through a restart, even when the shared checkpoint has
 advanced. Answering or withdrawing its wait releases that private seed. Closing
 the turn releases any remaining seeds. A changed history view or compatibility
 scope discards incompatible observations. Deleting the chat removes its
-checkpoint. Older binaries refuse the upgraded database. Unrecognized
+checkpoint. Version 6 adds queue checkout and transfer records without
+rewriting existing submissions. A checkout retains its queue rank and capacity
+while admission skips it. Transfers retain the source input and recipient turn
+alongside the same transaction's journal contribution. Older binaries refuse
+the upgraded database. Unrecognized
 schemas, other applications’ files, and non-empty files at version 0 are
 refused unchanged.
 

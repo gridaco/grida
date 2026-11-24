@@ -36,11 +36,12 @@ again.
 ## Inspect an attachment
 
 Sent images appear on their own outside the message's text bubble, without a
-card frame, filename or dimensions caption. Other attachments keep individual
-cards. Select a supported image preview to inspect it fullscreen. The image
-starts fitted to the window; zoom and pan to inspect details, then press
-Escape or choose **Close**. Opening a preview does not ask the model to run
-again.
+card frame, filename or dimensions caption. When you steer a queued message,
+its images appear beside it at the point it entered the turn. Other attachments
+keep individual cards. Select a supported image preview to inspect it fullscreen.
+The image starts fitted to the window. Zoom and pan to inspect details, then
+press Escape or choose **Close**. Opening a preview does not ask the model to
+run again.
 
 For an explicitly attached raster image, a compatible Desktop build reads the
 exact retained original, including after reopening or context compaction.

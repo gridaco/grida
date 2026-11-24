@@ -115,7 +115,7 @@ function WorkspaceRoute({
   }
   return (
     <WorkspaceWorkbench
-      key={`${state.workspace.id}:${initialActiveRelPath ?? ""}`}
+      key={state.workspace.id}
       workspace={state.workspace}
       initialActiveRelPath={initialActiveRelPath}
     />

@@ -1,6 +1,7 @@
 //! Versioned product operations layered over standard ACP.
 
 pub(super) mod approvals;
+mod attachments;
 pub(super) mod catalog;
 pub(super) mod compaction;
 mod deletion;
@@ -19,6 +20,7 @@ mod processes;
 pub(super) mod tool_images;
 pub(super) use processes::PROCESSES;
 mod questions;
+mod queue_actions;
 mod routes;
 mod selection;
 mod side_chats;
@@ -45,7 +47,6 @@ use agent_kit_core::{BindingId, ChangeId, Fingerprint, ModelId, SessionId, TurnI
 use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
-use grida_agent_master::configuration::SettingChange;
 use routes::RequestRoutes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -68,16 +69,14 @@ const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
 const EFFORT: &str = "co.grida/session/effort";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
-const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
-const CAPABILITIES: [&str; 8] = [
+const CAPABILITIES: [&str; 7] = [
     SUBMIT,
     INITIAL_TITLE,
     SNAPSHOT,
     STOP,
     OPERATING_REGIME,
     CONFIG_INSPECT,
-    CONFIG_UPDATE,
     CONFIG_RELOAD,
 ];
 
@@ -182,11 +181,13 @@ fn capability_keys(
     CAPABILITIES
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
+        .chain(reviewer.then_some(queue_actions::CAPABILITY))
+        .chain(reviewer.then_some(attachments::CAPABILITY))
         .chain(questions::CAPABILITIES)
         .chain([questions::OPTIONAL])
         .chain(approvals::capabilities(reviewer))
         .chain(history::CAPABILITIES)
-        .chain([compaction::COMPACT])
+        .chain([compaction::COMPACT, compaction::START])
         .chain([skills::CATALOG])
         .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
@@ -223,6 +224,7 @@ fn capability_keys(
         .chain(reviewer.then_some(MESSAGE_CONTEXT))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
         .chain(reviewer.then_some(super::projection::ACTIVITY_ORDER))
+        .chain(reviewer.then_some(compaction::ITEMS))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -237,6 +239,7 @@ struct Submit {
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
     selected_image: Option<crate::host::SelectedImage>,
+    attachments: Option<Vec<attachments::Attachment>>,
     #[serde(default)]
     allow_wakeups: bool,
     #[serde(default)]
@@ -294,6 +297,14 @@ fn identified_prompt(
             *part = crate::host::PromptPart::FileReference { reference };
         }
     }
+    if parts
+        .iter()
+        .filter(|part| matches!(part, PromptPart::FileReference { .. }))
+        .count()
+        > 1
+    {
+        return Err(Error::invalid_params().data("file_reference_count_limit"));
+    }
     if image.is_some() && file.is_some() {
         return Err(Error::invalid_params().data("file_attachment_count_limit"));
     }
@@ -321,7 +332,11 @@ fn identified_prompt(
         if incompatible {
             return Err(Error::invalid_params().data("selected_file_options_unsupported"));
         }
-        if has_embedded {
+        if has_embedded
+            || parts
+                .iter()
+                .any(|part| matches!(part, PromptPart::Image { .. }))
+        {
             return Err(Error::invalid_params().data("file_attachment_count_limit"));
         }
         if !parts.iter().any(|part| matches!(part, crate::host::PromptPart::Text { text } if !text.trim().is_empty())) {
@@ -358,7 +373,10 @@ fn append_message_context(
     Ok(())
 }
 
-fn display_parts(parts: &[PromptPart], sessions: &Mutex<ConnectionSessions>) -> Vec<DisplayPart> {
+fn display_parts(
+    parts: Vec<DisplayPart>,
+    sessions: &Mutex<ConnectionSessions>,
+) -> Vec<DisplayPart> {
     if !sessions
         .lock()
         .unwrap()
@@ -367,9 +385,7 @@ fn display_parts(parts: &[PromptPart], sessions: &Mutex<ConnectionSessions>) -> 
     {
         return Vec::new();
     }
-    crate::host::message_context::context(parts)
-        .map(|context| context.display_parts.clone())
-        .unwrap_or_default()
+    parts
 }
 
 /// The file references among a prompt's blocks, aligned with the blocks. Only a
@@ -467,6 +483,8 @@ enum SubmissionDisposition {
     Completed,
     Superseded,
     Withdrawn,
+    CheckedOut,
+    Transferred,
 }
 
 impl From<DurableSubmission> for SubmitResponse {
@@ -482,7 +500,11 @@ impl From<DurableSubmission> for SubmitResponse {
             InputDisposition::Superseded { replacement } => {
                 (SubmissionDisposition::Superseded, None, Some(replacement))
             }
-            InputDisposition::Withdrawn => (SubmissionDisposition::Withdrawn, None, None),
+            InputDisposition::Withdrawn
+            | InputDisposition::CheckedOut { .. }
+            | InputDisposition::Transferred { .. } => {
+                (SubmissionDisposition::Withdrawn, None, None)
+            }
         };
         Self {
             session_id: submission.session,
@@ -509,6 +531,8 @@ struct SnapshotResponse {
     session_revision: SessionRevision,
     queued_inputs: usize,
     queue: Vec<QueuedInput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    queue_checkout: Option<queue_actions::OpenCheckout>,
     admission_paused: bool,
     #[serde(default)]
     idle_queue_resume_available: bool,
@@ -529,13 +553,21 @@ struct QueuedInput {
     settings: InputSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     preview: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    checkoutable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    steerable: Option<bool>,
 }
 
 // Bound the extra display text in a snapshot independently of the queue length.
 const QUEUE_PREVIEW_ROWS: usize = 8;
 const QUEUE_PREVIEW_BYTES: usize = 2048;
 
-fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> {
+fn queued_input(
+    view: &InputView,
+    include_preview: bool,
+    actions: Option<&crate::host::queue_actions::QueueActions>,
+) -> Result<QueuedInput> {
     let (settings, parts) = InputSettings::with_parts(&view.input).map_err(host_error)?;
     let preview = if include_preview {
         parts.into_iter().find_map(|part| match part {
@@ -557,6 +589,8 @@ fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> 
         input_position: view.position,
         settings,
         preview,
+        checkoutable: actions.map(|actions| actions.checkoutable(&view.input)),
+        steerable: actions.map(|actions| actions.steerable(&view.input)),
     })
 }
 
@@ -640,14 +674,6 @@ fn turn_receipt(receipt: ControlReceipt, turn_id: TurnId) -> Result<TurnControlR
 struct ConfigInspect {}
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
-#[request(method = "_co.grida/config/update", response = Value)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ConfigUpdate {
-    expected_revision: Option<Fingerprint>,
-    change: SettingChange,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/config/reload", response = Value)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ConfigReload {
@@ -668,8 +694,6 @@ pub(super) fn handlers(
     let stop_sessions = sessions.clone();
     let inspect_host = host.clone();
     let inspect_sessions = sessions.clone();
-    let update_host = host.clone();
-    let update_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
     let embedded_context = reviewer && host.accepts_files();
 
@@ -681,6 +705,7 @@ pub(super) fn handlers(
             embedded_context,
         ))
         .extend(questions::handlers(host.clone(), sessions.clone()))
+        .extend(queue_actions::handlers(host.clone(), sessions.clone()))
         .extend(approvals::handlers(
             host.clone(),
             sessions.clone(),
@@ -747,6 +772,15 @@ pub(super) fn handlers(
                         &submit_sessions,
                         request.allow_wakeups || request.editor_endpoint_id.is_some(),
                     )?;
+                    if let Some(items) = request.attachments {
+                        attachments::append(
+                            &mut parts,
+                            items,
+                            &submit_sessions,
+                            &request.session_id,
+                            request.allow_wakeups || request.editor_endpoint_id.is_some(),
+                        )?;
+                    }
                     append_editor_context(&mut parts, request.editor_context, &submit_sessions)?;
                     append_message_context(&mut parts, request.message_context, &submit_sessions)?;
                     let (questions, question_batches) =
@@ -810,6 +844,30 @@ pub(super) fn handlers(
                         .side_snapshot(&snapshot)
                         .await
                         .map_err(host_error)?;
+                    let queue_actions = require(
+                        &snapshot_sessions,
+                        queue_actions::CAPABILITY,
+                        Some(&snapshot.session),
+                    )
+                    .is_ok();
+                    let actions = if queue_actions {
+                        Some(
+                            snapshot_host
+                                .queue_actions(&snapshot)
+                                .await
+                                .map_err(host_error)?,
+                        )
+                    } else {
+                        None
+                    };
+                    let queue_checkout = queue_actions
+                        .then(|| {
+                            snapshot
+                                .checkout
+                                .as_ref()
+                                .and_then(queue_actions::OpenCheckout::project)
+                        })
+                        .flatten();
                     let mut current = snapshot.current.map(TurnSummary::from);
                     if let Some(turn) = &mut current {
                         turn.model_id = snapshot_host
@@ -846,9 +904,14 @@ pub(super) fn handlers(
                             .iter()
                             .enumerate()
                             .map(|(index, view)| {
-                                queued_input(view, previews && index < QUEUE_PREVIEW_ROWS)
+                                queued_input(
+                                    view,
+                                    previews && index < QUEUE_PREVIEW_ROWS,
+                                    actions.as_ref(),
+                                )
                             })
                             .collect::<Result<_>>()?,
+                        queue_checkout,
                         admission_paused: snapshot.admission_paused,
                         idle_queue_resume_available,
                         current,
@@ -887,21 +950,6 @@ pub(super) fn handlers(
                 let result = async {
                     require(&inspect_sessions, CONFIG_INSPECT, None)?;
                     encode_config(inspect_host.configuration_inspect().await)
-                }
-                .await;
-                responder.respond_with_result(result)
-            },
-            on_receive_request!(),
-        )
-        .on_receive_request(
-            async move |request: ConfigUpdate, responder, _| {
-                let result = async {
-                    require(&update_sessions, CONFIG_UPDATE, None)?;
-                    encode_config(
-                        update_host
-                            .configuration_update(request.expected_revision, request.change)
-                            .await,
-                    )
                 }
                 .await;
                 responder.respond_with_result(result)

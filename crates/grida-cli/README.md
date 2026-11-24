@@ -75,6 +75,55 @@ installation on each platform, and owns the glibc 2.28 baseline, bundled notices
 and publication. Installation needs no optional platform packages or binary
 downloads. Packing the source directory is not a release path.
 
+## Agent terminal development harness
+
+The opt-in `grida-agent-tui` executable opens a single chat using the same ACP
+operations that Desktop uses. Start it with the native host binary and a
+dedicated state directory. The arguments after `--` configure the native
+provider in the ordinary `grida-agent serve` launch contract.
+
+```sh
+cargo build --locked -p grida-agent --bin grida-agent
+cargo run --locked -p grida-cli --features agent-tui --bin grida-agent-tui -- \
+  --agent target/debug/grida-agent --cwd /absolute/workspace \
+  --state-dir /absolute/harness-state -- \
+  --endpoint http://127.0.0.1:8080/v1 --model local-model \
+  --credential-env GRIDA_HARNESS_KEY
+```
+
+Use an explicitly running local compatible endpoint and its credential
+environment variable. A fixture can use an isolated `GRIDA_HOME` and an
+automatic compaction threshold suited to its scripted replies. The native
+[ACP process tests](../grida-agent/tests/process.rs) show how to start a
+deterministic fixture without model credentials.
+
+- **Enter** sends the draft or saves a queue edit. **Shift+Enter** inserts a
+  newline. Continue typing while replies stream. Send `/compact` from an idle
+  chat with an open, empty queue. The composer clears at dispatch. Once the
+  host accepts the command, you can queue another message while the summary
+  runs.
+- **↑/↓** select a waiting row. **F2** checks it out for editing. **F4**
+  restores the accepted original. **F3** steers with an eligible row.
+- **Tab** toggles focus between a blocking question and the composer. Type a
+  choice number or a freeform answer and press **Enter**. **F6** skips the
+  current question.
+- **Page Up/Down** scroll the latest transcript window. **F8** refreshes the
+  transcript and queue. **F5** resumes a waiting queue when the host offers it.
+- **Ctrl+C** closes the terminal and prints the session ID. Add
+  `--session ID` before the host arguments to reopen in the same workspace
+  and state directory. The harness recovers the host's open checkout and
+  original text. Unsubmitted changes to the composer stay local to the
+  running terminal.
+- **F7** reconciles and retries an unconfirmed request with its original
+  identity. On reopen, `--receipt ID` looks up the durable result of a
+  queue control.
+
+```sh
+cargo test --locked -p grida-cli --features agent-tui --bin grida-agent-tui
+```
+
+See the [terminal harness backlog](src/bin/agent-tui/TODO.md) for remaining workflows.
+
 ## CLI contracts
 
 The `conformance` feature adds `grida-conformance`, a test-only process driver for

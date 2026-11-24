@@ -18,13 +18,12 @@ const isInsiders = process.argv.includes("--insiders");
 // `electron-forge start` actually launches (full rebranding is otherwise a
 // packaging step, and macOS keys off this live bundle):
 //
-//   1. Dock icon + name (insiders only) — best-effort cosmetic.
+//   1. Development app name and channel-specific Dock icon.
 //   2. A unique CFBundleIdentifier per channel — FUNCTIONAL: it fixes `grida://`
 //      deep-link routing (GRIDA-SEC-005; see the block near the bottom).
 //
-// Calling this script without --insiders restores the original icon/name;
-// normal dev/package/make/publish scripts do that first so cosmetic insiders
-// branding cannot leak. Packaged builds are unaffected either way — forge
+// Calling this script without --insiders restores the original icon and
+// resets any previous Insiders branding. Packaged builds are unaffected — forge
 // packages from the @electron/get cache with its own appBundleId
 // (co.grida.desktop), not this node_modules bundle.
 // See:
@@ -57,8 +56,6 @@ function setPlistValue(key, value) {
 }
 
 if (isInsiders) {
-  setPlistValue("CFBundleName", "Grida (Insiders)");
-  setPlistValue("CFBundleDisplayName", "Grida (Insiders)");
   setPlistValue("CFBundleIconFile", "electron.icns");
 
   fs.copyFileSync(insidersIcon, path.join(resources, "electron.icns"));
@@ -66,6 +63,10 @@ if (isInsiders) {
   fs.copyFileSync(backupPlist, plist);
   fs.copyFileSync(backupIcon, path.join(resources, "electron.icns"));
 }
+
+const devName = isInsiders ? "Grida Insiders Dev" : "Grida Dev";
+setPlistValue("CFBundleName", devName);
+setPlistValue("CFBundleDisplayName", devName);
 
 // GRIDA-SEC-005 / #955 — make the DEV Electron a proper `grida-dev://` deep-link
 // handler. Dev (and insiders) use their OWN scheme — `grida-dev`, NOT the

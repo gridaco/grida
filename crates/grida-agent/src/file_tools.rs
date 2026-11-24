@@ -33,13 +33,8 @@ pub(crate) const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", "
 /// names are protected for commands only once they exist, so a command can
 /// start a new repository (permission policy, protected paths).
 pub(crate) const PROTECTED_WHEN_MISSING: [&str; 2] = [".grida", ".codex"];
-/// The directory ID that names the agent settings file. Only
-/// [`SETTINGS_PATH`] is reachable under it, by reads and approved writes.
-pub(crate) const SETTINGS_DIRECTORY: &str = "agent-settings";
-pub(crate) const SETTINGS_PATH: &str = "config.toml";
 /// Virtual directory for one individually approved, descriptor-bound text read.
 pub(crate) const EXTERNAL_FILE_DIRECTORY: &str = "external-file";
-const SETTINGS_NOTE: &str = " Directory \"agent-settings\" holds only config.toml, the agent settings file. Every change to it asks the person, and a saved change applies to messages accepted afterwards.";
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
 const TIME_LIMIT: Duration = Duration::from_secs(3);
@@ -73,15 +68,8 @@ pub struct FileAuthority {
 pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
 type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
 pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync;
-type SettingsAuthority = dyn Fn(&Invocation) -> Result<SettingsAccess> + Send + Sync;
 type ExternalFileAuthority = dyn Fn(&Invocation) -> Result<std::fs::File> + Send + Sync;
 
-/// Current authority over the agent settings file for one admitted action.
-#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
-pub(crate) struct SettingsAccess {
-    pub configuration: Arc<crate::configuration::Configuration>,
-    pub write: bool,
-}
 pub(crate) const READ_SCOPED_FILE: &str = "read_scoped_file";
 pub(crate) const VIEW_IMAGE: &str = "view_image";
 pub(crate) const CAPTURE_IMAGE_REFERENCE: &str = "capture_image_reference";
@@ -95,7 +83,6 @@ pub struct FileTools {
     capture_reference: Option<Arc<ImageCapture>>,
     image_view: ImageView,
     full_access: bool,
-    settings: Option<Arc<SettingsAuthority>>,
     external_file: Option<Arc<ExternalFileAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
@@ -132,18 +119,10 @@ impl FileTools {
             capture_reference,
             image_view: ImageView::LegacyPng,
             full_access: false,
-            settings: None,
             external_file: None,
             workers: Arc::new(Semaphore::new(WORKERS)),
             mutations: std::sync::Mutex::new(()),
         })
-    }
-
-    /// Reach the agent settings file through [`SETTINGS_DIRECTORY`]. The
-    /// authority decides each action; writes need an approved action.
-    pub(crate) fn with_settings(mut self, settings: Arc<SettingsAuthority>) -> Self {
-        self.settings = Some(settings);
-        self
     }
 
     pub(crate) fn with_external_file(mut self, open: Arc<ExternalFileAuthority>) -> Self {
@@ -357,14 +336,6 @@ impl FileTool {
             }
         };
         let mut description = description.to_owned();
-        if scope.settings.is_some()
-            && matches!(
-                operation,
-                Operation::Read | Operation::ReadScoped | Operation::Write | Operation::Edit
-            )
-        {
-            description.push_str(SETTINGS_NOTE);
-        }
         if scope.external_file.is_some() && matches!(operation, Operation::ReadScoped) {
             description.push_str(" To request a file outside the project, use directory \"external-file\" and its absolute path without the leading slash. Each read requires its own approval.");
         }
@@ -637,7 +608,6 @@ impl FileTools {
             &self.current,
             &self.capture_image,
             &self.capture_reference,
-            &self.settings,
             &self.external_file,
             request.directory,
             &budget.invocation,

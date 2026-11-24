@@ -1,3 +1,4 @@
+import type { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { DesktopNativeChat } from "@grida/desktop-bridge";
 import type {
   NativeChatController,
@@ -69,6 +70,7 @@ export namespace SideChatPlacement {
   export type Host = Readonly<{
     bridge: DesktopNativeChat;
     workspaceId?: string;
+    readWorkspaceDirectory?: WorkspaceArtifact.Readdir;
     editorSurfaces?: NativeChatEditorSurfaces;
   }>;
 

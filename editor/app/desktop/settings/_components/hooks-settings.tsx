@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
 import { FileCodeIcon, Loader2, RefreshCwIcon } from "lucide-react";
 import type { NativeHookEvent } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
-import { getDesktopBridge } from "@/lib/desktop/bridge";
-import { SettingsHooks } from "@/lib/desktop/settings-hooks";
+import { useSettingsHooks } from "@/lib/desktop/settings-hooks-react";
 import { SettingsGroup, SettingsSection } from "./settings-layout";
 
 const EVENT_LABELS: Record<NativeHookEvent, string> = {
@@ -17,23 +15,7 @@ const EVENT_LABELS: Record<NativeHookEvent, string> = {
 };
 
 export function HooksSettings() {
-  const [controller] = useState(
-    () => new SettingsHooks.Controller(() => getDesktopBridge()?.hooks)
-  );
-  const state = useSyncExternalStore(
-    controller.subscribe,
-    controller.read,
-    controller.read
-  );
-  useEffect(() => {
-    const refresh = () => void controller.refresh();
-    refresh();
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      controller.cancel();
-    };
-  }, [controller]);
+  const { controller, state } = useSettingsHooks();
   const inspection = state.inspection;
   const busy = state.loading || state.action !== null;
   return (

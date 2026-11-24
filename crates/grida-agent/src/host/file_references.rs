@@ -11,9 +11,6 @@ use agent_kit_core::{ArtifactId, BindingId, ErrorKind, Fingerprint, Result};
 use grida_agent_master::file_reference::{self, FileReference};
 use std::path::Path;
 
-/// At most one reference per message, like other attachments.
-pub(super) const MAX_REFERENCES: usize = 1;
-
 pub(super) fn media(reference: &FileReference) -> Result<MediaRef> {
     reference
         .validate()

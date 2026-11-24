@@ -2,7 +2,7 @@
 
 import { useContext } from "react";
 import { cn } from "@app/ui/lib/utils";
-import { ArrowUpRightIcon, PresentationIcon } from "lucide-react";
+import { ArrowUpRightIcon, BookOpenIcon, PresentationIcon } from "lucide-react";
 import {
   BrowserOpen,
   handleBrowserLinkClick,
@@ -11,6 +11,7 @@ import {
   IMAGE_REFERENCE_PART,
   readImageReferencePreviews,
 } from "@/lib/desktop/images-message-context";
+import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
 import { SLIDES_TEMPLATE_PART } from "@/lib/desktop/slides-message-context";
 import {
   readWorkflowReferencePreviews,
@@ -19,6 +20,7 @@ import {
 
 type ContextChip =
   | { group: "slides"; title: string }
+  | { group: "skills"; title: string; source?: string }
   | { group: "images"; title: string; href: string; thumbnail: string }
   | {
       group: "workflows";
@@ -30,6 +32,7 @@ type ContextChip =
 
 const labels = {
   slides: "Slides templates",
+  skills: "Selected skills",
   images: "Image references",
   workflows: "Workflow references",
 };
@@ -37,6 +40,31 @@ const labels = {
 function readChips(part: unknown): ContextChip[] {
   if (!part || typeof part !== "object") return [];
   const { kind, version, data } = part as Record<string, unknown>;
+  if (
+    kind === "skill" &&
+    version === 1 &&
+    data &&
+    typeof data === "object" &&
+    "name" in data &&
+    typeof data.name === "string" &&
+    data.name
+  ) {
+    const extension =
+      "extension" in data && typeof data.extension === "string"
+        ? data.extension
+        : undefined;
+    const name = extension ? `${extension}/${data.name}` : data.name;
+    return [
+      {
+        group: "skills",
+        title: name,
+        source: SkillMentions.sourceLabel(
+          "source" in data ? data.source : undefined,
+          extension
+        ),
+      },
+    ];
+  }
   if (
     kind === WORKFLOW_REFERENCE_PART.kind &&
     version === WORKFLOW_REFERENCE_PART.version
@@ -93,12 +121,22 @@ export function MessageContextParts({
     <ul aria-label={label} className={cn("flex flex-wrap gap-1.5", className)}>
       {chips.map((chip, index) => (
         <li key={index} className="max-w-full min-w-0">
-          {chip.group === "slides" ? (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-xs">
-              <PresentationIcon
-                aria-hidden
-                className="size-3.5 shrink-0 text-muted-foreground"
-              />
+          {chip.group === "slides" || chip.group === "skills" ? (
+            <span
+              title={chip.group === "skills" ? chip.source : undefined}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-xs"
+            >
+              {chip.group === "slides" ? (
+                <PresentationIcon
+                  aria-hidden
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+              ) : (
+                <BookOpenIcon
+                  aria-hidden
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+              )}
               <span className="truncate">{chip.title}</span>
             </span>
           ) : (

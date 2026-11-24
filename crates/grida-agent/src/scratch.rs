@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — private retained inputs and separate working copies.
 
 use crate::workspace::ProtectedRoots;
-use agent_kit_core::{ArtifactId, Error, ErrorKind, Result, SessionId};
+use agent_kit_core::{ArtifactId, ChangeId, Error, ErrorKind, Result, SessionId};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -15,6 +15,13 @@ pub struct ScratchLimits {
     pub max_asset_bytes: u64,
     pub max_source_bytes: u64,
     pub max_work_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PendingInputAsset {
+    pub input: ChangeId,
+    pub asset: ArtifactId,
 }
 
 /// An exact retained version. File locations are host-owned and stay out of
@@ -211,6 +218,41 @@ impl ScratchScope {
         }
     }
 
+    pub(crate) fn mark_input_asset_pending(
+        &self,
+        input: &ChangeId,
+        asset: &ArtifactId,
+    ) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.inner.mark_input_asset_pending(input, asset);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (input, asset);
+            Err(unsupported())
+        }
+    }
+
+    pub(crate) fn pending_input_assets(&self) -> Result<Vec<PendingInputAsset>> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.inner.pending_input_assets();
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        Err(unsupported())
+    }
+
+    pub(crate) fn resolve_pending_input_asset(
+        &mut self,
+        pending: &PendingInputAsset,
+        keep: bool,
+    ) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.inner.resolve_pending_input_asset(pending, keep);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (pending, keep);
+            Err(unsupported())
+        }
+    }
+
     pub fn materialize(&mut self, asset: &AssetRef) -> Result<WorkingCopy> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         return self.inner.materialize(asset);
@@ -362,7 +404,7 @@ mod native {
             if part == "owner.lock" && lock.is_some() {
                 return Ok(());
             }
-            if !matches!(part, "sources" | "work") || lock.is_none() {
+            if !matches!(part, "sources" | "work" | "pending-input") || lock.is_none() {
                 return Err(invalid_storage());
             }
             let directory = scope.existing_child(part)?.ok_or_else(invalid_storage)?;
@@ -372,10 +414,10 @@ mod native {
             let mut files = Vec::new();
             directory.entries(|entry| {
                 let (key, suffix) = entry.split_once('.').unwrap_or((entry, ""));
-                let valid = if part == "sources" {
-                    matches!(suffix, "asset" | "working")
-                } else {
-                    suffix.is_empty() || safe_extension(suffix)
+                let valid = match part {
+                    "sources" => matches!(suffix, "asset" | "working"),
+                    "pending-input" => suffix == "intake",
+                    _ => suffix.is_empty() || safe_extension(suffix),
                 };
                 if !is_key(key) || !valid {
                     return Err(invalid_storage());
@@ -514,6 +556,108 @@ mod native {
             })?;
             self.validate().map_err(|_| uncertain())?;
             Ok(asset)
+        }
+
+        fn discard_created(&mut self, asset: &AssetRef) -> Result<()> {
+            let (key, _) = self.open_asset(asset)?;
+            let working = working_name(&key, asset.name());
+            if self.work.read(&working)?.is_some() {
+                unix::unlinkat(&self.work.file, working.as_str(), AtFlags::empty())
+                    .map_err(io_failure)?;
+                self.work.sync()?;
+            }
+            let marker = format!("{key}.working");
+            if self.sources.files.read(&marker)?.is_some() {
+                unix::unlinkat(&self.sources.files.file, marker.as_str(), AtFlags::empty())
+                    .map_err(io_failure)?;
+            }
+            let source = format!("{key}.asset");
+            unix::unlinkat(&self.sources.files.file, source.as_str(), AtFlags::empty())
+                .map_err(io_failure)?;
+            self.sources.files.sync()?;
+            self.validate()
+        }
+
+        fn input_asset_key(&self, asset: &ArtifactId) -> Result<String> {
+            if !asset.as_str().starts_with("input/") {
+                return Err(invalid_storage());
+            }
+            self.sources.asset_key(asset, 1)
+        }
+
+        pub(super) fn mark_input_asset_pending(
+            &self,
+            input: &ChangeId,
+            asset: &ArtifactId,
+        ) -> Result<()> {
+            self.validate()?;
+            let key = self.input_asset_key(asset)?;
+            if self.sources.files.read(&format!("{key}.asset"))?.is_some() {
+                // Only mark allocations whose exact source has yet to be published.
+                return Ok(());
+            }
+            let pending = self.sources.scope.child("pending-input", false)?;
+            pending.publish(&format!("{key}.intake"), |file| {
+                serde_json::to_writer(
+                    file,
+                    &PendingInputAsset {
+                        input: input.clone(),
+                        asset: asset.clone(),
+                    },
+                )
+                .map_err(|_| invalid_storage())
+            })
+        }
+
+        pub(super) fn pending_input_assets(&self) -> Result<Vec<PendingInputAsset>> {
+            self.validate()?;
+            let Some(pending) = self.sources.scope.existing_child("pending-input")? else {
+                return Ok(Vec::new());
+            };
+            pending.remove_staging()?;
+            let mut records = Vec::new();
+            pending.entries(|name| {
+                let key = name
+                    .strip_suffix(".intake")
+                    .filter(|key| is_key(key))
+                    .ok_or_else(invalid_storage)?;
+                let file = pending.read(name)?.ok_or_else(invalid_storage)?;
+                let record: PendingInputAsset =
+                    serde_json::from_reader(file.take(4096)).map_err(|_| invalid_storage())?;
+                if self.input_asset_key(&record.asset)? != key {
+                    return Err(invalid_storage());
+                }
+                records.push(record);
+                Ok(())
+            })?;
+            Ok(records)
+        }
+
+        pub(super) fn resolve_pending_input_asset(
+            &mut self,
+            record: &PendingInputAsset,
+            keep: bool,
+        ) -> Result<()> {
+            self.validate()?;
+            let key = self.input_asset_key(&record.asset)?;
+            let Some(pending) = self.sources.scope.existing_child("pending-input")? else {
+                return Ok(());
+            };
+            let name = format!("{key}.intake");
+            let Some(file) = pending.read(&name)? else {
+                return Ok(());
+            };
+            let stored: PendingInputAsset =
+                serde_json::from_reader(file.take(4096)).map_err(|_| invalid_storage())?;
+            if stored.asset != record.asset || stored.input != record.input {
+                return Err(invalid_storage());
+            }
+            if !keep && let Some(mut source) = self.sources.files.read(&format!("{key}.asset"))? {
+                let asset = self.sources.read_asset(&mut source, &key)?;
+                self.discard_created(&asset)?;
+            }
+            unix::unlinkat(&pending.file, name.as_str(), AtFlags::empty()).map_err(io_failure)?;
+            pending.sync()
         }
 
         pub(super) fn read_retained(&self, asset: &AssetRef, maximum: usize) -> Result<Vec<u8>> {
@@ -1276,6 +1420,51 @@ mod native {
             assert_eq!(open().err().unwrap().code, "scratch_owner_in_use");
             drop(reopened);
             assert!(open().is_ok());
+        }
+
+        #[test]
+        fn pending_input_assets_survive_reopen_and_resolve_independently() {
+            let directory = tempfile::tempdir().unwrap();
+            let base = directory.path().canonicalize().unwrap();
+            fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).unwrap();
+            let owner = SessionId::new("owner").unwrap();
+            let limits = ScratchLimits {
+                max_assets: 4,
+                max_asset_bytes: 64,
+                max_source_bytes: 128,
+                max_work_bytes: 128,
+            };
+            let protected = ProtectedRoots::new(vec![]).unwrap();
+            let open = || Scope::open(&base, owner.clone(), limits, &protected, false);
+            let input = ChangeId::new("input").unwrap();
+            let accepted = ArtifactId::new("input/accepted").unwrap();
+            let refused = ArtifactId::new("input/refused").unwrap();
+            let never_published = ArtifactId::new("input/not-published").unwrap();
+            let mut scope = open().unwrap();
+            for id in [&accepted, &refused, &never_published] {
+                scope.mark_input_asset_pending(&input, id).unwrap();
+            }
+            let keep = scope
+                .retain(accepted.clone(), 1, "same.txt", &b"keep"[..])
+                .unwrap();
+            let remove = scope
+                .retain(refused, 1, "same.txt", &b"remove"[..])
+                .unwrap();
+            scope.materialize(&remove).unwrap();
+            drop(scope);
+
+            let mut scope = open().unwrap();
+            let pending = scope.pending_input_assets().unwrap();
+            assert_eq!(pending.len(), 3);
+            for record in pending {
+                scope
+                    .resolve_pending_input_asset(&record, record.asset == accepted)
+                    .unwrap();
+            }
+            assert!(scope.pending_input_assets().unwrap().is_empty());
+            assert_eq!(scope.read_retained(&keep, 64).unwrap(), b"keep");
+            assert!(scope.read_retained(&remove, 64).is_err());
+            assert_eq!(scope.occupancy().unwrap().1.files, 0);
         }
     }
 }

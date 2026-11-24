@@ -74,8 +74,8 @@ messages.map((m, i) => (
 Transcript-level indicators (rendered by the surface around the turn list, not
 per message): `PendingTurnIndicator` (labelled **Thinking**, immediately before
 first output and after 1.5 seconds of later quiet), `CompactionProgress` (while
-the Desktop `/compact` request is pending), and `CompactionNotice` (where
-earlier context was summarized). Pass a `progress` identity that changes only
+context compaction runs), and `CompactionNotice` (at the point context was
+compacted). Pass a `progress` identity that changes only
 when streamed text or tool activity changes. Progress hides the pending indicator
 immediately and restarts its quiet delay; polling and history replay must not
 reset it. Set `immediate` while the active turn has no output yet. The surface

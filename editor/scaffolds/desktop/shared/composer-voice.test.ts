@@ -122,6 +122,46 @@ describe("composer Voice", () => {
     disconnect?.();
   });
 
+  it("uses the supplied capture and recognizer without accessing the device", async () => {
+    const recognition = Promise.withResolvers<string>();
+    const openMicrophone = vi.fn<ComposerVoice.Host["openMicrophone"]>(
+      async () => stream as unknown as MediaStream
+    );
+    const recognize = vi.fn<ComposerVoice.Host["recognize"]>(() => ({
+      result: recognition.promise,
+      stop: () => recognition.resolve("sample transcript"),
+    }));
+    const composer = new ComposerVoice({
+      isSupported: () => true,
+      getSettings: async () => SETTINGS,
+      subscribe: () => () => {},
+      openMicrophone,
+      recognize,
+    });
+    const disconnect = composer.connect();
+    await vi.waitFor(() =>
+      expect(composer.getSnapshot().settings).toBe(SETTINGS)
+    );
+    const append = vi.fn<(text: string) => boolean>(() => true);
+    const run = composer.start(false, append);
+    await vi.waitFor(() =>
+      expect(composer.getSnapshot().state.phase).toBe("recording")
+    );
+
+    const signal = openMicrophone.mock.calls[0][1];
+    expect(openMicrophone).toHaveBeenCalledExactlyOnceWith("usb-mic", signal);
+    expect(recognize).toHaveBeenCalledExactlyOnceWith(stream, signal, "openai");
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(voice.transcribe).not.toHaveBeenCalled();
+    composer.stop();
+    await run;
+
+    expect(append).toHaveBeenCalledExactlyOnceWith("sample transcript");
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(signal.aborted).toBe(true);
+    disconnect?.();
+  });
+
   it.each([
     { change: "removed", settings: { ...SETTINGS, provider: null } },
     { change: "disabled", settings: { ...SETTINGS, useApiKey: false } },

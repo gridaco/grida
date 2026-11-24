@@ -1,5 +1,6 @@
 import {
   BrowserWindow,
+  dialog,
   screen,
   shell,
   type App,
@@ -14,9 +15,8 @@ import {
   type DesktopSettingsSection,
 } from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
-import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { RUNTIME_APP_ICON } from "./branding";
-import { IS_DEV } from "./env";
+import { DESKTOP_LAUNCH, IS_DEV } from "./env";
 
 /**
  * Title-bar row height in CSS pixels. Its controls center at 22px. The
@@ -296,7 +296,7 @@ export function create_desktop_window({
   const window = new BrowserWindow({
     ...get_window_constructor_options(presentation),
     title,
-    show,
+    show: show && urlPath === null,
     webPreferences: {
       // GRIDA-SEC-004 Electron hardening.
       nodeIntegration: false,
@@ -338,9 +338,31 @@ export function create_desktop_window({
   });
 
   // Per-window nav-history push channel must observe the initial load too.
-  attachNavigationEvents(window);
+  attachNavigationEvents(window, new URL(baseUrl).origin);
 
-  if (urlPath !== null) void window.loadURL(`${baseUrl}${urlPath}`);
+  if (urlPath !== null) {
+    if (show) {
+      // The hosted theme bootstrap runs before the renderer's first paint.
+      // Wait for that frame so the user never sees an unthemed blank window.
+      // See test/desktop-window-opening-appearance.md.
+      window.once("ready-to-show", () => window.show());
+    }
+    void window.loadURL(`${baseUrl}${urlPath}`).catch(() => {
+      if (
+        window.isDestroyed() ||
+        window.webContents.isLoadingMainFrame() ||
+        !show ||
+        window.isVisible()
+      ) {
+        return;
+      }
+      window.close();
+      dialog.showErrorBox(
+        "Couldn't open the Grida window",
+        "Try opening the window again."
+      );
+    });
+  }
 
   return window;
 }
@@ -462,7 +484,7 @@ function buildDesktopArguments({
   app: App;
   extra?: string[];
 }): string[] {
-  const workspaceChat = NativeDesktopProfile.ordinaryChat();
+  const workspaceChat = DESKTOP_LAUNCH.nativeChat === "ordinary";
   return [
     `--grida-version=${app.getVersion()}`,
     ...(workspaceChat ? [`--${NATIVE_WORKSPACE_CHAT_ARGUMENT}=1`] : []),

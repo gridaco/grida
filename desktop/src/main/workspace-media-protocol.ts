@@ -18,9 +18,9 @@
 import { protocol } from "electron";
 import { workspaceFileResponse } from "@grida/daemon/server";
 import { servicesSidecarClient } from "./services-sidecar-client";
-import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { WorkspaceMediaError } from "./workspace-media-registry";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
+import type { WorkspaceFileWorkers } from "./workspace-file-worker";
 
 const SCHEME = "grida-workspace";
 // The authority is a fixed, data-less literal — both ids live in the path (see
@@ -55,9 +55,9 @@ export function registerWorkspaceMediaScheme(): void {
  * naturally on the next load).
  */
 export function handleWorkspaceMediaProtocol(
-  catalog?: Pick<NativeWorkspaceCatalog, "grant">
+  catalog?: Pick<NativeWorkspaceCatalog, "grant">,
+  native?: Pick<WorkspaceFileWorkers, "open">
 ): void {
-  const native = nativeWorkspaceMedia();
   protocol.handle(SCHEME, async (request) => {
     const target = parseWorkspaceMediaUrl(request.url);
     if (!target) return new Response("bad request", { status: 400 });

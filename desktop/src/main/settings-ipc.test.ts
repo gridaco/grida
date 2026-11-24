@@ -61,9 +61,6 @@ vi.mock("./workspace-watcher-host", () => ({}));
 vi.mock("./workspace-files", () => ({}));
 vi.mock("./chatgpt-oauth", () => ({ unavailableChatGptOAuth: {} }));
 vi.mock("./media-host", () => ({ DesktopMediaHost: class {} }));
-vi.mock("./media-root", () => ({
-  DesktopMediaRoot: { current: () => "/fixture/media" },
-}));
 vi.mock("./native-chat-ipc", () => ({ NativeChatIpc: class {} }));
 vi.mock("./native-external-run-ipc", () => ({
   NativeExternalRunIpc: class {},
@@ -191,6 +188,12 @@ function setup(
   let role: DesktopIpcRole | null = "main";
   const open = vi.fn<(section?: DesktopSettingsSection) => void>();
   registerIpcHandlers({
+    profile: {
+      editorBaseUrl: "https://fixture.invalid",
+      mediaRoot: "/fixture/media",
+      nativeChat: "ordinary",
+      resourcesPath: "/fixture/resources",
+    },
     resolve_ipc_role: () => role,
     open_settings: open,
     global_hooks: hooks,
@@ -201,7 +204,10 @@ function setup(
     url: "https://fixture.invalid/desktop/workspace?id=project",
   };
   const event = {
-    sender: { mainFrame, isDestroyed: () => false },
+    sender: Object.assign(new EventEmitter(), {
+      mainFrame,
+      isDestroyed: (): boolean => false,
+    }),
     senderFrame: mainFrame as typeof mainFrame | null,
   };
   Object.assign(fixture.window, { webContents: event.sender });
@@ -469,7 +475,8 @@ it("allows Personalization edits only from the live Settings frame", async () =>
   ).toEqual(state);
   expect(owner.setPersonalization).toHaveBeenCalledWith(
     { webSearch: "live" },
-    expect.any(Function)
+    expect.any(Function),
+    expect.any(AbortSignal)
   );
   for (const invalid of [
     { fastMode: false },
@@ -486,6 +493,14 @@ it("allows Personalization edits only from the live Settings frame", async () =>
   owner.setPersonalization.mockImplementationOnce(async (_change, check) => {
     navigation.emit("did-start-navigation", { isMainFrame: true });
     check?.();
+    return state;
+  });
+  await expect(
+    f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { suggestedPrompts: true })
+  ).rejects.toThrow("denied");
+  owner.setPersonalization.mockImplementationOnce(async (_change, check) => {
+    check?.();
+    navigation.emit("did-start-navigation", { isMainFrame: true });
     return state;
   });
   await expect(
@@ -584,7 +599,7 @@ function hooksFixture() {
       .fn<() => Promise<typeof inspection>>()
       .mockResolvedValue(inspection),
     ensureConfig: vi
-      .fn<() => Promise<string>>()
+      .fn<NativeAgentHooks["ensureConfig"]>()
       .mockResolvedValue(inspection.configPath),
     reviewConfigured: vi
       .fn<
@@ -611,6 +626,18 @@ it("inspects/reloads global hooks and opens only the canonical config from Setti
   );
   expect(f.owner.trust).not.toHaveBeenCalled();
 });
+
+it.each([IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, IPC_CHANNELS.GLOBAL_HOOKS_RELOAD])(
+  "withholds %s results if Settings navigates during inspection",
+  async (channel) => {
+    const f = hooksFixture();
+    f.owner.configuration.mockImplementationOnce(async () => {
+      f.event.sender.emit("did-navigate");
+      return f.inspection;
+    });
+    await expect(f.hook(channel)).rejects.toThrow("global config read denied");
+  }
+);
 
 it("requires native explicit review of the exact global hook revision", async () => {
   const f = hooksFixture();
@@ -658,6 +685,20 @@ it("denies global hook operations from chat routes, subframes and injected argum
   expect(fixture.openPath).not.toHaveBeenCalled();
 });
 
+it("revokes config creation before confirmation when Settings navigates", async () => {
+  const f = hooksFixture();
+  f.owner.ensureConfig.mockImplementationOnce(async (check, signal) => {
+    f.event.sender.emit("did-navigate");
+    expect(signal?.aborted).toBe(true);
+    check?.();
+    return f.inspection.configPath;
+  });
+  await expect(f.hook(IPC_CHANNELS.GLOBAL_HOOKS_OPEN_CONFIG)).rejects.toThrow(
+    "global config open denied"
+  );
+  expect(fixture.openPath).not.toHaveBeenCalled();
+});
+
 it("revalidates Settings admission after the native trust dialog", async () => {
   const f = hooksFixture();
   fixture.confirm.mockImplementationOnce(async () => {
@@ -683,9 +724,10 @@ it("publishes completed route changes even when navigation-history flags remain 
     },
     send: vi.fn<(channel: string, state: unknown) => void>(),
   });
-  attachNavigationEvents({
-    webContents: contents as unknown as WebContents,
-  } as BrowserWindow);
+  attachNavigationEvents(
+    { webContents: contents as unknown as WebContents } as BrowserWindow,
+    "https://fixture.invalid"
+  );
   contents.emit("did-navigate", {}, url);
   url = "https://fixture.invalid/desktop/settings";
   contents.emit("did-navigate-in-page", {}, url, true);

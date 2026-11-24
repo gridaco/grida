@@ -6,6 +6,9 @@ mod checkpoint;
 #[path = "store/operation_claim.rs"]
 mod operation_claim;
 
+#[path = "store/queue_actions.rs"]
+mod queue_actions;
+
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{

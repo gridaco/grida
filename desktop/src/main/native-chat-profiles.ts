@@ -9,6 +9,7 @@ import {
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
   isValidEndpointProviderId,
+  resolveEndpointModel,
   type EndpointProviderConfig,
   type GGModelsView,
 } from "@grida/ai-host";
@@ -80,6 +81,23 @@ export namespace NativeChatProfiles {
     return { ...launch, compatibleOutputLimitField: "max-tokens" };
   }
 
+  export async function resolveConfigured(
+    profile: Saved,
+    resolve: Resolve,
+    requireCurrent: () => void,
+    llamaCppInputCount?: true
+  ): Promise<Launch | undefined> {
+    const launch = configuredLaunch(
+      await resolve(profile.providerId, profile.modelId, llamaCppInputCount)
+    );
+    requireCurrent();
+    if (
+      launch.llamaCppInputCount === llamaCppInputCount &&
+      binding(profile.providerId, launch) === profile.id
+    )
+      return launch;
+  }
+
   export function gatewayBinding(scope: string, modelId: string): string {
     return createHash("sha256")
       .update(JSON.stringify(["desktop-gateway-model-chat-v1", scope, modelId]))
@@ -147,19 +165,25 @@ export namespace NativeChatProfiles {
           model.id !== defaultModel && gatewayOutputLimit(model) !== undefined
       )
       .slice(0, MAX_CHOICES)
-      .map((model) => ({
-        id: gatewayBinding(scope, model.id),
-        providerId: GG_PROVIDER_ID,
-        modelId: model.id,
-        connection: GG_PROVIDER_METADATA.label,
-        model: label(model.label, model.id),
-        ...(positive(model.limits.context_tokens) && {
-          contextWindow: model.limits.context_tokens,
-        }),
-      }));
+      .map((model) => {
+        const window = gatewayContextWindow(model);
+        return {
+          id: gatewayBinding(scope, model.id),
+          providerId: GG_PROVIDER_ID,
+          modelId: model.id,
+          connection: GG_PROVIDER_METADATA.label,
+          model: label(model.label, model.id),
+          ...(window !== undefined && { contextWindow: window }),
+        };
+      });
   }
 
-  /** The context window from the selected provider's model catalogue. */
+  export function gatewayContextWindow(model: GatewayModel | undefined) {
+    const window = model?.limits.context_tokens;
+    return positive(window) ? window : undefined;
+  }
+
+  /** The context window from the bundled model catalogue. */
   export function contextWindow(modelId: string): number | undefined {
     const window =
       catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
@@ -237,52 +261,26 @@ export namespace NativeChatProfiles {
     resolve: Resolve
   ): Promise<Saved[]> {
     const choices: Saved[] = [];
-    const countedChoices: Saved[] = [];
     for (const endpoint of endpoints.slice(0, MAX_ENDPOINTS)) {
       if (!isValidEndpointProviderId(endpoint.id)) continue;
       const eligible = await resolve(endpoint.id).catch(() => null);
       if (!eligible || eligible.endpoint !== endpoint.base_url) continue;
-      const counted =
-        endpoint.input_counting === "llama.cpp"
-          ? await resolve(endpoint.id, undefined, true).catch(() => null)
-          : null;
       for (const model of endpoint.models) {
         if (choices.length >= MAX_CHOICES) return choices;
         if (!modelId(model.id)) continue;
         const launch = { ...eligible, model: model.id };
-        const window = model.overrides?.contextWindow ?? model.contextWindow;
-        const choice = {
+        const window = resolveEndpointModel(model).contextWindow;
+        choices.push({
           id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,
           modelId: model.id,
           connection: label(endpoint.label, endpoint.id),
           model: label(model.label, model.id),
           ...(positive(window) && { contextWindow: window }),
-        };
-        choices.push(choice);
-        if (
-          counted?.llamaCppInputCount &&
-          counted.endpoint === endpoint.base_url &&
-          countedChoices.length < MAX_CHOICES
-        ) {
-          countedChoices.push({
-            ...choice,
-            id: binding(
-              endpoint.id,
-              configuredLaunch({ ...counted, model: model.id })
-            ),
-            connection: label(
-              `${choice.connection} (llama.cpp counting)`,
-              `${endpoint.id} (llama.cpp counting)`
-            ),
-          });
-        }
+        });
       }
     }
-    return [
-      ...choices,
-      ...countedChoices.slice(0, MAX_CHOICES - choices.length),
-    ];
+    return choices;
   }
 
   export async function read(directory: string): Promise<Saved[]> {

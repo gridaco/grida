@@ -170,7 +170,7 @@ impl ReviewSession {
             request.reasoning,
             &request.extension,
             request.max_output_tokens,
-            candidate.input_limit,
+            (), // Preserve the identity of uncapped review sessions.
             &reviewer.project_instructions,
         ))?;
         let action = approval_review::action_message(request).ok_or_else(unavailable)?;

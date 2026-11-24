@@ -22,9 +22,8 @@ version does not discover project files, plugin hooks, or separate JSON hook
 configuration. Existing workspace `hooks.json` files are not loaded or copied
 into the global file.
 
-The source-built headless host's explicit permission profile is a separate
-supervisor execution contract; it does not automatically load this Desktop
-configuration.
+Headless sessions read context settings from the same file. Headless hook
+execution requires a trusted launch permission profile.
 
 ## Add a hook
 

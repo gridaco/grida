@@ -162,6 +162,28 @@
   background: var(--composer-chip-background);
 }
 
+/* Use the surrounding text baseline and keep the icon with the skill name. */
+.composer-content [data-composer-mention][sigil="$"] {
+  display: inline;
+  margin-inline: 0;
+  padding: 0;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+/* Lucide Book Open, matching the sent mention. */
+.composer-content [data-composer-mention][sigil="$"]::before {
+  content: "";
+  display: inline-block;
+  inline-size: 1em;
+  block-size: 1em;
+  margin-inline-end: 0.25em;
+  vertical-align: -0.15em;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
 .dark .composer-content {
   --composer-chip-color: var(--color-blue-400);
   --composer-chip-background: color-mix(

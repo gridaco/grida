@@ -6,9 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 const fixtures = vi.hoisted(() => ({
-  native: undefined as ReturnType<
-    typeof import("./workspace-media-access").nativeWorkspaceMedia
-  >,
+  native: undefined as WorkspaceFileWorkers | undefined,
   children: [] as ChildProcess[],
   handler: undefined as
     | ((request: Request) => Response | Promise<Response>)
@@ -31,9 +29,6 @@ vi.mock("./services-sidecar-client", () => ({
     fetch: vi.fn<(path: string, init?: unknown) => Promise<Response>>(),
     ServicesSidecarNotReadyError: class extends Error {},
   },
-}));
-vi.mock("./workspace-media-access", () => ({
-  nativeWorkspaceMedia: () => fixtures.native,
 }));
 vi.mock("node:child_process", async (load) => {
   const actual = await load<typeof import("node:child_process")>();
@@ -125,7 +120,7 @@ describe("parseWorkspaceMediaUrl", () => {
 });
 
 function registeredHandler(catalog?: Pick<NativeWorkspaceCatalog, "grant">) {
-  handleWorkspaceMediaProtocol(catalog);
+  handleWorkspaceMediaProtocol(catalog, fixtures.native);
   return fixtures.handler!;
 }
 
