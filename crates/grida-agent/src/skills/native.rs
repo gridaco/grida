@@ -6,7 +6,7 @@ use rustix::io::Errno;
 use std::fs::File;
 use std::io::Read as _;
 use std::os::unix::fs::MetadataExt as _;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 pub(super) const MAX_LAYER_ENTRIES: usize = 256;
 
@@ -120,11 +120,76 @@ impl Root {
         }))
     }
 
-    pub(super) fn project_guidance(&self) -> Result<Option<String>> {
-        let text = read_document(&self.directory, "AGENTS.md")
-            .map_err(|error| problem(error.kind, "project_instruction_unavailable"))?;
-        Ok(text.filter(|text| !text.trim().is_empty()))
+    pub(crate) fn validate_instruction_directory(&self, directory: &Path) -> Result<()> {
+        self.instruction_directories(directory, |_, _| Ok(()))
     }
+
+    pub(super) fn project_guidance(&self, directory: &Path) -> Result<Vec<(PathBuf, String)>> {
+        let mut documents = Vec::new();
+        let mut document_bytes = MAX_SOURCE_BYTES;
+        // Scope names can accumulate even when all documents are small.
+        let mut path_bytes = MAX_SOURCE_BYTES
+            .checked_sub(directory.as_os_str().len())
+            .ok_or_else(instruction_limit)?;
+        self.instruction_directories(directory, |descriptor, scope| {
+            let text = read_document(descriptor, "AGENTS.md").map_err(|error| {
+                if error.kind == ErrorKind::LimitExceeded {
+                    instruction_limit()
+                } else {
+                    problem(error.kind, "project_instruction_unavailable")
+                }
+            })?;
+            if let Some(body) = text.filter(|text| !text.trim().is_empty()) {
+                document_bytes = document_bytes
+                    .checked_sub(body.len())
+                    .ok_or_else(instruction_limit)?;
+                path_bytes = path_bytes
+                    .checked_sub(scope.as_os_str().len())
+                    .ok_or_else(instruction_limit)?;
+                documents.push((scope.to_path_buf(), body));
+            }
+            Ok(())
+        })?;
+        Ok(documents)
+    }
+
+    fn instruction_directories(
+        &self,
+        directory: &Path,
+        mut visit: impl FnMut(&File, &Path) -> Result<()>,
+    ) -> Result<()> {
+        if directory.to_str().is_none() {
+            return Err(invalid_instruction_directory());
+        }
+        let mut descriptor = self.directory.try_clone().map_err(|_| unavailable())?;
+        let mut scope = PathBuf::new();
+        visit(&descriptor, &scope)?;
+        for component in directory.components() {
+            let Component::Normal(name) = component else {
+                return Err(invalid_instruction_directory());
+            };
+            descriptor = fs::openat(&descriptor, name, dir_flags(), Mode::empty())
+                .map_err(|_| invalid_instruction_directory())?
+                .into();
+            scope.push(name);
+            visit(&descriptor, &scope)?;
+        }
+        Ok(())
+    }
+}
+
+fn invalid_instruction_directory() -> Error {
+    problem(
+        ErrorKind::InvalidInput,
+        "project_instruction_directory_invalid",
+    )
+}
+
+fn instruction_limit() -> Error {
+    problem(
+        ErrorKind::LimitExceeded,
+        "project_instruction_limit_exceeded",
+    )
 }
 
 impl Layer {

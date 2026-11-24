@@ -85,7 +85,7 @@ fn command() -> Command {
                         .value_name("DIRECTORY")
                         .value_parser(value_parser!(PathBuf))
                         .required_unless_present_any(["permission-profile", "input-png", "input-file"])
-                        .help("Working directory. Defaults to the trusted profile's primary or a private attachment context."),
+                        .help("Working directory. Defaults to the trusted profile's primary or a private attachment context. Select a subdirectory to load its project instructions."),
                 )
                 .arg(
                     Arg::new("input-png")
@@ -149,6 +149,14 @@ fn command() -> Command {
             Command::new("serve")
                 .about("Serve stable Agent Client Protocol")
                 .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
+                .arg(
+                    Arg::new("cwd")
+                        .long("cwd")
+                        .value_name("DIRECTORY")
+                        .value_parser(value_parser!(PathBuf))
+                        .requires("permission-profile")
+                        .help("Select project instructions for a directory inside the trusted profile's primary workspace"),
+                )
                 .arg(
                     Arg::new("subagents")
                         .long("subagents")
@@ -1123,6 +1131,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),
         None => host,
+    };
+    let host = if name == "serve"
+        && let Some(cwd) = args.get_one::<PathBuf>("cwd")
+    {
+        host.with_instruction_directory(cwd)?
+    } else {
+        host
     };
     let host = Arc::new(if args.get_flag("require-completion-text") {
         host.with_required_completion_text()

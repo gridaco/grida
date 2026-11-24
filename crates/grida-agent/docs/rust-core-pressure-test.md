@@ -1304,6 +1304,22 @@ and a structured selection controls which source is used for its name. The
 [native skill process cases](../tests/process/skills.rs) check the first
 model request, accepted revision after a file edit, and unchanged authored text.
 
+Project guidance follows the ordered path from the pinned workspace root
+through the trusted starting directory. Root guidance applies across the
+project. Instructions in descendant directories apply only to their subtree,
+and the closest applicable document wins a conflict. The shared policy tells
+the agent to check files deeper than its starting directory and to follow
+explicit chat instructions over project guidance. Root-only and empty projects
+remain valid. The project scope and captured instructions leave workspace
+authority unchanged.
+
+After a project file changes or disappears, queued and recovered work use
+the accepted revision, and later input uses the current instruction chain.
+The [headless project guidance cases](../tests/process/project_guidance.rs)
+inspect provider requests and the input acceptance and restart boundary.
+The native reader also checks linked documents and directories, scope escapes,
+and the aggregate document budget.
+
 The authenticated export and actual guest interaction have separate
 [loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
 [Electron](../../../desktop/src/main/browser-automation.electron.test.ts)

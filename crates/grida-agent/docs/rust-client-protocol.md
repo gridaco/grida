@@ -902,8 +902,29 @@ An explicit versioned link binds the source and revision. Workspace links also
 bind the discovered root identity. Qualified extension names keep their
 existing ownership and eligibility checks.
 
-An accepted input retains its chosen skill bodies and root `AGENTS.md` guidance.
-The `input` operation reports the selected skill versions and the project
+An accepted input retains its chosen skill bodies and applicable project
+`AGENTS.md` guidance. The host starts with the pinned, readable primary root.
+A trusted launch can select an absolute starting path within that root.
+The source-built `serve` launcher takes `--cwd` with an explicit
+`--permission-profile`, and profiled `run` uses its existing `--cwd`. ACP
+session workspace identity and tool grants stay at the admitted root.
+Desktop and TUI start at the selected folder by default.
+
+The host loads only the chain from the admitted root to the starting
+directory. It skips missing or blank files, caps the combined document contents
+at 32 KiB, and bounds the captured paths separately. Each source carries its
+workspace-relative path, subtree, revision, and contents. The closest applicable `AGENTS.md`
+takes precedence within its subtree, and explicit chat instructions take
+precedence over project guidance. Before work extends beyond the captured
+chain, the agent checks applicable files via the turn's existing workspace
+tools. These later reads enter the turn as tool results. A command's working
+directory applies to that command.
+
+The host loads current files at new input acceptance. Queueing, retry, and
+recovery reuse the accepted capture, including for earlier root-only records.
+Automatic approval review takes captured guidance as evidence. A request that
+exceeds the review budget can require manual approval.
+The `input` operation reports selected skill versions and the accepted project
 instruction revision. With `co.grida/session/message-context` negotiated, live user updates, input
 inspection, queued inspection and transcript windows return host-owned
 `displayParts` entries of kind `skill`, version `1`, with `name`, `source`,

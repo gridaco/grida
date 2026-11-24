@@ -40,8 +40,19 @@ they are unavailable until it finishes.
 ## Give the agent project instructions and skills
 
 On macOS and Linux, put project instructions in `AGENTS.md` at the top of the
-project folder. Desktop workspace chats and source-built hosts follow it
-automatically. A message keeps the instructions it started with, and edits
+project folder. To give a subdirectory its own instructions, put another
+`AGENTS.md` there. Each file applies to the directory that contains it and
+all directories below it. For example, `slides/AGENTS.md` applies to work
+in `slides/`. If project instructions conflict for a file, the agent follows
+the closest applicable `AGENTS.md`. Instructions in your chat message take
+precedence over project guidance.
+
+Desktop starts with the selected project folder. When a source-built host
+has both an admitted project root and a starting directory within it, it
+loads the instructions along the path from the root to that directory. As work
+reaches deeper directories, the agent checks for applicable files there
+using the workspace's existing tools. Instructions that Grida loads when it
+accepts a message stay with that message while it waits or resumes. Edits
 apply to later messages.
 
 In a chat that can use project files, such as a Desktop workspace chat,

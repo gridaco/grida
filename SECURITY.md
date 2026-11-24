@@ -2938,8 +2938,10 @@ secret is unset. A parallel mint policy or signer behind a new host adapter.
 
 **What it protects.** Skill discovery and guidance capture only read fixed
 documents under admitted sources. The project source is the explicitly
-readable primary directory. Personal skill discovery uses
-`$HOME/.agents/skills`. Bundled skills come from native package declarations.
+readable primary directory and, for project guidance, a bounded chain
+through a trusted starting directory within that root. Personal skill
+discovery uses `$HOME/.agents/skills`. Bundled skills come from native package
+declarations.
 A workspace cannot redirect discovery into another source or use a skill to
 expand the turn's file authority.
 
@@ -2962,7 +2964,10 @@ context.
 2. **Native project authority** — a local one-shot invocation pins its
    explicit project root. ACP discovers project guidance only inside the
    primary root of a host-supplied profile with read access already allowed.
-   A client-provided working directory alone confers no project discovery.
+   The trusted launcher can select an instruction starting directory within
+   that root. Directory traversal starts at the pinned descriptor and checks
+   each component without following links. The selected directory leaves
+   workspace identity and tool grants bound to the primary root.
    Desktop Main admits a registered destination and passes its directory
    identity to the pre-chat metadata query. Native discovery opens the
    directory with no-follow and verifies the identity of the opened descriptor
@@ -2971,11 +2976,12 @@ context.
 3. **Fixed personal scope and bounded reads** — the host resolves the local
    user's home and opens only `.agents/skills/<validated-name>/SKILL.md`
    beneath it. The same reader rejects links and nonregular files under both
-   roots and bounds directory and document reads. Candidates from one source
-   cannot satisfy an explicit reference to another. The accepted snapshot
-   carries text and provenance. A captured project skill includes its validated
-   workspace-relative directory. Supporting files are accessed under the
-   ordinary turn authority.
+   roots and bounds directory and document reads. Project instruction
+   capture bounds the combined document content and source paths across the
+   chain. Candidates from one source cannot satisfy an explicit reference to
+   another. The accepted snapshot carries text and provenance. A captured
+   project skill includes its validated workspace-relative directory.
+   Supporting files are accessed under the ordinary turn authority.
 4. **Host-issued presentation** — skill display entries come from accepted
    selections. The ACP input contract reserves that display kind for the
    host. The metadata query returns names, descriptions, sources and opaque
@@ -2989,7 +2995,8 @@ context.
   [permission profile](crates/grida-agent/src/permissions.rs),
   [Main workspace admission](desktop/src/main/native-desktop-agent.ts),
   [retained display validation](crates/grida-agent/src/host/message_context.rs),
-  [native process fixtures](crates/grida-agent/tests/process/skills.rs), and
+  [native skill fixtures](crates/grida-agent/tests/process/skills.rs),
+  [project guidance fixtures](crates/grida-agent/tests/process/project_guidance.rs), and
   [delegated skill-read cases](crates/grida-agent/tests/process/delegation.rs).
 
 **What does NOT belong here.** Following a link out of a skill tree.

@@ -5,9 +5,11 @@ mod catalog;
 mod extensions;
 #[cfg(unix)]
 mod native;
+mod project;
 use catalog::Catalog;
 #[cfg(unix)]
 pub(crate) use native::{PersonalSkills, Root as ProjectRoot};
+use project::ProjectGuidance;
 #[cfg(not(unix))]
 pub(crate) enum ProjectRoot {}
 #[cfg(not(unix))]
@@ -16,7 +18,9 @@ pub(crate) enum PersonalSkills {}
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::{ChangeId, Error, ErrorKind, Fingerprint, MessageId, Result};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 const URI_PREFIX: &str = "grida-skill:";
 const MAX_NAME: usize = 64;
@@ -152,13 +156,6 @@ impl CapturedSkill {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct ProjectGuidance {
-    source: String,
-    revision: String,
-    body: String,
-}
-
 /// Exact guidance used by an accepted input. Recovery requires no filesystem read.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct CapturedGuidance {
@@ -186,14 +183,12 @@ impl CapturedGuidance {
         !self.skills.is_empty()
     }
 
-    pub(crate) fn project_instructions(&self) -> Option<&str> {
-        self.project.as_ref().map(|project| project.body.as_str())
+    pub(crate) fn project_instructions(&self) -> Option<Cow<'_, str>> {
+        self.project.as_ref().map(ProjectGuidance::instructions)
     }
 
     pub(crate) fn project_revision(&self) -> Option<&str> {
-        self.project
-            .as_ref()
-            .map(|project| project.revision.as_str())
+        self.project.as_ref().map(ProjectGuidance::revision)
     }
 
     pub(crate) fn message(&self, input: &ChangeId) -> Result<Message> {
@@ -504,6 +499,7 @@ fn plain_mentions(text: &str) -> impl Iterator<Item = &str> {
     })
 }
 
+#[cfg(all(test, unix))]
 pub(crate) fn capture_for(
     root: Option<&ProjectRoot>,
     personal: Option<&PersonalSkills>,
@@ -511,11 +507,30 @@ pub(crate) fn capture_for(
     plain: &[String],
     optional: &[String],
 ) -> Result<Option<CapturedGuidance>> {
-    capture_from(root, personal, selected, plain, &Catalog::bundled(optional))
+    capture_at(root, Path::new(""), personal, selected, plain, optional)
+}
+
+pub(crate) fn capture_at(
+    root: Option<&ProjectRoot>,
+    directory: &Path,
+    personal: Option<&PersonalSkills>,
+    selected: Vec<SkillReference>,
+    plain: &[String],
+    optional: &[String],
+) -> Result<Option<CapturedGuidance>> {
+    capture_from(
+        root,
+        directory,
+        personal,
+        selected,
+        plain,
+        &Catalog::bundled(optional),
+    )
 }
 
 fn capture_from(
     root: Option<&ProjectRoot>,
+    directory: &Path,
     personal: Option<&PersonalSkills>,
     selected: Vec<SkillReference>,
     plain: &[String],
@@ -529,17 +544,9 @@ fn capture_from(
     }
     #[cfg(unix)]
     let project = root
-        .map(ProjectRoot::project_guidance)
+        .map(|root| ProjectGuidance::capture(root, directory))
         .transpose()?
-        .flatten()
-        .map(|body| {
-            Ok(ProjectGuidance {
-                source: "AGENTS.md".into(),
-                revision: Fingerprint::of(&("AGENTS.md", &body))?.to_hex(),
-                body,
-            })
-        })
-        .transpose()?;
+        .flatten();
     #[cfg(unix)]
     let layers = if !plain.is_empty()
         || selected
@@ -552,7 +559,7 @@ fn capture_from(
     };
     #[cfg(not(unix))]
     let project = {
-        let _ = (root, personal);
+        let _ = (root, directory, personal);
         None
     };
     let mut skills = Vec::new();

@@ -458,6 +458,60 @@ it("keeps an unknown send with its original chat and reconciles the same input o
   }
 });
 
+it.each([
+  ["input_unavailable", "failed"],
+  ["receipt transport failed", "unconfirmed"],
+] as const)(
+  "preserves a send refused by project instructions when the receipt reports %s",
+  async (receiptError, status) => {
+    const { bridge, controller } = fixture();
+    const drafts = durableDrafts();
+    const submit = vi
+      .spyOn(bridge, "submit")
+      .mockRejectedValueOnce(new Error("project_instruction_limit_exceeded"));
+    const receipt = vi
+      .spyOn(bridge, "inputReceipt")
+      .mockRejectedValueOnce(new Error(receiptError));
+    controller.keepDrafts(drafts, "workspace");
+    const key = "workspace:chat-a";
+    const document = { type: "doc", content: [{ type: "paragraph" }] };
+    try {
+      await controller.select("chat-a");
+      drafts.write(key, document);
+      expect(
+        controller.submitOptimistically(
+          "First",
+          controller.read().scope,
+          document
+        )
+      ).toBe(true);
+      const id = controller.read().outgoing[0]!.id;
+      await vi.waitFor(() =>
+        expect(controller.read().outgoing[0]).toMatchObject({
+          id,
+          status,
+          error:
+            "Project instructions exceed the size limit. Shorten the applicable AGENTS.md files, then retry.",
+        })
+      );
+      const inputId = submit.mock.calls[0]![1];
+      expect(receipt).toHaveBeenCalledExactlyOnceWith("chat-a", inputId);
+      expect(await drafts.readPending(key)).toMatchObject({
+        inputId,
+        text: "First",
+        outgoing: { id, document },
+      });
+      controller.retryOutgoing(id);
+      await vi.waitFor(() =>
+        expect(controller.read().outgoing[0]?.status).toBe("accepted")
+      );
+      expect(submit.mock.calls[1]?.[1]).toBe(inputId);
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
 it("keeps the previous input recoverable when removing the next draft's attachment", async () => {
   const { bridge, controller } = fixture();
   const blobs = new Map<string, ComposerDraftBlob>();

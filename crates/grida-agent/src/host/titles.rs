@@ -243,6 +243,8 @@ impl Host {
             inference_only: true,
             #[cfg(unix)]
             guidance_root: None,
+            #[cfg(unix)]
+            instruction_directory: PathBuf::new(),
             configuration_admission: Arc::default(),
             delegation_controls: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),

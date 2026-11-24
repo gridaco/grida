@@ -106,7 +106,7 @@ pub async fn run_with_file(
 /// Run with an optional file and a catalog title for the first accepted input.
 pub async fn run_with_input(
     host: &Host,
-    options: RunOptions,
+    mut options: RunOptions,
     input_file: Option<PathBuf>,
     initial_title: Option<String>,
     signal: impl Future<Output = Result<()>>,
@@ -114,8 +114,15 @@ pub async fn run_with_input(
     let result = if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"))
     } else {
-        match host.clone().with_headless_guidance(&options.cwd) {
-            Ok(scoped) => run_once(&scoped, options, input_file, initial_title, signal).await,
+        match host
+            .clone()
+            .with_headless_run_workspace(&options.cwd, options.session.as_ref())
+            .await
+        {
+            Ok((scoped, workspace)) => {
+                options.cwd = workspace;
+                run_once(&scoped, options, input_file, initial_title, signal).await
+            }
             Err(error) => Err(error),
         }
     };

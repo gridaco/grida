@@ -6823,6 +6823,7 @@ export class NativeChatController {
                 throw error;
               }
               if (
+                projectInstructionRefusal(error) ||
                 selectionRouteRefused(error) ||
                 (error instanceof Error &&
                   /^(?:chat_speed_unavailable|chat_web_search_unavailable|chat_turn_capabilities_unavailable|chat_turn_options_unsupported|chatgpt_reauthentication_required|web_search_selection_required|chat_selection_revision_changed)$/.test(
@@ -11260,8 +11261,22 @@ function selectionRouteRefused(error: unknown): boolean {
   );
 }
 
+function projectInstructionRefusal(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  switch (error.message) {
+    case "project_instruction_limit_exceeded":
+      return "Project instructions exceed the size limit. Shorten the applicable AGENTS.md files, then retry.";
+    case "project_instruction_unavailable":
+      return "Couldn't read the applicable AGENTS.md files. Check that they are readable regular files, then retry.";
+    case "project_instruction_directory_invalid":
+      return "Couldn't open the starting directory for project instructions. Restore the directory, then retry.";
+  }
+}
+
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
+  const projectInstructions = projectInstructionRefusal(error);
+  if (projectInstructions) return projectInstructions;
   if (error.message === "native_chat_permission_mode_initial_choice_changed")
     return INITIAL_ACCESS_CHANGED;
   if (

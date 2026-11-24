@@ -242,6 +242,8 @@ pub struct Host {
     inference_only: bool,
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
+    #[cfg(unix)]
+    instruction_directory: PathBuf,
     configuration_admission: Arc<Mutex<()>>,
     delegation_controls: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
@@ -1018,6 +1020,8 @@ impl Host {
             inference_only: false,
             #[cfg(unix)]
             guidance_root: None,
+            #[cfg(unix)]
+            instruction_directory: PathBuf::new(),
             configuration_admission: Arc::default(),
             delegation_controls: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
@@ -2980,11 +2984,19 @@ impl Host {
                 .desktop_image_generation
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::references);
+        let mut initial_instructions = grida_agent_master::CORE_INSTRUCTIONS.to_owned();
         let guidance = if child_work || self.inference_only {
             None
         } else {
+            let root = self.guidance_scope(session)?;
+            if root.is_some() {
+                initial_instructions.push_str("\n\n");
+                initial_instructions
+                    .push_str(grida_agent_master::conversation_seed::PROJECT_INSTRUCTIONS_POLICY);
+            }
             skills::capture_guidance(
-                self.guidance_scope(session)?,
+                root,
+                self.instruction_directory().to_path_buf(),
                 &parts,
                 optional_skills.clone(),
             )
@@ -3033,7 +3045,7 @@ impl Host {
             id,
             payload: StoredPrompt {
                 preceding_turn: preceding_turn.filter(|_| !child_work),
-                initial_instructions: Some(grida_agent_master::CORE_INSTRUCTIONS.to_owned()),
+                initial_instructions: Some(initial_instructions),
                 shell_exploration: !child_work,
                 editor_instructions: None,
                 question_instructions: (questions && !child_work)
@@ -3549,7 +3561,7 @@ impl Host {
                     .guidance
                     .as_ref()
                     .and_then(|g| g.project_instructions())
-                    .map(str::to_owned);
+                    .map(std::borrow::Cow::into_owned);
                 let guidance = stored
                     .guidance
                     .as_ref()

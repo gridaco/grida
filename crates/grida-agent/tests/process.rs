@@ -86,6 +86,9 @@ mod prediction;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/processes.rs"]
 mod processes;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/project_guidance.rs"]
+mod project_guidance;
 #[cfg(unix)]
 #[path = "process/prompt_preview.rs"]
 mod prompt_preview;

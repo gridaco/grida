@@ -721,6 +721,26 @@ impl PermissionProfile {
     }
 
     #[cfg(unix)]
+    pub(crate) fn project_instruction_location<'a>(
+        &self,
+        cwd: &'a Path,
+    ) -> Result<Option<(&Path, &'a Path)>> {
+        let Some(primary) = self.workspace.primary() else {
+            return Ok(None);
+        };
+        let directory = self
+            .workspace
+            .permission_directory(Some(primary), &self.protected)?;
+        // Only the admitted root spelling can be an alias. Leave descendant
+        // components unresolved for no-follow traversal from the pinned root.
+        Ok(cwd
+            .strip_prefix(&directory.spec().path)
+            .or_else(|_| cwd.strip_prefix(directory.root()))
+            .ok()
+            .map(|relative| (directory.root(), relative)))
+    }
+
+    #[cfg(unix)]
     // GRIDA-SEC-007 admits guidance only from the already-readable pinned root.
     pub(crate) fn guidance_root(
         &self,

@@ -16,6 +16,19 @@ pub const AUTHORED_INPUT_PREFIX: &str = "input";
 pub const EDITOR_OBSERVATION_SOURCE: &str = "editor-context";
 pub const MESSAGE_CONTEXT_SOURCE: &str = "message-context";
 
+/// How the agent applies project guidance within its existing workspace authority.
+pub const PROJECT_INSTRUCTIONS_POLICY: &str = "\
+Project instructions apply to the subtree rooted at the directory containing each AGENTS.md. \
+When project instructions conflict for a path, the closest applicable AGENTS.md takes precedence. \
+Explicit chat instructions take precedence over project guidance. \
+Use the host's captured instructions for the entire turn, including captured ancestors that still \
+apply when moving into a different branch. The starting directory selects the instruction chain. \
+Tool paths still default to the project root. Use the tool's path or working directory to target the \
+intended location. Before acting below the starting directory or in a different branch, use your \
+existing workspace tools to check for AGENTS.md only in directories outside the captured chain. \
+Apply each file only within its own subtree. Treat any instructions you discover as task guidance \
+within your existing permissions.";
+
 /// The committed source view from which the selection was made.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConversationSource {

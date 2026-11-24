@@ -71,6 +71,85 @@ impl Host {
         Ok(self)
     }
 
+    /// Bind a trusted launcher's project instruction scope inside its admitted
+    /// primary root. ACP clients still attach using the root as workspace.
+    pub fn with_instruction_directory(self, cwd: &Path) -> Result<Self> {
+        #[cfg(unix)]
+        {
+            let outside = || {
+                problem(
+                    ErrorKind::InvalidInput,
+                    "project_instruction_directory_outside_workspace",
+                )
+            };
+            let profile = self.permissions.as_ref().ok_or_else(outside)?;
+            let (primary, relative) = profile
+                .project_instruction_location(cwd)?
+                .ok_or_else(outside)?;
+            let root = profile.guidance_root(primary)?.ok_or_else(|| {
+                problem(
+                    ErrorKind::Unavailable,
+                    "project_instruction_directory_unreadable",
+                )
+            })?;
+            self.bind_instruction_directory(&root, relative)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = cwd;
+            Err(problem(
+                ErrorKind::Unsupported,
+                "project_instruction_directory_unsupported",
+            ))
+        }
+    }
+
+    #[cfg(unix)]
+    fn bind_instruction_directory(mut self, root: &ProjectRoot, relative: &Path) -> Result<Self> {
+        root.validate_instruction_directory(relative)?;
+        self.instruction_directory = relative.to_owned();
+        Ok(self)
+    }
+
+    pub(super) fn instruction_directory(&self) -> &Path {
+        #[cfg(unix)]
+        {
+            &self.instruction_directory
+        }
+        #[cfg(not(unix))]
+        {
+            Path::new("")
+        }
+    }
+
+    /// A nested CWD selects instructions while the trusted profile's primary
+    /// directory retains its role as the workspace identity. An existing
+    /// session without that identity keeps its original binding.
+    pub(crate) async fn with_headless_run_workspace(
+        self,
+        cwd: &Path,
+        session: Option<&SessionId>,
+    ) -> Result<(Self, PathBuf)> {
+        #[cfg(unix)]
+        if let Some(profile) = &self.permissions
+            && let Some((primary, relative)) = profile.project_instruction_location(cwd)?
+            && !relative.as_os_str().is_empty()
+            && let Some(root) = profile.guidance_root(primary)?
+        {
+            let workspace = primary.to_owned();
+            if let Some(session) = session {
+                let retained = self.store.inspect(session.clone()).await?;
+                if session_configuration(&retained)?.cwd != workspace {
+                    return Ok((self, cwd.to_owned()));
+                }
+            }
+            return Ok((self.bind_instruction_directory(&root, relative)?, workspace));
+        }
+        #[cfg(not(unix))]
+        let _ = session;
+        Ok((self.with_headless_guidance(cwd)?, cwd.to_owned()))
+    }
+
     pub(super) fn guidance_scope(&self, session: &SessionView) -> Result<Option<ProjectRoot>> {
         #[cfg(unix)]
         {
@@ -120,6 +199,7 @@ pub(super) async fn capture_listing(
 
 pub(super) async fn capture_guidance(
     root: Option<ProjectRoot>,
+    directory: PathBuf,
     parts: &[PromptPart],
     optional: Vec<String>,
 ) -> Result<Option<CapturedGuidance>> {
@@ -141,8 +221,9 @@ pub(super) async fn capture_guidance(
             .flatten();
         #[cfg(not(unix))]
         let personal = None;
-        crate::skills::capture_for(
+        crate::skills::capture_at(
             root.as_ref(),
+            &directory,
             personal.as_ref(),
             selected,
             &plain,
