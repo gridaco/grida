@@ -129,6 +129,12 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           (directory) => fs.mkdir(directory, { mode: 0o700 })
         )
       );
+      // Trigger compaction with the fixture history regardless of the default model.
+      await fs.writeFile(
+        path.join(source.providerHome, "config.toml"),
+        "schema_version = 1\nmodel_auto_compact_token_limit = 16000\n",
+        { mode: 0o600 }
+      );
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject).listen(0, "127.0.0.1", resolve);
       });
@@ -333,10 +339,15 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           mode
         );
         if (compact) {
-          await vi.waitFor(() => {
-            if (summaryRequests.length !== 1)
-              throw new Error("expected one held summary");
-          });
+          await vi.waitFor(
+            () => {
+              if (summaryRequests.length !== 1)
+                throw new Error(
+                  `Expected one held summary, received ${summaryRequests.length}`
+                );
+            },
+            { timeout: 5000 }
+          );
           held = {
             accepted,
             retry: await ipc.submit(

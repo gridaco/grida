@@ -162,8 +162,15 @@ async fn serve_stdio(
 ) -> Result<u8> {
     let supervised = provider.is_some();
     let side_chats = Arc::new(crate::host::side_chats::SideChats::default());
+    // Keep the connection's async state on the heap before polling the
+    // shutdown race on the executable's main thread.
+    let connection = Box::pin(acp::serve_stdio_with_side_chats(
+        host.clone(),
+        provider,
+        side_chats.clone(),
+    ));
     tokio::select! {
-        result = acp::serve_stdio_with_side_chats(host.clone(), provider, side_chats.clone()) => match result {
+        result = connection => match result {
             Ok(()) => {}
             Err(acp::ServeError::Shutdown(error)) => return Err(error),
             Err(acp::ServeError::Protocol(error)) => {

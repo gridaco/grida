@@ -1533,7 +1533,9 @@ impl Host {
         let worker_session = session.clone();
         let worker_turn = turn.clone();
         let queue_dispatch = work.track_queue_dispatch(&session);
-        let task = async move {
+        // Pin the worker before wrapping its lifetime so launch does not copy
+        // the long-lived future through the request thread's stack.
+        let task = Box::pin(async move {
             let _queue_dispatch = queue_dispatch;
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
@@ -1718,7 +1720,7 @@ impl Host {
             } else if suspended {
                 host.kick_stopped(worker_session, worker_turn).await;
             }
-        };
+        });
         self.workers.fetch_add(1, Ordering::Relaxed);
         let lifetime = WorkerLifetime {
             workers: self.workers.clone(),
