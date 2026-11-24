@@ -6,29 +6,63 @@ import { expect, it, vi } from "vitest";
 import type { App } from "electron";
 import VitePlugin from "@electron-forge/plugin-vite";
 import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
+import { ProtectedRoots } from "@grida/daemon/server";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { DesktopProfile } from "./desktop-profile";
+import { NativeDevelopmentResources } from "./native-development-resources";
 import { NativeAgentProcess } from "./native-agent-process";
 import {
   stageNativeAgent,
   verifyNativeAgent,
 } from "../../scripts/native-agent-package.mjs";
 
+it("excludes packaged application resources while allowing source checkouts as workspaces", () => {
+  const base = path.join(os.tmpdir(), "grida-native-profile-test");
+  const home = path.join(base, "home");
+  const appData = path.join(home, "app-data");
+  const checkout = path.join(home, "src", "grida");
+  const resources = path.join(
+    checkout,
+    "node_modules",
+    "electron",
+    "Resources"
+  );
+  const getPath = (name: Parameters<App["getPath"]>[0]) =>
+    name === "home" ? home : appData;
+
+  for (const isPackaged of [false, true]) {
+    const protectedPaths = new ProtectedRoots(
+      NativeDesktopProfile.ordinaryChatProtectedPaths(
+        { getPath, isPackaged },
+        resources
+      )
+    );
+    expect(protectedPaths.overlaps(checkout)).toBe(isPackaged);
+    expect(protectedPaths.overlaps(path.join(home, ".aws"))).toBe(true);
+    expect(protectedPaths.overlaps(path.join(home, ".grida"))).toBe(true);
+    expect(protectedPaths.overlaps(path.join(appData, "Grida Dev"))).toBe(true);
+  }
+});
+
 it.skipIf(process.platform === "win32")(
-  "preserves staged development worker and helper through Forge startup cleanup",
+  "preserves Forge build outputs and stages private development resources outside the checkout",
   async () => {
-    const root = await fs.mkdtemp(
-      path.join(os.tmpdir(), "grida-dev-resources-")
+    const root = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-dev-resources-"))
     );
     try {
-      const resources = path.join(root, ".native-resources");
+      const checkout = path.join(root, "source");
+      const browser = path.join(root, "browser");
+      const privateResources = path.join(browser, "native-resources");
+      const resources = path.join(checkout, ".native-resources");
       const artifacts = path.join(root, "artifacts");
       const target = path.join(
         artifacts,
         `${process.platform}-${process.arch}`
       );
       await fs.mkdir(target, { recursive: true });
-      await fs.mkdir(resources);
+      await fs.mkdir(resources, { recursive: true });
+      await fs.mkdir(browser, { mode: 0o700 });
       const { fixtureBinary } = (await import(
         new URL(
           "../../../scripts/cli-release/native-fixture.mjs",
@@ -39,27 +73,79 @@ it.skipIf(process.platform === "win32")(
       for (const name of ["grida-agent", "agent-kit-sandbox-helper"])
         await fs.writeFile(path.join(target, name), binary);
       stageNativeAgent(resources, artifacts, process.platform, process.arch);
-      const disposable = path.join(root, ".vite", "build");
+      const programs = path.join(resources, "bundled-programs");
+      await fs.mkdir(path.join(programs, "bin"), { recursive: true });
+      await fs.writeFile(path.join(programs, "bin", "grida-fx"), binary, {
+        mode: 0o755,
+      });
+      await fs.writeFile(path.join(programs, "fx-version"), "0.9.0\n");
+      await fs.writeFile(path.join(programs, "FX-LICENSE"), "Test license.\n");
+      const disposable = path.join(checkout, ".vite", "build");
       await fs.mkdir(disposable, { recursive: true });
       await fs.writeFile(path.join(disposable, "stale.js"), "stale");
       const plugin = new VitePlugin({ build: [], renderer: [] });
-      plugin.setDirectories(root);
+      plugin.setDirectories(checkout);
       const hooks = plugin.getHooks().preStart;
       if (!Array.isArray(hooks) || !hooks[0])
         throw new Error("Forge startup hook unavailable");
       await hooks[0].call(null, {} as ResolvedForgeConfig);
-      await expect(fs.stat(path.join(root, ".vite"))).rejects.toMatchObject({
-        code: "ENOENT",
-      });
-      expect(NativeAgentProcess.executable(resources)).toBe(
-        path.join(resources, "native-agent", "grida-agent")
+      await expect(fs.stat(path.join(checkout, ".vite"))).rejects.toMatchObject(
+        { code: "ENOENT" }
       );
+
+      const profile = DesktopProfile.resolve(
+        { getAppPath: () => checkout, getPath: () => browser },
+        DesktopProfile.launch(false, false, {
+          platform: process.platform,
+          argv: [],
+        }),
+        {
+          platform: process.platform,
+          home: root,
+          environment: {},
+          resourcesPath: "",
+        }
+      );
+      const helper = path.join(
+        resources,
+        "native-agent",
+        "agent-kit-sandbox-helper"
+      );
+      await fs.rename(helper, path.join(target, "helper-backup"));
+      await fs.symlink(path.join(target, "helper-backup"), helper);
+      await expect(NativeDevelopmentResources.prepare(profile)).rejects.toThrow(
+        /ELOOP|native_development_resources_invalid/
+      );
+      await fs.unlink(helper);
+      await fs.rename(path.join(target, "helper-backup"), helper);
+
+      const runtime = await NativeDevelopmentResources.prepare(profile);
+      expect(runtime.resourcesPath).toBe(privateResources);
+      expect((await fs.stat(privateResources)).mode & 0o777).toBe(0o700);
+      expect(NativeAgentProcess.executable(runtime.resourcesPath)).toBe(
+        path.join(privateResources, "native-agent", "grida-agent")
+      );
+      verifyNativeAgent(privateResources, process.platform, process.arch);
       verifyNativeAgent(resources, process.platform, process.arch);
-      expect(
-        await fs.readFile(
-          path.join(resources, "native-agent", "agent-kit-sandbox-helper")
-        )
-      ).toEqual(binary);
+      for (const file of [
+        "native-agent/grida-agent",
+        "native-agent/agent-kit-sandbox-helper",
+        "bundled-programs/bin/grida-fx",
+        "bundled-programs/fx-version",
+        "bundled-programs/FX-LICENSE",
+      ]) {
+        const source = path.join(resources, file);
+        const destination = path.join(privateResources, file);
+        expect(await fs.readFile(destination)).toEqual(
+          await fs.readFile(source)
+        );
+        expect((await fs.stat(destination)).ino).not.toBe(
+          (await fs.stat(source)).ino
+        );
+      }
+      await expect(
+        NativeDevelopmentResources.prepare(profile)
+      ).resolves.toEqual(runtime);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

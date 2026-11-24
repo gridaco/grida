@@ -68,10 +68,12 @@ native executable or failed handshake leaves chat unavailable.
 Windows currently starts retained services with chat unavailable pending an
 ACL-aware native storage contract.
 
-Development startup builds and stages the Rust host and helper under
-`desktop/.native-resources/`, outside Forge's disposable `.vite` output. The
-staged executables survive Forge's startup cleanup. This preserves the original
-Cargo debug binaries and does not modify the shared Electron installation.
+Development builds stage the Rust host, sandbox helper, and bundled programs
+under `desktop/.native-resources/`, outside Forge's disposable `.vite` output.
+After acquiring the instance lock, Desktop copies those artifacts into private
+runtime storage in the development browser profile. The runtime paths stay
+stable across launches and outside the Grida source checkout, so developers
+can open the checkout as a workspace while executable write protections apply.
 
 Launching the Desktop app with
 `--disable-agent` selects media-only startup before the chat server is imported.

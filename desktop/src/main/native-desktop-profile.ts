@@ -28,7 +28,10 @@ export namespace NativeDesktopProfile {
     { installed: ProtectedRoots; all: ProtectedRoots }
   >();
 
-  export function ordinaryChatProtectedPaths(app: HostApp): readonly string[] {
+  export function ordinaryChatProtectedPaths(
+    app: Pick<App, "getPath" | "isPackaged">,
+    resourcesPath = process.resourcesPath
+  ): readonly string[] {
     const userHome = app.getPath("home");
     const { filesystem } = buildDaemonSandboxPolicy({
       user_data: path.join(home.dir({ home: userHome }), "agent"),
@@ -37,7 +40,9 @@ export namespace NativeDesktopProfile {
     return [
       ...filesystem.deny_read,
       ...new ProtectedRoots(installRoots(app)).metadataPaths(),
-      ...(process.resourcesPath ? [path.dirname(process.resourcesPath)] : []),
+      // Source runs use Electron from the checkout's dependencies. Only a
+      // packaged launch has an installed application to exclude from grants.
+      ...(app.isPackaged && resourcesPath ? [path.dirname(resourcesPath)] : []),
     ];
   }
 

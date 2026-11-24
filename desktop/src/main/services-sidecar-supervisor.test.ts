@@ -56,6 +56,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
       nativeChat: "ordinary",
       projectsRoot: path.join(root, "projects"),
       providerHome: gridaHome,
+      resourcesPath: path.join(userData, "native-resources"),
       temp: path.join(root, "temp"),
       userData,
       userHome: root,
@@ -178,6 +179,28 @@ describe("ServicesSidecarSupervisor recovery", () => {
       } finally {
         await fs.rm(root, { recursive: true, force: true });
       }
+    }
+  );
+
+  it.runIf(supportsNativeChat)(
+    "excludes the development runtime from file grants and daemon access",
+    async () => {
+      const launch = profile({ isPackaged: false });
+      const supervisor = new ServicesSidecarSupervisor(launch);
+      supervisor.selectNativeChat(true);
+      const state = supervisor as unknown as {
+        initSandbox(): Promise<void>;
+        nativeSandbox: RetainedServiceSandbox;
+        protectedFileRoots: readonly string[];
+      };
+      await state.initSandbox();
+
+      expect(state.protectedFileRoots).toContain(launch.resourcesPath);
+      const filesystem = state.nativeSandbox.configuration.filesystem;
+      expect(filesystem.denyRead).toContain(launch.resourcesPath);
+      expect(filesystem.denyWrite).toContain(launch.resourcesPath);
+      expect(filesystem.denyWrite).not.toContain(launch.userData);
+      supervisor.stop();
     }
   );
 

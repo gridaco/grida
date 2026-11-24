@@ -11,9 +11,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { App, IpcMainInvokeEvent, WebContents } from "electron";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
+import { DesktopProfile } from "./desktop-profile";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeChatProfiles } from "./native-chat-profiles";
+import { NativeDevelopmentResources } from "./native-development-resources";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeChatIpc } from "./native-chat-ipc";
 import { NativeChatSelections } from "./native-chat-selections";
@@ -353,7 +355,7 @@ it.skipIf(process.platform === "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform === "darwin")(
-  "refuses a private home root and never reuses a replaced ordinary workspace",
+  "opens a source checkout with private native resources and refuses protected or replaced roots",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-workspace-")
@@ -361,9 +363,10 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     const root = path.join(base, "workspace");
     const home = path.join(base, "home");
     const secret = path.join(home, ".ssh");
+    const appData = path.join(home, "app-data");
     const source = {
       userDataPath: path.join(base, "agent"),
-      desktopUserDataPath: path.join(base, "desktop"),
+      desktopUserDataPath: path.join(appData, "Grida Dev", "Browser"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -378,12 +381,49 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     };
     let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
     try {
+      await fs.mkdir(path.dirname(source.desktopUserDataPath), {
+        recursive: true,
+        mode: 0o700,
+      });
       await Promise.all(
         [root, ...Object.values(source)].map((directory) =>
           fs.mkdir(directory, { mode: 0o700 })
         )
       );
       await fs.mkdir(secret, { recursive: true, mode: 0o700 });
+      const getPath = (name: Parameters<App["getPath"]>[0]) =>
+        name === "home"
+          ? home
+          : name === "appData"
+            ? appData
+            : source.desktopUserDataPath;
+      const build = DesktopProfile.resolve(
+        { getAppPath: () => root, getPath },
+        DesktopProfile.launch(false, false, {
+          platform: process.platform,
+          argv: [],
+        }),
+        {
+          platform: process.platform,
+          home,
+          environment: {},
+          resourcesPath: "",
+        }
+      );
+      await fs.mkdir(build.resourcesPath, { mode: 0o700 });
+      await fs.cp(
+        path.join(resources!, "native-agent"),
+        path.join(build.resourcesPath, "native-agent"),
+        { recursive: true }
+      );
+      const runtime = await NativeDevelopmentResources.prepare(build);
+
+      const skill = path.join(root, ".agents", "skills", "workspace-review");
+      await fs.mkdir(skill, { recursive: true });
+      await fs.writeFile(
+        path.join(skill, "SKILL.md"),
+        "---\nname: workspace-review\ndescription: Review the workspace.\n---\nReview the project.\n"
+      );
       sidecar.selectNativeChat.mockReturnValue({
         ...source,
         configHome: source.providerHome,
@@ -398,12 +438,10 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       sidecar.findWorkspace.mockResolvedValue(workspace);
       const { NativeDesktopAgent } = await import("./native-desktop-agent");
       const { NativeDesktopProfile } = await import("./native-desktop-profile");
-      const protectedPaths = NativeDesktopProfile.ordinaryChatProtectedPaths({
-        commandLine: { getSwitchValue: () => "" },
-        setPath: () => {},
-        getPath: (name: Parameters<App["getPath"]>[0]) =>
-          name === "home" ? home : base,
-      });
+      const protectedPaths = NativeDesktopProfile.ordinaryChatProtectedPaths(
+        { isPackaged: false, getPath },
+        path.join(root, "node_modules", "electron", "Resources")
+      );
       expect(protectedPaths).toEqual(
         expect.arrayContaining([secret, path.join(home, ".aws")])
       );
@@ -418,7 +456,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
               organization: { id: 1 },
             }),
         }),
-        resources!,
+        runtime.resourcesPath,
         protectedPaths,
         { openExternal: async () => {} }
       );
@@ -428,6 +466,21 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       });
       await expect(agent.ensure(workspace.id)).rejects.toThrow(
         "native_workspace_root_denied"
+      );
+      sidecar.findWorkspace.mockResolvedValueOnce({
+        ...workspace,
+        root: secret,
+      });
+      await expect(agent.skills(workspace.id)).rejects.toThrow(
+        "native_workspace_root_denied"
+      );
+      await expect(agent.skills(workspace.id)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "workspace-review",
+            source: "project_agents",
+          }),
+        ])
       );
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
       await agent.ensure(workspace.id);

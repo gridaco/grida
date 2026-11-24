@@ -58,6 +58,7 @@ import { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeAgentProcess } from "./main/native-agent-process";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
+import { NativeDevelopmentResources } from "./main/native-development-resources";
 import { configurationErrorMessage } from "./main/native-agent-config";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
@@ -789,7 +790,6 @@ app.on("ready", async () => {
   // Capture the login-shell environment alongside hosted window startup.
   void NativeCommandProfiles.programEnvironment();
   const ordinaryNativeChat = profile.nativeChat === "ordinary";
-  const nativeResources = profile.resourcesPath;
   let externalProfile: string | undefined;
   try {
     externalProfile = NativeExternalRuns.launchProfile(
@@ -841,6 +841,7 @@ app.on("ready", async () => {
   if (nativeProfile) {
     try {
       const provider = await NativeDesktopProfile.configure(app, profile);
+      profile = await NativeDevelopmentResources.prepare(profile);
       configureServicesSidecar(profile);
       const mcp = await NativeMcpLaunch.configure(
         process.argv,
@@ -897,7 +898,7 @@ app.on("ready", async () => {
         };
         nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
           accountSession,
-          nativeResources,
+          profile.resourcesPath,
           options
         );
       }
@@ -908,7 +909,7 @@ app.on("ready", async () => {
           NativeExternalRuns.open({
             ...access,
             profileFile,
-            resourcesPath: nativeResources,
+            resourcesPath: profile.resourcesPath,
             packaged: app.isPackaged,
           })
         );
@@ -934,7 +935,7 @@ app.on("ready", async () => {
         nativeEditorMcp = await NativeEditorMcpExport.start(
           process.argv,
           profile.userData,
-          nativeResources,
+          profile.resourcesPath,
           {
             editorOrigin: new URL(profile.editorBaseUrl).origin,
             admits: (sender) => {
@@ -962,6 +963,16 @@ app.on("ready", async () => {
       return;
     }
   } else {
+    try {
+      profile = await NativeDevelopmentResources.prepare(profile);
+    } catch {
+      dialog.showErrorBox(
+        "Grida couldn’t start",
+        "The native development tools couldn’t be staged. Start Grida with the Desktop development command to rebuild the tools, then check the browser profile directory if the problem persists."
+      );
+      app.quit();
+      return;
+    }
     configureServicesSidecar(profile);
     nativeDocuments = ordinarySelectedSvgFiles(profile);
     if (ordinaryNativeChat) {
@@ -970,7 +981,7 @@ app.on("ready", async () => {
           NativeDesktopProfile.ordinaryChatProtectedPaths(app);
         nativeDesktopAgent = await NativeDesktopAgent.prepareOrdinary(
           accountSession,
-          nativeResources,
+          profile.resourcesPath,
           protectedPaths,
           {
             onLifecycle: onNativeLifecycle,
@@ -1103,8 +1114,8 @@ app.on("ready", async () => {
     open_settings: (section) =>
       open_or_focus_settings(app, windowAdmission, section),
     voice,
-    archives: createDesktopArchives(native, nativeResources),
-    chat_catalog: createDesktopChatCatalog(native, nativeResources),
+    archives: createDesktopArchives(native, profile.resourcesPath),
+    chat_catalog: createDesktopChatCatalog(native, profile.resourcesPath),
     open_restored_chat: (workspaceId, sessionId) =>
       focusNativeChat(workspaceId, { sessionId }, windowAdmission),
     global_hooks: native?.globalHooks,
@@ -1126,7 +1137,7 @@ app.on("ready", async () => {
       ensure_native_chat: (workspaceId, requireCurrent) =>
         native.ensure(workspaceId, requireCurrent),
       supports_automatic_approval_review: () =>
-        NativeAgentProcess.supportsScopedApprovals(nativeResources),
+        NativeAgentProcess.supportsScopedApprovals(profile.resourcesPath),
       native_chat_skills: (workspaceId) => native.skills(workspaceId),
       resolve_welcome_chat_workspace: (workspaceId) =>
         native.welcomeWorkspace(workspaceId),

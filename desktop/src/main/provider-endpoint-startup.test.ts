@@ -150,6 +150,7 @@ function setup() {
     nativeChat: "ordinary",
     projectsRoot: path.join(fixture.root, "projects"),
     providerHome: agent,
+    resourcesPath: path.join(fixture.root, "resources"),
     temp: path.join(fixture.root, "temp"),
     userData: browser,
     userHome: path.join(fixture.root, "home"),

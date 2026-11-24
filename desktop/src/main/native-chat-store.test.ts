@@ -73,6 +73,7 @@ async function fixture(nativeChat: "ordinary" | "preview" = "preview") {
       nativeChat,
       projectsRoot: path.join(root, "projects"),
       providerHome: agent,
+      resourcesPath: launch.resourcesPath,
       temp: electron.temp,
       userData: electron.userData,
       userHome: root,

@@ -997,13 +997,20 @@ pixels through this reader, with no additional filesystem or model grant.
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
   builds the locked Rust host and helper, strips only staged copies and verifies
-  their executable format through the same package stager. Main selects that
-  fixed private development location outside Forge's disposable output or
-  packaged resources, never a PATH lookup. Actual Forge cleanup tests preserve
-  the staged worker/helper and retain the same launch-time resource checks.
+  their executable format through the same package stager. After taking the
+  instance lock, [Main stages the fixed payload](desktop/src/main/native-development-resources.ts)
+  in private development profile storage outside the checkout and uses those
+  paths for the native launch. The retained sidecar excludes the private
+  runtime from file grants and denies access in its OS sandbox. Packaged
+  launches use the installed resources.
+  Forge cleanup tests cover the build inputs and the private runtime copies.
   Ordinary macOS/Linux launches select native chat in either channel. The
   supervisor never starts the historical chat runtime; unavailable native chat
   cannot silently enable it.
+  Ordinary chat excludes installed application resources in packaged launches.
+  In a source run, the workspace may contain the checkout's Electron
+  dependencies and native build inputs. Native executable write protections and
+  private state and credential exclusions apply in both launches.
   Windows retains non-chat services and withholds chat until native private
   storage is supported. This does not establish Windows kernel containment.
 

@@ -48,6 +48,7 @@ type SidecarProfile = Pick<
   | "nativeChat"
   | "projectsRoot"
   | "providerHome"
+  | "resourcesPath"
   | "temp"
   | "userData"
   | "userHome"
@@ -328,7 +329,16 @@ export class ServicesSidecarSupervisor {
     const protectedRoots = preview
       ? NativeDesktopProfile.protectedRoots(app)
       : NativeDesktopProfile.installedRootsForDevelopment(app, this.profile);
-    this.protectedStateRoots = protectedRoots?.canonicalPaths() ?? [];
+    // Ordinary development launches execute private copies beside chat state.
+    // Protect those copies without taking away the sidecar's other file roots.
+    const developmentRuntime =
+      !this.profile.isPackaged && this.profile.nativeChat === "ordinary"
+        ? [this.profile.resourcesPath]
+        : [];
+    this.protectedStateRoots = [
+      ...(protectedRoots?.canonicalPaths() ?? []),
+      ...developmentRuntime,
+    ];
     const chatState = path.join(
       this.profile.userData,
       NativeDesktopProfile.chatStateDirectory
@@ -370,6 +380,7 @@ export class ServicesSidecarSupervisor {
       desktopStateRoot: nativeStateRoot,
       protectedStateRoots: [
         ...(protectedRoots?.metadataPaths() ?? []),
+        ...developmentRuntime,
         endpointConsent,
       ],
       catalogueDirectory: this.profile.catalogueDirectory,
