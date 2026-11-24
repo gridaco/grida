@@ -118,6 +118,9 @@ attachment also keeps it with an explanation instead of omitting it.
    - Expected: the workspace sends the original request and attachment once in
      Plan with the chosen effort. A connection that cannot accept the image
      keeps the complete draft with an explanation and sends nothing.
+   - Repeat with two images and text. Start typing the next draft while the
+     workspace opens. The two images and original text appear on the first
+     message. The composer shows only the text typed after Send.
 8. Reload while an attachment-bearing request is waiting for startup.
    - Expected: the retained attachment card asks for reattachment. The text is
      kept and no text-only request starts. Remove or reattach the file to proceed.

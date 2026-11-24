@@ -52,7 +52,9 @@ pub(super) const CONVERSATIONS: ConversationProjection = ConversationProjection 
                     || (message.id.as_str().starts_with("steer/")
                         && matches!(
                             message.provenance.source.as_str(),
-                            "native-client" | message_context::SUPPLIED_SOURCE
+                            "native-client"
+                                | message_context::SUPPLIED_SOURCE
+                                | super::queue_actions::STEERING_SOURCE
                         )))
         }
         _ => false,

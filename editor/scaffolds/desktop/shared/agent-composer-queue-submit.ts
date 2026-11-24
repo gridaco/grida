@@ -1,10 +1,12 @@
 import equal from "deep-equal";
 import type { ComposerMessage } from "@/kits/composer";
 
+type SubmissionScope = object | string | number | undefined;
+
 export type AgentComposerQueueSubmitLease = {
   readonly lifecycle: number;
   readonly sequence: number;
-  readonly scope: string | number | undefined;
+  readonly scope: SubmissionScope;
 };
 
 /**
@@ -20,28 +22,45 @@ export class AgentComposerQueueSubmitGuard {
   private sequence = 0;
   private mounted = false;
   private active: AgentComposerQueueSubmitLease | null = null;
+  private readonly listeners = new Set<() => void>();
 
-  mount(): void {
-    if (this.mounted) return;
-    this.lifecycle += 1;
-    this.mounted = true;
+  readonly read = () => this.active;
+
+  readonly subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  private publish(): void {
+    this.listeners.forEach((listener) => listener());
   }
+
+  readonly mount = () => {
+    if (!this.mounted) {
+      this.lifecycle += 1;
+      this.mounted = true;
+    }
+    return () => this.unmount();
+  };
 
   unmount(): void {
     if (!this.mounted) return;
     this.mounted = false;
-    this.active = null;
+    if (this.active) {
+      this.active = null;
+      this.publish();
+    }
   }
 
   get inFlight(): boolean {
     return this.active !== null;
   }
 
-  inFlightFor(scope: string | number | undefined): boolean {
+  inFlightFor(scope: SubmissionScope): boolean {
     return this.active !== null && Object.is(this.active.scope, scope);
   }
 
-  begin(scope?: string | number): AgentComposerQueueSubmitLease | null {
+  begin(scope?: SubmissionScope): AgentComposerQueueSubmitLease | null {
     if (!this.mounted) return null;
     if (this.active && Object.is(this.active.scope, scope)) return null;
     const lease = {
@@ -52,12 +71,13 @@ export class AgentComposerQueueSubmitGuard {
     // A real session rebind supersedes an acknowledgement for the prior
     // session. Its promise may still settle, but identity checks make it inert.
     this.active = lease;
+    this.publish();
     return lease;
   }
 
   owns(
     lease: AgentComposerQueueSubmitLease,
-    scope: string | number | undefined = lease.scope
+    scope: SubmissionScope = lease.scope
   ): boolean {
     return (
       this.mounted &&
@@ -67,13 +87,11 @@ export class AgentComposerQueueSubmitGuard {
     );
   }
 
-  /**
-   * Release the current lease. `true` means the owner is still mounted, so its
-   * caller may safely commit React state for this settlement.
-   */
+  /** Release the current lease if it still owns the submission. */
   finish(lease: AgentComposerQueueSubmitLease): boolean {
     if (!this.owns(lease)) return false;
     this.active = null;
+    this.publish();
     return true;
   }
 }

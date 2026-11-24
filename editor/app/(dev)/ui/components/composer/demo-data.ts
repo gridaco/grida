@@ -233,15 +233,22 @@ export function toAttachment(file: MockItem): ComposerAttachmentInput {
   };
 }
 
-export const samplePdfAttachmentId = "sample-project-brief";
+const samplePdfPoster = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="68" viewBox="0 0 96 68">
+    <rect x="16" y="8" width="64" height="65" rx="3" fill="white" stroke="#e5e5e5"/>
+    <rect x="22" y="14" width="52" height="12" rx="2" fill="#e0f2fe"/>
+    <text x="22" y="38" font-family="sans-serif" font-size="6" font-weight="600" fill="#262626">Project brief</text>
+    <path d="M22 43h49m-49 4h43m-43 4h30" stroke="#d4d4d4"/>
+  </svg>`
+)}`;
 
 export const demoStartingAttachments: readonly ComposerAttachmentInput[] = [
   toAttachment(folders[0]),
   toAttachment(files[0]),
   {
-    id: samplePdfAttachmentId,
     name: "Project brief.pdf",
     mime: "application/pdf",
+    poster: samplePdfPoster,
   },
   {
     name: "Research notes.hwp",

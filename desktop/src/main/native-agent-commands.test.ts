@@ -120,6 +120,86 @@ describe("native chat commands", () => {
       ],
     ]);
   });
+  it("returns identified compaction admission and the no-change outcome", async () => {
+    const request =
+      vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+    const admission = {
+      requestId: "start-a",
+      status: "admitted",
+      turnId: "compact/observed",
+    };
+    const empty = {
+      requestId: "start-b",
+      status: "no_change",
+      turnId: null,
+    };
+    request.mockResolvedValueOnce(admission).mockResolvedValueOnce(empty);
+    const commands = new NativeAgentCommands(request);
+    const session = { id: "source" };
+    const check = vi.fn<() => void>();
+    await expect(
+      commands.startCompaction(session, admission.requestId, check)
+    ).resolves.toEqual(admission);
+    await expect(
+      commands.startCompaction(session, empty.requestId, check)
+    ).resolves.toEqual(empty);
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls).toEqual([
+      [
+        "_co.grida/session/compact/start",
+        { sessionId: "source", requestId: "start-a" },
+      ],
+      [
+        "_co.grida/session/compact/start",
+        { sessionId: "source", requestId: "start-b" },
+      ],
+    ]);
+  });
+
+  it.each([
+    { requestId: "different", status: "admitted", turnId: "compact/observed" },
+    { requestId: "exact", status: "admitted", turnId: null },
+    { requestId: "exact", status: "no_change", turnId: "compact/observed" },
+    { requestId: "exact", status: "installed", turnId: "compact/observed" },
+  ])(
+    "treats a malformed compaction admission as unconfirmed: %j",
+    async (reply) => {
+      const commands = new NativeAgentCommands(async () => reply);
+      await expect(
+        commands.startCompaction({ id: "source" }, "exact", () => {})
+      ).rejects.toThrow("native_chat_command_unverified");
+    }
+  );
+
+  it.each([
+    ["native_agent_request_timeout", "native_chat_command_unverified"],
+    ["compaction_admission_pending", "native_chat_command_unverified"],
+    ["native_agent_request_failed", "native_chat_command_unverified"],
+    ["session_turn_active", "session_turn_active"],
+  ])(
+    "distinguishes unresolved admission from refusal: %s",
+    async (code, expected) => {
+      const request =
+        vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+      const admission = {
+        requestId: "exact",
+        status: "admitted",
+        turnId: "compact/observed",
+      };
+      request
+        .mockRejectedValueOnce(new Error(code))
+        .mockResolvedValueOnce(admission);
+      const commands = new NativeAgentCommands(request);
+      const session = { id: "source" };
+      await expect(
+        commands.startCompaction(session, admission.requestId, () => {})
+      ).rejects.toThrow(expected);
+      await expect(
+        commands.startCompaction(session, admission.requestId, () => {})
+      ).resolves.toEqual(admission);
+      expect(request.mock.calls[0]).toEqual(request.mock.calls[1]);
+    }
+  );
 });
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
@@ -231,23 +311,43 @@ it.runIf(Boolean(packaged))(
         )
       ).toBe(true);
       const compactId = randomUUID();
-      const pending = ipc.runCommand(
+      const admission = await ipc.startCompaction(
         event,
         source.attachmentId,
-        "compact",
         compactId
       );
+      expect(admission).toMatchObject({
+        status: "admitted",
+        requestId: compactId,
+      });
+      expect(
+        await ipc.startCompaction(event, source.attachmentId, compactId)
+      ).toEqual(admission);
       await vi.waitFor(() => expect(requests).toHaveLength(2), {
         timeout: 5000,
       });
       const current = await ipc.observe(event, source.attachmentId);
-      expect(current.snapshot.current?.turnId).toMatch(/^compact\//);
+      expect(current.snapshot.compactionStart).toBe(true);
+      expect(current.snapshot.current?.turnId).toBe(admission.turnId);
       await ipc.control(event, source.attachmentId, {
         action: "stop",
         observationId: current.observationId,
         requestId: randomUUID(),
       });
-      const outcome = await pending;
+      await vi.waitFor(
+        async () => {
+          const observed = await ipc.observe(event, source.attachmentId);
+          expect(observed.snapshot.current).toBeNull();
+          expect(observed.snapshot.latest?.turnId).toBe(admission.turnId);
+        },
+        { timeout: 5000 }
+      );
+      const outcome = await ipc.runCommand(
+        event,
+        source.attachmentId,
+        "compact",
+        compactId
+      );
       expect(outcome).toMatchObject({
         command: "compact",
         status: "uncertain",

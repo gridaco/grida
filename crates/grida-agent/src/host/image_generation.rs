@@ -190,6 +190,10 @@ pub(super) struct Prepared {
 }
 
 impl Prepared {
+    pub(super) fn has_attachment(&self) -> bool {
+        self.attachment.is_some()
+    }
+
     pub(super) fn workspace_reference(&self) -> bool {
         self.workspace_reference
     }

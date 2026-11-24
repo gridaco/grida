@@ -6,7 +6,7 @@ import type {
   NativeChatMessageAttachment,
 } from "@grida/desktop-bridge";
 import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
-import { FileIcon, ImageIcon, ListEndIcon } from "lucide-react";
+import { ListEndIcon } from "lucide-react";
 import {
   HoverCard,
   HoverCardContent,
@@ -81,11 +81,15 @@ export function NativeQueuedMessagePreview({
           onClick={() => controller.setOpen(!state.open)}
         >
           <ListEndIcon className="size-4 shrink-0 text-muted-foreground" />
-          <AttachmentIndicator
-            attachments={attachments}
-            source={state.image}
-            onError={controller.imageFailed}
-          />
+          {state.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={state.image}
+              alt={imageName ?? "Queued image"}
+              onError={controller.imageFailed}
+              className="size-7 shrink-0 rounded-md object-cover"
+            />
+          )}
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </button>
       </HoverCardTrigger>
@@ -303,40 +307,6 @@ export namespace NativeQueuedMessagePreview {
       ? source
       : null;
   }
-}
-
-function AttachmentIndicator({
-  attachments,
-  source,
-  onError,
-}: {
-  attachments: readonly NativeChatMessageAttachment[];
-  source: string | null;
-  onError: () => void;
-}) {
-  if (source)
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={source}
-        alt={imageName(attachments)}
-        onError={onError}
-        className="size-7 shrink-0 rounded-md object-cover"
-      />
-    );
-  if (attachments.some((entry) => entry.mimeType?.startsWith("image/")))
-    return (
-      <ImageIcon
-        aria-label="Image attachment"
-        className="size-4 shrink-0 text-muted-foreground"
-      />
-    );
-  return attachments.length ? (
-    <FileIcon
-      aria-label="File attachment"
-      className="size-4 shrink-0 text-muted-foreground"
-    />
-  ) : null;
 }
 
 function imageName(

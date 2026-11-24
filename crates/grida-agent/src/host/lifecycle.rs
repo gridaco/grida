@@ -431,6 +431,7 @@ mod tests {
             Active {
                 turn,
                 admitted,
+                queued_steer: None,
                 handle: finishing.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,
@@ -731,6 +732,7 @@ mod tests {
             Active {
                 turn: TurnId::new("finishing").unwrap(),
                 admitted: true,
+                queued_steer: None,
                 handle: finishing.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,

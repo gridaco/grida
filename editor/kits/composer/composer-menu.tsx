@@ -3,6 +3,7 @@
 import {
   createContext,
   type HTMLAttributes,
+  type MouseEvent,
   type ReactNode,
   type Ref,
   useContext,
@@ -37,11 +38,29 @@ const Anchor = createContext<HTMLElement | null>(null);
 export function ComposerMenuAnchor({
   children,
   className,
+  onClick,
   onPointerDown,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
   const { editor } = useComposerInternals();
+  const focusDraft = (event: MouseEvent<HTMLDivElement>) => {
+    const { currentTarget, target } = event;
+    if (
+      !editor?.isEditable ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      !(target instanceof Element) ||
+      !currentTarget.contains(target)
+    )
+      return;
+    const control = target.closest(
+      "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu], [data-composer-formatting]"
+    );
+    if (control && currentTarget.contains(control)) return;
+    event.preventDefault();
+    editor.commands.focus("end");
+  };
   return (
     <Anchor.Provider value={anchor}>
       <div
@@ -51,21 +70,17 @@ export function ComposerMenuAnchor({
         data-composer-menu-anchor
         onPointerDown={(event) => {
           onPointerDown?.(event);
-          const { currentTarget, target } = event;
+          focusDraft(event);
+        }}
+        onClick={(event) => {
+          onClick?.(event);
+          // Clicks without pointer-down also activate the composer surface.
           if (
-            !editor?.isEditable ||
-            event.defaultPrevented ||
-            event.button !== 0 ||
-            !(target instanceof Element) ||
-            !currentTarget.contains(target)
+            !editor?.view.hasFocus() &&
+            event.currentTarget.ownerDocument.getSelection()?.isCollapsed !==
+              false
           )
-            return;
-          const control = target.closest(
-            "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu], [data-composer-formatting]"
-          );
-          if (control && currentTarget.contains(control)) return;
-          event.preventDefault();
-          editor.commands.focus("end");
+            focusDraft(event);
         }}
       >
         {children}

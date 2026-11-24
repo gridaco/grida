@@ -14,6 +14,7 @@ import {
 import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
 import { NativeToolImages } from "./native-tool-images";
+import { NativeAttachmentBatch } from "./native-attachment-batch";
 import type {
   DesktopComposerPredictionSettings,
   NativeChatAcceptance,
@@ -23,6 +24,7 @@ import type {
   NativeChatCatalogEntry,
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatCompactionAdmission,
   NativeChatControlReceipt,
   NativeChatEffort,
   NativeChatGoalObservation,
@@ -42,6 +44,7 @@ import type {
   NativeChatQuestionAnswer,
   NativeChatSingleQuestionAnswer,
   NativeChatQueueChange,
+  NativeChatQueueCheckoutRequest,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatReadiness,
@@ -194,6 +197,7 @@ export type ActiveNativeChat = Readonly<{
         | "ownsSession"
         | "commands"
         | "runCommand"
+        | "startCompaction"
         | "prepareRevision"
         | "revise"
         | "listSubagents"
@@ -211,9 +215,17 @@ export type ActiveNativeChat = Readonly<{
         | "queuedMessage"
         | "acceptsQueuedTextReplacement"
         | "readQueuedAttachmentPreview"
+        | "checkoutQueued"
+        | "reinsertQueued"
+        | "readQueueCheckout"
+        | "readQueueCheckoutPreview"
+        | "queueActionReceipt"
+        | "steerQueued"
         | "acceptsSelectedImage"
         | "supportsSelectedImage"
         | "submitSelectedImage"
+        | "acceptsAttachments"
+        | "submitAttachments"
         | "acceptsLibrarySelection"
         | "submitWithLibrarySelection"
         | "librarySelections"
@@ -2072,6 +2084,29 @@ export class NativeChatIpc {
     return result;
   }
 
+  async startCompaction(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    requestId: unknown
+  ): Promise<NativeChatCompactionAdmission> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if (!token(requestId)) throw new Error("native_chat_command_invalid");
+    const chat = owner.active.chat;
+    if (!chat.startCompaction)
+      throw new Error("native_chat_command_unavailable");
+    const admission = await chat.startCompaction(
+      attachment.session,
+      requestId,
+      () => this.revalidate(owner, attachment)
+    );
+    try {
+      this.revalidate(owner, attachment);
+    } catch (cause) {
+      throw new Error("native_chat_command_unverified", { cause });
+    }
+    return admission;
+  }
+
   prepareRevision(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -3225,6 +3260,44 @@ export class NativeChatIpc {
     return this.owner(event).active.chat.acceptsFileReference;
   }
 
+  acceptsAttachments(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsAttachments === true;
+  }
+
+  async submitAttachments(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ): Promise<NativeChatAcceptance> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const input = record(value);
+    const chat = owner.active.chat;
+    const submit = chat.submitAttachments;
+    if (!submit || !chat.acceptsAttachments)
+      throw new Error("native_chat_attachments_unavailable");
+    if (
+      !input ||
+      typeof input.inputId !== "string" ||
+      !Array.isArray(input.attachments)
+    )
+      throw new Error("native_chat_attachments_invalid");
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      input.inputId,
+      input.selectionRevision,
+      input.webSearch,
+      NativeAttachmentBatch.hasImage(input.attachments) ? "selected" : undefined
+    );
+    if (prior) return prior;
+    const requireCurrent = () => this.revalidate(owner, attachment);
+    const result = await this.admit(owner, attachment, () =>
+      submit.call(chat, attachment.session, input, requireCurrent)
+    );
+    requireCurrent();
+    return result;
+  }
+
   async inspectHooks(
     event: IpcMainInvokeEvent,
     attachmentId?: string
@@ -3820,6 +3893,155 @@ export class NativeChatIpc {
         (this.readingInputImages.get(owner) ?? 1) - 1
       );
     }
+  }
+
+  async checkoutQueued(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const input = queuedAction(value);
+    const snapshot = requireObservation(attachment, input.observationId);
+    const checkout = owner.active.chat.checkoutQueued;
+    if (!checkout) throw new Error("native_chat_queue_checkout_unavailable");
+    const result = await this.admit(owner, attachment, () =>
+      checkout.call(owner.active.chat, attachment.session, snapshot, input)
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async reinsertQueued(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const value = record(input);
+    if (
+      !value ||
+      !Object.hasOwn(value, "checkoutId") ||
+      typeof value.checkoutId !== "string" ||
+      !Object.hasOwn(value, "requestId") ||
+      typeof value.requestId !== "string" ||
+      (value.text !== undefined && typeof value.text !== "string") ||
+      (value.attachments !== undefined && !Array.isArray(value.attachments)) ||
+      Object.keys(value).some(
+        (key) =>
+          key !== "checkoutId" &&
+          key !== "requestId" &&
+          key !== "text" &&
+          key !== "attachments"
+      )
+    )
+      throw new Error("native_chat_queue_change_invalid");
+    const reinsert = owner.active.chat.reinsertQueued;
+    if (!reinsert) throw new Error("native_chat_queue_checkout_unavailable");
+    const request = {
+      checkoutId: value.checkoutId,
+      requestId: value.requestId,
+      ...(value.text !== undefined && { text: value.text }),
+      ...(value.attachments !== undefined && {
+        attachments: value.attachments,
+      }),
+    };
+    const requireCurrent = () => this.revalidate(owner, attachment);
+    const result = await this.admit(owner, attachment, () =>
+      reinsert.call(
+        owner.active.chat,
+        attachment.session,
+        request,
+        ...(request.attachments === undefined ? [] : [requireCurrent])
+      )
+    );
+    requireCurrent();
+    return result;
+  }
+
+  async readQueueCheckout(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    checkoutId: unknown,
+    inputId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const read = owner.active.chat.readQueueCheckout;
+    if (!read || typeof checkoutId !== "string" || typeof inputId !== "string")
+      throw new Error("native_chat_queue_checkout_unavailable");
+    const result = await read.call(
+      owner.active.chat,
+      attachment.session,
+      checkoutId,
+      inputId
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async readQueueCheckoutPreview(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    checkoutId: unknown,
+    previewId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const read = owner.active.chat.readQueueCheckoutPreview;
+    if (!read || typeof checkoutId !== "string" || !token(previewId))
+      throw new Error("native_chat_queue_checkout_unavailable");
+    const reading = this.readingInputImages.get(owner) ?? 0;
+    if (reading >= 8) throw new Error("native_chat_input_image_busy");
+    this.readingInputImages.set(owner, reading + 1);
+    try {
+      const result = await read.call(
+        owner.active.chat,
+        attachment.session,
+        checkoutId,
+        previewId
+      );
+      this.revalidate(owner, attachment);
+      return result;
+    } finally {
+      this.readingInputImages.set(
+        owner,
+        (this.readingInputImages.get(owner) ?? 1) - 1
+      );
+    }
+  }
+
+  async queueActionReceipt(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    requestId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const read = owner.active.chat.queueActionReceipt;
+    if (!read || typeof requestId !== "string")
+      throw new Error("native_chat_queue_checkout_unavailable");
+    const receipt = await read.call(
+      owner.active.chat,
+      attachment.session,
+      requestId
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
+  }
+
+  async steerQueued(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const input = queuedAction(value);
+    const snapshot = requireObservation(attachment, input.observationId);
+    const steer = owner.active.chat.steerQueued;
+    if (!steer) throw new Error("native_chat_queued_steering_unavailable");
+    const receipt = await this.admit(owner, attachment, () =>
+      steer.call(owner.active.chat, attachment.session, snapshot, input)
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
   }
 
   async editQueue(
@@ -4938,6 +5160,7 @@ function sameBasis(
 ): boolean {
   return (
     left.sessionRevision === right.sessionRevision &&
+    left.queueActionRevision === right.queueActionRevision &&
     left.current?.turnId === right.current?.turnId &&
     left.current?.epoch === right.current?.epoch &&
     left.current?.journalPosition === right.current?.journalPosition &&
@@ -5032,6 +5255,23 @@ function requireObservation(
   const snapshot = token(id) ? attachment.observations.get(id) : undefined;
   if (!snapshot) throw new Error("native_chat_observation_unavailable");
   return snapshot;
+}
+
+function queuedAction(input: unknown): NativeChatQueueCheckoutRequest {
+  const value = record(input);
+  if (
+    !value ||
+    Object.keys(value).length !== 3 ||
+    !token(value.observationId) ||
+    typeof value.inputId !== "string" ||
+    typeof value.requestId !== "string"
+  )
+    throw new Error("native_chat_queue_change_invalid");
+  return {
+    observationId: value.observationId,
+    inputId: value.inputId,
+    requestId: value.requestId,
+  };
 }
 
 function queueChange(input: unknown): NativeChatQueueChange {

@@ -1,7 +1,5 @@
 "use client";
 
-import type { JSONContent } from "@tiptap/core";
-
 import { Kbd } from "@app/ui/components/kbd";
 import { cn } from "@app/ui/lib/utils";
 import markdownStyles from "@/components/chat-markdown.module.css";
@@ -35,6 +33,8 @@ import {
 } from "./composer-core";
 import { ComposerFormattingMenu } from "./composer-formatting-menu";
 import { ComposerTiptap } from "./composer-tiptap";
+import { ComposerTiptapHistory } from "./composer-tiptap-history";
+import type { ComposerHistory } from "./composer-history";
 import { ComposerTransfer } from "./composer-transfer";
 import "@/components/chat-web-link.css";
 import "./composer-content.css";
@@ -60,16 +60,27 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  clearForHistory: (sent?: {
+    draft: ComposerHistory.Draft;
+    text: string;
+  }) => void;
+  readHistoryDraft: () => ComposerHistory.Draft | undefined;
+  guardHistoryDocument: () => () => boolean;
+  configureHistory: (binding: ComposerTiptapHistory.Binding) => void;
+  /** Add a reversible non-text action to this editor's undo history. */
+  recordHistoryEffect: (apply: (forward: boolean) => void) => boolean;
   /** Whether an inline suggestion can occupy the empty editable paragraph. */
   isEmptyDraft: () => boolean;
   /** The editor's document, or null when it is empty. */
   readDocument: () => unknown | null;
   /** Restore a saved document into an empty editor. False when not applied. */
   restoreDocument: (doc: unknown) => boolean;
+  /** `onHistoryChange` receives true on append or redo, and false on undo. */
   appendText: (
     text: string,
     maxBytes: number,
-    placement?: "paragraph" | "inline"
+    placement?: "paragraph" | "inline",
+    onHistoryChange?: (forward: boolean) => void
   ) => boolean;
   /** Put the caret at the end of the draft. False before the editor exists. */
   focus: () => boolean;
@@ -158,6 +169,26 @@ export function useComposer() {
         editor?.commands.clearContent(true);
         core.clear();
       },
+      clearForHistory(sent) {
+        if (editor) ComposerTiptapHistory.for(editor).clear(sent);
+        core.clear();
+      },
+      readHistoryDraft() {
+        return editor ? ComposerTiptapHistory.for(editor).read() : undefined;
+      },
+      guardHistoryDocument() {
+        return editor
+          ? ComposerTiptapHistory.for(editor).guardDocument()
+          : () => false;
+      },
+      configureHistory(binding) {
+        if (editor) ComposerTiptapHistory.for(editor).configure(binding);
+      },
+      recordHistoryEffect(apply) {
+        if (!editor || editor.isDestroyed) return false;
+        ComposerTiptapHistory.for(editor).recordStandaloneEffect(apply);
+        return true;
+      },
       isEmptyDraft() {
         const current = core.getSnapshot();
         return (
@@ -174,19 +205,23 @@ export function useComposer() {
       restoreDocument(doc) {
         if (!editor || !editor.isEmpty) return false;
         try {
-          editor.commands.setContent(doc as JSONContent, true);
-          // Continue typing at the end of the restored text.
-          editor.commands.setTextSelection(editor.state.doc.content.size);
+          ComposerTiptapHistory.for(editor).restore(doc);
         } catch {
           return false;
         }
         ComposerTiptap.syncCore(core, editor);
         return true;
       },
-      appendText(text, maxBytes, placement) {
+      appendText(text, maxBytes, placement, onHistoryChange) {
         return (
           !!editor &&
-          ComposerTiptap.appendText(editor, text, maxBytes, placement)
+          ComposerTiptap.appendText(
+            editor,
+            text,
+            maxBytes,
+            placement,
+            onHistoryChange
+          )
         );
       },
       focus() {

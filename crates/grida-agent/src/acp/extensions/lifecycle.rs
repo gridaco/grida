@@ -40,6 +40,7 @@ struct Enqueue {
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
     selected_image: Option<crate::host::SelectedImage>,
+    attachments: Option<Vec<attachments::Attachment>>,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
@@ -235,6 +236,15 @@ pub(super) fn handlers(
                         &enqueue.1,
                         request.editor_endpoint_id.is_some(),
                     )?;
+                    if let Some(items) = request.attachments {
+                        attachments::append(
+                            &mut parts,
+                            items,
+                            &enqueue.1,
+                            &request.session_id,
+                            request.editor_endpoint_id.is_some(),
+                        )?;
+                    }
                     append_editor_context(&mut parts, request.editor_context, &enqueue.1)?;
                     append_message_context(&mut parts, request.message_context, &enqueue.1)?;
                     let (questions, question_batches) =
@@ -286,13 +296,33 @@ pub(super) fn handlers(
             async move |request: Input, responder, _| {
                 let result = async {
                     require(&input.1, INPUT, Some(&request.session_id))?;
+                    let queue_actions = require(
+                        &input.1,
+                        super::queue_actions::CAPABILITY,
+                        Some(&request.session_id),
+                    )
+                    .is_ok();
                     let inspected = input
                         .0
                         .inspect_input(request.session_id, request.input_id)
                         .await
                         .map_err(host_error)?;
+                    let disposition = inspected.receipt.disposition.clone();
+                    let mut receipt = SubmitResponse::from(inspected.receipt);
+                    if queue_actions {
+                        match disposition {
+                            InputDisposition::CheckedOut { .. } => {
+                                receipt.disposition = SubmissionDisposition::CheckedOut;
+                            }
+                            InputDisposition::Transferred { turn } => {
+                                receipt.disposition = SubmissionDisposition::Transferred;
+                                receipt.turn_id = Some(turn);
+                            }
+                            _ => {}
+                        }
+                    }
                     Ok(InputResponse {
-                        receipt: SubmitResponse::from(inspected.receipt),
+                        receipt,
                         settings: inspected.settings,
                         text_editable: inspected.text_editable,
                         text_only: matches!(inspected.parts.as_slice(), [PromptPart::Text { .. }]),

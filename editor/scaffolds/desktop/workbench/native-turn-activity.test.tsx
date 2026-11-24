@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { NativeChatMessage } from "@grida/desktop-bridge";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -6,6 +6,69 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 
 describe("NativeTurnActivity", () => {
+  it.each(["Steer with these images.", ""])(
+    "renders retained previews for a steered input with caption %j",
+    (text) => {
+      const load = vi.fn<(token: string) => Promise<Blob>>();
+      const [block] = turn_activity.group(
+        [
+          {
+            messageId: "request",
+            role: "user",
+            text: "Start the turn.",
+            turnId: "turn",
+            activityOrder: 1,
+          },
+          {
+            messageId: "progress",
+            role: "assistant",
+            text: "Working on it.",
+            turnId: "turn",
+            activityOrder: 2,
+          },
+          {
+            messageId: "steering",
+            role: "user",
+            text,
+            turnId: "turn",
+            activityOrder: 3,
+            attachments: [
+              {
+                name: "first.png",
+                mimeType: "image/png",
+                previewId: "first-selector",
+              },
+              {
+                name: "second.webp",
+                mimeType: "image/webp",
+                previewId: "second-selector",
+              },
+            ],
+          },
+        ],
+        [{ turnId: "turn", status: null, startedAtMs: 0 }],
+        { turnId: "turn" }
+      );
+      if (block.kind !== "turn") throw new Error("expected_turn");
+      const html = renderToStaticMarkup(
+        <NativeTurnActivity
+          block={block}
+          loadAttachmentPreview={load}
+          renderMessage={(message) => (
+            <p key={message.messageId}>{message.text}</p>
+          )}
+        />
+      );
+      const first = html.indexOf('title="Preview first.png"');
+      const second = html.indexOf('title="Preview second.webp"');
+      expect(first).toBeGreaterThan(html.indexOf("Working on it."));
+      expect(second).toBeGreaterThan(first);
+      expect(html).not.toContain("Preview unavailable");
+      expect(html).not.toContain("-selector");
+      expect(load).not.toHaveBeenCalled();
+    }
+  );
+
   it("keeps inline compactions with the rest of the turn's work", () => {
     const work: turn_activity.Item[] = [
       {

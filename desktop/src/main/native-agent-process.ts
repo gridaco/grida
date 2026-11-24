@@ -30,6 +30,7 @@ import {
 } from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
 import { NativeFileReference } from "./native-file-reference";
+import { NativeAttachmentBatch } from "./native-attachment-batch";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -219,10 +220,12 @@ export class NativeAgentProcess {
   private librarySelection = false;
   private fileInput = false;
   private fileReference = false;
+  private attachmentBatches = false;
   private inputImages = false;
   private toolImages = false;
   private inputImageChunks = false;
   private queuedMessages = false;
+  private queueActions = false;
   private queuedTextReplacement = false;
   private selectedImage = false;
   private agentEffort = false;
@@ -364,6 +367,15 @@ export class NativeAgentProcess {
     return this.connected && this.activityOrder;
   }
 
+  get acceptsCompactionStart(): boolean {
+    return (
+      this.connected &&
+      this.commandCapabilities.has(
+        NativeAgentCommands.compactionStartCapability
+      )
+    );
+  }
+
   get acceptsCompactionItems(): boolean {
     return this.connected && this.compactionItems;
   }
@@ -416,6 +428,10 @@ export class NativeAgentProcess {
     return this.connected && this.fileReference;
   }
 
+  get acceptsAttachmentBatches(): boolean {
+    return this.connected && this.attachmentBatches;
+  }
+
   get acceptsInputImages(): boolean {
     return this.connected && this.inputImages;
   }
@@ -430,6 +446,10 @@ export class NativeAgentProcess {
 
   get acceptsQueuedMessages(): boolean {
     return this.connected && this.queuedMessages;
+  }
+
+  get acceptsQueueActions(): boolean {
+    return this.connected && this.queueActions;
   }
 
   get acceptsQueuedTextReplacement(): boolean {
@@ -913,10 +933,12 @@ export class NativeAgentProcess {
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
                 [NativeFileReference.capability]: 1,
+                [NativeAttachmentBatch.capability]: 1,
                 [NativeInputImages.capability]: 1,
                 [NativeInputImages.chunkCapability]: 1,
                 [NativeToolImages.capability]: 1,
                 [NativeQueuedMessages.capability]: 1,
+                [NativeQueuedMessages.actionsCapability]: 1,
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
@@ -1022,6 +1044,8 @@ export class NativeAgentProcess {
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.fileReference =
         advertised?.[NativeFileReference.capability] === 1;
+      processOwner.attachmentBatches =
+        advertised?.[NativeAttachmentBatch.capability] === 1;
       processOwner.inputImages =
         advertised?.[NativeInputImages.capability] === 1;
       processOwner.inputImageChunks =
@@ -1029,6 +1053,8 @@ export class NativeAgentProcess {
       processOwner.toolImages = advertised?.[NativeToolImages.capability] === 1;
       processOwner.queuedMessages =
         advertised?.[NativeQueuedMessages.capability] === 1;
+      processOwner.queueActions =
+        advertised?.[NativeQueuedMessages.actionsCapability] === 1;
       processOwner.queuedTextReplacement =
         advertised?.[NativeQueuedMessages.replaceTextCapability] === 1;
       processOwner.selectedImage =

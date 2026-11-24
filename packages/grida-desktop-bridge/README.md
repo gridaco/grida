@@ -42,6 +42,15 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
+`nativeChat.submitAttachments()` takes one ordered list of selected files and
+references under the input identity. Check `nativeChat.acceptsAttachments()`
+on the attached host before submitting a batch. The preload resolves native
+disk paths from selected `File` values. Queue checkout edit indexes are tied
+to the returned checkout. Passing an attachment list to `queueCheckout.reinsert()`
+replaces the entire list in order; an empty list clears it, and omitting both
+text and attachments restores the accepted message. On uncertain delivery use
+the original input or checkout action receipt before preparing sources again.
+
 `browser.preview()` and `browser.previewPublicLink()` return the same
 `WebPreview.Metadata` shape to a live workspace attachment. Fields are
 optional and can include a title, description, favicon, Open Graph image, and
@@ -229,6 +238,15 @@ After `archives.unarchive` succeeds, `archives.openRestored` can use the same
 opaque archive row ID to open the restored chat from that Settings document.
 This optional action is separate from the metadata-only unarchive. It accepts
 no workspace or session ID and its handle expires after use or timeout.
+
+A chat observation with `snapshot.compactionStart === true` can use
+`nativeChat.startCompaction(attachmentId, requestId)` when the preload
+provides the method. An `admitted` reply echoes the request ID and names the
+admitted turn. Use that turn's activity and lifecycle for progress and its
+outcome. A `no_change` reply has a null turn ID. Retry an unconfirmed start
+with its original request ID. Clients without start admission use
+`nativeChat.runCommand(attachmentId, "compact", requestId)` for the
+compaction report.
 
 Compatible native hosts supply optional `activityOrder` on exposed messages,
 individual tool calls and child lifecycle events. Positive safe-integer

@@ -67,14 +67,28 @@ sample transcript.
   the inline favicon from one check. Stop the server and hover again to see
   the shared fallback.
 - **Message queue** shows previews, dragging and keyboard reordering,
-  editing in the composer, and Steer. **Running turn** controls whether a send
-  enters the queue and whether queued messages can be steered.
+  editing in the composer, and Steer. Edit the image caption or add a caption
+  to the queued `README.md` attachment. Opening a message takes it out of
+  the mock queue. **Send** or Enter reinserts the revision. Escape or undoing
+  entry into the edit restores the original at the same position among the
+  remaining messages. Add a batch or remove individual cards in the same
+  composer used by Desktop. Press ↑ in the empty composer to take out the
+  last queued message. Move the sample image to the first row and choose
+  **Steer** to see it appear in the conversation. Turn off **Running turn**
+  and choose **Resume queue** to start the next waiting message. After using
+  **Remove from queue**, press **⌘Z** in the composer to restore the message.
 - **Attachments** shows image captions, image-only messages, file and folder
   cards, and an unavailable preview. The + menu and file drops stage local
-  attachments. Image previews and fullscreen use the production interaction.
+  attachments. Use **Hold submission** to delay a send, then accept it or
+  refuse it and retry from the message. Type another draft while the first
+  send waits. After accepting or refusing, add another attachment to that
+  draft. **Reopen chat** reattaches the same
+  chat with its accepted messages and current draft. Image previews and
+  fullscreen use the production interaction.
 - **Long pasted text** opens with a sample card and accepts text pastes of at
   least 1,000 characters or 12 lines. **Show in text field** moves the whole
-  passage to the end of the editable draft. Use **Add sample paste** to try
+  passage to the end of the editable draft. Undo returns the card, and redo
+  puts its text back in the draft. Use **Add sample paste** to try
   another card. The demo keeps the cards in local UI state with sending disabled.
 - **Slide selection** shows the selected text in the composer and a selection
   marker on eligible sent messages. Toggle the selection to check that sent
@@ -84,8 +98,9 @@ sample transcript.
   during **Streaming** to see the animated scroll-to-bottom button. Turn
   **Streaming** off to see the arrow.
 - **Compaction** shows the production transcript rows for a saved summary
-  and compaction in progress on load. To try the full flow, send `/compact`
-  in the example below and select **Finish compaction**.
+  and compaction in progress on load. Send `/compact` in the example below.
+  The command clears at Send. Send a follow-up while compaction runs, then
+  select **Finish compaction** to start the queued message.
 - **Pause and resume** opens on a paused reply. Use **Resume** and **Pause**
   in the composer to switch states.
 - **Subagents** shows overlapping work with finished, failed, and stopped
@@ -97,9 +112,10 @@ sample transcript.
 - **Permission approval** and **Library request** use the same floating cards
   above the composer as questions. The Library picker uses one local image that
   you can select or skip.
-- **Kit and files** starts with a compact folder, a square image, a sample
-  PDF thumbnail, and a file without a preview. Add more files to scroll the
-  attachment strip, or change the drop mode to insert inline references.
+- **Kit and files** uses the same composer cards as Desktop. It starts with
+  a compact folder, a square image, a sample PDF thumbnail, and a file
+  without a preview. Add more files to scroll the attachment strip, or
+  change the drop mode to insert inline references.
 
 Examples are independent. The local bridge lives in `desktop-chat-fixture.ts`.
 Its example records live in `desktop-conversation-fixtures.ts` and

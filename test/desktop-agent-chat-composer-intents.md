@@ -38,6 +38,8 @@ of disappearing.
 1. Open a native workspace chat and select a configured model. Wait for the
    connection to finish starting. Check that the header contains the chat list,
    title, new-chat button, and options menu, with the model in the composer.
+   Click empty space beside the composer toolbar. The caret appears in the
+   draft. Clicking a toolbar button still operates its own control.
 2. Type `Keep this draft /plan` and press Enter on the slash-menu item. The
    Plan badge appears; `Keep this draft` remains editable. No turn starts.
 3. Remove Plan, type `/goal`, and click its slash-menu item. Goal appears,
@@ -85,19 +87,19 @@ of disappearing.
    earlier order must keep that order rather than reviving a previous drag.
    The local composer playground demonstrates this without a running agent;
    **Reset examples** restores the original queue after a drag. Choose
-   **…** → **Edit**: its text opens in the same main composer, and the row stays
-   visible as **Editing**. **Save changes** or Enter replaces only that text;
-   Cancel or Escape leaves the queue unchanged. The prior unsent draft, its
-   attachment and mode chips return. During save, the input is read-only; a
-   failed save keeps the edited text for retry. No other row can steer while an
-   edit occupies the composer. Every row keeps its queue icon, including rows
-   with image thumbnails. On a runtime that supports caption replacement, edit
-   the image message's text and save: the image, captured modes and queue
-   position stay the same. Edit again and clear the caption: Save remains
-   available, and the image-only message stays queued. A text-only message
-   cannot be saved empty. The local playground covers these caption edits and
-   restores any ordinary draft and staged attachment afterward. Goals remain
-   non-editable, and an older runtime must not offer attachment text editing.
+   **…** → **Edit**. The item disappears from the runnable queue and its
+   text opens in place of the draft in the main composer. The usual composer
+   controls stay in place. Let another item run while editing. **Send** or Enter
+   returns the revision at its reserved position among the surviving items.
+   Escape or undoing entry into the edit restores the original. The ordinary
+   draft, attachment and mode chips return. An unconfirmed operation offers
+   Retry. Reopen the chat during
+   editing and verify **Continue editing** and **Restore original**.
+   Edit a queued image caption and verify that saving or clearing its text
+   preserves the image and captured settings. A text-only message cannot
+   be saved empty. Add several files and remove one existing attachment, then
+   save. Verify each remaining card and its order. Cancel another attachment edit
+   and verify the original cards and the ordinary draft return.
    The messages run in the new order. When an interruption
    holds the queue with no turn running, it shows **Queue paused because you
    interrupted** with **Resume**, and the empty composer's primary button is ▶.
@@ -124,6 +126,11 @@ of disappearing.
     `/compact` and sending it behaves the same.
     10d. In a chat with no background process running, choose `/stop`. A status
     line says no background processes are running; the turn keeps going.
+    10e. In an idle chat with earlier conversation and an open, empty queue,
+    send `/compact`. The composer clears while **Compacting context** is
+    visible. Send a follow-up while compaction runs. It appears in the queue
+    and starts after compaction settles. The transcript retains the summary
+    entry and the earlier conversation.
 11. The ring beside the model picker shows context use once the model's window
     is known; hover for the percentage, click for the breakdown. Scrolling the
     chat fades content at the top and bottom edges. No **Execution details**

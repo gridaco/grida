@@ -12,6 +12,7 @@ use agent_client_protocol::v1::schema::{
 use tokio::sync::oneshot;
 
 pub(super) const COMPACT: &str = "co.grida/session/compact";
+pub(super) const START: &str = "co.grida/session/compact/start";
 pub(in crate::acp) const ITEMS: &str = "co.grida/session/compaction-items";
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -28,29 +29,82 @@ struct Compact {
 #[serde(transparent)]
 struct CompactResponse(CompactionReport);
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/session/compact/start", response = StartResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Start {
+    session_id: SessionId,
+    request_id: ChangeId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct StartResponse {
+    request_id: ChangeId,
+    #[serde(flatten)]
+    admission: Admission,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(
+    tag = "status",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+enum Admission {
+    Admitted { turn_id: TurnId },
+    NoChange { turn_id: () },
+}
+
 pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
-    RequestRoutes::default().on_receive_request(
-        async move |request: Compact, responder, connection| {
-            let host = host.clone();
-            let sessions = sessions.clone();
-            connection.spawn(async move {
-                let result = async {
-                    require(&sessions, COMPACT, Some(&request.session_id))?;
-                    host.compact(CompactRequest {
-                        session: request.session_id,
-                        request: request.request_id,
-                        recover: request.recover,
-                    })
-                    .await
-                    .map(CompactResponse)
-                    .map_err(host_error)
-                }
-                .await;
-                responder.respond_with_result(result)
-            })
-        },
-        on_receive_request!(),
-    )
+    let start = (host.clone(), sessions.clone());
+    RequestRoutes::default()
+        .on_receive_request(
+            async move |request: Compact, responder, connection| {
+                let host = host.clone();
+                let sessions = sessions.clone();
+                connection.spawn(async move {
+                    let result = async {
+                        require(&sessions, COMPACT, Some(&request.session_id))?;
+                        host.compact(CompactRequest {
+                            session: request.session_id,
+                            request: request.request_id,
+                            recover: request.recover,
+                        })
+                        .await
+                        .map(CompactResponse)
+                        .map_err(host_error)
+                    }
+                    .await;
+                    responder.respond_with_result(result)
+                })
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: Start, responder, connection| {
+                let (host, sessions) = start.clone();
+                connection.spawn(async move {
+                    let result = async {
+                        require(&sessions, START, Some(&request.session_id))?;
+                        let turn = host
+                            .start_compaction(request.session_id, request.request_id.clone())
+                            .await
+                            .map_err(host_error)?;
+                        Ok(StartResponse {
+                            request_id: request.request_id,
+                            admission: match turn {
+                                Some(turn_id) => Admission::Admitted { turn_id },
+                                None => Admission::NoChange { turn_id: () },
+                            },
+                        })
+                    }
+                    .await;
+                    responder.respond_with_result(result)
+                })
+            },
+            on_receive_request!(),
+        )
 }
 
 #[derive(Clone, Copy)]

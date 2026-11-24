@@ -229,6 +229,14 @@ impl Host {
                         .insert(message, context.display_parts.clone());
                 }
             }
+            for input in self
+                .store
+                .transferred_input_ids(session.clone(), turn.clone())
+                .await?
+            {
+                let message = super::queue_actions::steering_message_id(&input)?;
+                facts.authored_inputs.insert(message, (turn.clone(), input));
+            }
             if inline_compaction || automatic_review {
                 let ordering = self.activity_order.clone();
                 let (summary, mut reviews, items) = self

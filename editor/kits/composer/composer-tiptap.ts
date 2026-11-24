@@ -23,6 +23,7 @@ import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { chatWebLinkIcon } from "@/components/chat-web-link";
+import { ComposerTiptapHistory } from "./composer-tiptap-history";
 import {
   ComposerCore,
   type ComposerCommand,
@@ -527,6 +528,10 @@ export namespace ComposerTiptap {
       }
     }
 
+    if (!trigger && editor && ComposerTiptapHistory.keyDown(editor, event)) {
+      event.preventDefault();
+      return true;
+    }
     if (input.event.key !== "Enter") return false;
 
     if (input.event.shiftKey) {
@@ -617,7 +622,8 @@ export namespace ComposerTiptap {
     editor: Editor,
     text: string,
     maxBytes: number,
-    placement: "paragraph" | "inline" = "paragraph"
+    placement: "paragraph" | "inline" = "paragraph",
+    onHistoryChange?: (forward: boolean) => void
   ): boolean {
     if (editor.isDestroyed || !text) return false;
     const empty = hasEmptyParagraph(editor);
@@ -637,6 +643,9 @@ export namespace ComposerTiptap {
 
     const lines = text.split("\n");
     const end = doc.content.size;
+    const history = onHistoryChange
+      ? ComposerTiptapHistory.for(editor)
+      : undefined;
     const chain = editor.chain();
     let insertAt: number | { from: number; to: number } = empty
       ? { from: 0, to: end }
@@ -656,7 +665,14 @@ export namespace ComposerTiptap {
       content: line ? [{ type: "text", text: line }] : [],
     }));
     if (paragraphs.length > 0) chain.insertContentAt(insertAt, paragraphs);
-    return chain.focus("end").run();
+    if (history && onHistoryChange)
+      chain.command(({ tr }) => {
+        if (tr.docChanged) history.recordEffect(tr, onHistoryChange);
+        return true;
+      });
+    const appended = chain.focus("end").run();
+    if (appended) history?.closeGroup();
+    return appended;
   }
 
   export function toDocument(json: JSONContent): ComposerDocument.Root {

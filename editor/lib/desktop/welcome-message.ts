@@ -18,17 +18,22 @@
  * (see test/desktop-welcome-first-message.md).
  */
 
-import { parseNativeChatMessageContext } from "@grida/desktop-bridge";
+import {
+  NATIVE_CHAT_MAX_ATTACHMENTS,
+  parseNativeChatMessageContext,
+} from "@grida/desktop-bridge";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import type {
   NativeChatInitialComposer,
   NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
 
-const attachments = new Map<
-  string,
-  NonNullable<NativeChatInitialComposer["attachment"]>
->();
+type Attachment = NonNullable<NativeChatInitialComposer["attachment"]>;
+type AttachmentDescription = Readonly<{
+  kind: Attachment["kind"];
+  name: string;
+}>;
+const attachmentBatches = new Map<string, readonly Attachment[]>();
 
 const KEY_PREFIX = "grida.welcome.message.v1.";
 const PROFILE_ID = /^[a-f0-9]{64}$/;
@@ -74,8 +79,10 @@ export type WelcomeDraftTransfer = (destination: {
 
 /** A request owns its follow-up until the destination editor can take it. */
 export class WelcomeFollowupDraft {
+  private handedOff = false;
   private transferred = false;
   private readonly key: string;
+  private latest?: { document: unknown; revision?: string };
 
   constructor(
     requestId: string,
@@ -85,16 +92,41 @@ export class WelcomeFollowupDraft {
     this.key = `desktop-home:followup:${requestId}`;
   }
 
-  /** Keep the last Home edit across a renderer reload, independently of later Home use. */
-  save(document: unknown, flushHome = false): void {
+  observe(document: unknown, revision?: string): void {
+    if (this.transferred) return;
+    this.latest = { document, revision };
+    this.save(document);
+  }
+
+  handoff(): void {
+    this.handedOff = true;
+    this.save(this.currentDocument());
+  }
+
+  /** The editor may unmount before its last autosave. */
+  flush(): void {
     if (this.transferred || !this.source) return;
+    const document = this.source.read();
+    if (document === undefined) return;
     const { store } = this.source;
-    if (flushHome) store.write(this.homeKey, document);
-    store.write(
+    const previous = this.latest?.revision;
+    const revision =
+      store.documentRevision(this.homeKey) === previous
+        ? store.write(this.homeKey, document)
+        : previous;
+    this.observe(document, revision);
+  }
+
+  private currentDocument(): unknown {
+    const live = this.source?.read();
+    return live === undefined ? this.latest?.document : live;
+  }
+
+  private save(document: unknown): void {
+    if (this.transferred || !this.handedOff || !this.source) return;
+    this.source.store.write(
       this.key,
-      document == null
-        ? null
-        : { document, revision: store.documentRevision(this.homeKey) }
+      document == null ? null : { document, revision: this.latest?.revision }
     );
   }
 
@@ -105,17 +137,21 @@ export class WelcomeFollowupDraft {
       document?: unknown;
       revision?: string;
     } | null;
-    const current = this.source?.read();
+    const current = this.currentDocument();
     const document = current === undefined ? saved?.document : current;
     // A different Home visit might have written exactly the same words.
     const revision = source.documentRevision(this.homeKey);
-    const owned = saved?.revision
-      ? saved.revision === revision
-      : !revision && this.source && source.read(this.homeKey) === document;
-    if (store.read(key) !== null) {
+    const capturedRevision = this.source
+      ? this.latest?.revision
+      : saved?.revision;
+    if (store.read(key) !== null || store.documentRevision(key) !== undefined) {
       // The follow-up belongs on Home. Flush a final live edit before retiring
       // the handoff copy. A later Home visit owns its own version.
-      if (this.source && current !== undefined && (owned || !revision)) {
+      if (
+        this.source &&
+        current !== undefined &&
+        revision === capturedRevision
+      ) {
         try {
           source.checkpoint(this.homeKey, current);
         } catch {
@@ -127,15 +163,14 @@ export class WelcomeFollowupDraft {
       return;
     }
     if (document == null) return;
-    store.write(key, document);
+    const copiedRevision = store.write(key, document);
     this.transferred = true;
     // Preserve the on-disk copy if the target could only retain it in memory.
-    if (
-      (revision || source.documentRevision(this.key)) &&
-      !store.documentRevision(key)
-    )
+    if ((revision || source.documentRevision(this.key)) && !copiedRevision)
       return;
-    if (owned) source.write(this.homeKey, null);
+    if (capturedRevision) source.retireDocument(this.homeKey, capturedRevision);
+    else if (!revision && this.source && source.read(this.homeKey) === document)
+      source.write(this.homeKey, null);
     source.write(this.key, null);
   };
 }
@@ -185,8 +220,12 @@ export namespace welcome_message {
   ): boolean {
     try {
       if (!storage) return false;
-      const token = message.attachment ? crypto.randomUUID() : undefined;
-      const { attachment, transferNextDraft, ...settings } = message;
+      const { attachment, attachments, transferNextDraft, ...settings } =
+        message;
+      if (attachment && attachments) return false;
+      const files = attachments ?? (attachment ? [attachment] : []);
+      if (files.length > NATIVE_CHAT_MAX_ATTACHMENTS) return false;
+      const token = files.length ? crypto.randomUUID() : undefined;
       const requestId = message.requestId ?? crypto.randomUUID();
       const raw = JSON.stringify({
         ...settings,
@@ -194,9 +233,11 @@ export namespace welcome_message {
         ...(attachment && {
           attachment: {
             token,
-            kind: attachment.kind,
-            name: attachment.file.name,
+            ...describeAttachment(attachment),
           },
+        }),
+        ...(attachments?.length && {
+          attachments: { token, items: attachments.map(describeAttachment) },
         }),
       });
       storage.setItem(key(workspaceId), raw);
@@ -204,9 +245,9 @@ export namespace welcome_message {
       if (claim?.storage === storage && claim.raw !== raw)
         claims.delete(workspaceId);
       const previous = attachmentTokens.get(workspaceId);
-      if (previous) attachments.delete(previous);
-      if (token && attachment) {
-        attachments.set(token, attachment);
+      if (previous) attachmentBatches.delete(previous);
+      if (token) {
+        attachmentBatches.set(token, files);
         attachmentTokens.set(workspaceId, token);
       } else attachmentTokens.delete(workspaceId);
       if (transferNextDraft)
@@ -370,9 +411,10 @@ function forgetHandoff(
   const value = JSON.parse(raw);
   if (nextDrafts.get(workspaceId)?.requestId === value?.requestId)
     nextDrafts.delete(workspaceId);
-  if (typeof value?.attachment?.token === "string") {
-    attachments.delete(value.attachment.token);
-    if (attachmentTokens.get(workspaceId) === value.attachment.token)
+  const token = value?.attachments?.token ?? value?.attachment?.token;
+  if (typeof token === "string") {
+    attachmentBatches.delete(token);
+    if (attachmentTokens.get(workspaceId) === token)
       attachmentTokens.delete(workspaceId);
   }
 }
@@ -409,7 +451,9 @@ function parse(
     preparedMode,
     manualApproval,
     attachment,
+    attachments: batch,
     missingAttachment: missing,
+    missingAttachments: missingBatch,
   } = value as Record<string, unknown>;
   if (
     effort !== undefined &&
@@ -446,6 +490,9 @@ function parse(
     return null;
   let resource: NativeChatInitialComposer["attachment"];
   let missingAttachment: NativeChatInitialComposer["missingAttachment"];
+  let resources: NativeChatInitialComposer["attachments"];
+  let missingAttachments: NativeChatInitialComposer["missingAttachments"];
+  if (attachment !== undefined && batch !== undefined) return null;
   if (missing !== undefined) {
     if (!missing || typeof missing !== "object") return null;
     const { kind, name } = missing as Record<string, unknown>;
@@ -462,14 +509,49 @@ function parse(
       typeof name !== "string"
     )
       return null;
-    resource = attachments.get(token);
+    resource = attachmentBatches.get(token)?.[0];
     if (!resource) missingAttachment = { kind, name };
+  }
+  if (missingBatch !== undefined) {
+    if (
+      !Array.isArray(missingBatch) ||
+      missingBatch.length > NATIVE_CHAT_MAX_ATTACHMENTS ||
+      !missingBatch.every((item) => item && typeof item.name === "string")
+    )
+      return null;
+    missingAttachments = missingBatch.map(({ name }) => ({ name }));
+  }
+  if (batch !== undefined) {
+    if (!batch || typeof batch !== "object") return null;
+    const { token, items } = batch as Record<string, unknown>;
+    if (
+      typeof token !== "string" ||
+      !Array.isArray(items) ||
+      !items.length ||
+      items.length > NATIVE_CHAT_MAX_ATTACHMENTS ||
+      !items.every(isAttachmentDescription)
+    )
+      return null;
+    const known = attachmentBatches.get(token);
+    if (
+      known?.length === items.length &&
+      known.every((item, index) => {
+        const description = items[index];
+        return (
+          item.kind === description.kind && item.file.name === description.name
+        );
+      })
+    )
+      resources = known;
+    else missingAttachments = items.map(({ name }) => ({ name }));
   }
   if (
     !text.trim() &&
     !messageContext?.displayParts.length &&
     !resource &&
-    !missingAttachment
+    !missingAttachment &&
+    !resources?.length &&
+    !missingAttachments?.length
   )
     return null;
   return {
@@ -492,7 +574,21 @@ function parse(
     ...(manualApproval === true && { manualApproval }),
     ...(resource && { attachment: resource }),
     ...(missingAttachment && { missingAttachment }),
+    ...(resources?.length && { attachments: resources }),
+    ...(missingAttachments?.length && { missingAttachments }),
   };
+}
+
+function describeAttachment({ kind, file }: Attachment): AttachmentDescription {
+  return { kind, name: file.name };
+}
+
+function isAttachmentDescription(
+  value: unknown
+): value is AttachmentDescription {
+  if (!value || typeof value !== "object") return false;
+  const { kind, name } = value as Record<string, unknown>;
+  return (kind === "file" || kind === "directory") && typeof name === "string";
 }
 
 function parseTurnOptions(

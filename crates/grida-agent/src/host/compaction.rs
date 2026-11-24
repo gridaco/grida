@@ -108,6 +108,23 @@ enum CompactionTrigger {
     Inherited,
 }
 
+enum ManualCompaction {
+    NoChange,
+    Existing(Box<RecordedCompaction>),
+    Started(Box<StartedCompaction>),
+}
+
+struct RecordedCompaction {
+    view: TurnView,
+    plan: CompactionPlan,
+}
+
+struct StartedCompaction {
+    host: Host,
+    turn: TurnId,
+    completion: oneshot::Receiver<Result<RunResult>>,
+}
+
 impl Host {
     pub(crate) async fn running_standalone_compaction(
         &self,
@@ -134,112 +151,53 @@ impl Host {
         self.compact_observed(request, None).await
     }
 
+    /// Admit manual compaction and leave execution with the registered worker.
+    pub(crate) async fn start_compaction(
+        &self,
+        session: SessionId,
+        request: ChangeId,
+    ) -> Result<Option<TurnId>> {
+        self.owned_control(move |host| async move {
+            match host
+                .admit_manual_compaction(CompactRequest {
+                    session,
+                    request,
+                    recover: false,
+                })
+                .await?
+            {
+                ManualCompaction::NoChange => Ok(None),
+                ManualCompaction::Existing(record) => Ok(Some(record.view.binding.turn)),
+                ManualCompaction::Started(started) => Ok(Some(started.turn)),
+            }
+        })
+        .await
+    }
+
     pub(crate) async fn compact_observed(
         &self,
         request: CompactRequest,
         accepted: Option<oneshot::Sender<TurnId>>,
     ) -> Result<CompactionReport> {
         self.owned_control(move |host| async move {
-            let CompactRequest {
-                session,
-                request,
-                recover,
-            } = request;
-            host.refuse_in_side_chat(&session, side_chats::Refusal::Compaction)
-                .await?;
-            let fingerprint = Fingerprint::of(&(&session, &request))?;
-            let turn = TurnId::new(format!(
-                "compact/{:x}",
-                uuid::Uuid::from_bytes(
-                    fingerprint.bytes()[..16]
-                        .try_into()
-                        .expect("fingerprint prefix")
-                )
-            ))?;
-            let launch = match host.store.inspect_turn(session.clone(), turn.clone()).await {
-                Ok(view) => {
-                    let plan = host
-                        .compaction_plan(session.clone(), turn.clone())
-                        .await?
-                        .ok_or_else(|| {
-                            problem(ErrorKind::Conflict, "compaction_identity_reused")
-                        })?;
-                    match view.disposition {
-                        TurnDisposition::Settled => {
-                            return host
-                                .report_compaction(
-                                    &session,
-                                    &turn,
-                                    &plan,
-                                    &view.outcome.ok_or_else(|| {
-                                        problem(
-                                            ErrorKind::InvalidState,
-                                            "compaction_outcome_missing",
-                                        )
-                                    })?,
-                                )
-                                .await;
-                        }
-                        TurnDisposition::Running => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Running,
-                            ));
-                        }
-                        TurnDisposition::Suspended => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Suspended,
-                            ));
-                        }
-                        TurnDisposition::Interrupted if !recover => {
-                            return Ok(CompactionReport::state(
-                                Some(turn),
-                                CompactionStatus::Interrupted,
-                            ));
-                        }
-                        TurnDisposition::Interrupted => {
-                            Launch::RecoverCompaction(RecoveryRequest {
-                                id: change_id()?,
-                                session: session.clone(),
-                                turn: turn.clone(),
-                                expected_epoch: view.binding.epoch,
-                            })
-                        }
-                    }
-                }
-                Err(error) if error.code == "turn_missing" && !recover => {
-                    Launch::Compact(request, None)
-                }
-                Err(error) => return Err(error),
-            };
-            let (host, launch) = match launch {
-                Launch::Compact(request, _) => {
-                    let (host, revision) = host.for_derived_session(&session).await?;
-                    (host, Launch::Compact(request, revision))
-                }
-                existing => (host, existing),
-            };
-            let ticket = {
-                let mut work = host.settled_work(&session).await?;
-                host.register(&mut work, session.clone(), turn.clone(), launch)?
-            };
-            match ticket
-                .admission
-                .await
-                .map_err(|_| problem(ErrorKind::Uncertain, "compaction_admission_interrupted"))?
-            {
-                Ok(_) => {}
-                Err(error) if error.code == "compaction_nothing_to_do" => {
+            let session = request.session.clone();
+            let StartedCompaction {
+                host,
+                turn,
+                completion,
+            } = match host.admit_manual_compaction(request).await? {
+                ManualCompaction::NoChange => {
                     return Ok(CompactionReport::state(None, CompactionStatus::NoChange));
                 }
-                Err(error) => return Err(error),
-            }
+                ManualCompaction::Existing(record) => {
+                    return host.read_compaction_report(&session, *record).await;
+                }
+                ManualCompaction::Started(started) => *started,
+            };
             if let Some(accepted) = accepted {
                 let _ = accepted.send(turn.clone());
             }
-            match ticket
-                .completion
+            match completion
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "compaction_worker_interrupted"))??
             {
@@ -264,6 +222,118 @@ impl Host {
             }
         })
         .await
+    }
+
+    async fn admit_manual_compaction(&self, request: CompactRequest) -> Result<ManualCompaction> {
+        let CompactRequest {
+            session,
+            request,
+            recover,
+        } = request;
+        self.refuse_in_side_chat(&session, side_chats::Refusal::Compaction)
+            .await?;
+        let fingerprint = Fingerprint::of(&(&session, &request))?;
+        let turn = TurnId::new(format!(
+            "compact/{:x}",
+            uuid::Uuid::from_bytes(
+                fingerprint.bytes()[..16]
+                    .try_into()
+                    .expect("fingerprint prefix")
+            )
+        ))?;
+        let inspected = self.recorded_compaction(&session, &turn).await?;
+        let (host, launch) = match inspected {
+            Some(record) if recover && record.view.disposition == TurnDisposition::Interrupted => (
+                self.clone(),
+                Launch::RecoverCompaction(RecoveryRequest {
+                    id: change_id()?,
+                    session: session.clone(),
+                    turn: turn.clone(),
+                    expected_epoch: record.view.binding.epoch,
+                }),
+            ),
+            Some(record) => return Ok(ManualCompaction::Existing(record)),
+            None if recover => return Err(problem(ErrorKind::InvalidInput, "turn_missing")),
+            None => {
+                let (host, revision) = self.for_derived_session(&session).await?;
+                (host, Launch::Compact(request, revision))
+            }
+        };
+        let ticket = {
+            let mut work = host.settled_work(&session).await?;
+            if !recover {
+                // A matching turn may commit after the first lookup. Recheck
+                // before this request can register another worker.
+                if let Some(record) = host.recorded_compaction(&session, &turn).await? {
+                    return Ok(ManualCompaction::Existing(record));
+                }
+                if work
+                    .active
+                    .get(&session)
+                    .is_some_and(|worker| worker.turn == turn)
+                {
+                    return Err(problem(
+                        ErrorKind::Uncertain,
+                        "compaction_admission_pending",
+                    ));
+                }
+            }
+            host.register(&mut work, session, turn.clone(), launch)?
+        };
+        match ticket
+            .admission
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "compaction_admission_interrupted"))?
+        {
+            Ok(_) => Ok(ManualCompaction::Started(Box::new(StartedCompaction {
+                host,
+                turn,
+                completion: ticket.completion,
+            }))),
+            Err(error) if error.code == "compaction_nothing_to_do" => {
+                Ok(ManualCompaction::NoChange)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn recorded_compaction(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<Option<Box<RecordedCompaction>>> {
+        let view = match self.store.inspect_turn(session.clone(), turn.clone()).await {
+            Ok(view) => view,
+            Err(error) if error.code == "turn_missing" => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let plan = self
+            .compaction_plan(session.clone(), turn.clone())
+            .await?
+            .ok_or_else(|| problem(ErrorKind::Conflict, "compaction_identity_reused"))?;
+        Ok(Some(Box::new(RecordedCompaction { view, plan })))
+    }
+
+    async fn read_compaction_report(
+        &self,
+        session: &SessionId,
+        record: RecordedCompaction,
+    ) -> Result<CompactionReport> {
+        let turn = record.view.binding.turn;
+        let status = match record.view.disposition {
+            TurnDisposition::Settled => {
+                let outcome = record.view.outcome.ok_or_else(|| {
+                    problem(ErrorKind::InvalidState, "compaction_outcome_missing")
+                })?;
+                return self
+                    .report_compaction(session, &turn, &record.plan, &outcome)
+                    .await;
+            }
+            TurnDisposition::Running => CompactionStatus::Running,
+            TurnDisposition::Suspended => CompactionStatus::Suspended,
+            TurnDisposition::Interrupted => CompactionStatus::Interrupted,
+        };
+        Ok(CompactionReport::state(Some(turn), status))
     }
 
     pub(super) async fn compaction_plan(

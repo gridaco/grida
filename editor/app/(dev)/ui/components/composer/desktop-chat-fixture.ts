@@ -1,6 +1,7 @@
 import type {
   DesktopNativeChat,
   NativeChatAcceptance,
+  NativeChatAttachmentInput,
   NativeChatControlReceipt,
   NativeChatEffort,
   NativeChatMessage,
@@ -10,7 +11,13 @@ import type {
   NativeChatPermissionState,
   NativeChatQuestion,
   NativeChatQueueAction,
+  NativeChatQueueActionReceipt,
+  NativeChatQueueCheckout,
+  NativeChatQueueCheckoutRequest,
   NativeChatQueuePage,
+  NativeChatQueueReceipt,
+  NativeChatQueueReinsertRequest,
+  NativeChatQueueReinsertResult,
   NativeChatTurn,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -36,6 +43,18 @@ type Input = {
   goalStart?: fixtures.Queued["goalStart"];
 };
 
+type QueuePosition = {
+  item: fixtures.Queued;
+  before: readonly string[];
+  after: readonly string[];
+};
+
+type QueueCheckout = {
+  item: fixtures.Queued;
+  checkoutId: string;
+  position: number;
+};
+
 /** Local implementation of the fragment of Desktop IPC used by the examples. */
 export class DesktopChatFixture {
   readonly submission = new DesktopRequestFixture();
@@ -54,8 +73,32 @@ export class DesktopChatFixture {
   >();
   private readonly svgListeners = new Set<() => void>();
   private readonly runningListeners = new Set<() => void>();
-  private readonly imageBytes = new Map<string, ArrayBuffer>();
+  private readonly imageBytes = new Map<string, ArrayBuffer | Blob>();
   private readonly receipts = new Map<string, NativeChatAcceptance>();
+  private readonly queueReceipts = new Map<string, NativeChatQueueReceipt>();
+  private readonly compactionRequests = new Map<
+    string,
+    { turnId: string; outcome: Promise<"installed" | "failed"> }
+  >();
+  private readonly queueActionReceipts = new Map<
+    string,
+    { receipt: NativeChatQueueActionReceipt; observationId?: string }
+  >();
+  private readonly checkoutReceipts = new Map<
+    string,
+    {
+      request: NativeChatQueueCheckoutRequest;
+      result: Awaited<ReturnType<NativeChatQueueCheckout["checkout"]>>;
+    }
+  >();
+  private readonly reinsertReceipts = new Map<
+    string,
+    {
+      request: NativeChatQueueReinsertRequest;
+      result: NativeChatQueueReinsertResult;
+    }
+  >();
+  private checkedOut?: QueueCheckout;
   private liveTurnId: string;
   private questions: readonly NativeChatQuestion[];
   private waitingFor: "approval" | "library-request" | null;
@@ -370,7 +413,10 @@ export class DesktopChatFixture {
           ? "suspended"
           : "running"
         : "settled",
-      status: this.running ? null : "succeeded",
+      status: this.running
+        ? null
+        : (this.records.find(({ turnId }) => turnId === this.liveTurnId)
+            ?.status ?? "succeeded"),
       inputNeeded: !!this.questions.length || !!this.waitingFor,
     };
   }
@@ -385,50 +431,395 @@ export class DesktopChatFixture {
     };
   }
 
+  private startCompaction(requestId: string) {
+    if (this.scenario !== "compaction") return;
+    const previous = this.compactionRequests.get(requestId);
+    if (previous) return previous;
+    if (this.running || this.waiting.length > 0)
+      throw new Error("session_prompt_in_progress");
+    const turnId = `compaction-${requestId}`;
+    const startedAtMs = Date.now();
+    const item = {
+      id: turnId,
+      automatic: false,
+      startedAtMs,
+    } as const;
+    this.liveTurnId = turnId;
+    this.running = true;
+    this.settled = false;
+    this.records = [
+      ...this.records,
+      {
+        turnId,
+        startedAtMs,
+        status: null,
+        compactions: [{ ...item, status: "running" }],
+      },
+    ];
+    const settle = (succeeded: boolean) => {
+      const finishedAtMs = Date.now();
+      this.records = this.records.map((record) =>
+        record.turnId === turnId
+          ? {
+              ...record,
+              status: succeeded ? "succeeded" : "failed",
+              settledAtMs: finishedAtMs,
+              compactions: [
+                {
+                  ...item,
+                  status: succeeded ? "succeeded" : "failed",
+                  finishedAtMs,
+                  ...(succeeded && {
+                    summary:
+                      "The gallery handout uses large print with a map on the back.",
+                  }),
+                },
+              ],
+            }
+          : record
+      );
+      this.running = false;
+      this.settled = true;
+      if (this.waiting.length) this.mutateQueue({ action: "resume" });
+      this.changed();
+      return succeeded ? ("installed" as const) : ("failed" as const);
+    };
+    const outcome = this.compaction.wait().then(
+      () => settle(true),
+      () => settle(false)
+    );
+    const started = { turnId, outcome };
+    this.compactionRequests.set(requestId, started);
+    this.changed();
+    return started;
+  }
+
+  private canSteerQueued(item: fixtures.Queued): boolean {
+    return (
+      this.turn().disposition === "running" &&
+      !item.goalStart &&
+      item.operatingRegime !== "plan" &&
+      item.effort !== "ultra" &&
+      (item.attachments?.every((attachment) => !!attachment.previewId) ?? true)
+    );
+  }
+
   private queuePage(): NativeChatQueuePage {
     return {
       offset: 0,
       previousOffset: null,
       nextOffset: null,
-      items: this.waiting.map(
-        ({
-          id,
-          text,
-          attachments,
-          unavailable,
-          operatingRegime,
-          effort,
-          goalStart,
-        }) => ({
+      items: this.waiting.map((item) => {
+        const { id, text, attachments, operatingRegime, effort, goalStart } =
+          item;
+        return {
           inputId: id,
           preview: text || null,
           attachments,
           operatingRegime,
           effort,
           goalStart,
-          textOnly: !attachments?.length && !unavailable,
-          textEditable: !unavailable && !goalStart,
-        })
-      ),
+          textOnly: !attachments?.length,
+          attachmentIndexes: attachments?.map((_, index) => index) ?? [],
+          textEditable: !goalStart,
+          checkoutable: !goalStart && !this.checkedOut,
+          steerable: this.canSteerQueued(item),
+        };
+      }),
     };
   }
 
   private queued(inputId: string) {
     const item = this.waiting.find((item) => item.id === inputId);
-    if (!item || item.unavailable)
-      throw new Error("fixture_queued_input_unavailable");
+    if (!item) throw new Error("fixture_queued_input_unavailable");
     return item;
   }
 
+  private readonly queueCheckout: NativeChatQueueCheckout = {
+    checkout: async (_, request) => {
+      const { inputId, observationId, requestId } = request;
+      const prior = this.checkoutReceipts.get(requestId);
+      if (prior) {
+        if (
+          prior.request.inputId !== inputId ||
+          prior.request.observationId !== observationId
+        )
+          throw new Error("fixture_queue_request_id_reused");
+        return prior.result;
+      }
+      if (this.queueActionReceipts.has(requestId))
+        throw new Error("fixture_queue_request_id_reused");
+      if (this.checkedOut || observationId !== `observation-${this.revision}`)
+        throw new Error("stale_session_revision");
+      const item = this.queued(inputId);
+      if (item.goalStart) throw new Error("fixture_queued_input_unavailable");
+      const checkoutId = requestId;
+      this.checkedOut = {
+        checkoutId,
+        item,
+        position: this.waiting.indexOf(item),
+      };
+      this.waiting = this.waiting.filter((row) => row !== item);
+      const result = { checkoutId, message: this.describeQueued(item) };
+      this.checkoutReceipts.set(requestId, { request, result });
+      this.queueActionReceipts.set(requestId, {
+        receipt: {
+          action: "checkout",
+          checkoutId,
+          inputId,
+          requestId,
+          sessionId: this.sessionId,
+          sessionRevision: this.revision + 1,
+        },
+      });
+      this.changed();
+      return result;
+    },
+    reinsert: async (_, request) => {
+      const { checkoutId, requestId, text, attachments } = request;
+      const prior = this.reinsertReceipts.get(requestId);
+      if (prior) {
+        if (
+          prior.request.checkoutId !== checkoutId ||
+          prior.request.text !== text ||
+          prior.request.attachments !== attachments
+        )
+          throw new Error("fixture_queue_request_id_reused");
+        return prior.result;
+      }
+      if (this.queueActionReceipts.has(requestId))
+        throw new Error("fixture_queue_request_id_reused");
+      const checkout = this.checkedOut;
+      if (checkout?.checkoutId !== checkoutId)
+        throw new Error("fixture_queue_checkout_unavailable");
+      if (text !== undefined || attachments !== undefined) {
+        try {
+          await this.submission.wait();
+        } catch {
+          const result = { outcome: "refused" } as const;
+          this.reinsertReceipts.set(requestId, { request, result });
+          return result;
+        }
+      }
+      if (this.checkedOut !== checkout)
+        throw new Error("fixture_queue_checkout_unavailable");
+      const item =
+        text === undefined && attachments === undefined
+          ? checkout.item
+          : this.revisedQueuedItem(
+              checkout.item,
+              text ?? checkout.item.text,
+              attachments
+            );
+      this.restoreQueuePosition(checkout, item);
+      const receipt = {
+        requestId,
+        sessionId: this.sessionId,
+        sessionRevision: this.revision + 1,
+      };
+      const result = { outcome: "reinserted", receipt } as const;
+      this.reinsertReceipts.set(requestId, { request, result });
+      this.queueActionReceipts.set(requestId, {
+        receipt: {
+          ...receipt,
+          action: "reinsert",
+          checkoutId,
+          inputId: item.id,
+        },
+      });
+      this.changed();
+      return result;
+    },
+    receipt: async (_, requestId) =>
+      this.queueActionReceipts.get(requestId)?.receipt ?? null,
+    read: async (_, checkoutId, inputId) => {
+      const checkout = this.checkedOut;
+      if (checkout?.checkoutId !== checkoutId || checkout.item.id !== inputId)
+        throw new Error("queue_checkout_unavailable");
+      return this.describeQueued(checkout.item);
+    },
+    readAttachmentPreview: async (_, checkoutId, previewId) => {
+      const checkout = this.checkedOut;
+      if (
+        checkout?.checkoutId !== checkoutId ||
+        !checkout.item.attachments?.some(
+          (entry) => entry.previewId === previewId
+        )
+      )
+        throw new Error("fixture_image_unavailable");
+      return this.imagePreview(previewId);
+    },
+  };
+
+  private describeQueued({
+    id,
+    text,
+    attachments,
+    goalStart,
+  }: fixtures.Queued) {
+    return {
+      inputId: id,
+      text,
+      attachments,
+      attachmentIndexes: attachments?.map((_, index) => index) ?? [],
+      textEditable: !goalStart,
+      textOnly: !attachments?.length,
+    };
+  }
+
+  private restoreQueuePosition(
+    checkout: QueueCheckout,
+    item: fixtures.Queued
+  ): void {
+    const next = [...this.waiting];
+    next.splice(checkout.position, 0, item);
+    this.waiting = next;
+    this.checkedOut = undefined;
+  }
+
+  private removeQueued(index: number) {
+    const next = [...this.waiting];
+    const [item] = next.splice(index, 1);
+    this.waiting = next;
+    if (this.checkedOut && index < this.checkedOut.position)
+      this.checkedOut.position--;
+    return item;
+  }
+
+  private queuePosition(item: fixtures.Queued): QueuePosition {
+    const index = this.waiting.indexOf(item);
+    return {
+      item,
+      before: this.waiting.slice(0, index).map((row) => row.id),
+      after: this.waiting.slice(index + 1).map((row) => row.id),
+    };
+  }
+
+  private insertAtQueuePosition(
+    position: QueuePosition,
+    item: fixtures.Queued
+  ): void {
+    const indexOf = (id: string) =>
+      this.waiting.findIndex((row) => row.id === id);
+    const successor = position.after.map(indexOf).find((index) => index >= 0);
+    const predecessor = position.before
+      .map(indexOf)
+      .findLast((index) => index >= 0);
+    const index = successor ?? (predecessor ?? -1) + 1;
+    this.waiting = [
+      ...this.waiting.slice(0, index),
+      item,
+      ...this.waiting.slice(index),
+    ];
+  }
+
+  /** Capture the original item before the confirmed withdrawal is recorded. */
+  readonly captureQueueRemoval = (inputId: string) => {
+    const item = this.waiting.find((row) => row.id === inputId);
+    if (!item) return;
+    const position = this.queuePosition(item);
+    let removed = true;
+    return (forward: boolean) => {
+      if (forward === removed) return;
+      if (forward) {
+        if (!this.waiting.includes(item)) return;
+        this.removeQueued(this.waiting.indexOf(item));
+      } else {
+        this.insertAtQueuePosition(position, item);
+      }
+      removed = forward;
+      this.changed();
+    };
+  };
+
+  private attachmentCard(
+    input: NativeChatAttachmentInput
+  ): NativeChatMessageAttachment {
+    if (input.kind === "image" || input.kind === "png") {
+      const previewId = crypto.randomUUID();
+      const source = input.kind === "image" ? input.file : input.bytes;
+      this.imageBytes.set(previewId, source);
+      return input.kind === "image"
+        ? {
+            name: input.file.name,
+            size: input.file.size,
+            mimeType: input.file.type,
+            previewId,
+          }
+        : {
+            name: input.name,
+            size: input.bytes.byteLength,
+            mimeType: "image/png",
+            previewId,
+          };
+    }
+    return input.kind === "reference"
+      ? {
+          name: input.file.name,
+          mimeType: input.mimeType,
+          size: input.file.size,
+        }
+      : { name: input.name, size: input.bytes.byteLength };
+  }
+
+  private revisedQueuedItem(
+    item: fixtures.Queued,
+    text: string,
+    edit?: NativeChatQueueReinsertRequest["attachments"]
+  ): fixtures.Queued {
+    const attachments =
+      edit === undefined
+        ? item.attachments
+        : edit.map((entry) => {
+            if (entry.kind !== "keep") return this.attachmentCard(entry);
+            const original = item.attachments?.[entry.index];
+            if (!original)
+              throw new Error("fixture_queue_attachment_unavailable");
+            return original;
+          });
+    if (!text.trim() && !attachments?.length)
+      throw new Error("fixture_empty_queued_message");
+    return { ...item, id: crypto.randomUUID(), text, attachments };
+  }
+
   private mutateQueue(action: NativeChatQueueAction) {
-    if (action.action === "resume") return;
+    if (action.action === "resume") {
+      if (this.running || !this.waiting.length)
+        throw new Error("fixture_queue_cannot_resume");
+      const item = this.removeQueued(0);
+      this.running = true;
+      this.paused = false;
+      this.settled = false;
+      this.liveTurnId = `${this.sessionId}-turn-${this.revision + 1}`;
+      this.messages = [
+        ...this.messages,
+        {
+          messageId: item.id,
+          inputId: item.id,
+          role: "user",
+          turnId: this.liveTurnId,
+          text: item.text,
+          attachments: item.attachments,
+        },
+      ];
+      this.records = [
+        ...this.records,
+        { turnId: this.liveTurnId, status: null, startedAtMs: Date.now() },
+      ];
+      return;
+    }
     const index = this.waiting.findIndex((item) => item.id === action.inputId);
     if (index < 0) throw new Error("fixture_queued_input_unavailable");
+    if (action.action === "withdraw") {
+      this.removeQueued(index);
+      return;
+    }
     const [item] = this.waiting.slice(index, index + 1);
     const next = [...this.waiting];
-    if (action.action === "withdraw") next.splice(index, 1);
-    else if (action.action === "replace" || action.action === "replaceText") {
-      next[index] = { ...item, id: crypto.randomUUID(), text: action.text };
+    if (action.action === "replace" || action.action === "replaceText") {
+      if (item.attachments?.length && action.action === "replace")
+        throw new Error("fixture_attachment_requires_text_replacement");
+      next[index] = this.revisedQueuedItem(item, action.text);
     } else {
       const destination =
         action.action === "place"
@@ -440,22 +831,34 @@ export class DesktopChatFixture {
     this.waiting = next;
   }
 
-  private async accept(input: Input): Promise<NativeChatAcceptance> {
+  private async accept(
+    input: Input,
+    selectedAttachments?: readonly NativeChatAttachmentInput[]
+  ): Promise<NativeChatAcceptance> {
     const prior = this.receipts.get(input.inputId);
     if (prior) return prior;
-    await this.submission.wait();
+    try {
+      await this.submission.wait();
+    } catch (error) {
+      if (!selectedAttachments?.length) throw error;
+      throw new Error("native_chat_attachment_preparation_failed", {
+        cause: error,
+      });
+    }
     const {
       action,
       inputId,
       text,
-      attachments,
       svgSelection,
       operatingRegime,
       effort,
       goalStart,
     } = input;
-    const queued = action === "enqueue";
-    if (queued) {
+    const attachments =
+      selectedAttachments?.map((item) => this.attachmentCard(item)) ??
+      input.attachments;
+    const turnId = action === "submit" ? `${inputId}-turn` : null;
+    if (!turnId) {
       this.waiting = [
         ...this.waiting,
         {
@@ -468,15 +871,24 @@ export class DesktopChatFixture {
         },
       ];
     } else {
+      const now = Date.now();
+      this.liveTurnId = turnId;
+      this.settled = true;
       this.messages = [
         ...this.messages,
         {
           messageId: inputId,
+          inputId,
+          turnId,
           role: "user",
           text,
           attachments,
           svgSelection,
         },
+      ];
+      this.records = [
+        ...this.records,
+        { turnId, status: "succeeded", startedAtMs: now, settledAtMs: now },
       ];
     }
     this.revision++;
@@ -484,21 +896,21 @@ export class DesktopChatFixture {
       sessionId: this.sessionId,
       inputId,
       inputPosition: this.revision,
-      turnId: null,
-      disposition: queued ? "queued" : "completed",
+      turnId,
+      disposition: turnId ? "completed" : "queued",
     } satisfies NativeChatAcceptance;
     this.receipts.set(inputId, receipt);
     return receipt;
   }
 
   private async imagePreview(previewId: string) {
-    return (
-      this.imageBytes.get(previewId) ??
-      (await fixtures.readImage(previewId)).arrayBuffer()
-    );
+    const source =
+      this.imageBytes.get(previewId) ?? (await fixtures.readImage(previewId));
+    return source instanceof Blob ? source.arrayBuffer() : source;
   }
 
   readonly bridge: DesktopNativeChat = {
+    queueCheckout: this.queueCheckout,
     status: async () => "native-ready",
     takeNotificationFocus: async () => null,
     list: async () => ({
@@ -526,28 +938,24 @@ export class DesktopChatFixture {
     detach: async () => {},
     commands: async () => ["compact"],
     runCommand: async (_attachmentId, _command, requestId) => {
-      if (this.scenario !== "compaction") {
-        return { command: "compact", turnId: null, status: "no_change" };
-      }
-      await this.compaction.wait();
-      const turnId = `compaction-${requestId}`;
-      this.records = [
-        ...this.records,
-        {
-          turnId,
-          status: "succeeded",
-          startedAtMs: conversations.startedAtMs,
-          settledAtMs: conversations.startedAtMs + 3200,
-          compaction: {
-            summary:
-              "The gallery handout uses large print with a map on the back.",
-            automatic: false,
-          },
-        },
-      ];
-      this.changed();
-      return { command: "compact", turnId, status: "installed" };
+      const started = this.startCompaction(requestId);
+      return started
+        ? {
+            command: "compact",
+            turnId: started.turnId,
+            status: await started.outcome,
+          }
+        : { command: "compact", turnId: null, status: "no_change" };
     },
+    startCompaction: async (_attachmentId, requestId) => {
+      const started = this.startCompaction(requestId);
+      return started
+        ? { requestId, turnId: started.turnId, status: "admitted" }
+        : { requestId, turnId: null, status: "no_change" };
+    },
+    acceptsAttachments: async () => true,
+    submitAttachments: async (_, { attachments, ...input }) =>
+      this.accept(input, attachments),
     acceptsSelectedImage: async () => true,
     acceptsPng: async () => true,
     acceptsFile: async () => true,
@@ -623,8 +1031,20 @@ export class DesktopChatFixture {
         current: this.running ? this.turn() : null,
         latest: this.settled ? this.turn() : null,
         queuedInputs: this.waiting.length,
+        attachmentBatches: true,
+        compactionStart: true,
         queuePreview: this.queuePage(),
+        ...(this.checkedOut && {
+          queueCheckout: {
+            checkoutId: this.checkedOut.checkoutId,
+            inputId: this.checkedOut.item.id,
+          },
+        }),
         admissionPaused: false,
+        ...(!this.running &&
+          this.waiting.length > 0 && {
+            idleQueueResumeAvailable: true as const,
+          }),
         historyRevisionAvailable: true,
         ...(this.bridge.subagentActivity && {
           subagentsAvailable: true,
@@ -664,23 +1084,66 @@ export class DesktopChatFixture {
     },
     queue: async () => this.queuePage(),
     queuedText: async (_, __, inputId) => this.queued(inputId).text,
-    queuedMessage: async (_, __, inputId) => {
-      const { text, attachments, goalStart } = this.queued(inputId);
-      return {
-        inputId,
-        text,
-        attachments,
-        textEditable: !goalStart,
-        textOnly: !attachments?.length,
-      };
-    },
+    queuedMessage: async (_, __, inputId) =>
+      this.describeQueued(this.queued(inputId)),
     editQueue: async (_, action) => {
+      const prior = this.queueReceipts.get(action.requestId);
+      if (prior) return prior;
+      if (action.action === "replace" || action.action === "replaceText")
+        await this.submission.wait();
+      if (action.observationId !== `observation-${this.revision}`)
+        throw new Error("stale_session_revision");
       this.mutateQueue(action);
-      return {
+      const receipt = {
         requestId: action.requestId,
         sessionId: this.sessionId,
-        sessionRevision: ++this.revision,
+        sessionRevision: this.revision + 1,
       };
+      this.queueReceipts.set(action.requestId, receipt);
+      this.changed();
+      return receipt;
+    },
+    steerQueued: async (_, request) => {
+      const { inputId, observationId, requestId } = request;
+      const prior = this.queueActionReceipts.get(requestId);
+      if (prior) {
+        if (
+          prior.receipt.action !== "steer" ||
+          prior.receipt.inputId !== inputId ||
+          prior.observationId !== observationId
+        )
+          throw new Error("fixture_queue_request_id_reused");
+        return prior.receipt;
+      }
+      if (observationId !== `observation-${this.revision}`)
+        throw new Error("stale_session_revision");
+      const item = this.queued(inputId);
+      if (!this.canSteerQueued(item))
+        throw new Error("queue_steer_target_unavailable");
+      const turnId = this.liveTurnId;
+      this.removeQueued(this.waiting.indexOf(item));
+      this.messages = [
+        ...this.messages,
+        {
+          messageId: inputId,
+          inputId,
+          role: "user",
+          turnId,
+          text: item.text,
+          attachments: item.attachments,
+        },
+      ];
+      const receipt = {
+        action: "steer",
+        inputId,
+        turnId,
+        requestId,
+        sessionId: this.sessionId,
+        sessionRevision: this.revision + 1,
+      } as const;
+      this.queueActionReceipts.set(requestId, { receipt, observationId });
+      this.changed();
+      return receipt;
     },
     steer: async (_, input) => {
       this.messages = [

@@ -11,6 +11,7 @@ import {
 import {
   AgentComposerInput,
   type AgentComposerInputProps,
+  type ComposerCommandAction,
 } from "./agent-composer-input";
 import { AgentComposerTools } from "./agent-composer-tools";
 import { ComposerVoice } from "./composer-voice";
@@ -137,6 +138,7 @@ export namespace AgentComposer {
   export type Command = Readonly<{
     id: CommandId;
     run(): void | Promise<void>;
+    dispatch?: ComposerCommandAction["dispatch"];
   }>;
   export type Action = Readonly<{
     disabled?: boolean;

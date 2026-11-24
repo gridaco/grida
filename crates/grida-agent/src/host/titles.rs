@@ -147,10 +147,15 @@ impl Host {
             .initial_label
             .map(InitialLabel::Display)
             .or_else(|| pending.as_ref().map(|_| InitialLabel::AwaitSuggestion));
-        let (acceptance, revision) = self
+        let retained = super::attachment_batch::has_retained_assets(&input);
+        let result = self
             .store
-            .submit_with_initial_label(session, input, expected, initial)
-            .await?;
+            .submit_with_initial_label(session.clone(), input, expected, initial)
+            .await;
+        if retained {
+            self.settle_input_assets(&session).await;
+        }
+        let (acceptance, revision) = result?;
         Ok(AcceptedInput {
             receipt: acceptance,
             title: pending.zip(revision),

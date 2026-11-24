@@ -18,6 +18,7 @@ export function NativeAttachmentCard({
   preview,
   mimeType,
   video,
+  queuedPreview,
   onRemove,
 }: {
   name: string;
@@ -28,18 +29,34 @@ export function NativeAttachmentCard({
   mimeType?: string;
   /** A video's poster frame and facts. */
   video?: Partial<video_attachment.Preview>;
-  onRemove: () => void;
+  queuedPreview?: Readonly<{
+    inputId: string;
+    previewId: string;
+    read(inputId: string, previewId: string): Promise<Blob>;
+  }>;
+  onRemove?: () => void;
 }) {
   const [url, setUrl] = useState<string>();
+  const { inputId, previewId, read } = queuedPreview ?? {};
   useEffect(() => {
-    if (!preview) {
+    let disposed = false;
+    let objectUrl: string | undefined;
+    const show = (image: Blob) => {
+      if (disposed) return;
+      objectUrl = URL.createObjectURL(image);
+      setUrl(objectUrl);
+    };
+    if (preview) show(preview);
+    else {
       setUrl(undefined);
-      return;
+      if (read && inputId && previewId)
+        void read(inputId, previewId).then(show, () => {});
     }
-    const next = URL.createObjectURL(preview);
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [preview]);
+    return () => {
+      disposed = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [preview, inputId, previewId, read]);
   return (
     <ComposerAttachmentCard
       attachment={{

@@ -44,6 +44,10 @@ async function started(workspace = true) {
   const process = {
     connected: true,
     acceptsFileReference: true,
+    acceptsAttachmentBatches: false,
+    acceptsFile: false,
+    supportsSelectedImage: false,
+    acceptsQueueActions: false,
     request,
     close: async () => {},
   };
@@ -91,6 +95,91 @@ const input = (filePath: string) => ({
   mimeType: "video/quicktime",
   preview: { poster: POSTER, durationMs: 12_500, width: 1920, height: 1080 },
   operatingRegime: "act",
+});
+
+it("sends one ordered batch and reuses the same attachment shape for editing", async () => {
+  const f = await started();
+  try {
+    const input = {
+      action: "enqueue",
+      inputId: "batch",
+      text: "Compare the notes and folder.",
+      operatingRegime: "act",
+      attachments: [
+        {
+          kind: "file",
+          name: "notes.txt",
+          bytes: new TextEncoder().encode("notes").buffer,
+        },
+        { kind: "reference", path: f.downloads },
+      ],
+    };
+    await expect(f.client.submitAttachments(f.session, input)).rejects.toThrow(
+      "native_chat_attachments_unavailable"
+    );
+    f.process.acceptsAttachmentBatches = true;
+    f.process.acceptsFile = true;
+    f.process.supportsSelectedImage = true;
+    f.process.acceptsQueueActions = true;
+    await expect(
+      f.client.submitAttachments(f.session, input)
+    ).resolves.toMatchObject({ inputId: "batch", disposition: "queued" });
+    expect(f.request.mock.lastCall).toEqual([
+      "_co.grida/session/enqueue",
+      {
+        sessionId: f.session.id,
+        inputId: "batch",
+        operatingRegime: "act",
+        prompt: [{ type: "text", text: input.text }],
+        attachments: [
+          {
+            kind: "staged_file",
+            size: 5,
+            selection: {
+              name: "notes.txt",
+              source: "snapshot",
+              path: expect.any(String),
+              sha256: expect.any(Array),
+            },
+          },
+          {
+            kind: "reference",
+            reference: {
+              name: "downloads",
+              path: f.downloads,
+              mimeType: "inode/directory",
+            },
+          },
+        ],
+      },
+    ]);
+    f.request.mockResolvedValueOnce({
+      sessionId: f.session.id,
+      requestId: "edit",
+      checkoutId: "checkout",
+      sessionRevision: 2,
+      inputId: "revision",
+      action: "reinsert",
+    });
+    await expect(
+      f.client.reinsertQueued(f.session, {
+        checkoutId: "checkout",
+        requestId: "edit",
+        attachments: [{ kind: "keep", index: 1 }],
+      })
+    ).resolves.toHaveProperty("outcome", "reinserted");
+    expect(f.request.mock.lastCall).toEqual([
+      "_co.grida/session/queue-reinsert",
+      {
+        sessionId: f.session.id,
+        requestId: "edit",
+        checkoutId: "checkout",
+        attachments: [{ kind: "keep", index: 1 }],
+      },
+    ]);
+  } finally {
+    await f.close();
+  }
 });
 
 it("sends a file outside the workspace as a path with its facts, never its bytes", async () => {

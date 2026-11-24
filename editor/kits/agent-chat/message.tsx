@@ -863,12 +863,15 @@ export function CompactionProgress() {
 export function CompactionNotice({
   summary,
   elapsedMs,
+  failed = false,
 }: {
   summary?: string;
   elapsedMs?: number;
+  failed?: boolean;
 }) {
-  const label =
-    elapsedMs === undefined
+  const label = failed
+    ? "Context compaction failed"
+    : elapsedMs === undefined
       ? "Context compacted"
       : `Context compacted · ${formatElapsed(Math.floor(elapsedMs / 1000))}`;
   const marker = (

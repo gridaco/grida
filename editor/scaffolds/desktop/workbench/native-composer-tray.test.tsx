@@ -33,7 +33,11 @@ function render(children: ReactNode): string {
 
 const queue: NativeChatQueuePage = {
   items: [
-    { inputId: "first", preview: "First message\nSecond line" },
+    {
+      inputId: "first",
+      preview: "First message\nSecond line",
+      steerable: true,
+    },
     { inputId: "second", preview: "Second message" },
     {
       inputId: "third",
@@ -49,10 +53,9 @@ const queue: NativeChatQueuePage = {
 function fixture() {
   const controller: NativeComposerQueue.Controller = {
     queueCurrent: true,
-    canSteer: false,
     editQueue: vi
       .fn<NativeComposerQueue.Controller["editQueue"]>()
-      .mockResolvedValue(),
+      .mockResolvedValue(true),
     showQueuePage: vi
       .fn<NativeComposerQueue.Controller["showQueuePage"]>()
       .mockResolvedValue(),
@@ -66,7 +69,7 @@ function fixture() {
     canEditQueuedText: (item) => !item.goalStart && item.textOnly !== false,
     steerQueued: vi
       .fn<NativeComposerQueue.Controller["steerQueued"]>()
-      .mockResolvedValue(null),
+      .mockResolvedValue(undefined),
     editQueuedText: vi
       .fn<NativeComposerQueue.Controller["editQueuedText"]>()
       .mockResolvedValue(),
@@ -97,13 +100,12 @@ describe("NativeComposerQueue", () => {
         view={view}
         queue={queue}
         count={3}
-        onReturnedText={() => {}}
       />
     );
     expect(html).toContain('data-testid="native-composer-queue"');
     expect(html).toContain("First message");
     expect(html).toContain("Second message");
-    expect(html).toContain('aria-label="Image attachment"');
+    expect(html).toContain("Image message");
     const grips = html.match(
       /<button[^>]*aria-label="Reorder queued message"[^>]*>/g
     )!;
@@ -122,7 +124,6 @@ describe("NativeComposerQueue", () => {
         view={view}
         queue={{ ...queue, offset: 5 }}
         count={10}
-        onReturnedText={() => {}}
       />
     );
     drag.end!(ended("first", "third"));
@@ -139,7 +140,6 @@ describe("NativeComposerQueue", () => {
       <NativeComposerQueue
         controller={{
           ...controller,
-          canSteer: true,
           canSteerQueued: () => true,
         }}
         view={{
@@ -148,12 +148,10 @@ describe("NativeComposerQueue", () => {
         }}
         queue={queue}
         count={3}
-        onReturnedText={() => {}}
       />
     );
     expect(html).toContain('aria-current="true"');
     expect(html).toContain("First message");
-    expect(html).toContain("Editing");
     expect(html).not.toContain("<textarea");
     expect(html).not.toContain('aria-label="Edit queued message"');
     expect(html).not.toContain("Revised text");
@@ -175,7 +173,6 @@ describe("NativeComposerQueue", () => {
       <NativeComposerQueue
         controller={{
           ...controller,
-          canSteer: true,
           canSteerQueued: () => true,
         }}
         view={{
@@ -185,7 +182,6 @@ describe("NativeComposerQueue", () => {
         }}
         queue={queue}
         count={3}
-        onReturnedText={() => {}}
       />
     );
     const buttons = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g)!;
@@ -209,7 +205,6 @@ describe("NativeComposerQueue", () => {
           view={{ ...view, acting: reason === "acting" }}
           queue={queue}
           count={3}
-          onReturnedText={() => {}}
         />
       );
       expect(html).not.toContain('aria-label="Reorder queued message"');
@@ -230,7 +225,6 @@ describe("NativeComposerQueue", () => {
         view={view}
         queue={queue}
         count={3}
-        onReturnedText={() => {}}
       />
     );
     drag.end!(ended(active!, over));
@@ -243,13 +237,46 @@ describe("NativeComposerQueue", () => {
       <NativeComposerTray
         controller={controller}
         view={{ ...controller.read(), queue }}
-        onReturnedText={() => {}}
         renderOutgoingStatus={() => null}
       />
     );
     expect(html).toContain('data-testid="workspace-composer-tray"');
     expect(html).toContain('data-testid="native-composer-queue"');
     expect(html).toContain("First message");
+  });
+
+  it("leaves checked-out edits and their recovery controls to the composer", () => {
+    const controller = new NativeChatController({} as DesktopNativeChat);
+    const view = {
+      ...controller.read(),
+      queueDraft: {
+        inputId: "first",
+        checkoutId: "checkout",
+        text: "Revised text",
+      },
+      queueEditRecovery: "reinsert" as const,
+    };
+    const html = render(
+      <NativeComposerTray
+        controller={controller}
+        view={{ ...view, queue }}
+        renderOutgoingStatus={() => null}
+      />
+    );
+    expect(html).not.toContain("First message");
+    expect(html).toContain("Second message");
+    expect(html).not.toContain("Editing queued message");
+    expect(html).not.toContain("Queue change unconfirmed");
+
+    expect(
+      render(
+        <NativeComposerTray
+          controller={controller}
+          view={view}
+          renderOutgoingStatus={() => null}
+        />
+      )
+    ).toBe("");
   });
 
   it("shows each captured follow-up in the queue from the first send through native admission", () => {
@@ -284,7 +311,6 @@ describe("NativeComposerQueue", () => {
               ...pending.slice(admitted),
             ],
           }}
-          onReturnedText={() => {}}
           renderOutgoingStatus={() => <span>Waiting for admission</span>}
         />
       );

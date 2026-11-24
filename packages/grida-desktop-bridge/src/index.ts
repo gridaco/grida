@@ -70,6 +70,10 @@ export { WebPreview } from "./web-preview";
 export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
+export {
+  NATIVE_CHAT_MAX_ATTACHMENTS,
+  NATIVE_CHAT_MAX_ATTACHMENT_IMAGE_BYTES,
+} from "./native-chat";
 export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";

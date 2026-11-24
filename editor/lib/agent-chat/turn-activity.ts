@@ -48,12 +48,13 @@ export namespace turn_activity {
 
   export type Block =
     | Readonly<{ kind: "message"; message: NativeChatMessage }>
-    /** Earlier context was summarized here; the turn added no messages. */
+    /** Standalone compaction settled without adding a user or agent message. */
     | Readonly<{
         kind: "compaction";
         turnId: string;
         compactionId: string;
         summary?: string;
+        failed?: true;
       }>
     | Readonly<{
         kind: "turn";
@@ -93,7 +94,7 @@ export namespace turn_activity {
     const compactions = records.flatMap((record, at) =>
       turnsWithMessages.has(record.turnId)
         ? []
-        : completedCompactions(record).map((compaction) => ({
+        : completedCompactions(record, true).map((compaction) => ({
             at,
             record,
             compaction,
@@ -108,6 +109,7 @@ export namespace turn_activity {
           turnId: record.turnId,
           compactionId: compaction.id,
           summary: compaction.summary,
+          ...(compaction.status === "failed" && { failed: true }),
         });
       }
     };
@@ -220,10 +222,15 @@ export namespace turn_activity {
   }
 
   function completedCompactions(
-    record: NativeChatTurnRecord | undefined
+    record: NativeChatTurnRecord | undefined,
+    includeManualFailures = false
   ): NativeChatCompaction[] {
     if (record?.compactions?.length)
-      return record.compactions.filter((item) => item.status === "succeeded");
+      return record.compactions.filter(
+        (item) =>
+          item.status === "succeeded" ||
+          (includeManualFailures && !item.automatic && item.status === "failed")
+      );
     return record?.compaction
       ? [{ ...record.compaction, id: record.turnId, status: "succeeded" }]
       : [];
@@ -292,7 +299,11 @@ export namespace turn_activity {
   export function items(messages: readonly NativeChatMessage[]): Item[] {
     const result: Item[] = [];
     for (const message of messages) {
-      if (message.text.trim()) result.push({ kind: "commentary", message });
+      if (
+        message.text.trim() ||
+        (message.role === "user" && message.attachments?.length)
+      )
+        result.push({ kind: "commentary", message });
       if (!message.activity?.length) continue;
       const last = result.at(-1);
       if (last?.kind === "activity")

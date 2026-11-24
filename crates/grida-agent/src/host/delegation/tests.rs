@@ -1855,6 +1855,7 @@ async fn waiting_collects_terminal_failure_with_resource_uncertainty_without_pol
             Active {
                 turn: TurnId::new(TURN).unwrap(),
                 admitted: true,
+                queued_steer: None,
                 handle: cleanup.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,

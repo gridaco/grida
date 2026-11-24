@@ -74,28 +74,38 @@ const EMPTY_QUEUE: NativeChatQueuePage = {
 export function NativeComposerTray({
   controller,
   view,
-  onReturnedText,
+  prepareQueueRemoval,
   renderOutgoingStatus,
 }: {
   controller: NativeChatController;
   view: NativeChatView;
   renderOutgoingStatus: (item: NativeChatView["outgoing"][number]) => ReactNode;
-  /** Text that left the queue but could not reach the current turn. */
-  onReturnedText: (text: string) => void;
+  prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
 }) {
   const queue = view.queue;
   const goal = view.goal?.goal;
   const pendingGoal = !!view.observation?.snapshot.pendingGoalId;
   const showGoal = pendingGoal || (!!goal && goal.state.status !== "cleared");
   const items = queue?.items ?? [];
-  const outgoing = view.outgoing.filter((item) => item.placement === "queue");
+  const hidden =
+    view.queueDraft?.checkoutId || view.queueDraft?.fromKeyboard
+      ? view.queueDraft.inputId
+      : undefined;
+  const outgoing = view.outgoing.filter(
+    (item) => item.placement === "queue" && item.id !== hidden
+  );
   const count = view.observation?.snapshot.queuedInputs ?? items.length;
   // An interrupted turn pauses the queue. An idle queue can also wait with
   // nothing paused (after a restart); a goal that is starting is its own row.
   const interrupted = !!view.observation?.snapshot.admissionPaused;
   const held =
     count > 0 && controller.canResumeQueue && (interrupted || !pendingGoal);
-  if (!count && !outgoing.length && !showGoal) return null;
+  const showQueue =
+    items.some((item) => item.inputId !== hidden) ||
+    outgoing.length > 0 ||
+    (!!queue && (queue.previousOffset !== null || queue.nextOffset !== null));
+  const loadingRows = count > 0 && !items.length && !outgoing.length && !held;
+  if (!showQueue && !loadingRows && !held && !showGoal) return null;
   return (
     <div
       data-testid="workspace-composer-tray"
@@ -122,18 +132,18 @@ export function NativeComposerTray({
           </Button>
         </div>
       )}
-      {count > 0 && !items.length && !outgoing.length && !held && (
+      {loadingRows && (
         <p role="status" className="text-muted-foreground px-3 py-2">
           {count === 1 ? "1 queued message" : `${count} queued messages`}
         </p>
       )}
-      {(items.length > 0 || outgoing.length > 0) && (
+      {showQueue && (
         <NativeComposerQueue
           controller={controller}
           view={view}
           queue={queue ?? EMPTY_QUEUE}
           count={count}
-          onReturnedText={onReturnedText}
+          prepareQueueRemoval={prepareQueueRemoval}
         >
           {outgoing.map((item) => (
             <div
@@ -143,8 +153,16 @@ export function NativeComposerTray({
               <NativeQueuedMessagePreview
                 inputId={item.id}
                 preview={item.text || null}
-                label={item.text || item.attachment?.name || "Queued message"}
-                attachments={item.attachment ? [item.attachment] : undefined}
+                label={
+                  item.text ||
+                  item.attachments?.map(({ name }) => name).join(", ") ||
+                  item.attachment?.name ||
+                  "Queued message"
+                }
+                attachments={
+                  item.attachments ??
+                  (item.attachment ? [item.attachment] : undefined)
+                }
                 displayParts={item.displayParts}
               />
               {renderOutgoingStatus(item)}
@@ -165,7 +183,7 @@ export function NativeComposerQueue({
   view,
   queue,
   count,
-  onReturnedText,
+  prepareQueueRemoval,
   children,
 }: NativeComposerQueue.Props) {
   const ids = queue.items.map((item) => item.inputId);
@@ -182,6 +200,10 @@ export function NativeComposerQueue({
   }, [order, authoritativeOrder]);
   const shown =
     order && order.basis.join("\n") === authoritativeOrder ? order.ids : ids;
+  const visible =
+    view.queueDraft?.checkoutId || view.queueDraft?.fromKeyboard
+      ? shown.filter((id) => id !== view.queueDraft?.inputId)
+      : shown;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
@@ -218,8 +240,8 @@ export function NativeComposerQueue({
         modifiers={[restrictToVerticalAxis, restrictToParentElement]}
         onDragEnd={drop}
       >
-        <SortableContext items={shown} strategy={verticalListSortingStrategy}>
-          {shown.map((inputId) => {
+        <SortableContext items={visible} strategy={verticalListSortingStrategy}>
+          {visible.map((inputId) => {
             const item = queue.items.find((row) => row.inputId === inputId)!;
             return (
               <QueueRow
@@ -231,10 +253,10 @@ export function NativeComposerQueue({
                 queued={count}
                 sortable={
                   !locked &&
-                  shown.length > 1 &&
+                  visible.length > 1 &&
                   view.queueDraft?.inputId !== inputId
                 }
-                onReturnedText={onReturnedText}
+                prepareQueueRemoval={prepareQueueRemoval}
               />
             );
           })}
@@ -281,7 +303,6 @@ export namespace NativeComposerQueue {
     | "showQueuePage"
     | "readQueuedText"
     | "readQueuedAttachmentPreview"
-    | "canSteer"
     | "canSteerQueued"
     | "steerQueued"
     | "editQueuedText"
@@ -298,7 +319,7 @@ export namespace NativeComposerQueue {
     queue: NativeChatQueuePage;
     /** Size of the entire queue, including rows on other pages. */
     count: number;
-    onReturnedText: (text: string) => void;
+    prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
   }>;
 }
 
@@ -309,7 +330,7 @@ function QueueRow({
   position,
   queued,
   sortable,
-  onReturnedText,
+  prepareQueueRemoval,
 }: {
   controller: NativeComposerQueue.Controller;
   view: NativeComposerQueue.View;
@@ -317,7 +338,7 @@ function QueueRow({
   position: number;
   queued: number;
   sortable: boolean;
-  onReturnedText: (text: string) => void;
+  prepareQueueRemoval?: (inputId: string) => (() => void) | undefined;
 }) {
   const {
     attributes,
@@ -380,10 +401,7 @@ function QueueRow({
             : undefined
         }
       />
-      {editing && (
-        <span className="shrink-0 text-xs text-muted-foreground">Editing</span>
-      )}
-      {controller.canSteer && (
+      {item.steerable === true && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -394,11 +412,7 @@ function QueueRow({
               disabled={
                 locked || !!view.queueDraft || !controller.canSteerQueued(item)
               }
-              onClick={() =>
-                void controller
-                  .steerQueued(item.inputId)
-                  .then((text) => text && onReturnedText(text))
-              }
+              onClick={() => void controller.steerQueued(item.inputId)}
             >
               <CornerDownRightIcon className="size-3.5" />
               Steer
@@ -410,12 +424,17 @@ function QueueRow({
       <TrayIcon
         label="Remove from queue"
         disabled={rowLocked}
-        onClick={() =>
-          void controller.editQueue({
-            action: "withdraw",
-            inputId: item.inputId,
-          })
-        }
+        onClick={() => {
+          const onRemoved = prepareQueueRemoval?.(item.inputId);
+          void controller
+            .editQueue({
+              action: "withdraw",
+              inputId: item.inputId,
+            })
+            .then((removed) => {
+              if (removed) onRemoved?.();
+            });
+        }}
       >
         <Trash2Icon />
       </TrayIcon>

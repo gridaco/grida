@@ -607,25 +607,24 @@ it("keeps typed queue edits through reconnect and saves them only when asked", a
     f.loseHost();
     window.dispatchEvent(new Event("focus"));
   });
-  const save = page.getByRole("button", { name: "Save changes" });
+  const sendEdit = page.getByRole("button", { name: "Send", exact: true });
   const reconnect = page.getByRole("button", {
     name: "Reconnect",
     exact: true,
   });
   await expect.element(reconnect).toBeVisible();
-  await expect.element(save).toBeDisabled();
+  await expect.element(sendEdit).toBeDisabled();
   await expect.element(page.getByText(edited, { exact: true })).toBeVisible();
   f.restoreHost();
   await act(async () => reconnect.click());
   await expect.element(reconnect).not.toBeInTheDocument();
-  await expect.element(save).toBeEnabled();
+  await expect.element(sendEdit).toBeEnabled();
   await expect.poll(() => composer()?.textContent).toBe(edited);
   await expect.element(queuePaused).toBeVisible();
   expect(f.bridge.editQueue).not.toHaveBeenCalled();
   expect(f.submit).toHaveBeenCalledTimes(2);
 
-  await act(async () => save.click());
-  await expect.element(save).not.toBeInTheDocument();
+  await act(async () => sendEdit.click());
   await expect.element(page.getByText(edited, { exact: true })).toBeVisible();
   await expect.poll(() => composer()?.textContent).toBe(draft);
   expect(f.bridge.editQueue).toHaveBeenCalledExactlyOnceWith(

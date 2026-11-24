@@ -3,6 +3,7 @@
 mod access;
 pub(crate) mod activity_order;
 mod approval_review;
+mod attachment_batch;
 mod before_tool;
 mod bundled_skills;
 mod catalog;
@@ -35,9 +36,11 @@ mod permissions;
 pub(crate) mod prediction;
 pub mod prompt_preview;
 mod questions;
+pub(crate) mod queue_actions;
 mod queued_text;
 mod reconsideration;
 mod retained_file;
+pub(crate) use attachment_batch::{AttachmentEdit, MAX_ATTACHMENTS, is_attachment};
 mod retained_inputs;
 mod selected_file;
 mod selection;
@@ -62,6 +65,7 @@ pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use images::MAX_IMAGE_BYTES;
+pub(crate) use images::QueueReadBasis;
 pub use images::{ImageSource, ImageUpload, RetainedRaster, SelectedImage};
 pub(crate) use images::{is_retained_image, retained_image_size, retained_raster};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
@@ -390,6 +394,7 @@ impl Work {
 struct Active {
     turn: TurnId,
     admitted: bool,
+    queued_steer: Option<queue_actions::QueueSteerTarget>,
     handle: AbortHandle,
     pending_stop: Option<TurnId>,
     missed_stop: bool,
@@ -770,7 +775,7 @@ struct PreparedInput {
     subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
-    retained_file: Option<crate::scratch::WorkingCopyReceipt>,
+    retained_files: Vec<crate::scratch::WorkingCopyReceipt>,
     context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
@@ -1730,6 +1735,7 @@ impl Host {
             Active {
                 turn,
                 admitted: false,
+                queued_steer: None,
                 handle: handle.abort_handle(),
                 pending_stop: None,
                 missed_stop: false,
@@ -2197,14 +2203,21 @@ impl Host {
             })
             .transpose()?
             .flatten();
-        let file = prepared
-            .retained_file
-            .take()
-            .map(|work| {
+        let fixed_image_binding = image.is_some()
+            || prepared
+                .image_generation
+                .as_ref()
+                .is_some_and(image_generation::Prepared::has_attachment);
+        let file = (!prepared.retained_files.is_empty())
+            .then(|| {
                 let storage = execution.retained_inputs.clone().ok_or_else(|| {
                     problem(ErrorKind::Unsupported, "file_attachment_unavailable")
                 })?;
-                retained_file::TurnFile::bind(storage, claim.lease.binding(), work)
+                retained_file::TurnFile::bind(
+                    storage,
+                    claim.lease.binding(),
+                    std::mem::take(&mut prepared.retained_files),
+                )
             })
             .transpose()?;
         let skill_reader = prepared
@@ -2425,6 +2438,15 @@ impl Host {
                 prepared.spending.as_ref().filter(|_| !cancellation_only),
             )?
         };
+        let raster_steer = if !fixed_image_binding
+            && provider
+                .capabilities(&prepared.config.model)
+                .is_ok_and(|capabilities| capabilities.input_modalities.contains(&Modality::Image))
+        {
+            execution.retained_inputs.clone()
+        } else {
+            None
+        };
         let spending_runtime = (legacy_subscription
             || (!cancellation_only && prepared.spending.is_some()))
         .then(|| {
@@ -2641,6 +2663,14 @@ impl Host {
             };
             master = master.with_lifecycle_hooks(selected, inventory, grants);
         }
+        if !closing
+            && !cancellation_only
+            && !prepared.subagent
+            && let Some(active) = self.work.lock().await.active.get_mut(session)
+            && &active.turn == turn
+        {
+            active.queued_steer = Some(queue_actions::QueueSteerTarget::with_raster(raster_steer));
+        }
         Ok(Some(Admitted {
             opened,
             work: TurnWork::Conversation {
@@ -2845,26 +2875,7 @@ impl Host {
         }
         validate_prompt_parts(&parts)?;
         let cwd = session_configuration(session)?.cwd;
-        for part in &parts {
-            if let PromptPart::FileReference { reference } = part {
-                file_references::check_workspace_path(reference, &cwd)?;
-            }
-            if let PromptPart::SelectedImage { selection } = part {
-                selection.validate()?;
-                let path = Path::new(&selection.path);
-                if selection.source == ImageSource::Snapshot {
-                    images::check_snapshot_path(self.state_dir.as_deref(), path)?;
-                } else {
-                    if let Some(state) = &self.state_dir {
-                        crate::workspace::ProtectedRoots::new(vec![state.to_path_buf()])?
-                            .check(path)?;
-                    }
-                    if let Some(permissions) = &self.permissions {
-                        permissions.check_selected_image(path)?;
-                    }
-                }
-            }
-        }
+        self.check_attachment_paths(&parts, &cwd)?;
         let execution = self.execution()?;
         let selection = self.capture_chat_selection(
             session,
@@ -2980,52 +2991,9 @@ impl Host {
         } else {
             Some(skills::capture_listing(self.guidance_scope(session)?, optional_skills).await?)
         };
-        let parts = if parts.iter().any(|part| {
-            matches!(
-                part,
-                PromptPart::Image { .. }
-                    | PromptPart::SelectedImage { .. }
-                    | PromptPart::File { .. }
-            )
-        }) {
-            if parts.iter().any(|part| {
-                matches!(
-                    part,
-                    PromptPart::Image { .. } | PromptPart::SelectedImage { .. }
-                )
-            }) && !self.accepts_images()
-            {
-                return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));
-            }
-            let storage = execution
-                .retained_inputs
-                .clone()
-                .ok_or_else(|| problem(ErrorKind::Unsupported, "file_attachment_unavailable"))?;
-            let cwd = session_configuration(session)?.cwd;
-            let session = session.session.clone();
-            let input = id.clone();
-            tokio::task::spawn_blocking(move || {
-                parts
-                    .into_iter()
-                    .map(|part| match part {
-                        PromptPart::Image { image } => {
-                            storage.retain_prompt_image(&session, &cwd, &input, image)
-                        }
-                        PromptPart::SelectedImage { selection } => {
-                            storage.retain_prompt_image(&session, &cwd, &input, selection.read()?)
-                        }
-                        PromptPart::File { file } => Ok(PromptPart::RetainedFile {
-                            work: storage.retain_file(&session, &cwd, &input, file)?,
-                        }),
-                        other => Ok(other),
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })
-            .await
-            .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))??
-        } else {
-            parts
-        };
+        let parts = self
+            .retain_prompt_attachments(&session.session, &cwd, &id, parts)
+            .await?;
         let allow_attachment_reference = desktop_image_generation.is_some()
             && self.supports_attachment_reference()
             && self
@@ -3159,7 +3127,7 @@ impl Host {
         let effort;
         let delegation;
         let worker;
-        let mut retained_file = None;
+        let mut retained_files = Vec::new();
         let skills;
         let project_instructions;
         let (
@@ -3239,11 +3207,15 @@ impl Host {
                     ));
                 }
                 if !cancellation_only {
-                    retained_file = stored.parts.iter().find_map(|part| match part {
-                        PromptPart::RetainedFile { work } => Some(work.clone()),
-                        _ => None,
-                    });
-                    if retained_file.is_some() && subagent_profile.is_some() {
+                    retained_files = stored
+                        .parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            PromptPart::RetainedFile { work } => Some(work.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    if !retained_files.is_empty() && subagent_profile.is_some() {
                         return Err(problem(
                             ErrorKind::InvalidState,
                             "retained_file_scope_mismatch",
@@ -3704,7 +3676,7 @@ impl Host {
             subagent,
             operating_regime,
             messages,
-            retained_file,
+            retained_files,
             context_limits,
             questions,
             question_batches,
@@ -4969,22 +4941,16 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 }
 
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
-    let mut uploads = 0;
-    let mut files = 0;
-    let mut references = 0;
+    attachment_batch::check_count(parts)?;
     for part in parts {
         match part {
-            PromptPart::Image { .. } => uploads += 1,
             PromptPart::SelectedImage { selection } => {
                 selection.validate()?;
-                uploads += 1;
             }
-            PromptPart::File { .. } => files += 1,
             PromptPart::FileReference { reference } => {
                 reference
                     .validate()
                     .map_err(|code| problem(ErrorKind::InvalidInput, code))?;
-                references += 1;
             }
             PromptPart::RetainedImage { .. } | PromptPart::PreparedImage { .. } => {
                 return Err(problem(
@@ -5000,21 +4966,6 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
             }
             _ => {}
         }
-    }
-    if uploads > 1 {
-        return Err(problem(ErrorKind::LimitExceeded, "image_count_limit"));
-    }
-    if references > file_references::MAX_REFERENCES {
-        return Err(problem(
-            ErrorKind::LimitExceeded,
-            "file_reference_count_limit",
-        ));
-    }
-    if files > 1 || files > 0 && uploads > 0 {
-        return Err(problem(
-            ErrorKind::LimitExceeded,
-            "file_attachment_count_limit",
-        ));
     }
     validate_prompt_record(parts)
 }

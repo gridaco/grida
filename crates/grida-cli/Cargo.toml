@@ -18,10 +18,27 @@ name = "grida-conformance"
 path = "src/bin/conformance.rs"
 required-features = ["conformance"]
 
+[[bin]]
+name = "grida-agent-tui"
+path = "src/bin/agent-tui/main.rs"
+required-features = ["agent-tui"]
+
 [features]
 conformance = []
+agent-tui = [
+  "dep:agent-client-protocol",
+  "dep:ratatui",
+  "crossterm/event-stream",
+  "tokio/process",
+  "tokio-util/compat",
+]
 
 [dependencies]
+agent-client-protocol = { version = "=5.0.0", optional = true }
+ratatui = { version = "=0.30.2", default-features = false, features = [
+  "crossterm_0_29",
+  "unstable-rendered-line-info",
+], optional = true }
 agent-kit-core = { path = "../agent-kit-core" }
 agent-kit-providers = { path = "../agent-kit-providers" }
 grida-agent = { path = "../grida-agent" }

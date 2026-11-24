@@ -710,6 +710,70 @@ admission or host restart, without accepting more work. Reusing a request ID wit
 a different action is refused. The general `replace` operation retains its
 whole-input behavior; it is not a fallback for caption editing.
 
+### Check out, reinsert, and steer queued work
+
+A private stdio client can negotiate `co.grida/session/queue-actions` version 1.
+Snapshot returns `checkoutable` and `steerable` for the observed queue rows.
+A session with a checked-out item also returns `queueCheckout` with its
+`checkoutId` and `inputId`. Reattaching can observe the checkout and the retained
+input without admitting it. The checkout remains open until it is reinserted.
+When both queue actions and queued image chunks are negotiated, pass
+`checkoutId` in place of `expectedSessionRevision` to `queued-message` and
+`read-queued-input-image-chunk` with the original `inputId`. The read requires
+the exact open checkout in the attached session and grants no access to a
+source path.
+
+| Method suffix after `_co.grida/session/` | Parameters                                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `queue-checkout`                         | `sessionId`, `requestId`, `expectedSessionRevision`, and `inputId`.                                   |
+| `queue-reinsert`                         | `sessionId`, `requestId`, `checkoutId`, optional `text` and negotiated `attachments`.                 |
+| `steer-queued`                           | `task` naming the exact running turn at the observed session and control revisions, and `inputId`.    |
+| `queue-action-receipt`                   | `sessionId` and `requestId`. Returns `receipt`, or null when no action committed under that identity. |
+
+Checkout wins against admission at the observed revision and takes the item out
+of the runnable queue. The session can hold one checkout. Its ID is the
+checkout's request ID. It reserves the original position and capacity while
+other messages can run or reorder. Reinserting without `text` and `attachments`
+restores the original input. A supplied `text` uses the same retained-part and settings
+rules as `replace-text`, with a fresh immutable input identity. Reinsertion
+requires the open checkout and tolerates intervening queue activity. It follows
+ordinary admission and respects an explicit queue pause.
+
+Clients that negotiate [ordered attachment intake](#ordered-attachment-intake)
+can also supply `attachments` to `queue-reinsert`. Its entries name selected inputs or a
+`{ "kind": "keep", "index": 0 }` member of the exact checkout. The
+negotiated checkout read identifies these members in `attachmentIndexes`,
+aligned with the attachment blocks in the returned editable prompt. That
+prompt contains authored text and attachments. The host carries other
+captured context forward. Indices are zero-based and belong to that checkout.
+List the kept and new inputs in
+their desired order. An empty list removes every attachment. An omitted
+list keeps the old attachments. An omitted `text` keeps the old text when
+the list is supplied. Omit both to restore the original input.
+
+The host verifies additions against the captured model and input scope, and
+commits the revised input as a single replacement at the reserved position.
+A refusal leaves the checkout open. An exact retry of Save checks its
+committed ordered intent before it reopens a selected source. Keeping an
+existing member uses its retained identity and issues no new read grant.
+
+A queued steer transfers an eligible input to the named running turn and
+appends its user contribution in one commit. A conflict leaves the source
+queued. It uses the turn's captured model, permissions, and effort and keeps
+any Goal's objective and allowance. A Plan turn stays read-only. Inputs queued
+for Plan, Ultra, or a Goal start retain their own turn. A file or folder
+reference transfers as a reference. Raster input requires verified retained
+bytes for every image and compatible turn capabilities. Input with a turn-bound file or
+other incompatible capability stays queued.
+
+The action receipt carries `sessionId`, `requestId`, `sessionRevision`, and
+`inputId`. The receipt lookup identifies `action` as `checkout`, `reinsert`, or
+`steer` and includes the applicable `checkoutId` or `turnId`. An exact retry
+observes the committed receipt even after the checkout closes, the reinserted
+message runs, or the addressed turn settles. Reusing the request ID with
+changed intent is refused. Receipt lookup uses the authorized attached session
+and works after reconnect or restart. It makes no new change.
+
 Private stdio clients can negotiate `co.grida/session/updates` version 1.
 Already attached sessions then receive standard `session/update` assistant
 chunks for identified submissions, queued work, and resumed turns. The
@@ -870,6 +934,25 @@ setup. An exact bare `/compact` or `/fork` in `session/prompt` runs the same
 host control and returns its result under the negotiated key in `_meta`.
 Identified control requests support exact retries across reconnects.
 
+An attached client can negotiate `co.grida/session/compact/start` version 1
+and call `_co.grida/session/compact/start` with `{sessionId, requestId}`.
+The reply reports admission while the compaction worker continues:
+
+- `{requestId, status: "admitted", turnId}` identifies the durable manual
+  compaction turn. An exact retry returns the same admission even after the
+  turn settles or the client reconnects. The receipt describes the
+  original admission. Use the recovery operation for an interrupted turn.
+- `{requestId, status: "no_change", turnId: null}` reports that the host found
+  no history to compact. The request has no durable turn. Use a fresh
+  request ID for a later compaction after this reply.
+- `compaction_admission_pending` means the same request is still awaiting
+  durable admission. Retry with its original request ID.
+
+Read the current session snapshot after admission and use the existing
+compaction items and lifecycle events to observe progress and settlement.
+Clients that need the outcome as a reply can use
+`_co.grida/session/compact` with its original capability.
+
 Compaction starts from an idle session with open admission and an empty queue.
 It owns a real turn that can be paused or stopped. New queued input remains
 accepted. Standard load and history anchors keep the original transcript.
@@ -891,6 +974,43 @@ A conversation checkpoint created under a retired workspace input cap returns
 `retired_input_cap_requires_restart` before Resume claims the turn. Stop
 remains available, and the client can accept a fresh message afterward.
 
+### Ordered attachment intake
+
+Private stdio clients can negotiate `co.grida/session/attachment-batches`
+version 1 with the existing per-kind capabilities. Submit and Enqueue accept
+`attachments` as an ordered array of up to eight entries alongside prompt
+text. Each entry is one of the following.
+
+- `{ "kind": "image", "selection": { … } }` uses the selected raster
+  descriptor below. Source files and prepared derivatives are retained
+  separately. Total original raster bytes are limited to 64 MiB per batch.
+- `{ "kind": "file", "name": "notes.txt", "data": "…" }` carries
+  standard base64. Each file is limited to 256 KiB. Inline file data in the
+  entire batch is limited to 384 KiB before encoding.
+- `{ "kind": "staged_file", "selection": { … }, "size": 262144 }`
+  names one file in the protected launcher snapshot directory. The
+  descriptor must declare `source: "snapshot"`. The host rechecks the
+  exact digest and byte count and enforces the same 256 KiB per-file limit.
+  This permits larger batches within the existing ACP frame limit.
+- `{ "kind": "reference", "reference": { … } }` describes one file or
+  folder by `name`, absolute `path` and optional `workspacePath`,
+  `mimeType`, `size` and `preview`. The host records the path and grants
+  no access.
+
+Use one intake form per request. A batch with legacy selected-file,
+selected-image, embedded-resource or ACP image blocks is refused. Existing
+text and mode restrictions apply. The host accepts one input after all
+members are prepared, and no turn sees part of a refused batch. New scratch
+assets are marked pending until native admission is confirmed. On
+interruption, later intake reconciles their ownership against durable
+accepted inputs before allocating additional assets.
+
+Each retained file has a distinct selection identity even when filenames
+match. For a turn with multiple retained files, `inspect_retained_file`
+requires an `attachment_id` from the turn's offered file list.
+
+### Single-attachment intake
+
 Private stdio advertises `promptCapabilities.image` on declared image-capable
 native profiles on macOS and Linux, including the subscription composition.
 `session/prompt`, Submit, Enqueue, and
@@ -900,8 +1020,10 @@ base64 encoding. The host checks decoded image bounds and rejects the full input
 image cannot be accepted. Readback identifies the image with a text marker.
 Only the original digest and identity are in conversation records. Resume
 verifies the exact retained bytes before dispatch. A fork or compaction can
-omit earlier image content and records that omission. Image steering, earlier
-message replacement, and shared WebSocket intake are unavailable.
+omit earlier image content and records that omission. The direct steer operation
+accepts no image blocks. Eligible retained images can move through the private
+queued-steer operation above. Earlier-message replacement with images and
+shared WebSocket image intake are unavailable.
 
 For an explicitly selected local raster, negotiate
 `co.grida/session/selected-image` version 1. Submit, Enqueue and Goal Start accept one

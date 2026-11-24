@@ -80,9 +80,21 @@ function ComposerExamples() {
         <PreviewRefreshDemo />
       </Example>
       <Example id="message-queue" title="Message queue">
+        <p className="text-sm text-muted-foreground">
+          Choose Edit from a message’s menu, then use Send to put the revision
+          back in the queue or press Escape to restore the original. Move the
+          sample image to the top and choose Steer to see it in the
+          conversation.
+        </p>
         <DesktopComposerDemo queued />
       </Example>
       <Example id="attachments" title="Attachments">
+        <p className="text-sm text-muted-foreground">
+          Drop two images, add a caption, and turn on Hold submission before
+          sending. Type your next draft while the send waits. Accept the send or
+          refuse it and retry from the message. Reopen chat to see the accepted
+          images in the transcript and continue your next draft.
+        </p>
         <DesktopComposerDemo scenario="attachments" />
       </Example>
       <Example id="long-paste" title="Long pasted text">
@@ -106,8 +118,8 @@ function ComposerExamples() {
           <CompactionProgress />
         </div>
         <p className="text-sm text-muted-foreground">
-          To try the full flow, send <code>/compact</code> below and select
-          Finish compaction.
+          Send <code>/compact</code> below. Send a follow-up while the summary
+          is running, then select Finish compaction to start that message.
         </p>
         <DesktopComposerDemo scenario="compaction" />
       </Example>

@@ -4,6 +4,9 @@ mod acceptance;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/approvals.rs"]
 mod approvals;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/attachment_batches.rs"]
+mod attachment_batches;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     CancelNotification, ContentBlock, InitializeRequest, LoadSessionRequest, NewSessionRequest,
@@ -89,6 +92,9 @@ mod prompt_preview;
 #[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/queue_actions.rs"]
+mod queue_actions;
 #[path = "process/responses.rs"]
 mod responses;
 #[cfg(any(target_os = "macos", target_os = "linux"))]

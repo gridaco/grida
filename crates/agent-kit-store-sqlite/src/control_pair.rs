@@ -1,15 +1,14 @@
 //! Conditional controls for a turn and an operation's claimed destination.
 
 use super::{
-    Inner, OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit, database_error, decode,
-    deletion, error, execute, load_turn, lookup_request, operation_claim_key, record_control,
-    save_request,
+    Inner, OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit, database_error, deletion,
+    error, execute, load_turn, lookup_request, operation_claim_key, record_control,
+    retained_request, save_request,
 };
 use agent_kit_core::turn::TurnState;
-use agent_kit_core::{ChangeId, ErrorKind, Fingerprint, OperationId, Result, SessionId, TurnId};
+use agent_kit_core::{ErrorKind, Fingerprint, OperationId, Result, SessionId, TurnId};
 use agent_kit_sessions::{ControlReceipt, ControlRequest, SessionControl};
-use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
-use serde::de::DeserializeOwned;
+use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -289,23 +288,6 @@ pub(super) fn retained_operation_claim(
 ) -> Result<Option<OperationClaimRecord>> {
     let key = operation_claim_key(source_turn, operation)?;
     retained_request(connection, source_session, OPERATION_CLAIM, &key)
-}
-
-fn retained_request<T: DeserializeOwned>(
-    connection: &Connection,
-    session: &SessionId,
-    kind: &str,
-    id: &ChangeId,
-) -> Result<Option<T>> {
-    let bytes: Option<Vec<u8>> = connection
-        .query_row(
-            "SELECT receipt FROM requests WHERE session=?1 AND kind=?2 AND id=?3",
-            params![session.as_str(), kind, id.as_str()],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(database_error)?;
-    bytes.as_deref().map(decode).transpose()
 }
 
 fn record_fresh_control(

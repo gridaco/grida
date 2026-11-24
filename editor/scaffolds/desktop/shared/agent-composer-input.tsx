@@ -34,10 +34,8 @@ import {
 } from "react";
 import {
   ArrowUpIcon,
-  CheckIcon,
   LoaderCircleIcon,
   MicIcon,
-  PencilIcon,
   SquareIcon,
 } from "lucide-react";
 import { isDesktopVoiceReady } from "@grida/desktop-bridge";
@@ -62,7 +60,9 @@ import { EditorSelectionIndicator } from "@/kits/agent-chat/editor-selection-ind
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
+  ComposerAttachmentStrip,
   ComposerContent,
+  ComposerHistory,
   ComposerMenuAnchor,
   ComposerProvider,
   ComposerToolbarTooltip,
@@ -72,13 +72,8 @@ import {
   useComposer,
   type ComposerCatalog,
   type ComposerController,
-  type ComposerMessage,
 } from "@/kits/composer";
-import {
-  AgentComposerQueueSubmitGuard,
-  isSameComposerDraft,
-  type AgentComposerQueueSubmitLease,
-} from "./agent-composer-queue-submit";
+import { AgentComposerSubmission } from "./agent-composer-submission";
 
 const ESCAPE_CONFIRM_MS = 2000;
 const MAX_DICTATION_DRAFT_BYTES = 512 * 1024;
@@ -91,27 +86,15 @@ const noSubscription = () => () => {};
  * lowered into the prompt. Shown in the trigger menu; intercepted on
  * submit.
  */
-export type ComposerCommandAction = {
-  id: string;
-  title: string;
-  description?: string;
-  standalone?: true;
-  run: () => void | Promise<void>;
-};
+export type ComposerCommandAction = AgentComposerSubmission.Command;
 
 export type AgentComposerInputProps = {
   /** Borrow this input for an existing message; the ordinary draft is retained. */
   editing?: Readonly<{
     id: string;
     text: string;
-    label: string;
-    busy?: boolean;
-    /** Save needs fresh host state, while the local draft stays editable. */
-    saveDisabled?: boolean;
-    /** The edited message has retained non-text content even with empty text. */
-    allowEmpty?: boolean;
-    /** True only after confirmation. The caller then clears `editing`. */
-    onSave(text: string): Promise<boolean>;
+    savedDocument?: Readonly<{ document: unknown | null }>;
+    onWrite?(document: unknown | null): void;
     onCancel(): void;
   }>;
   catalog: ComposerCatalog;
@@ -121,10 +104,11 @@ export type AgentComposerInputProps = {
   /** Handle intent commands when selected, before they become prompt chips. */
   onCommandSelect?: (command: ComposerCatalog["commands"][number]) => boolean;
   /**
-   * Receives the lowered prompt text. Empty submissions are filtered unless
-   * `allowEmptySubmit` is set.
+   * Receives the lowered prompt and the document captured at Send.
+   * Empty submissions are filtered unless `allowEmptySubmit` is set.
    */
-  onSubmit: (text: string) => void | Promise<void>;
+  onSubmit: (text: string, document: unknown | null) => void | Promise<void>;
+  readOnly?: boolean;
   /** Transfer the draft immediately. An undefined result uses onSubmit. */
   onCapture?: (text: string, document: unknown) => boolean | undefined;
   /** Override the inline notice when an awaited send fails. */
@@ -148,7 +132,12 @@ export type AgentComposerInputProps = {
   submissionScope?: string | number;
   draftRef?: Ref<
     Pick<ComposerController, "appendText" | "focus"> &
-      Partial<Pick<ComposerController, "readDocument" | "restoreDocument">>
+      Partial<
+        Pick<
+          ComposerController,
+          "readDocument" | "restoreDocument" | "recordHistoryEffect"
+        >
+      >
   >;
   /** An Escape confirmation applies only to the turn visible on the first press. */
   activeTurnId?: string;
@@ -167,12 +156,14 @@ export type AgentComposerInputProps = {
    * Where unsent text is kept, keyed by chat. The draft survives remounting,
    * reconnection and restarts; only deleting it or an accepted send clears it.
    */
-  draft?: {
-    key: string;
-    store: ComposerDrafts;
-    promotedFrom?: string;
-    /** Retain edits that must also cross a Home-to-workspace handoff. */
-    onWrite?: (document: unknown | null) => void;
+  draft?: ComposerDraftBinding.Target & {
+    store: Pick<ComposerDrafts, "beginDocumentSend" | "settleDocumentSend">;
+  };
+  history?: Omit<ComposerHistory.Source, "onRecallBlocked"> & {
+    recallBlockedMessage?: string;
+    disabled?: boolean;
+    retainSent?: boolean;
+    attachments?: ComposerHistory.Attachments;
   };
   placeholder?: string;
   prediction?: NativeComposerPrediction;
@@ -212,7 +203,7 @@ export function AgentComposerInput({
 }: AgentComposerInputProps) {
   // Surface action commands in the `/` menu alongside catalog commands.
   const effectiveCatalog = useMemo<ComposerCatalog>(() => {
-    if (editing) return { commands: [], mentions: [] };
+    if (editing) return { commands: [], mentions: catalog.mentions };
     if (!commandActions || commandActions.length === 0) return catalog;
     const actionCommands = commandActions.map((a) => ({
       id: a.id,
@@ -245,6 +236,7 @@ function AgentComposerInner({
   onSubmit,
   onCapture,
   onSubmitError,
+  readOnly: inputReadOnly = false,
   isStreaming,
   busy,
   submitting = false,
@@ -256,6 +248,7 @@ function AgentComposerInner({
   onStop,
   emptyAction,
   draft,
+  history: historySource,
   prediction,
   placeholder = "Ask anything…",
   autofocus,
@@ -279,59 +272,40 @@ function AgentComposerInner({
   // change. A different chat starts from its own draft.
   const draftKey = draft?.key;
   const draftStore = draft?.store;
-  const onDraftWrite = draft?.onWrite;
   const promotedFrom = draft?.promotedFrom;
-  const editOwner = draftKey ?? submissionScope;
+  const ordinaryOwner = draftKey ?? submissionScope;
+  const editOwner = useMemo(() => ({}), [ordinaryOwner, draftStore]);
   const [binding] = useState(() => new ComposerDraftBinding());
+  const isDraftBound = useCallback(
+    () =>
+      draftKey === undefined ||
+      !draftStore ||
+      binding.owns({ key: draftKey, store: draftStore }),
+    [binding, draftKey, draftStore]
+  );
   const { voice, state: voiceState } = useComposerVoice(voiceDictation);
   useLayoutEffect(
     () => voice.cancel,
     [voice, draftKey, draftStore, submissionScope, editing?.id]
   );
+  useLayoutEffect(() => {
+    if (draft && binding.restore(draft, composer) === "restored" && autofocus)
+      composer.focus();
+  }, [binding, composer, draft, autofocus]);
   useEffect(() => {
-    if (!draftKey || !draftStore || !composer.ready) return;
-    const meeting = binding.meet(draftKey, promotedFrom);
-    if (meeting === "held") return;
-    const saved = draftStore.read(draftKey);
-    if (
-      meeting === "promoted" &&
-      JSON.stringify(saved) === JSON.stringify(readDocument())
-    ) {
-      binding.restored(draftKey);
-      return;
-    }
-    if (binding.held !== null) composer.clear();
-    if (saved === null || restoreDocument(saved)) {
-      binding.restored(draftKey);
-      if (autofocus) composer.focus();
-    }
-    // composer.clear is stable for a given editor, like restoreDocument.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    binding,
-    draftKey,
-    draftStore,
-    promotedFrom,
-    readDocument,
-    restoreDocument,
-    composer.ready,
-    composer.focus,
-    autofocus,
-  ]);
-  useEffect(() => {
-    if (!draftKey || !draftStore || binding.held !== draftKey) return;
-    const document = editSession.document(editOwner, readDocument());
-    draftStore.write(draftKey, document);
-    onDraftWrite?.(document);
+    if (!draft || !binding.owns(draft)) return;
+    const current = readDocument();
+    if (editing && editSession.owns(editing.id, editOwner))
+      editing.onWrite?.(current);
+    binding.retain(draft, editSession.document(editOwner, current));
   }, [
     binding,
     composer.snapshot,
-    onDraftWrite,
-    draftKey,
-    draftStore,
+    draft,
     readDocument,
     editSession,
     editOwner,
+    editing,
   ]);
   const predictedText = useSyncExternalStore(
     prediction?.subscribe ?? noSubscription,
@@ -344,20 +318,10 @@ function AgentComposerInner({
       if (typeof submissionScope === "number")
         prediction?.setDraft(
           submissionScope,
-          empty &&
-            !editing &&
-            !hasEditorSelection &&
-            (!draftKey || binding.held === draftKey)
+          empty && !editing && !hasEditorSelection && isDraftBound()
         );
     },
-    [
-      prediction,
-      submissionScope,
-      editing,
-      hasEditorSelection,
-      draftKey,
-      binding,
-    ]
+    [prediction, submissionScope, editing, hasEditorSelection, isDraftBound]
   );
   useEffect(() => {
     reportDraft(composer.isEmptyDraft());
@@ -377,39 +341,32 @@ function AgentComposerInner({
       focus: composer.focus,
       readDocument,
       restoreDocument,
+      recordHistoryEffect: composer.recordHistoryEffect,
     }),
-    [composer.appendText, composer.focus, readDocument, restoreDocument]
+    [
+      composer.appendText,
+      composer.focus,
+      composer.recordHistoryEffect,
+      readDocument,
+      restoreDocument,
+    ]
   );
 
-  const actionById = useMemo(() => {
-    const map = new Map<string, ComposerCommandAction>();
-    for (const a of commandActions ?? []) map.set(a.id, a);
-    return map;
-  }, [commandActions]);
-
-  const queueSubmitGuardRef = useRef<AgentComposerQueueSubmitGuard | null>(
-    null
+  const [submission] = useState(() => new AgentComposerSubmission());
+  const submitScope = useMemo(
+    () => ({}),
+    [submissionScope, draftKey, draftStore, editing?.id]
   );
-  if (!queueSubmitGuardRef.current) {
-    queueSubmitGuardRef.current = new AgentComposerQueueSubmitGuard();
-  }
-  const queueSubmitGuard = queueSubmitGuardRef.current;
-  const submissionScopeRef = useRef(submissionScope);
-  submissionScopeRef.current = submissionScope;
-  const [queueingLease, setQueueingLease] =
-    useState<AgentComposerQueueSubmitLease | null>(null);
-  const isQueueing =
-    queueingLease !== null &&
-    queueSubmitGuard.owns(queueingLease, submissionScope);
-  const readOnly = !!editing && (!!editing.busy || isQueueing);
-  useEffect(() => {
-    queueSubmitGuard.mount();
-    return () => queueSubmitGuard.unmount();
-  }, [queueSubmitGuard]);
-  const editingRef = useRef(editing);
-  editingRef.current = editing;
-  const editOwnerRef = useRef(editOwner);
-  editOwnerRef.current = editOwner;
+  const submitScopeRef = useRef(submitScope);
+  submitScopeRef.current = submitScope;
+  const pendingSubmission = useSyncExternalStore(
+    submission.subscribe,
+    submission.read,
+    noSuggestion
+  );
+  const isQueueing = pendingSubmission?.scope === submitScope;
+  const readOnly = inputReadOnly || (!!editing && isQueueing);
+  useLayoutEffect(submission.mount, [submission]);
 
   // Minimal, neutral inline feedback for cases that would otherwise do nothing
   // visible, such as an unconfirmed send.
@@ -426,227 +383,114 @@ function AgentComposerInner({
     },
     []
   );
-  useEffect(() => {
+  const [localHistoryOwner] = useState(() => ({}));
+  const history = ComposerHistory.forDraft(
+    draftStore ?? localHistoryOwner,
+    draftKey ?? String(submissionScope),
+    promotedFrom
+  );
+  const historyScope = useMemo(
+    () => (editing ? {} : history),
+    [history, editing?.id]
+  );
+  useLayoutEffect(() => {
     const result = editSession.sync(
       editing,
       editOwner,
-      composer,
-      !!draftStore && !!draftKey
+      { ...composer, clear: composer.clearForHistory },
+      !!draft && binding.owns(draft)
     );
     if (result === "changed" || result === "rejected") notify(null);
     if (result === "rejected") editing?.onCancel();
-  }, [editSession, editing, editOwner, composer, notify, draftStore, draftKey]);
-
-  const submit = async () => {
-    if (editing) {
-      if (readOnly || editing.saveDisabled) return;
-      const message = composer.submit({
-        submitted_at: Date.now(),
-        allow_empty: editing.allowEmpty,
-      });
-      const text = message?.meta.markdown ?? message?.meta.text;
-      if (text === undefined || (!editing.allowEmpty && !text.trim())) return;
-      const lease = queueSubmitGuard.begin(submissionScope);
-      if (!lease) return;
-      setQueueingLease(lease);
-      const ownsEdit = () =>
-        queueSubmitGuard.owns(lease, submissionScopeRef.current) &&
-        editingRef.current?.id === editing.id &&
-        editSession.owns(editing.id, editOwnerRef.current);
-      try {
-        const saved = await editing.onSave(text);
-        if (!saved && ownsEdit())
-          notify("Couldn't save changes. Your edit is still here.");
-      } catch {
-        if (ownsEdit())
-          notify("Couldn't save changes. Your edit is still here.");
-      } finally {
-        if (queueSubmitGuard.finish(lease)) setQueueingLease(null);
-      }
-      return;
-    }
-    if (
-      voice.getSnapshot().active ||
-      !canSubmit ||
-      submitting ||
-      (draftKey && binding.held !== draftKey)
-    )
-      return;
-    if (queueSubmitGuard.inFlightFor(submissionScope)) return;
-    // No `isStreaming` early-return: submitting while a turn runs queues the
-    // message.
-    // `allow_empty` mirrors the later `allowEmptySubmit` guard: without it the
-    // composer core returns null for a blank editor and we'd bail here, before
-    // that guard — so a picked-template start or host-owned empty action would
-    // be lost. Let the empty message through and gate below.
-    const message = composer.submit({
-      submitted_at: Date.now(),
-      allow_empty: allowEmptySubmit,
-    });
-    if (!message) return;
-    // Intercept action commands (`/compact`, …) — run them instead of
-    // sending a normal turn.
-    const actions = message.parts
-      .filter((p) => p.type === "command")
-      .map((p) => (p as { id: string }).id)
-      .filter((id) => actionById.has(id));
-    const parts = message.parts.filter(
-      (part) => part.type !== "text" || part.text.trim()
-    );
-    const first = parts[0];
-    const literal =
-      parts.length === 1 &&
-      first?.type === "text" &&
-      first.text.trim().startsWith("/")
-        ? actionById.get(first.text.trim().slice(1))
-        : undefined;
-    const standalone =
-      actions
-        .map((id) => actionById.get(id))
-        .find((action) => action?.standalone) ??
-      (literal?.standalone ? literal : undefined);
-    if (standalone) {
-      if (parts.length !== 1) {
-        notify(`Send /${standalone.id} on its own.`);
-        return;
-      }
-      const lease = queueSubmitGuard.begin(submissionScope);
-      if (!lease) return;
-      setQueueingLease(lease);
-      try {
-        await standalone.run();
-        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
-          const current = composer.submit({
-            submitted_at: message.meta.submitted_at,
-            allow_empty: true,
-          });
-          if (current && isSameComposerDraft(message, current))
-            composer.clear();
-          notify(null);
-        }
-      } catch {
-        if (queueSubmitGuard.owns(lease, submissionScopeRef.current))
-          notify("Couldn't confirm the command — your draft is still here.");
-      } finally {
-        if (queueSubmitGuard.finish(lease)) {
-          setQueueingLease((current) => (current === lease ? null : current));
-        }
-      }
-      return;
-    }
-    if (actions.length > 0) {
-      composer.clear();
-      for (const id of actions) void actionById.get(id)!.run();
-      return;
-    }
-
-    const text = lowerPrompt(message);
-    if (!text.trim() && !allowEmptySubmit) return;
-    if (onCapture) {
-      try {
-        const captured = onCapture(text, readDocument());
-        if (captured !== undefined) {
-          if (captured) {
-            composer.clear();
-            composer.focus();
-            notify(null);
-          }
-          return;
-        }
-      } catch (error) {
-        if (onSubmitError) onSubmitError(error);
-        else notify("Couldn't send the message. Your draft is still here.");
-        return;
-      }
-    }
-    if (isBusy || awaitSubmission) {
-      // Keep the draft while awaiting confirmation and guard against duplicate
-      // Enter or button presses.
-      const lease = queueSubmitGuard.begin(submissionScope);
-      if (!lease) return;
-      setQueueingLease(lease);
-      const sentDraft =
-        draftKey && draftStore?.beginDocumentSend(draftKey, readDocument());
-      try {
-        await onSubmit(text);
-        const settled =
-          !sentDraft || draftStore?.settleDocumentSend(sentDraft, true);
-        if (
-          settled &&
-          (!sentDraft || sentDraft.key === binding.held) &&
-          queueSubmitGuard.owns(lease, submissionScopeRef.current)
-        ) {
-          // The editor remains usable while the bridge acknowledges enqueue.
-          // Re-read it now: a user edit or session switch may have produced a
-          // newer draft that this older acknowledgement must never clear.
-          const currentMessage = composer.submit({
-            submitted_at: message.meta.submitted_at,
-            allow_empty: true,
-          });
-          if (currentMessage && isSameComposerDraft(message, currentMessage))
-            composer.clear();
-          notify(null);
-        }
-      } catch (error) {
-        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
-          if (onSubmitError) onSubmitError(error);
-          else
-            notify(
-              awaitSubmission
-                ? "Couldn't confirm the send — your draft is still here."
-                : "Couldn't queue the message — your draft is still here."
-            );
-        }
-      } finally {
-        if (sentDraft) draftStore?.settleDocumentSend(sentDraft, false);
-        if (queueSubmitGuard.finish(lease)) {
-          setQueueingLease((current) => (current === lease ? null : current));
-        }
-      }
-      return;
-    }
-
-    composer.clear();
-    notify(null);
-    void onSubmit(text);
-  };
-
-  const primaryAction = voiceState.active
-    ? undefined
-    : isStreaming
-      ? {
-          label: "Stop",
-          icon: <SquareIcon className="size-3 fill-current" />,
-          onClick: onStop,
-          confirmWithEscape: true,
-        }
-      : !composer.snapshot.text.trim()
-        ? emptyAction
-        : undefined;
-  const sending = isQueueing || submitting || voiceState.sendPending;
-  const submitRef = useRef(submit);
+  }, [editSession, editing, editOwner, composer, notify, draft, binding]);
   useLayoutEffect(() => {
-    submitRef.current = submit;
-  });
-  const requestSubmit = () => {
-    if (!voice.getSnapshot().active) return submit();
-    if (!canSubmit || sending || (draftKey && binding.held !== draftKey))
-      return;
-    voice.stopAndSend(() => {
-      if (submissionScopeRef.current === submissionScope)
-        void submitRef.current();
+    composer.configureHistory({
+      scope: historyScope,
+      history,
+      active:
+        !!historySource &&
+        !historySource.disabled &&
+        !editing &&
+        !selectionLabel &&
+        !voiceState.active &&
+        !submitting &&
+        !isQueueing &&
+        isDraftBound(),
+      retainSent: historySource?.retainSent,
+      undoBoundary: editing && {
+        undo: readOnly ? undefined : editing.onCancel,
+      },
+      attachments: editing ? undefined : historySource?.attachments,
+      source: {
+        previous: historySource?.previous ?? (() => []),
+        beforeRecall: historySource?.beforeRecall,
+        onRecallBlocked: () =>
+          notify(historySource?.recallBlockedMessage ?? null),
+      },
     });
+  });
+
+  const ownsDraft = () =>
+    submitScopeRef.current === submitScope &&
+    isDraftBound() &&
+    (!editing || editSession.owns(editing.id, editOwner));
+  const submitIntent: AgentComposerSubmission.Request = {
+    scope: submitScope,
+    isCurrent: ownsDraft,
+    canSubmit: canSubmit && !readOnly && !submitting,
+    editing: !!editing,
+    busy: isBusy,
+    awaitSubmission,
+    allowEmpty: allowEmptySubmit,
+    editor: {
+      ...composer,
+      clearForHistory: (sent) => {
+        if (draft) binding.sent(draft);
+        composer.clearForHistory(sent);
+      },
+      restoreDocument: (document) => {
+        if (!composer.restoreDocument(document)) return false;
+        if (draft) binding.retain(draft, composer.readDocument());
+        return true;
+      },
+    },
+    commands: commandActions,
+    draft,
+    notify,
+    onCapture,
+    onSubmit,
+    onSubmitError,
   };
+
+  const submitIntentRef = useRef(submitIntent);
+  useLayoutEffect(() => {
+    submitIntentRef.current = submitIntent;
+  });
+  const requestSubmit = () =>
+    submission.request(() => submitIntentRef.current, voice);
+
+  const primaryAction =
+    voiceState.active || editing
+      ? undefined
+      : isStreaming
+        ? {
+            label: "Stop",
+            icon: <SquareIcon className="size-3 fill-current" />,
+            onClick: onStop,
+            confirmWithEscape: true,
+          }
+        : !allowEmptySubmit && !composer.snapshot.text.trim()
+          ? emptyAction
+          : undefined;
+  const sending = isQueueing || submitting || voiceState.sendPending;
+  const actionBusy = sending || readOnly;
   const canStopDictation =
     voiceState.state.phase === "starting" ||
     voiceState.state.phase === "recording";
   const finishingDictation = voiceState.state.phase === "finishing";
   const showDictationProgress = finishingDictation && !voiceState.sendPending;
   const escapeAction =
-    !editing &&
-    !sending &&
-    !voiceState.active &&
-    primaryAction?.confirmWithEscape
+    !sending && !voiceState.active && primaryAction?.confirmWithEscape
       ? primaryAction
       : undefined;
   const submitLabel =
@@ -659,7 +503,7 @@ function AgentComposerInner({
   const actionLabel = sending
     ? "Sending…"
     : (primaryAction?.label ?? submitLabel);
-  const actionKey = sending
+  const actionKey = actionBusy
     ? undefined
     : escapeAction
       ? "Escape"
@@ -741,10 +585,9 @@ function AgentComposerInner({
         }
         if (
           editing &&
+          !readOnly &&
           event.key === "Escape" &&
-          !editing.busy &&
-          !isQueueing &&
-          !isFormattingMenuEvent(event)
+          isComposerEscape(event)
         ) {
           event.preventDefault();
           event.stopPropagation();
@@ -758,18 +601,9 @@ function AgentComposerInner({
         voiceState.active && voiceState.compact && voiceStyles.compact
       )}
     >
-      {!editing && <ComposerTriggerMenu />}
-      {editing && (
-        <div
-          role="status"
-          className="flex items-center gap-1.5 px-3 pt-2 text-xs text-muted-foreground"
-        >
-          <PencilIcon className="size-3.5" />
-          {editing.label}
-        </div>
-      )}
-      {!editing && (attachments || selectionLabel) && (
-        <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
+      <ComposerTriggerMenu />
+      {(attachments || selectionLabel) && (
+        <ComposerAttachmentStrip>
           {attachments}
           {selectionLabel && (
             <EditorSelectionIndicator
@@ -783,7 +617,7 @@ function AgentComposerInner({
               }
             />
           )}
-        </div>
+        </ComposerAttachmentStrip>
       )}
       <ComposerContent
         scrollFade
@@ -795,13 +629,13 @@ function AgentComposerInner({
         autofocus={autofocus}
         onSubmitRequest={requestSubmit}
         suggestion={
-          prediction && predictedText
+          !editing && prediction && predictedText
             ? { text: predictedText, take: prediction.take }
             : undefined
         }
         onDraftChange={prediction && reportDraft}
         readOnly={readOnly}
-        onTransfer={editing ? () => {} : onAttachmentTransfer}
+        onTransfer={onAttachmentTransfer}
         placeholder={placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto select-text text-[14px] leading-[23px] font-[375] text-[color:color-mix(in_srgb,var(--foreground)_90%,var(--background))]"
@@ -839,14 +673,13 @@ function AgentComposerInner({
               }}
             />
           ) : (
-            !editing && toolbarStart
+            toolbarStart
           )}
           <div className="ml-auto flex min-w-0 items-center gap-0.5 overflow-hidden">
-            {!editing && !voiceState.active && toolbarEnd}
+            {!voiceState.active && toolbarEnd}
           </div>
         </div>
-        {!editing &&
-          voiceState.supported &&
+        {voiceState.supported &&
           (isDesktopVoiceReady(voiceState.settings) ? (
             <DictationButton
               escapeShortcut={canStopDictation}
@@ -859,20 +692,20 @@ function AgentComposerInner({
               }
               aria-disabled={finishingDictation || undefined}
               className="aria-disabled:opacity-50"
-              disabled={!voiceState.active && (sending || !composer.ready)}
+              disabled={!voiceState.active && (actionBusy || !composer.ready)}
               onClick={(event) => {
                 if (finishingDictation) return;
                 if (voiceState.active) {
                   stopDictation();
                   return;
                 }
-                if (draftKey && binding.held !== draftKey) return;
+                if (!ownsDraft()) return;
                 const compact =
                   composer.isEmptyDraft() && !attachments && !selectionLabel;
                 if (compact) event.currentTarget.focus();
                 else if (event.detail > 0) composer.focus();
                 void voice.start(compact, (text) => {
-                  if (draftKey && binding.held !== draftKey) return false;
+                  if (!ownsDraft()) return false;
                   return composer.appendText(
                     text,
                     MAX_DICTATION_DRAFT_BYTES,
@@ -907,94 +740,54 @@ function AgentComposerInner({
             />
           ))}
         <div className="shrink-0">
-          {editing ? (
-            <div className="flex items-center gap-2">
-              <ComposerToolbarTooltip label="Cancel edit" shortcut="Esc">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={composerToolbarButtonClassName}
-                  disabled={readOnly}
-                  onClick={editing.onCancel}
-                  aria-keyshortcuts="Escape"
-                >
-                  Cancel
-                </Button>
-              </ComposerToolbarTooltip>
-              <ComposerToolbarTooltip label="Apply edit" shortcut="Enter">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={composerToolbarButtonClassName}
-                  disabled={
-                    readOnly ||
-                    editing.saveDisabled ||
-                    (!editing.allowEmpty && !composer.snapshot.text.trim())
-                  }
-                  onClick={submit}
-                  aria-busy={readOnly}
-                  aria-keyshortcuts="Enter"
-                >
-                  {readOnly ? (
-                    <LoaderCircleIcon
-                      aria-hidden="true"
-                      className="size-3.5 animate-spin motion-reduce:animate-none"
-                    />
-                  ) : (
-                    <CheckIcon className="size-3.5" />
-                  )}
-                  Save changes
-                </Button>
-              </ComposerToolbarTooltip>
-            </div>
-          ) : (
-            <ComposerToolbarTooltip
-              label={sending ? undefined : primaryAction?.label}
-              shortcut={escapeAction ? "Esc ×2" : undefined}
+          <ComposerToolbarTooltip
+            label={actionBusy ? undefined : primaryAction?.label}
+            shortcut={escapeAction ? "Esc ×2" : undefined}
+          >
+            <Button
+              type="button"
+              size="icon-xs"
+              className={cn(toolbarIconClassName, "aria-disabled:opacity-50")}
+              disabled={
+                (actionBusy && !voiceState.sendPending) ||
+                voiceState.state.phase === "starting" ||
+                (!primaryAction &&
+                  (!canSubmit ||
+                    (!voiceState.active &&
+                      !allowEmptySubmit &&
+                      !composer.snapshot.text.trim())))
+              }
+              aria-disabled={voiceState.sendPending || undefined}
+              aria-label={actionLabel}
+              aria-busy={actionBusy}
+              aria-keyshortcuts={actionKey}
+              onClick={() => {
+                if (voiceState.sendPending) return;
+                if (primaryAction) {
+                  setConfirmUntil(0);
+                  primaryAction.onClick();
+                } else void requestSubmit();
+              }}
             >
-              <Button
-                type="button"
-                size="icon-xs"
-                className={cn(toolbarIconClassName, "aria-disabled:opacity-50")}
-                disabled={
-                  (sending && !voiceState.sendPending) ||
-                  voiceState.state.phase === "starting" ||
-                  (!primaryAction && !canSubmit)
-                }
-                aria-disabled={voiceState.sendPending || undefined}
-                aria-label={actionLabel}
-                aria-busy={sending || undefined}
-                aria-keyshortcuts={actionKey}
-                onClick={() => {
-                  if (voiceState.sendPending) return;
-                  if (primaryAction) {
-                    setConfirmUntil(0);
-                    primaryAction.onClick();
-                  } else void requestSubmit();
-                }}
-              >
-                {sending ? (
-                  <LoaderCircleIcon
-                    aria-hidden="true"
-                    className="size-4 animate-spin motion-reduce:animate-none"
-                  />
-                ) : escapeAction && confirmUntil ? (
-                  <kbd
-                    aria-hidden="true"
-                    className="font-sans text-[10px] leading-none font-semibold"
-                  >
-                    Esc
-                  </kbd>
-                ) : primaryAction ? (
-                  primaryAction.icon
-                ) : (
-                  <ArrowUpIcon className="size-4" />
-                )}
-              </Button>
-            </ComposerToolbarTooltip>
-          )}
+              {actionBusy ? (
+                <LoaderCircleIcon
+                  aria-hidden="true"
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                />
+              ) : escapeAction && confirmUntil ? (
+                <kbd
+                  aria-hidden="true"
+                  className="font-sans text-[10px] leading-none font-semibold"
+                >
+                  Esc
+                </kbd>
+              ) : primaryAction ? (
+                primaryAction.icon
+              ) : (
+                <ArrowUpIcon className="size-4" />
+              )}
+            </Button>
+          </ComposerToolbarTooltip>
           <span role="status" className="sr-only">
             {escapeAction && confirmUntil
               ? `Press Escape again to ${escapeAction.label.toLowerCase()}.`
@@ -1004,26 +797,4 @@ function AgentComposerInner({
       </div>
     </ComposerMenuAnchor>
   );
-}
-
-/**
- * Build the prompt text the agent receives: the authored message, then
- * any referenced workspace paths (`@`-mentions / file-refs) as an explicit
- * list so the agent can resolve them.
- */
-function lowerPrompt(message: ComposerMessage): string {
-  const paths = new Set<string>();
-  for (const part of message.parts) {
-    if (part.type === "mention" && part.target.path)
-      paths.add(part.target.path);
-    else if (part.type === "file-ref") paths.add(part.ref.path);
-  }
-  const sections = [(message.meta.markdown ?? message.meta.text).trim()];
-  if (paths.size > 0)
-    sections.push(
-      `Referenced workspace files:\n${[...paths]
-        .map((path) => `- ${path}`)
-        .join("\n")}`
-    );
-  return sections.filter((s) => s.length > 0).join("\n\n");
 }

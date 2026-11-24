@@ -10,15 +10,23 @@ use tokio_tungstenite::tungstenite::Message;
 #[path = "compaction/limits.rs"]
 mod limits;
 
+const COMPACT_START: &str = "co.grida/session/compact/start";
+const START_COMPACTION: &str = "_co.grida/session/compact/start";
+
 async fn client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
     let mut initialize = extension_initialize();
     initialize["clientCapabilities"]["_meta"]["co.grida/session/compact"] = 1.into();
+    initialize["clientCapabilities"]["_meta"][COMPACT_START] = 1.into();
     let reply = ws_rpc(&mut socket, 1, "initialize", initialize).await;
     assert_eq!(
         reply["result"]["agentCapabilities"]["_meta"]["co.grida/session/compact"],
+        1
+    );
+    assert_eq!(
+        reply["result"]["agentCapabilities"]["_meta"][COMPACT_START],
         1
     );
     socket
@@ -1287,6 +1295,117 @@ async fn compact_on_peer(
     load(&mut peer, session, cwd).await;
     let request = compact(session, id);
     tokio::spawn(async move { ws_rpc(&mut peer, 3, "_co.grida/session/compact", request).await })
+}
+
+#[tokio::test]
+async fn compact_start_returns_before_inference_and_replays_the_admitted_turn() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Original answer."),
+        Reply::Release("Summary contains the retained constraints.", held),
+        Reply::Finished("Queued answer."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+
+    let no_change = ws_rpc(
+        &mut socket,
+        3,
+        START_COMPACTION,
+        compact(&session, "empty-compaction"),
+    )
+    .await;
+    assert_eq!(
+        no_change["result"],
+        json!({"requestId":"empty-compaction","status":"no_change","turnId":null}),
+        "{no_change}"
+    );
+    let initial = session_snapshot(&mut socket, &session).await;
+    assert!(initial["current"].is_null() && initial["latest"].is_null());
+
+    let original = "Design requirements to keep in the transcript. ".repeat(32);
+    let first = prompt(&mut socket, 4, &session, &original).await;
+    assert_eq!(first["result"]["stopReason"], "end_turn", "{first}");
+    endpoint.request().await;
+
+    let mut requester = client(&url).await;
+    let params = compact(&session, "compact-start");
+    let unattached = ws_rpc(&mut requester, 2, START_COMPACTION, params.clone()).await;
+    assert_eq!(unattached["error"]["data"], "session_setup_required");
+    load(&mut requester, &session, workspace.path()).await;
+    let started = ws_rpc(&mut requester, 3, START_COMPACTION, params.clone()).await;
+    let receipt = started["result"].clone();
+    assert_eq!(receipt["requestId"], "compact-start", "{started}");
+    assert_eq!(receipt["status"], "admitted", "{started}");
+    let turn = receipt["turnId"].as_str().unwrap();
+
+    // The provider cannot finish until release. Drop the initiating
+    // connection and recover the same admission through another attachment.
+    drop(requester);
+    let summary_request = endpoint.request().await;
+    assert!(summary_request["messages"].to_string().contains(&original));
+    let retry = ws_rpc(&mut socket, 5, START_COMPACTION, params.clone()).await;
+    assert_eq!(retry["result"], receipt, "{retry}");
+    let active = session_snapshot(&mut socket, &session).await;
+    assert_eq!(active["current"]["turnId"], turn);
+    assert_eq!(active["current"]["disposition"], "running");
+    let refused = ws_rpc(
+        &mut socket,
+        6,
+        START_COMPACTION,
+        compact(&session, "another-compaction"),
+    )
+    .await;
+    assert_eq!(refused["error"]["data"], "session_prompt_in_progress");
+
+    let queued = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "next-input", "Use the retained constraints."),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    assert!(endpoint.requests.try_recv().is_err());
+    release.send(()).unwrap();
+
+    let follow_up = endpoint.request().await;
+    let messages = follow_up["messages"].to_string();
+    assert!(messages.contains("Summary contains the retained constraints."));
+    assert!(messages.contains("Use the retained constraints."));
+    assert!(!messages.contains(&original));
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    let settled = ws_rpc(&mut socket, 8, START_COMPACTION, params.clone()).await;
+    assert_eq!(settled["result"], receipt, "{settled}");
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        [
+            original.as_str(),
+            "Original answer.",
+            "Use the retained constraints.",
+            "Queued answer.",
+        ]
+    );
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut reopened = client(&url).await;
+    load(&mut reopened, &session, workspace.path()).await;
+    let recovered = ws_rpc(&mut reopened, 3, START_COMPACTION, params).await;
+    assert_eq!(recovered["result"], receipt, "{recovered}");
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(reopened);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

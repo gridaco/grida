@@ -36,6 +36,7 @@ export function NativeTurnActivity({
   compactionDurations,
   onReconsider,
   onOpenSubagent,
+  loadAttachmentPreview,
   loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
@@ -49,6 +50,7 @@ export function NativeTurnActivity({
   ) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
   onOpenSubagent?: (childId: string, inputId: string) => void;
+  loadAttachmentPreview?: (previewId: string) => Promise<Blob>;
   loadToolImage?: (previewId: string) => Promise<Blob>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -182,6 +184,7 @@ export function NativeTurnActivity({
               key={item.message.messageId}
               // A turn's actions sit under its final answer only.
               actions={{ hidden: true }}
+              loadAttachmentPreview={loadAttachmentPreview}
               message={{
                 id: item.message.messageId,
                 role: item.message.role,

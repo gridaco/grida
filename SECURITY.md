@@ -1223,6 +1223,28 @@ pixels through this reader, with no additional filesystem or model grant.
   [Request-gate cases](desktop/src/bridge/selected-image-request.test.ts) and
   [bridge DTO cases](packages/grida-desktop-bridge/src/native-chat.test.ts)
   pin the typed input boundary before source custody is entered.
+  The [batch preload gate](desktop/src/bridge/attachment-batch-request.ts)
+  uses the same selected `File` check for each path. The
+  [Main batch adapter](desktop/src/main/native-attachment-batch.ts) binds
+  temporary copies to the session, request and ordered attachment slot and
+  revalidates the frame before dispatch. It stages larger retained file
+  batches through protected custody, keeping the existing ACP frame limit.
+  File and folder references still name only metadata, using the same
+  protected-root checks and granting no access to their contents. Temporary
+  copies are removed after confirmed admission or when a failed preparation
+  owns the copies it created. [Preload batch tests](desktop/src/bridge/attachment-batch-request.test.ts)
+  and [Main stage tests](desktop/src/main/native-attachment-batch.test.ts) pin
+  ordered custody, path refusal and uncertain delivery recovery.
+- **Attachment batches.** The [private ACP intake](crates/grida-agent/src/acp/extensions/attachments.rs)
+  accepts bounded ordered inputs on an attached session. The
+  [native attachment owner](crates/grida-agent/src/host/attachment_batch.rs)
+  applies the same selected-raster checks per member. A staged retained file
+  must be in the protected snapshot directory and match its exact size and
+  digest. [Scratch custody](crates/grida-agent/src/scratch.rs) records pending
+  asset identities under the owning session. Later intake reconciles those
+  identities against durable accepted input before removing uncommitted bytes.
+  Keeping an attachment in a queued edit resolves only to an index in the
+  exact native checkout. It confers no new filesystem authority.
 - [Desktop workspace ownership](desktop/src/main/native-workspace-agents.ts)
   shares one startup across requests for the same registered workspace and
   canonical root. It bounds concurrent engine ownership and withdraws lookup
@@ -2207,7 +2229,7 @@ Today:
   cover the read and the refusal of an unlisted name.
 - The native [artifact read](crates/grida-agent/src/acp/extensions/summaries.rs) requires negotiated private stdio and an exact attached session. It returns a bounded PNG only when the settled turn's successful crop receipt matches the existing private scratch bytes. The read uses pinned descriptors, creates no files, and exposes no path, digest, or unrelated tool output. [Process tests](crates/grida-agent/tests/process/images.rs) cover reopen, a replaced or missing copy, and refusal across sessions and shared connections.
 - The Desktop [artifact IPC](desktop/src/main/native-chat-ipc.ts) admits only an artifact listed for the same attachment's latest observed finished turn. Main rechecks the frame, chat, and observation after the read. The [PNG response validator](desktop/src/main/native-agent-artifacts.ts) validates the bounded byte response against the selected descriptor and returns only bytes. The [Desktop fixture](desktop/src/main/native-agent-images.test.ts) verifies restart recovery and missing-file refusal through the built native child.
-- Queued input inspection uses the separately negotiated private [native routes](crates/grida-agent/src/acp/extensions/input_images.rs). The [host](crates/grida-agent/src/host/images.rs) verifies the exact queued input, owning attachment, and observed session revision before and after reading retained bytes. Each chunk is at most 256 KiB and its original is bounded to 20 MiB. Claimed, withdrawn, replaced, stale and foreign inputs reject without dispatch or mutation. [Main's queued display owner](desktop/src/main/native-queued-messages.ts) replaces hidden transport URIs with bounded opaque selectors scoped to the session, input and revision; [IPC](desktop/src/main/native-chat-ipc.ts) additionally rechecks the initiating frame and latest observation after delivery. The existing input inspection reports factual text-only eligibility, so rendering an image does not permit text replacement to discard it. [Native process fixtures](crates/grida-agent/tests/process/raster_images.rs), [Main decoder fixtures](desktop/src/main/native-queued-messages.test.ts) and [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) cover scope, revocation, bounded bytes and observational behavior.
+- Queued input inspection uses the separately negotiated private [native routes](crates/grida-agent/src/acp/extensions/input_images.rs). The [host](crates/grida-agent/src/host/images.rs) verifies the exact retained input and owning attachment with the observed queue revision or open checkout before and after reading bytes. Each chunk is at most 256 KiB and its original is bounded to 20 MiB. Claimed, withdrawn, replaced, stale and foreign inputs reject without dispatch or mutation. [Main's queued display owner](desktop/src/main/native-queued-messages.ts) replaces hidden transport URIs with bounded opaque selectors scoped to the session, input and queue revision or checkout identity. [IPC](desktop/src/main/native-chat-ipc.ts) additionally rechecks the initiating frame and latest observation after delivery. The existing input inspection reports factual text-only eligibility, so rendering an image does not permit text replacement to discard it. [Native process fixtures](crates/grida-agent/tests/process/raster_images.rs), [Main decoder fixtures](desktop/src/main/native-queued-messages.test.ts) and [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) cover scope, revocation, bounded bytes and observational behavior.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
 - The [settings owner](crates/grida-agent/src/configuration.rs) validates the global config and serializes managed writes. The [Settings writer](desktop/src/main/native-agent-config.ts) rechecks renderer authority before confirming the native write. [Permission admission](crates/grida-agent/src/permissions.rs) gives restricted tools only their current workspace or exact-file grants. [Native configuration tests](crates/grida-agent/tests/process/configuration.rs) and [approval process tests](crates/grida-agent/tests/process/approvals.rs) cover global loading and restricted access. [Settings writer tests](desktop/src/main/native-agent-config.test.ts) cover native confirmation and frame revocation.
@@ -4414,6 +4436,13 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [Main owner tests](desktop/src/main/native-chat-selections.test.ts) —
   product metadata and bounded input preparation inherit fixed private-root
   denials without changing credentials, replay custody or dispatch authority.
+
+- [Native attachment batches](crates/grida-agent/src/host/attachment_batch.rs)
+  use the existing protected-root checks for selected sources and admit staged
+  copies only from session-bound custody. Reusing a retained attachment from a
+  queue checkout confers no filesystem grant. The
+  [attachment process tests](crates/grida-agent/tests/process/attachment_batches.rs)
+  cover refusal without partial admission.
 
 - [Documentation checker](scripts/cli-docs/check.mjs) and
   [feature-only validation driver](crates/grida-cli/src/bin/conformance.rs) —

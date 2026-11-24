@@ -111,7 +111,7 @@ describe("queued message preview", () => {
     );
   });
 
-  it("keeps the queue icon alongside the file fallback and queued text", () => {
+  it("shows the queue icon and text for a file without a thumbnail", () => {
     const html = renderToStaticMarkup(
       <NativeQueuedMessagePreview
         inputId="file-input"
@@ -120,11 +120,8 @@ describe("queued message preview", () => {
       />
     );
     expect(firstSvgGlyph(html)).toBe(queueGlyph);
-    expect(html.match(/<svg\b/g)).toHaveLength(2);
-    expect(html).toContain('aria-label="File attachment"');
-    expect(html.indexOf('aria-label="File attachment"')).toBeLessThan(
-      html.indexOf("Read the attached notes")
-    );
+    expect(html.match(/<svg\b/g)).toHaveLength(1);
+    expect(html).toContain("Read the attached notes");
     expect(html).not.toContain("<img");
   });
 
@@ -143,10 +140,9 @@ describe("queued message preview", () => {
       />
     );
     expect(firstSvgGlyph(html)).toBe(queueGlyph);
-    expect(html.match(/<svg\b/g)).toHaveLength(2);
+    expect(html.match(/<svg\b/g)).toHaveLength(1);
     expect(html).not.toContain("<img");
     expect(html).not.toContain("https://example.com");
-    expect(html).toContain('aria-label="Image attachment"');
   });
 
   it("loads image bytes only through the supplied capability and renders a bounded still", async () => {

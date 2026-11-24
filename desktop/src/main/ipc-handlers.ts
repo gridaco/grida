@@ -681,6 +681,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       nativeChat.runCommand(event, id, command, requestId)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_START_COMPACTION,
+    (event, id: string, requestId: unknown) =>
+      nativeChat.startCompaction(event, id, requestId)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
     (event, id: string, observationId: unknown, messageId: unknown) =>
       nativeChat.prepareRevision(event, id, observationId, messageId)
@@ -1005,6 +1010,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: unknown) =>
       nativeChat.submitFileReference(event, id, input)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_ATTACHMENTS, (event) =>
+    nativeChat.acceptsAttachments(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_ATTACHMENTS,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitAttachments(event, id, input)
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
     (event, id: string, input: string) =>
@@ -1099,6 +1112,36 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
     (event, id: string, change: unknown) =>
       nativeChat.editQueue(event, id, change)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_CHECKOUT,
+    (event, id: string, input: unknown) =>
+      nativeChat.checkoutQueued(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_REINSERT,
+    (event, id: string, input: unknown) =>
+      nativeChat.reinsertQueued(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT,
+    (event, id: string, checkout: unknown, input: unknown) =>
+      nativeChat.readQueueCheckout(event, id, checkout, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT_PREVIEW,
+    (event, id: string, checkout: unknown, preview: unknown) =>
+      nativeChat.readQueueCheckoutPreview(event, id, checkout, preview)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE_ACTION_RECEIPT,
+    (event, id: string, request: unknown) =>
+      nativeChat.queueActionReceipt(event, id, request)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STEER_QUEUED,
+    (event, id: string, input: unknown) =>
+      nativeChat.steerQueued(event, id, input)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_STEER, (event, id: string, input: unknown) =>
     nativeChat.steer(event, id, input)

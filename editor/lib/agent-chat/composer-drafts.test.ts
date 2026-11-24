@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AttachmentBatch } from "./attachment-batch";
 import {
   ComposerDrafts,
   type ComposerDraftBlob,
@@ -25,6 +26,7 @@ class MemoryBlobs implements ComposerDraftBlobs {
 class MemoryStorage implements Storage {
   private readonly items = new Map<string, string>();
   failWrites = false;
+  failRemovals = false;
   get length() {
     return this.items.size;
   }
@@ -38,6 +40,7 @@ class MemoryStorage implements Storage {
     return [...this.items.keys()][index] ?? null;
   }
   removeItem(key: string) {
+    if (this.failRemovals) throw new Error("storage removal refused");
     this.items.delete(key);
   }
   setItem(key: string, value: string) {
@@ -327,6 +330,52 @@ describe("ComposerDrafts", () => {
     expect(drafts.settleDocumentSend(sendB, true)).toBe(false);
   });
 
+  it.each(["memory", "persisted"] as const)(
+    "keeps a newer identical write when an earlier document send settles (%s)",
+    (mode) => {
+      const storage = mode === "persisted" ? new MemoryStorage() : null;
+      const drafts = new ComposerDrafts(storage);
+      const key = "w:a";
+      const document = doc("Same words");
+      drafts.write(key, document);
+      const send = drafts.beginDocumentSend(key, document);
+      drafts.write(key, document);
+      expect(drafts.settleDocumentSend(send, true)).toBe(true);
+      expect(drafts.read(key)).toEqual(document);
+    }
+  );
+
+  it("checks durable document removal before committing a strict checkpoint", () => {
+    const storage = new MemoryStorage();
+    const drafts = new ComposerDrafts(storage);
+    const key = "w:a";
+    const document = doc("Send from Home");
+    const revision = drafts.write(key, document)!;
+    storage.failRemovals = true;
+    expect(() => drafts.checkpoint(key, null)).toThrow(
+      "storage removal refused"
+    );
+    expect(drafts.read(key)).toEqual(document);
+    expect(drafts.retireDocument(key, revision)).toBe(false);
+    expect(drafts.read(key)).toBeNull();
+    storage.failRemovals = false;
+    expect(drafts.retireDocument(key, revision)).toBe(true);
+    expect(new ComposerDrafts(storage).read(key)).toBeNull();
+  });
+
+  it("preserves a newer memory-only edit when a durable caption retires", () => {
+    const storage = new MemoryStorage();
+    const drafts = new ComposerDrafts(storage);
+    const key = "w:a";
+    const revision = drafts.write(key, doc("Sent caption"))!;
+    const next = doc("Unsent follow-up");
+    storage.failWrites = true;
+    drafts.write(key, next);
+    expect(drafts.retireDocument(key, revision)).toBe(true);
+    expect(drafts.read(key)).toEqual(next);
+    expect(new ComposerDrafts(storage).read(key)).toBeNull();
+  });
+
   it("settles a promoted send without clearing edits under the old key", async () => {
     const drafts = new ComposerDrafts(null);
     const document = doc("Send from a new draft");
@@ -469,6 +518,196 @@ describe("ComposerDrafts", () => {
 });
 
 describe("durable pending composer sends", () => {
+  it.each([
+    "queued after batch",
+    "queued after single file",
+    "stored after single file",
+  ] as const)(
+    "keeps a newer batch when earlier attachments retire (%s)",
+    async (scenario) => {
+      const storage = new MemoryStorage();
+      const blobs = new MemoryBlobs();
+      const drafts = new ComposerDrafts(storage, blobs);
+      const key = "workspace:chat";
+      const file = (bytes: number) =>
+        ({
+          kind: "file",
+          name: "same.txt",
+          bytes: new Uint8Array([bytes]).buffer,
+        }) as const;
+      const original = [AttachmentBatch.entry(file(1))];
+      const legacy = scenario !== "queued after batch";
+      if (legacy) await drafts.writeAttachment(key, file(1));
+      else await drafts.writeAttachmentBatch(key, original, true);
+      await drafts.writePending(key, {
+        inputId: "old",
+        text: "Original.",
+        mode: "submit",
+        allowLibrarySelection: false,
+        ...(legacy ? { attachment: file(1) } : { attachments: original }),
+      });
+      const next = [AttachmentBatch.entry(file(2))];
+      if (scenario === "stored after single file")
+        await drafts.writeAttachmentBatch(key, next, true);
+      const completing = drafts.completePending(key, "old");
+      if (scenario !== "stored after single file")
+        await drafts.writeAttachmentBatch(key, next, true);
+      await completing;
+      expect(await drafts.readAttachmentBatch(key)).toEqual(next);
+      await expect(
+        new ComposerDrafts(storage, blobs).readAttachmentBatch(key)
+      ).resolves.toEqual(next);
+    }
+  );
+
+  it.each(["later writer", "removal refused"] as const)(
+    "retires only a durable captured caption when attachment staging resumes (%s)",
+    async (change) => {
+      const storage = new MemoryStorage();
+      const blobs = new MemoryBlobs();
+      const drafts = new ComposerDrafts(storage, blobs);
+      const key = "workspace:chat";
+      const document = doc("Compare these.");
+      drafts.write(key, document);
+      const batch = [
+        AttachmentBatch.entry({
+          kind: "image",
+          file: new File(["image fixture"], "photo.jpg", {
+            type: "image/jpeg",
+          }),
+        }),
+      ];
+      await drafts.writeAttachmentBatch(key, batch, true);
+      const request = {
+        inputId: "captured-send",
+        text: "Compare these.",
+        mode: "submit" as const,
+        allowLibrarySelection: false,
+        attachments: AttachmentBatch.persisted(batch),
+        outgoing: { id: "captured-send", staged: true as const, document },
+      };
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const transfer = blobs.transfer.bind(blobs);
+      vi.spyOn(blobs, "transfer").mockImplementationOnce(async (...args) => {
+        await transfer(...args);
+        started.resolve();
+        await release.promise;
+      });
+      const staging = drafts.stageOutgoing(key, request, true, batch);
+      await started.promise;
+      const other = new ComposerDrafts(storage, blobs);
+      if (change === "later writer")
+        other.write(key, structuredClone(document));
+      else storage.failRemovals = true;
+      release.resolve();
+      const reason = await staging.then(
+        () => undefined,
+        (error: Error) => error.message
+      );
+      const refused = change === "removal refused";
+      expect(reason).toBe(refused ? "storage removal refused" : undefined);
+      expect(drafts.read(key)).toBeNull();
+      if (refused) {
+        storage.failRemovals = false;
+        await drafts.stageOutgoing(key, request, true, batch);
+      }
+      expect(new ComposerDrafts(storage, blobs).read(key)).toEqual(
+        refused ? null : document
+      );
+    }
+  );
+
+  it("uses the current checkout preview capability for kept attachments after reload", async () => {
+    const storage = new MemoryStorage();
+    const blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(storage, blobs);
+    const key = "workspace:chat/queue-draft/checkout";
+    const draft = [
+      AttachmentBatch.entry({
+        kind: "file",
+        name: "added.txt",
+        bytes: new ArrayBuffer(1),
+      }),
+      AttachmentBatch.keep(
+        { name: "original.png", previewId: "old-preview" },
+        1
+      ),
+    ];
+    await drafts.writeAttachmentBatch(key, draft, true);
+    const restored = await new ComposerDrafts(
+      storage,
+      blobs
+    ).readAttachmentBatch(key);
+    expect(restored?.[1].card.previewId).toBeUndefined();
+    const entries = AttachmentBatch.checkout(
+      [
+        { name: "removed.png", previewId: "removed" },
+        { name: "original.png", previewId: "new-preview" },
+      ],
+      [0, 1],
+      restored
+    );
+    expect(entries.map(({ card }) => card.name)).toEqual([
+      "added.txt",
+      "original.png",
+    ]);
+    expect(entries[1].card.previewId).toBe("new-preview");
+  });
+
+  it("reopens an ordered send after a reload without borrowing the next draft's attachments", async () => {
+    const storage = new MemoryStorage();
+    const blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(storage, blobs);
+    const key = "workspace:chat";
+    const file = new File(["original notes"], "notes.txt");
+    const photo = new File(["image fixture"], "photo.jpg", {
+      type: "image/jpeg",
+    });
+    const batch = [
+      AttachmentBatch.entry({ kind: "reference", file }),
+      AttachmentBatch.entry({
+        kind: "image",
+        file: photo,
+        originalFile: photo,
+      }),
+    ];
+    await drafts.writeAttachmentBatch(key, batch, true);
+    await drafts.stageOutgoing(
+      key,
+      {
+        inputId: "send-batch",
+        text: "Compare these.",
+        mode: "enqueue",
+        allowLibrarySelection: false,
+        attachments: AttachmentBatch.persisted(batch),
+        outgoing: { id: "send-batch", staged: true },
+      },
+      true,
+      batch
+    );
+    const next = [
+      AttachmentBatch.entry({
+        kind: "file",
+        name: "next.txt",
+        bytes: new ArrayBuffer(1),
+      }),
+    ];
+    await drafts.writeAttachmentBatch(key, next, true);
+    const restored = new ComposerDrafts(storage, blobs);
+    const pending = await restored.readPending(key);
+    expect(pending?.attachments).toEqual([
+      { id: batch[0].id, card: batch[0].card },
+      {
+        id: batch[1].id,
+        card: batch[1].card,
+        input: { kind: "image", file: photo },
+      },
+    ]);
+    await restored.completePending(key, "send-batch");
+    expect(await restored.readAttachmentBatch(key)).toEqual(next);
+  });
+
   const pending = {
     inputId: "immutable-input",
     text: "Inspect this original",

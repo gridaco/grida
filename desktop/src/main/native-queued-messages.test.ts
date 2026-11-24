@@ -21,6 +21,41 @@ const prompt = (mimeType = "image/jpeg", size = 3) => ({
 });
 
 describe("NativeQueuedMessages", () => {
+  it("publishes checked-out attachment indexes only in negotiated edit scope", () => {
+    const messages = new NativeQueuedMessages();
+    const input = { ...prompt(), attachmentIndexes: [0] };
+    expect(
+      messages.describe("chat", 1, "queued", input).attachmentIndexes
+    ).toBeUndefined();
+    expect(
+      messages.describe("chat", "checkout", "queued", input, true, true)
+        .attachmentIndexes
+    ).toEqual([0]);
+    expect(
+      messages.describe(
+        "chat",
+        "checkout",
+        "queued",
+        { inputId: "queued", prompt: [], attachmentIndexes: [] },
+        true,
+        true
+      ).attachmentIndexes
+    ).toEqual([]);
+    for (const attachmentIndexes of [undefined, [], [1], [0, 0], ["0"]])
+      expect(() =>
+        messages.describe(
+          "chat",
+          "checkout",
+          "queued",
+          { ...input, attachmentIndexes },
+          true,
+          true
+        )
+      ).toThrow("queued_message_unavailable");
+    expect(() =>
+      messages.describe("chat", 1, "queued", input, true, true)
+    ).toThrow("queued_message_unavailable");
+  });
   it("publishes text edit eligibility only for a negotiated replacement host", () => {
     const messages = new NativeQueuedMessages();
     const input = { ...prompt(), textOnly: false, textEditable: true };

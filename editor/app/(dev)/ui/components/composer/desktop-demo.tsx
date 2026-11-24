@@ -42,6 +42,7 @@ export function DesktopComposerDemo({
   const [fixture, setFixture] = useState(
     () => new DesktopChatFixture(scenario, queued)
   );
+  const [openCount, setOpenCount] = useState(0);
   const [streaming, setStreaming] = useState(scenario === "streaming");
   const running = useSyncExternalStore(
     fixture.subscribeRunning,
@@ -65,6 +66,7 @@ export function DesktopComposerDemo({
     fixture.compaction.read
   );
   const question = scenario === "question";
+  const attachments = scenario === "attachments";
   const webPreview = scenario === "web-preview";
   const previews = useMemo(
     () =>
@@ -174,7 +176,7 @@ export function DesktopComposerDemo({
               Running turn
             </label>
           )}
-          {(scenario === "text" || question) && (
+          {(scenario === "text" || question || attachments) && (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -204,6 +206,16 @@ export function DesktopComposerDemo({
                 {question ? "Refuse answer" : "Refuse submission"}
               </Button>
             </>
+          )}
+          {attachments && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={submission.pending}
+              onClick={() => setOpenCount((current) => current + 1)}
+            >
+              Reopen chat
+            </Button>
           )}
           {question && (
             <Button
@@ -253,7 +265,7 @@ export function DesktopComposerDemo({
           <BrowserOpen value={webPreview ? openWeb : null}>
             <BrowserPreview value={webPreview ? previews : null}>
               <NativeAgentPane
-                key={fixture.sessionId}
+                key={`${fixture.sessionId}:${openCount}`}
                 bridge={fixture.bridge}
                 predictionPreferences={
                   scenario === "suggested-prompt"
@@ -261,6 +273,9 @@ export function DesktopComposerDemo({
                     : undefined
                 }
                 initialSession={fixture.sessionId}
+                captureQueueRemoval={
+                  queued ? fixture.captureQueueRemoval : undefined
+                }
                 editorSurfaces={
                   scenario === "svg-selection"
                     ? fixture.editorSurfaces
@@ -268,7 +283,7 @@ export function DesktopComposerDemo({
                 }
                 sideChatPlacement={sideChats}
                 libraryRequestSource={
-                  scenario === "library-request"
+                  queued || scenario === "library-request"
                     ? fixtures.libraryRequestSource
                     : undefined
                 }

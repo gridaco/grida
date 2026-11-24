@@ -149,6 +149,27 @@ export namespace NativeFileReference {
     resolved: Resolved,
     options: { mimeType?: string; preview?: NativeChatAttachmentPreview } = {}
   ) {
+    const { path, workspacePath, preview, ...description } = attachment(
+      resolved,
+      options
+    );
+    const details = {
+      ...(workspacePath !== undefined && { workspacePath }),
+      ...(preview && { preview }),
+    };
+    return {
+      type: "resource_link",
+      ...description,
+      uri: pathToFileURL(path).href,
+      ...(Object.keys(details).length && { _meta: { [DETAILS]: details } }),
+    };
+  }
+
+  /** The metadata-only native batch member. */
+  export function attachment(
+    resolved: Resolved,
+    options: { mimeType?: string; preview?: NativeChatAttachmentPreview }
+  ) {
     const directory = resolved.kind === "directory";
     // Main owns resource type. A folder has neither a content byte size nor a
     // media preview, regardless of what an untrusted page reported.
@@ -157,19 +178,15 @@ export namespace NativeFileReference {
       : options.mimeType === DIRECTORY_MEDIA_TYPE
         ? undefined
         : options.mimeType;
-    const details = {
+    return {
+      name: resolved.name,
+      path: resolved.path,
       ...(resolved.workspacePath !== undefined && {
         workspacePath: resolved.workspacePath,
       }),
-      ...(!directory && options.preview && { preview: options.preview }),
-    };
-    return {
-      type: "resource_link",
-      name: resolved.name,
-      uri: pathToFileURL(resolved.path).href,
       ...(resolved.kind === "file" && { size: resolved.size }),
       ...(mimeType && { mimeType }),
-      ...(Object.keys(details).length && { _meta: { [DETAILS]: details } }),
+      ...(!directory && options.preview && { preview: options.preview }),
     };
   }
 

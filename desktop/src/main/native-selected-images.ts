@@ -31,6 +31,20 @@ export class NativeSelectedImages {
     inputId: string,
     source: NativeSelectedImages.Source
   ): Promise<NativeSelectedImages.Descriptor> {
+    return this.stage(sessionId, inputId, source).then(
+      ({ descriptor }) => descriptor
+    );
+  }
+
+  /** Stage a source and report whether this attempt created the custody record. */
+  stage(
+    sessionId: string,
+    inputId: string,
+    source: NativeSelectedImages.Source
+  ): Promise<{
+    descriptor: NativeSelectedImages.Descriptor;
+    created: boolean;
+  }> {
     const key = this.key(sessionId, inputId);
     return this.serial(key, async () => {
       await privateDirectory(this.directory);
@@ -73,7 +87,7 @@ export class NativeSelectedImages {
               Buffer.from(previous.descriptor.sha256).toString("hex"));
         if (!same)
           throw new Error("native_chat_selected_image_identity_reused");
-        return previous.descriptor;
+        return { descriptor: previous.descriptor, created: false };
       }
       if (
         (await fs.readdir(this.directory)).filter((name) =>
@@ -148,7 +162,7 @@ export class NativeSelectedImages {
         await fs.unlink(temporary).catch(() => {});
         throw error;
       }
-      return descriptor;
+      return { descriptor, created: true };
     });
   }
 

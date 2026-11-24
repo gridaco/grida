@@ -1207,6 +1207,248 @@ describe("native chat IPC", () => {
     expect(read).toHaveBeenCalledOnce();
   });
 
+  it("keeps a fresh observation when queue action eligibility changes at the same revision", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const initial = await ipc.observe(first.event, opened.attachmentId);
+    const observe = vi.spyOn(chat, "observe");
+    observe.mockResolvedValueOnce({
+      ...initial.snapshot,
+      queueActionRevision: "actions-available",
+    });
+    const available = await ipc.observe(first.event, opened.attachmentId);
+    observe.mockResolvedValueOnce({
+      ...initial.snapshot,
+      queueActionRevision: "actions-refused",
+    });
+    const refused = await ipc.observe(first.event, opened.attachmentId);
+    expect(available.snapshot.sessionRevision).toBe(
+      refused.snapshot.sessionRevision
+    );
+    expect(available.observationId).not.toBe(refused.observationId);
+  });
+
+  it("normalizes optional reinsertion text for the authorized attachment", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const session = { id: opened.sessionId };
+    const restore = { checkoutId: randomUUID(), requestId: randomUUID() };
+    const replace = { ...restore, requestId: randomUUID(), text: "" };
+    const reinsert = vi.fn<NonNullable<typeof chat.reinsertQueued>>(
+      async (session, input) => ({
+        outcome: "reinserted",
+        receipt: {
+          sessionId: session.id,
+          requestId: input.requestId,
+          sessionRevision: 2,
+        },
+      })
+    );
+    chat.reinsertQueued = reinsert;
+
+    await expect(
+      ipc.reinsertQueued(second.event, opened.attachmentId, restore)
+    ).rejects.toThrow("attachment_unavailable");
+    const submit = (value: unknown) =>
+      ipc.reinsertQueued(
+        first.event,
+        opened.attachmentId,
+        structuredClone(value)
+      );
+    await expect(submit({ ...restore, unexpected: undefined })).rejects.toThrow(
+      "native_chat_queue_change_invalid"
+    );
+    await expect(submit({ ...restore, text: null })).rejects.toThrow(
+      "native_chat_queue_change_invalid"
+    );
+    expect(reinsert).not.toHaveBeenCalled();
+
+    await expect(submit(restore)).resolves.toHaveProperty(
+      "outcome",
+      "reinserted"
+    );
+    await expect(
+      submit({ ...restore, text: undefined })
+    ).resolves.toHaveProperty("outcome", "reinserted");
+    await expect(submit(replace)).resolves.toHaveProperty(
+      "outcome",
+      "reinserted"
+    );
+    expect(reinsert.mock.calls).toStrictEqual([
+      [session, restore],
+      [session, restore],
+      [session, replace],
+    ]);
+  });
+
+  it("revokes batch admission when its attached frame navigates during preparation", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const waiting = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const dispatch = vi.fn<() => void>();
+    Object.defineProperty(chat, "acceptsAttachments", { value: true });
+    const submit = vi.fn<NonNullable<typeof chat.submitAttachments>>(
+      async (session, _input, requireCurrent) => {
+        entered.resolve();
+        await waiting.promise;
+        requireCurrent?.();
+        dispatch();
+        return chat.enqueue(session, "batch", "Inspect these files.");
+      }
+    );
+    chat.submitAttachments = submit;
+    const input = {
+      action: "enqueue",
+      inputId: "batch",
+      text: "Inspect these files.",
+      operatingRegime: "act",
+      attachments: [
+        { kind: "file", name: "notes.txt", bytes: new ArrayBuffer(1) },
+      ],
+    };
+    await expect(
+      ipc.submitAttachments(second.event, opened.attachmentId, input)
+    ).rejects.toThrow("attachment_unavailable");
+    expect(submit).not.toHaveBeenCalled();
+    expect(ipc.acceptsAttachments(first.event)).toBe(true);
+    const pending = ipc.submitAttachments(
+      first.event,
+      opened.attachmentId,
+      input
+    );
+    await entered.promise;
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    waiting.resolve();
+    await expect(pending).rejects.toThrow("attachment_unavailable");
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("passes an explicit empty attachment edit through the authorized checkout", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const reinsert = vi.fn<NonNullable<typeof chat.reinsertQueued>>(
+      async (session, input, requireCurrent) => {
+        requireCurrent?.();
+        return {
+          outcome: "reinserted",
+          receipt: {
+            sessionId: session.id,
+            requestId: input.requestId,
+            sessionRevision: 2,
+          },
+        };
+      }
+    );
+    chat.reinsertQueued = reinsert;
+    const input = {
+      checkoutId: randomUUID(),
+      requestId: randomUUID(),
+      attachments: [],
+    };
+    await expect(
+      ipc.reinsertQueued(
+        first.event,
+        opened.attachmentId,
+        structuredClone(input)
+      )
+    ).resolves.toHaveProperty("outcome", "reinserted");
+    expect(reinsert).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      input,
+      expect.any(Function)
+    );
+    await expect(
+      ipc.reinsertQueued(first.event, opened.attachmentId, {
+        ...input,
+        attachments: null,
+      })
+    ).rejects.toThrow("queue_change_invalid");
+  });
+
+  it("reconciles queue actions on a fresh attachment and revokes checkout preview delivery on navigation", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const basis = await ipc.observe(first.event, opened.attachmentId);
+    const reattached = await ipc.load(second.event, opened.sessionId);
+    const checkoutId = randomUUID();
+    const inputId = "queued";
+    const receipt = {
+      sessionId: opened.sessionId,
+      requestId: checkoutId,
+      sessionRevision: 2,
+      action: "checkout" as const,
+      checkoutId,
+      inputId,
+    };
+    const find = vi
+      .fn<NonNullable<typeof chat.queueActionReceipt>>()
+      .mockResolvedValue(receipt);
+    const checkout = vi.fn<NonNullable<typeof chat.checkoutQueued>>();
+    const read = vi.fn<NonNullable<typeof chat.readQueueCheckout>>();
+    const preview = Promise.withResolvers<ArrayBuffer>();
+    const readPreview = vi
+      .fn<NonNullable<typeof chat.readQueueCheckoutPreview>>()
+      .mockReturnValue(preview.promise);
+    chat.checkoutQueued = checkout;
+    chat.queueActionReceipt = find;
+    chat.readQueueCheckout = read;
+    chat.readQueueCheckoutPreview = readPreview;
+
+    await expect(
+      ipc.checkoutQueued(second.event, reattached.attachmentId, {
+        observationId: basis.observationId,
+        requestId: checkoutId,
+        inputId,
+      })
+    ).rejects.toThrow("observation_unavailable");
+    expect(checkout).not.toHaveBeenCalled();
+    await expect(
+      ipc.queueActionReceipt(second.event, opened.attachmentId, checkoutId)
+    ).rejects.toThrow("attachment_unavailable");
+    await expect(
+      ipc.queueActionReceipt(second.event, reattached.attachmentId, checkoutId)
+    ).resolves.toEqual(receipt);
+    expect(find).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      checkoutId
+    );
+    await expect(
+      ipc.readQueueCheckout(
+        first.event,
+        reattached.attachmentId,
+        checkoutId,
+        inputId
+      )
+    ).rejects.toThrow("attachment_unavailable");
+    expect(read).not.toHaveBeenCalled();
+
+    await expect(
+      ipc.readQueueCheckoutPreview(
+        second.event,
+        reattached.attachmentId,
+        checkoutId,
+        "/private/still.png"
+      )
+    ).rejects.toThrow("queue_checkout_unavailable");
+    expect(readPreview).not.toHaveBeenCalled();
+    const previewId = randomUUID();
+    const pending = ipc.readQueueCheckoutPreview(
+      second.event,
+      reattached.attachmentId,
+      checkoutId,
+      previewId
+    );
+    expect(readPreview).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      checkoutId,
+      previewId
+    );
+    second.contents.emit("did-start-navigation", { isMainFrame: true });
+    preview.resolve(new ArrayBuffer(12));
+    await expect(pending).rejects.toThrow("attachment_unavailable");
+  });
+
   it("rejects late queued preview delivery after navigation and supports absent optional readers", async () => {
     const { ipc, first, chat } = setup();
     const opened = await ipc.create(first.event);
@@ -3852,6 +4094,52 @@ describe("native chat IPC", () => {
       }
     );
     expect(listeners.get(one.sessionId)?.size).toBe(0);
+  });
+
+  it("binds a compaction admission to the sending frame and its attachment lifetime", async () => {
+    const { ipc, first, second, chat } = setup();
+    const source = await ipc.create(first.event);
+    const requestId = randomUUID();
+    await expect(
+      ipc.startCompaction(first.event, source.attachmentId, requestId)
+    ).rejects.toThrow("native_chat_command_unavailable");
+
+    const reply =
+      Promise.withResolvers<
+        Awaited<ReturnType<NonNullable<typeof chat.startCompaction>>>
+      >();
+    const start = vi.fn<NonNullable<typeof chat.startCompaction>>(
+      async (_session, _id, check) => {
+        check();
+        return reply.promise;
+      }
+    );
+    chat.startCompaction = start;
+    await expect(
+      ipc.startCompaction(second.event, source.attachmentId, requestId)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    await expect(
+      ipc.startCompaction(first.event, source.attachmentId, "invalid")
+    ).rejects.toThrow("native_chat_command_invalid");
+    expect(start).not.toHaveBeenCalled();
+
+    const pending = ipc.startCompaction(
+      first.event,
+      source.attachmentId,
+      requestId
+    );
+    expect(start).toHaveBeenCalledExactlyOnceWith(
+      { id: source.sessionId },
+      requestId,
+      expect.any(Function)
+    );
+    ipc.detach(first.event, source.attachmentId);
+    reply.resolve({
+      requestId,
+      status: "admitted",
+      turnId: "compact/observed",
+    });
+    await expect(pending).rejects.toThrow("native_chat_command_unverified");
   });
 
   it("registers each native chat invoke through the guarded IPC entrypoint", () => {

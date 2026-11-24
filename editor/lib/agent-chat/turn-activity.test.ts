@@ -448,6 +448,34 @@ describe("turn_activity.group", () => {
 });
 
 describe("turn_activity compaction notes", () => {
+  it("places a failed manual compaction in the transcript", () => {
+    const blocks = turn_activity.group(
+      [],
+      [
+        {
+          turnId: "manual",
+          startedAtMs: 1,
+          status: "failed",
+          compactions: [{ id: "one", status: "failed", automatic: false }],
+        },
+        {
+          turnId: "automatic",
+          startedAtMs: 2,
+          status: "failed",
+          compactions: [{ id: "two", status: "failed", automatic: true }],
+        },
+      ],
+      null
+    );
+    expect(blocks).toMatchObject([
+      {
+        kind: "compaction",
+        turnId: "manual",
+        compactionId: "one",
+        failed: true,
+      },
+    ]);
+  });
   it("keeps two inline markers between their tool rounds during work and on replay", () => {
     const messages: NativeChatMessage[] = [
       {

@@ -13,7 +13,7 @@ pub(super) fn text_editable(input: &Submission) -> bool {
         })
 }
 
-fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Submission> {
+pub(super) fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Submission> {
     if !text_editable(original) {
         return Err(problem(ErrorKind::Conflict, "queued_text_not_editable"));
     }
@@ -61,23 +61,6 @@ fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Subm
 }
 
 impl Host {
-    pub(crate) async fn queued_text_editable(
-        &self,
-        session: &SessionId,
-        input: &ChangeId,
-        expected: SessionRevision,
-    ) -> Result<bool> {
-        let view = self.store.inspect(session.clone()).await?;
-        if view.revision != expected {
-            return Err(problem(ErrorKind::Conflict, "session_revision_changed"));
-        }
-        Ok(view.queued.iter().any(|row| {
-            &row.input.id == input
-                && row.disposition == InputDisposition::Queued
-                && text_editable(&row.input)
-        }))
-    }
-
     /// Replace only user text, preserving the exact captured non-text input,
     /// settings and authority. A retry replays the original control receipt.
     pub async fn replace_queued_text(

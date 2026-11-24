@@ -301,6 +301,310 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
   }
 });
 
+it("sends image-only batches without introducing synthetic prompt text", async () => {
+  const test = fixture();
+  const sessionId = "fixture-image-session";
+  const inputId = "fixture-image-input";
+  const request = vi.fn<NativeAgentProcess["request"]>();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    connected: true,
+    acceptsAttachmentBatches: true,
+    supportsSelectedImage: true,
+    acceptsPng: true,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      protectedPaths: [],
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    request.mockResolvedValueOnce({});
+    const session = await client.load(sessionId);
+    const input = {
+      action: "enqueue",
+      inputId,
+      text: "",
+      operatingRegime: "act",
+    };
+    const image = {
+      kind: "image",
+      name: "first.png",
+      bytes: new Uint8Array([1]).buffer,
+    };
+    const file = {
+      kind: "file",
+      name: "description.txt",
+      bytes: new Uint8Array([2]).buffer,
+    };
+    request.mockClear();
+    await expect(
+      client.submitAttachments(session, {
+        ...input,
+        attachments: [image, file],
+      })
+    ).rejects.toThrow("native_chat_text_invalid");
+    expect(request).not.toHaveBeenCalled();
+    request.mockResolvedValueOnce({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 1,
+      turnId: null,
+    });
+    await expect(
+      client.submitAttachments(session, {
+        ...input,
+        attachments: [image, { ...image, name: "second.png" }],
+      })
+    ).resolves.toMatchObject({ inputId });
+    expect(request).toHaveBeenCalledExactlyOnceWith(
+      "_co.grida/session/enqueue",
+      expect.objectContaining({
+        prompt: [],
+        attachments: [
+          {
+            kind: "image",
+            selection: expect.objectContaining({ name: "first.png" }),
+          },
+          {
+            kind: "image",
+            selection: expect.objectContaining({ name: "second.png" }),
+          },
+        ],
+      })
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
+it("uses the observed turn for queued steering and recovers committed checkout receipts", async () => {
+  const test = fixture();
+  const sessionId = "fixture-queue-session";
+  const inputId = "queued-input";
+  const request =
+    vi.fn<
+      (method: string, input?: Record<string, unknown>) => Promise<unknown>
+    >();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    acceptsQueuedMessages: true,
+    acceptsQueueActions: true,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  const active = {
+    turnId: "original-turn",
+    epoch: 1,
+    journalPosition: 1,
+    historyPosition: 1,
+    controlRevision: 2,
+    disposition: "running",
+    status: null,
+    paused: false,
+    cancelled: false,
+  };
+  const snapshot = {
+    sessionId,
+    sessionRevision: 10,
+    queuedInputs: 1,
+    queue: [
+      {
+        inputId,
+        inputPosition: 1,
+        settings: {},
+        checkoutable: true,
+        steerable: true,
+      },
+    ],
+    admissionPaused: false,
+    current: active,
+    latest: null,
+  };
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    request.mockResolvedValueOnce({});
+    const session = await client.load(sessionId);
+    request.mockResolvedValueOnce(snapshot);
+    const observed = await client.observe(session);
+    expect(observed.queueActionRevision).toMatch(/^[a-f0-9]{64}$/);
+    expect(observed.queuePreview?.items[0]).toMatchObject({
+      inputId,
+      checkoutable: true,
+      steerable: true,
+    });
+    const waiting = {
+      ...snapshot,
+      queuedInputs: 9,
+      queue: Array.from({ length: 9 }, (_, index) => ({
+        ...snapshot.queue[0],
+        inputId: `queued-${index}`,
+        inputPosition: index,
+      })),
+    };
+    request.mockResolvedValueOnce(waiting);
+    const steerable = await client.observe(session);
+    waiting.queue[8] = { ...waiting.queue[8], steerable: false };
+    request.mockResolvedValueOnce(waiting);
+    const ineligible = await client.observe(session);
+    expect(steerable.sessionRevision).toBe(ineligible.sessionRevision);
+    expect(steerable.queuePreview).toEqual(ineligible.queuePreview);
+    expect(steerable.queueActionRevision).not.toBe(
+      ineligible.queueActionRevision
+    );
+    const action = {
+      inputId,
+      observationId: "original-observation",
+      requestId: "transfer",
+    };
+    request.mockResolvedValueOnce({
+      ...snapshot,
+      sessionRevision: 11,
+      current: { ...active, turnId: "successor" },
+    });
+    await client.observe(session);
+    request.mockRejectedValueOnce(new Error("active_turn_mismatch"));
+    await expect(client.steerQueued(session, observed, action)).rejects.toThrow(
+      "active_turn_mismatch"
+    );
+    expect(request).toHaveBeenLastCalledWith("_co.grida/session/steer-queued", {
+      inputId,
+      task: {
+        sessionId,
+        requestId: "transfer",
+        turnId: "original-turn",
+        expectedSessionRevision: 10,
+        expectedControlRevision: 2,
+      },
+    });
+    expect(
+      request.mock.calls.some(
+        ([method]) => method === "_co.grida/session/withdraw"
+      )
+    ).toBe(false);
+
+    const checkoutId = "checkout-request";
+    const receipt = {
+      sessionId,
+      inputId,
+      checkoutId,
+      sessionRevision: 12,
+      requestId: checkoutId,
+      action: "checkout",
+    };
+    const message = {
+      inputId,
+      textEditable: true,
+      prompt: [
+        { type: "text", text: "Original" },
+        {
+          type: "resource_link",
+          name: "still.png",
+          mimeType: "image/png",
+          uri: "urn:grida:retained-attachment:input/still",
+          size: 12,
+        },
+      ],
+    };
+    request
+      .mockResolvedValueOnce(receipt)
+      .mockRejectedValueOnce(new Error("queue_checkout_unavailable"));
+    await expect(
+      client.checkoutQueued(session, observed, {
+        ...action,
+        requestId: checkoutId,
+      })
+    ).rejects.toThrow("native_chat_queue_action_unverified");
+
+    request.mockResolvedValueOnce(receipt).mockResolvedValueOnce(message);
+    const checked = await client.checkoutQueued(session, observed, {
+      ...action,
+      requestId: checkoutId,
+    });
+    const previewId = checked.message.attachments?.[0]?.previewId;
+    expect(previewId).toBeDefined();
+    expect(checked).toMatchObject({
+      checkoutId,
+      message: { inputId, text: "Original" },
+    });
+    expect(request).toHaveBeenLastCalledWith(
+      "_co.grida/session/queued-message",
+      {
+        sessionId,
+        inputId,
+        checkoutId,
+      }
+    );
+    const readCalls = request.mock.calls.length;
+    await expect(
+      client.readQueueCheckoutPreview(session, "different-checkout", previewId!)
+    ).rejects.toThrow("queued_message_unavailable");
+    expect(request).toHaveBeenCalledTimes(readCalls);
+
+    request.mockResolvedValueOnce({ receipt });
+    await expect(
+      client.queueActionReceipt(session, checkoutId)
+    ).resolves.toEqual(receipt);
+    expect(request).toHaveBeenLastCalledWith(
+      "_co.grida/session/queue-action-receipt",
+      {
+        sessionId,
+        requestId: checkoutId,
+      }
+    );
+    request.mockResolvedValueOnce({
+      receipt: { ...receipt, sessionId: "another-chat" },
+    });
+    await expect(
+      client.queueActionReceipt(session, checkoutId)
+    ).rejects.toThrow("native_chat_invalid_protocol_value");
+
+    const restore = {
+      ...receipt,
+      sessionRevision: 13,
+      requestId: "restore-request",
+      action: "reinsert",
+    };
+    const restoreRequest = { checkoutId, requestId: "restore-request" };
+    request.mockRejectedValueOnce(new Error("sqlite_commit_unconfirmed"));
+    await expect(
+      client.reinsertQueued(session, restoreRequest)
+    ).rejects.toThrow("sqlite_commit_unconfirmed");
+    request.mockResolvedValueOnce(restore);
+    await expect(
+      client.reinsertQueued(session, restoreRequest)
+    ).resolves.toEqual({ outcome: "reinserted", receipt: restore });
+    expect(request).toHaveBeenLastCalledWith(
+      "_co.grida/session/queue-reinsert",
+      {
+        sessionId,
+        checkoutId,
+        requestId: "restore-request",
+      }
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it("opens a saved queue passively and resumes idle queued work on an exact observation", async () => {
   const test = fixture();
   const sessionId = "fixture-queue-session";
@@ -440,6 +744,61 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     await expect(client.queue(session, observed, 0)).rejects.toThrow(
       "native_chat_queue_changed"
     );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
+it("leaves compaction unconfirmed after losing its host session during admission", async () => {
+  const test = fixture();
+  const reply = Promise.withResolvers<unknown>();
+  const request = vi.fn<(method: string) => Promise<unknown>>(
+    async (method) => {
+      if (method === "session/new") return { sessionId: "fixture-session" };
+      if (method === "_co.grida/session/compact/start") return reply.promise;
+      throw new Error("unexpected_request");
+    }
+  );
+  const process = {
+    connected: true,
+    acceptsCompactionStart: true,
+    request,
+    close: async () => {},
+  };
+  const start = vi
+    .spyOn(NativeAgentProcess, "start")
+    .mockResolvedValueOnce(process as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "responses",
+      model: "fixture",
+    });
+    const session = await client.create();
+    const pending = client.startCompaction(session, "request", () => {});
+    expect(request).toHaveBeenLastCalledWith(
+      "_co.grida/session/compact/start",
+      {
+        sessionId: session.id,
+        requestId: "request",
+      }
+    );
+    await client.close();
+    await expect(
+      client.startCompaction(session, "another-request", () => {})
+    ).rejects.toThrow("native_chat_closed");
+    reply.resolve({
+      status: "admitted",
+      requestId: "request",
+      turnId: "compact/observed",
+    });
+    await expect(pending).rejects.toThrow("native_chat_command_unverified");
   } finally {
     await client?.close();
     start.mockRestore();

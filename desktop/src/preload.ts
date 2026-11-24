@@ -20,6 +20,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { MediaTransport } from "@grida/ai-host/media-transport";
 import { FileReferenceRequest } from "./bridge/file-reference-request";
 import { SelectedImageRequest } from "./bridge/selected-image-request";
+import { AttachmentBatchRequest } from "./bridge/attachment-batch-request";
 import { NativeChatInvoke } from "./bridge/native-chat-invoke";
 import { catalogWorkspaceId } from "./bridge/chat-catalog-route";
 import {
@@ -898,6 +899,12 @@ const bridge: DesktopBridge = {
         command,
         requestId
       ),
+    startCompaction: (attachmentId, requestId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_START_COMPACTION,
+        attachmentId,
+        requestId
+      ),
     prepareRevision: (attachmentId, observationId, messageId) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
@@ -1182,6 +1189,21 @@ const bridge: DesktopBridge = {
           webUtils.getPathForFile(each)
         )
       ),
+    acceptsAttachments: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_ATTACHMENTS),
+    submitAttachments: async (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_ATTACHMENTS,
+        attachmentId,
+        {
+          ...input,
+          attachments: await AttachmentBatchRequest.prepare(
+            input.attachments,
+            (file) => webUtils.getPathForFile(file),
+            false
+          ),
+        }
+      ),
     predictPrompt: (attachmentId, observationId) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_PREDICT_PROMPT,
@@ -1270,6 +1292,55 @@ const bridge: DesktopBridge = {
         IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
         attachmentId,
         change
+      ),
+    queueCheckout: {
+      checkout: (attachmentId, input) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_CHECKOUT,
+          attachmentId,
+          input
+        ),
+      reinsert: async (attachmentId, input) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_REINSERT,
+          attachmentId,
+          input.attachments === undefined
+            ? input
+            : {
+                ...input,
+                attachments: await AttachmentBatchRequest.prepare(
+                  input.attachments,
+                  (file) => webUtils.getPathForFile(file),
+                  true
+                ),
+              }
+        ),
+      read: (attachmentId, checkoutId, inputId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT,
+          attachmentId,
+          checkoutId,
+          inputId
+        ),
+      readAttachmentPreview: (attachmentId, checkoutId, previewId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_READ_QUEUE_CHECKOUT_PREVIEW,
+          attachmentId,
+          checkoutId,
+          previewId
+        ),
+      receipt: (attachmentId, requestId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.NATIVE_CHAT_QUEUE_ACTION_RECEIPT,
+          attachmentId,
+          requestId
+        ),
+    },
+    steerQueued: (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_STEER_QUEUED,
+        attachmentId,
+        input
       ),
     steer: (attachmentId, input) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),

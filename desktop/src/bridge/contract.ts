@@ -142,6 +142,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_DELETE: "grida:native-chat:delete",
   NATIVE_CHAT_COMMANDS: "grida:native-chat:commands",
   NATIVE_CHAT_RUN_COMMAND: "grida:native-chat:run-command",
+  NATIVE_CHAT_START_COMPACTION: "grida:native-chat:start-compaction",
   NATIVE_CHAT_PREPARE_REVISION: "grida:native-chat:prepare-revision",
   NATIVE_CHAT_REVISE: "grida:native-chat:revise",
   NATIVE_CHAT_LIST_SUBAGENTS: "grida:native-chat:list-subagents",
@@ -206,6 +207,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_ACCEPTS_FILE_REFERENCE:
     "grida:native-chat:accepts-file-reference",
   NATIVE_CHAT_SUBMIT_FILE_REFERENCE: "grida:native-chat:submit-file-reference",
+  NATIVE_CHAT_ACCEPTS_ATTACHMENTS: "grida:native-chat:accepts-attachments",
+  NATIVE_CHAT_SUBMIT_ATTACHMENTS: "grida:native-chat:submit-attachments",
   NATIVE_CHAT_HOOKS: "grida:native-chat:hooks",
   NATIVE_CHAT_IMPORT_HOOK: "grida:native-chat:import-hook",
   NATIVE_CHAT_REMOVE_HOOK: "grida:native-chat:remove-hook",
@@ -227,6 +230,13 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_READ_QUEUED_ATTACHMENT_PREVIEW:
     "grida:native-chat:read-queued-attachment-preview",
   NATIVE_CHAT_EDIT_QUEUE: "grida:native-chat:edit-queue",
+  NATIVE_CHAT_QUEUE_CHECKOUT: "grida:native-chat:queue-checkout",
+  NATIVE_CHAT_QUEUE_REINSERT: "grida:native-chat:queue-reinsert",
+  NATIVE_CHAT_READ_QUEUE_CHECKOUT: "grida:native-chat:read-queue-checkout",
+  NATIVE_CHAT_READ_QUEUE_CHECKOUT_PREVIEW:
+    "grida:native-chat:read-queue-checkout-preview",
+  NATIVE_CHAT_QUEUE_ACTION_RECEIPT: "grida:native-chat:queue-action-receipt",
+  NATIVE_CHAT_STEER_QUEUED: "grida:native-chat:steer-queued",
   NATIVE_CHAT_STEER: "grida:native-chat:steer",
   NATIVE_CHAT_GOAL: "grida:native-chat:goal",
   NATIVE_CHAT_START_GOAL: "grida:native-chat:start-goal",

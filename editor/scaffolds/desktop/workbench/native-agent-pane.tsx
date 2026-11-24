@@ -79,6 +79,7 @@ import {
 } from "./side-chat-placement";
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeAttachmentCard } from "./native-attachment-card";
+import { AttachmentBatch } from "@/lib/agent-chat/attachment-batch";
 import { NativeEarlierMessages } from "./native-earlier-messages";
 import { NativeDisplayedReply } from "./native-displayed-reply";
 import { NativeTurnActivity } from "./native-turn-activity";
@@ -336,6 +337,10 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
 };
 
+type CaptureQueueRemoval = (
+  inputId: string
+) => ((forward: boolean) => void) | undefined;
+
 type LibraryRequestSource = {
   loadPage: LibraryExplorerPageLoader;
   readPng(id: string, maxBytes: number): Promise<ArrayBuffer>;
@@ -356,6 +361,7 @@ export function NativeAgentPane({
   startupProfileId,
   editorSurfaces,
   libraryRequestSource,
+  captureQueueRemoval,
   sideChatPlacement,
   firstMessage,
   onProcessesChange,
@@ -376,6 +382,7 @@ export function NativeAgentPane({
   startupProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   libraryRequestSource?: LibraryRequestSource;
+  captureQueueRemoval?: CaptureQueueRemoval;
   /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
@@ -495,6 +502,7 @@ export function NativeAgentPane({
       projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
       libraryRequestSource={libraryRequestSource}
+      captureQueueRemoval={captureQueueRemoval}
       recovery={recovery}
       firstMessage={initialSession ? undefined : firstMessage}
       draftRef={draft}
@@ -514,7 +522,7 @@ export function NativeAgentPane({
 
 /** The composer handle a chat pane lends its owner. */
 type NativeChatComposer = Pick<ComposerController, "appendText" | "focus"> &
-  Partial<Pick<ComposerController, "restoreDocument">>;
+  Partial<Pick<ComposerController, "restoreDocument" | "recordHistoryEffect">>;
 
 /**
  * A side chat, as a placement presents it: the ordinary chat pane bound to
@@ -581,6 +589,7 @@ function NativeChatPane({
   projectFolderId = workspaceId,
   editorSurfaces,
   libraryRequestSource,
+  captureQueueRemoval,
   recovery,
   firstMessage,
   draftRef: draft,
@@ -597,6 +606,7 @@ function NativeChatPane({
   projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   libraryRequestSource?: LibraryRequestSource;
+  captureQueueRemoval?: CaptureQueueRemoval;
   /** No connection can run yet; the composer's model picker starts the chat. */
   recovery?: ConnectionRecovery;
   firstMessage?: NativeFirstMessage;
@@ -624,6 +634,19 @@ function NativeChatPane({
     controller.read,
     controller.read
   );
+  const queueEdit = state.queueDraft;
+  const queuedInputId = queueEdit?.inputId;
+  const queueEntries = queueEdit?.attachmentEntries;
+  const queueCards =
+    queueEntries ??
+    queueEdit?.attachments?.map((card, index) =>
+      AttachmentBatch.keep(card, index)
+    );
+  const canStageQueuedAttachment = controller.canEditQueueAttachments;
+  const queuedEditHasContent = queueEntries
+    ? !!(queueEntries.length || queueEdit?.displayParts?.length)
+    : undefined;
+
   const handoffInput =
     (!state.selected ||
       state.selected === firstMessage?.composer?.preparedSessionId) &&
@@ -783,8 +806,11 @@ function NativeChatPane({
   );
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
+  const unconfirmedQueueChange = !!state.queueEditRecovery;
+  const recoverableQueueEdit = controller.recoverableQueueEdit;
   const error =
     state.error ??
+    (unconfirmedQueueChange ? "Couldn't confirm the queue change." : null) ??
     state.approvalError ??
     state.questionError ??
     controller.turnOptionsError;
@@ -928,8 +954,8 @@ function NativeChatPane({
   // editor; the composer consumes its own drops first, so each is handled once.
   // (see test/desktop-agent-chat-pane-drop.md)
   const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
-    if (!activityOpen && !homeInput)
-      void controller.pickTransferredAttachment(state.scope, resources);
+    if (activityOpen || homeInput) return;
+    void controller.pickTransferredAttachment(state.scope, resources);
   };
 
   return (
@@ -1058,6 +1084,7 @@ function NativeChatPane({
                         : undefined
                     }
                     renderMessage={renderMessage}
+                    loadAttachmentPreview={controller.readAttachmentPreview}
                     loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(
                       (event) => event.parentTurnId === block.turnId
@@ -1070,6 +1097,7 @@ function NativeChatPane({
                   <CompactionNotice
                     key={block.compactionId}
                     summary={block.summary}
+                    failed={block.failed}
                     elapsedMs={state.liveCompactionDurations?.get(
                       block.compactionId
                     )}
@@ -1083,6 +1111,14 @@ function NativeChatPane({
                   text={homeInput.text}
                   displayParts={homeInput.messageContext?.displayParts}
                   attachmentName={homeAttachmentName}
+                  attachmentNames={
+                    firstMessage?.composer?.attachments?.map(
+                      ({ file }) => file.name
+                    ) ??
+                    firstMessage?.composer?.missingAttachments?.map(
+                      ({ name }) => name
+                    )
+                  }
                 />
               )}
               {state.outgoing
@@ -1092,6 +1128,7 @@ function NativeChatPane({
                     key={item.id}
                     text={item.text}
                     attachmentName={item.attachment?.name}
+                    attachmentNames={item.attachments?.map(({ name }) => name)}
                     displayParts={item.displayParts}
                   >
                     {renderOutgoingStatus(item)}
@@ -1195,20 +1232,48 @@ function NativeChatPane({
             </Button>
           </div>
         )}
-        {error && !state.connectionRecovery && (
+        {(error || recoverableQueueEdit) && !state.connectionRecovery && (
           <div
-            role="alert"
-            className={`flex items-center gap-2 pt-2 text-xs text-destructive ${layout.contentInset}`}
+            role={error ? "alert" : "status"}
+            className={`flex items-center gap-2 pt-2 text-xs ${error ? "text-destructive" : "text-muted-foreground"} ${layout.contentInset}`}
           >
-            <span className="flex-1">{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => void controller.repair()}
-            >
-              Refresh
-            </Button>
+            <span className="flex-1">
+              {error ?? "You have an unsaved queued edit."}
+            </span>
+            {error ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={unconfirmedQueueChange && state.acting}
+                onClick={() =>
+                  void (unconfirmedQueueChange
+                    ? controller.retryQueueEdit()
+                    : controller.repair())
+                }
+              >
+                {unconfirmedQueueChange ? "Retry" : "Refresh"}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => void controller.continueQueueEdit()}
+                >
+                  Continue editing
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => void controller.restoreQueueEdit()}
+                >
+                  Restore original
+                </Button>
+              </>
+            )}
           </div>
         )}
         {(approval || questions.length > 0 || librarySelection) && (
@@ -1305,34 +1370,47 @@ function NativeChatPane({
         <div className={`shrink-0 pt-3 pb-4 ${layout.contentInset}`}>
           {state.imageInput && (
             <input
-              key={`png-${state.scope}`}
+              key={`png-${state.scope}-${queuedInputId ?? "draft"}`}
               ref={pngPicker}
               type="file"
-              accept="image/png,.png"
+              multiple={state.attachmentBatches}
+              accept={
+                state.attachmentBatches
+                  ? "image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+                  : "image/png,.png"
+              }
               aria-label="Select PNG"
               className="hidden"
               onChange={(event) => {
                 const input = event.currentTarget;
-                const file = input.files?.[0];
+                const files = Array.from(input.files ?? []);
                 input.value = "";
-                if (file)
-                  void controller.pickAttachment(state.scope, "png", file);
+                if (state.attachmentBatches) {
+                  void controller.pickTransferredAttachment(
+                    state.scope,
+                    files.map((file) => ({ kind: "file", file }))
+                  );
+                } else if (files[0])
+                  void controller.pickAttachment(state.scope, "png", files[0]);
               }}
             />
           )}
           {(state.fileInput || state.fileReferenceInput) && (
             <input
-              key={`file-${state.scope}`}
+              key={`file-${state.scope}-${queuedInputId ?? "draft"}`}
               ref={filePicker}
               type="file"
+              multiple={state.attachmentBatches}
               aria-label="Select file to attach"
               className="hidden"
               onChange={(event) => {
                 const input = event.currentTarget;
-                const file = input.files?.[0];
+                const files = Array.from(input.files ?? []);
                 input.value = "";
-                // Small files go directly, others by reference.
-                if (file) void controller.pickFile(state.scope, file);
+                void controller.pickTransferredAttachment(
+                  state.scope,
+                  files.map((file) => ({ kind: "file", file }))
+                );
               }}
             />
           )}
@@ -1373,13 +1451,33 @@ function NativeChatPane({
               {state.attachmentNotice}
             </p>
           )}
-          {(state.commandRunning === "fork" || state.commandNotice) && (
+          {controller.attachmentBatchProblem && (
+            <p
+              role="status"
+              className="text-muted-foreground px-1 pb-1 text-xs"
+            >
+              {controller.attachmentBatchProblem}
+            </p>
+          )}
+          {(state.commandRunning === "fork" ||
+            state.commandNotice ||
+            controller.canRetryCompactionStart) && (
             <div className="flex items-center gap-2 px-1 pb-1 text-xs">
               <span role="status">
                 {state.commandRunning === "fork"
                   ? "Creating fork…"
                   : state.commandNotice}
               </span>
+              {controller.canRetryCompactionStart && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => void controller.retryCompactionStart()}
+                >
+                  Retry compaction
+                </Button>
+              )}
               {state.commandFork && (
                 <Button
                   type="button"
@@ -1396,8 +1494,17 @@ function NativeChatPane({
             controller={controller}
             view={state}
             renderOutgoingStatus={renderOutgoingStatus}
-            onReturnedText={(text) =>
-              void draft.current?.appendText(text, MAX_DRAFT_BYTES)
+            prepareQueueRemoval={
+              captureQueueRemoval &&
+              ((inputId) => {
+                const apply = captureQueueRemoval(inputId);
+                if (!apply) return;
+                return () => {
+                  if (controller.read().scope !== state.scope) return;
+                  const composer = draft.current;
+                  if (composer?.recordHistoryEffect?.(apply)) composer.focus();
+                };
+              })
             }
           />
           {/* Draft binding and submissionScope handle chat changes. Keep the
@@ -1421,6 +1528,7 @@ function NativeChatPane({
               uncertain: state.permissionModeUncertain,
               onRetry: () => void controller.checkPermissionMode(),
               busy:
+                !!queueEdit ||
                 state.permissionModeBusy ||
                 state.loading ||
                 state.acting ||
@@ -1430,79 +1538,167 @@ function NativeChatPane({
               onChange: (mode) => void controller.selectPermissionMode(mode),
             }}
             draft={controller.composerDraft()}
+            history={{
+              previous: controller.previousComposerPrompts,
+              beforeRecall: controller.recallQueuedPrompt,
+              recallBlockedMessage: "This queued message can’t be recalled.",
+              attachments: controller.composerHistoryAttachments(state.scope),
+              disabled:
+                !!homeInput ||
+                !!state.draftMessageContext ||
+                state.attachmentReading ||
+                !!state.attachmentDraft?.error ||
+                state.goalIntent ||
+                !!state.connectionRecovery ||
+                state.loading,
+            }}
             prediction={prediction}
             editing={
-              state.queueDraft
+              queueEdit
                 ? {
-                    id: `${state.selected}:${state.queueDraft.inputId}`,
-                    text: state.queueDraft.text,
-                    label: "Editing queued message",
-                    busy: state.acting,
-                    saveDisabled:
-                      state.queueLoading || !!state.connectionRecovery,
-                    allowEmpty: state.queueDraft.allowEmpty,
-                    onSave: (text) => controller.saveQueueDraft(text),
+                    id: `${state.selected}:${queueEdit.checkoutId ?? queueEdit.inputId}`,
+                    text: queueEdit.text,
+                    savedDocument: queueEdit.savedDocument,
+                    onWrite: queueEdit.checkoutId
+                      ? (document) =>
+                          controller.keepQueueEditDocument(
+                            queueEdit.checkoutId!,
+                            document
+                          )
+                      : undefined,
                     onCancel: () => controller.closeQueueDraft(),
                   }
                 : undefined
             }
+            readOnly={
+              !!queueEdit &&
+              (state.acting ||
+                unconfirmedQueueChange ||
+                !!state.connectionRecovery)
+            }
             autofocus={autofocus}
             catalog={catalog}
-            commands={controller.composerCommands.map((id) => ({
-              id,
-              run: () => controller.runComposerCommand(id),
-            }))}
+            commands={
+              queueEdit
+                ? []
+                : controller.composerCommands.map((id) => ({
+                    id,
+                    run: () => controller.runComposerCommand(id),
+                    ...(id === "compact" &&
+                      controller.supportsCompactionStart && {
+                        dispatch: () => controller.dispatchCompaction(),
+                      }),
+                  }))
+            }
             attachments={
-              !homeInput &&
-              (state.draftMessageContext ||
-                (state.attachmentDraft && !state.attachmentReading)) && (
-                <>
-                  {state.draftMessageContext && (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {state.draftMessageContext.displayParts.length ? (
-                        <MessageContextParts
-                          parts={state.draftMessageContext.displayParts}
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Message context
-                        </span>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label="Remove message context"
-                        disabled={!controller.canRemoveMessageContext}
-                        onClick={() =>
-                          controller.removeMessageContext(state.scope)
+              queueEdit ? (
+                queueCards?.length || queueEdit.displayParts?.length ? (
+                  <>
+                    {queueEdit.displayParts?.length ? (
+                      <MessageContextParts parts={queueEdit.displayParts} />
+                    ) : null}
+                    {queueCards?.map((entry) => (
+                      <NativeAttachmentCard
+                        key={entry.id}
+                        name={entry.card.name}
+                        size={entry.card.size}
+                        mimeType={entry.card.mimeType}
+                        png={false}
+                        preview={AttachmentBatch.preview(entry)}
+                        video={entry.card.preview}
+                        queuedPreview={
+                          entry.card.previewId
+                            ? {
+                                inputId: queueEdit.inputId,
+                                previewId: entry.card.previewId,
+                                read: controller.readQueuedAttachmentPreview,
+                              }
+                            : undefined
                         }
-                      >
-                        <XIcon className="size-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                  {state.attachmentDraft && !state.attachmentReading && (
-                    <NativeAttachmentCard
-                      name={state.attachmentDraft.name}
-                      size={state.attachmentDraft.size}
-                      png={state.attachmentDraft.kind === "png"}
-                      preview={attachmentPreview}
-                      mimeType={state.attachmentDraft.mimeType}
-                      video={state.attachmentDraft.preview}
-                      onRemove={() => controller.removeAttachment(state.scope)}
-                    />
-                  )}
-                </>
+                        onRemove={
+                          canStageQueuedAttachment
+                            ? () =>
+                                controller.removeAttachmentEntry(
+                                  state.scope,
+                                  entry.id
+                                )
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </>
+                ) : null
+              ) : (
+                !homeInput &&
+                (state.draftMessageContext ||
+                  (state.attachmentDraft && !state.attachmentReading) ||
+                  state.batchAttachments?.length) && (
+                  <>
+                    {state.draftMessageContext && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {state.draftMessageContext.displayParts.length ? (
+                          <MessageContextParts
+                            parts={state.draftMessageContext.displayParts}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Message context
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Remove message context"
+                          disabled={!controller.canRemoveMessageContext}
+                          onClick={() =>
+                            controller.removeMessageContext(state.scope)
+                          }
+                        >
+                          <XIcon className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                    {state.batchAttachments?.map((entry) => (
+                      <NativeAttachmentCard
+                        key={entry.id}
+                        name={entry.card.name}
+                        size={entry.card.size}
+                        mimeType={entry.card.mimeType}
+                        png={false}
+                        preview={AttachmentBatch.preview(entry)}
+                        video={entry.card.preview}
+                        onRemove={() =>
+                          controller.removeAttachmentEntry(
+                            state.scope,
+                            entry.id
+                          )
+                        }
+                      />
+                    ))}
+                    {state.attachmentDraft && !state.attachmentReading && (
+                      <NativeAttachmentCard
+                        name={state.attachmentDraft.name}
+                        size={state.attachmentDraft.size}
+                        png={state.attachmentDraft.kind === "png"}
+                        preview={attachmentPreview}
+                        mimeType={state.attachmentDraft.mimeType}
+                        video={state.attachmentDraft.preview}
+                        onRemove={() =>
+                          controller.removeAttachment(state.scope)
+                        }
+                      />
+                    )}
+                  </>
+                )
               )
             }
             allowEmptySubmit={
-              !state.goalIntent &&
-              !!state.draftMessageContext &&
-              (!!state.draftMessageContext.displayParts.length ||
-                !!state.attachmentDraft)
+              queueEdit
+                ? (queuedEditHasContent ?? !!queueEdit.allowEmpty)
+                : controller.canSubmitWithoutText
             }
-            selectionLabel={editorSelection}
+            selectionLabel={queueEdit ? undefined : editorSelection}
             onClearSelection={controller.clearComposerEditorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
@@ -1512,9 +1708,16 @@ function NativeChatPane({
                 : undefined
             }
             canSubmit={
-              !homeInput &&
-              controller.canSubmit &&
-              (!state.goalIntent || controller.canStartGoal)
+              queueEdit
+                ? !state.acting &&
+                  !state.queueEditRecovery &&
+                  !state.queueLoading &&
+                  !state.attachmentReading &&
+                  !queueEntries?.some(({ input }) => !input) &&
+                  !state.connectionRecovery
+                : !homeInput &&
+                  controller.canSubmit &&
+                  (!state.goalIntent || controller.canStartGoal)
             }
             busy={!!turn}
             submitting={state.submitting}
@@ -1547,51 +1750,62 @@ function NativeChatPane({
             activeTurnId={turn?.turnId}
             submissionScope={state.scope}
             draftRef={draft}
-            onSubmit={(text) =>
-              controller.submitFromComposer(text, state.scope)
+            onSubmit={(text, document) =>
+              controller.submitFromComposer(
+                text,
+                state.scope,
+                queuedInputId,
+                queuedEditHasContent,
+                document
+              )
             }
             onStop={() => void controller.control("stop")}
             actions={{
               files:
                 state.fileInput || state.fileReferenceInput
                   ? {
-                      disabled:
-                        !!homeInput ||
-                        state.goalIntent ||
-                        !(
-                          controller.canAttach("file") ||
-                          controller.canAttach("reference")
-                        ),
+                      disabled: queueEdit
+                        ? !canStageQueuedAttachment
+                        : !!homeInput ||
+                          state.goalIntent ||
+                          !(
+                            controller.canAttach("file") ||
+                            controller.canAttach("reference")
+                          ),
                       onSelect: () => filePicker.current?.click(),
                     }
                   : undefined,
               image: state.imageInput
                 ? {
-                    disabled:
-                      !!homeInput ||
-                      state.goalIntent ||
-                      !controller.canAttach("png"),
+                    disabled: queueEdit
+                      ? !canStageQueuedAttachment
+                      : !!homeInput ||
+                        state.goalIntent ||
+                        !controller.canAttach("png"),
                     onSelect: () => pngPicker.current?.click(),
                   }
                 : undefined,
               library:
-                workspaceId && state.imageInput
+                (workspaceId || libraryRequestSource) && state.imageInput
                   ? {
-                      disabled: !!homeInput || state.acting || state.goalIntent,
+                      disabled: queueEdit
+                        ? !canStageQueuedAttachment
+                        : !!homeInput || state.acting || state.goalIntent,
                       onSelect: () => setLibraryScope(state.scope),
                     }
                   : undefined,
               goal: {
-                active: state.goalIntent,
+                active: !queueEdit && state.goalIntent,
                 offered: !!bridge.startGoal && controller.offers("goals"),
-                disabled: state.acting || !controller.canStartGoal,
+                disabled:
+                  !!queueEdit || state.acting || !controller.canStartGoal,
                 removeDisabled: state.acting,
                 onChange: (active) => controller.selectGoalIntent(active),
               },
               plan: {
-                active: state.operatingRegime === "plan",
+                active: !queueEdit && state.operatingRegime === "plan",
                 offered: !!bridge.submitInRegime,
-                disabled: state.acting,
+                disabled: !!queueEdit || state.acting,
                 onChange: (active) =>
                   controller.selectOperatingRegime(active ? "plan" : "act"),
               },
@@ -1603,7 +1817,10 @@ function NativeChatPane({
               initialError: modelReadError,
               defaultUnavailable: !!recovery || selectionRead === "unavailable",
               busy:
-                state.profileBusy || state.acting || state.permissionModeBusy,
+                !!queueEdit ||
+                state.profileBusy ||
+                state.acting ||
+                state.permissionModeBusy,
               onSelect:
                 bridge.selectProfile && !controller.fixedSession
                   ? async (selection) => {
@@ -1639,23 +1856,30 @@ function NativeChatPane({
                 : (effort) => controller.selectEffort(effort),
             }}
           />
-          {workspaceId && state.imageInput && libraryScope === state.scope && (
-            <AgentLibraryAttachmentPicker
-              open
-              single
-              onOpenChange={(open) => {
-                if (!open) setLibraryScope(null);
-              }}
-              onAttach={([pin]) => {
-                if (!pin) return;
-                void controller.pickLibraryImage(
-                  state.scope,
-                  `Library: ${pin.title}`,
-                  (maxBytes) => readLibraryPng(pin.id, maxBytes)
-                );
-              }}
-            />
-          )}
+          {(workspaceId || libraryRequestSource) &&
+            (!queueEdit || canStageQueuedAttachment) &&
+            state.imageInput &&
+            libraryScope === state.scope && (
+              <AgentLibraryAttachmentPicker
+                open
+                single
+                loadPage={libraryRequestSource?.loadPage}
+                onOpenChange={(open) => {
+                  if (!open) setLibraryScope(null);
+                }}
+                onAttach={([pin]) => {
+                  if (!pin) return;
+                  const readPng =
+                    libraryRequestSource?.readPng ?? readLibraryPng;
+                  const name = `Library: ${pin.title}`;
+                  void controller.pickLibraryImage(
+                    state.scope,
+                    name,
+                    (maxBytes) => readPng(pin.id, maxBytes)
+                  );
+                }}
+              />
+            )}
           {librarySelection &&
             libraryRequest?.scope === state.scope &&
             libraryRequest.selectionId === librarySelection.selectionId && (
