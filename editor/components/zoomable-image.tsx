@@ -21,6 +21,7 @@ const WHEEL_ZOOM_SENSITIVITY = 0.01;
 export function ZoomableImage({
   src,
   alt,
+  referrerPolicy,
   className,
   imageClassName,
   onError,
@@ -28,6 +29,7 @@ export function ZoomableImage({
 }: {
   src: string;
   alt: string;
+  referrerPolicy?: React.HTMLAttributeReferrerPolicy;
   className?: string;
   imageClassName?: string;
   onError?: () => void;
@@ -218,6 +220,7 @@ export function ZoomableImage({
         ref={imgRef}
         src={src}
         alt={alt}
+        referrerPolicy={referrerPolicy}
         decoding="async"
         className={cn(
           "absolute left-0 top-0 max-w-none select-none",

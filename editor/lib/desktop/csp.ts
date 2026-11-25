@@ -6,12 +6,11 @@
  * route-export validation. `proxy.ts` and the CSP contract test
  * (`proxy.test.ts`) both import `buildDesktopCsp` from here.
  *
- * The template is hoisted so each `/desktop/*` request only interpolates the
- * per-request nonce (one concat) instead of rebuilding a 10-directive string.
- * The `'unsafe-eval'` tail is dev-only — pinned at module load.
+ * The request supplies the script nonce. The `'unsafe-eval'` tail is
+ * dev-only and fixed at module load.
  */
 
-import { LibraryStorage } from "@/lib/library/storage";
+import { DesktopImagePolicy } from "@/lib/desktop/image-policy";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -21,8 +20,6 @@ const DESKTOP_CSP_SCRIPT_TAIL = IS_DEV
 
 const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
 
-const FX_SHOWCASE_MEDIA_SOURCE = "https://fx-cdn.grida.co/showcase/";
-
 //   connect-src allows:
 //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
 //   - http://127.0.0.1:*  — the services sidecar
@@ -31,64 +28,6 @@ const FX_SHOWCASE_MEDIA_SOURCE = "https://fx-cdn.grida.co/showcase/";
 const DESKTOP_CSP_CONNECT_SRC = IS_DEV
   ? `connect-src 'self' http://127.0.0.1:* http://localhost:* ws://localhost:* wss://localhost:*; `
   : `connect-src 'self' http://127.0.0.1:*; `;
-
-/**
- * GRIDA-SEC-004 carve-out — the Grida Library is FIRST-PARTY storage. Its
- * explicitly selected public origin serves the reference images picked in the
- * artwork-station gather step; they are kept as URLs and rendered directly, so
- * the first-party origin is allowlisted in `img-src` (image only). When Tigris
- * is selected, retain the configured Supabase origin for saved reference URLs.
- *
- * This is NOT a generation-provider CDN: GENERATED media (fal/openrouter/…) is
- * still sidecar bytes via `data:`/`blob:`/`grida-workspace:` and those hosts stay
- * excluded (pinned by `proxy.test.ts`). Derived from explicit configuration at
- * module load; an unset Supabase origin is omitted, and malformed values can't
- * widen the policy.
- */
-/**
- * Reduce an arbitrary string to a single bare `scheme://host[:port]` origin, or
- * "" if it isn't a valid absolute URL. This is the ONLY way a value reaches the
- * `img-src` carve-out — so a caller (or a malformed env) can never smuggle in
- * multiple sources or extra CSP directives (`; script-src …`): a value with a
- * space or `;` fails `new URL()` or is stripped down to just its origin.
- */
-function normalizeLibraryImgOrigin(value: string): string {
-  if (!value) return "";
-  try {
-    const origin = new URL(value).origin;
-    return origin === "null" ? "" : origin;
-  } catch {
-    return "";
-  }
-}
-
-const LIBRARY_IMG_ORIGINS =
-  LibraryStorage.provider() === "tigris"
-    ? [LibraryStorage.origin(), process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""]
-    : [process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""];
-
-/** `img-src` with the first-party library origin appended when present. The
- *  origin is re-normalized here so the directive is safe regardless of caller. */
-function imgSrcDirective(
-  libraryImgOrigins: string | readonly string[]
-): string {
-  // `grida-workspace:` is the privileged streaming scheme for workspace media:
-  // the main process serves it by proxying to the sidecar's
-  // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
-  // privileged origin, NOT an external host.
-  const base = `img-src 'self' data: blob: grida-workspace: ${FX_SHOWCASE_MEDIA_SOURCE}`;
-  const origins = Array.from(
-    new Set(
-      (typeof libraryImgOrigins === "string"
-        ? [libraryImgOrigins]
-        : libraryImgOrigins
-      )
-        .map(normalizeLibraryImgOrigin)
-        .filter(Boolean)
-    )
-  );
-  return origins.length ? `${base} ${origins.join(" ")}` : base;
-}
 
 /**
  * Build the desktop CSP header for a given per-request nonce. The contract test
@@ -102,7 +41,7 @@ function imgSrcDirective(
  */
 export function buildDesktopCsp(
   nonce: string,
-  libraryImgOrigins: string | readonly string[] = LIBRARY_IMG_ORIGINS
+  libraryImgOrigins?: string | readonly string[]
 ): string {
   return (
     DESKTOP_CSP_PREFIX +
@@ -112,10 +51,10 @@ export function buildDesktopCsp(
     // at build/SSR — keep `'unsafe-inline'` for now; tightening style-src is a
     // separate change.
     `style-src 'self' 'unsafe-inline'; ` +
-    `${imgSrcDirective(libraryImgOrigins)}; ` +
+    `img-src 'self' data: blob: grida-workspace: ${DesktopImagePolicy.sources(libraryImgOrigins).join(" ")}; ` +
     // The sidecar downloads BYOK video. The renderer plays those bytes from
     // `data:`/`blob:` alongside local workspace media and public FX showcase clips.
-    `media-src 'self' data: blob: grida-workspace: ${FX_SHOWCASE_MEDIA_SOURCE}; ` +
+    `media-src 'self' data: blob: grida-workspace: ${DesktopImagePolicy.fxShowcase}; ` +
     `font-src 'self' data:; ` +
     DESKTOP_CSP_CONNECT_SRC +
     `frame-ancestors 'none'; ` +

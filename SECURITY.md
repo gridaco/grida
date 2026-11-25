@@ -867,13 +867,20 @@ downloaded). The desktop CSP allows the selected first-party Library origin in
 Tigris asset origin and retains the configured Supabase image origin for saved
 references. This is distinct from the generated-media rule above: generation
 provider CDNs (fal/openrouter/…) stay excluded — generated media is sidecar
-bytes via `data:`/`blob:`/`grida-workspace:`. Origins are fixed from the explicit
-provider configuration at module load; an unset Supabase origin is omitted,
-and malformed values cannot widen the policy.
+bytes via `data:`/`blob:`/`grida-workspace:`. Origins come from the explicit
+provider configuration. An unset Supabase origin is omitted, and malformed
+values cannot widen the policy.
 `proxy.test.ts` pins both the allow (library origin in `img-src` only) and the
 deny (provider CDNs still excluded). The alternative — proxying library images
 through `grida-workspace:` like generated media — was rejected: the library is
 first-party public read-only storage, and the product keeps its pins as URLs.
+
+**Public images in Desktop chat.** The Desktop image policy adds the exact
+HTTPS hosts `images.unsplash.com` and `upload.wikimedia.org` to `img-src`.
+The [shared policy](editor/lib/desktop/image-policy.ts) also supplies the
+chat renderer's allowlist. Other external image references become an explicit
+open action. The public hosts have image-only admission, and inline and
+fullscreen chat images omit the referrer.
 
 **FX showcase previews.** Desktop Home renders pinned posters and clips from
 the public FX CDN. The Desktop CSP allows `https://fx-cdn.grida.co/showcase/`
@@ -956,6 +963,11 @@ not user-attachment or crop capabilities. The renderer receives only captured
 pixels through this reader, with no additional filesystem or model grant.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
+
+- The [Desktop image policy](editor/lib/desktop/image-policy.ts) supplies
+  the exact external image sources used by the [CSP template](editor/lib/desktop/csp.ts).
+  The [CSP contract tests](editor/proxy.test.ts) pin image-only admission for
+  the added public hosts.
 
 - [Desktop personalization settings](desktop/src/main/desktop-personalization.ts),
   [physical config reads](desktop/src/main/native-agent-files.ts) and
@@ -2265,7 +2277,7 @@ Today:
 - `packages/grida-daemon/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
 - `packages/grida-daemon/src/sandbox/policy.ts` — daemon sandbox policy frame (secret-path denies and an optional development-network baseline). Desktop builds the sidecar policy from it directly with the development baseline off and no provider hosts, so direct external networking is absent.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
-- [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope, and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
+- [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set and the `grida-workspace:` img/media scope. The [Desktop image policy](editor/lib/desktop/image-policy.ts) supplies external `img-src` entries. Pinned by `proxy.test.ts`.
 - [Library byte locations](editor/lib/library/storage.ts) and [their tests](editor/lib/library/storage.test.ts) — explicit provider selection and validated first-party image origin used by the CSP's Library `img-src` carve-out. They add no connection or provider authority.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
 - [editor/scaffolds/desktop/desktop-bridge-gate.tsx](editor/scaffolds/desktop/desktop-bridge-gate.tsx) — server-rendering-safe gate that renders children only when `window.grida` is present.

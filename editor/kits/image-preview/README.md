@@ -18,3 +18,5 @@ Viewport behavior lives in the shared `ZoomableImage` component and immutable
 For retained images, pass `loadImage` in place of `src`. The loader runs
 when the preview opens and returns a Blob. The preview releases its display
 URL on close. Copy and Download use the loaded bytes directly.
+Pass `allowTransfer={false}` for a source that can display in an image element
+but cannot be fetched by the browser.

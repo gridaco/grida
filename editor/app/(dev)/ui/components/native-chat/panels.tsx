@@ -39,7 +39,7 @@ export function NativeChatDemoPanelLayout({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-wrap overflow-hidden">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
       {active && (
         <section
           aria-label="Chat panels"

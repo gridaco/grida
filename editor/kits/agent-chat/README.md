@@ -35,6 +35,13 @@ messages.map((m, i) => (
   description, and product label. The domain and **Open** action are available
   immediately. Inline links use the favicon from the shared page snapshot
   when available. A surface can omit the service to render ordinary links.
+  Desktop supplies a workspace image resolver for assistant Markdown. Relative
+  raster paths and in-workspace file URLs display inline and open fullscreen.
+  Unavailable files retain their alt text. Each image is a live reference to the
+  workspace, so reopening a chat loads the current file.
+  Desktop also supplies the web sources from its image policy. Images from
+  those sources can display inline. Other web images show their alt text and
+  an **Open image** link without loading the image in the transcript.
 - **Response cards** → the client supplies a footer for a finished answer.
   `ResponseCards` derives the display data from the retained answer. The
   containing surface supplies the opener for cards, Markdown web links, and

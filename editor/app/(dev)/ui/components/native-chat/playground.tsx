@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { reply_images } from "@/kits/agent-chat/reply-images";
 import { DesktopComposerDemo } from "../composer/desktop-demo";
-import type { DesktopConversationFixtures } from "../composer/desktop-conversation-fixtures";
+import { DesktopConversationFixtures } from "../composer/desktop-conversation-fixtures";
 import { ComposerDemoVoice } from "../composer/demo-voice";
 
 type Scenario = {
@@ -17,6 +18,11 @@ const scenarios = [
   { id: "empty", label: "New chat", example: "empty" },
   { id: "queue", label: "Message queue", example: "text", queued: true },
   { id: "attachments", label: "Attachments", example: "attachments" },
+  {
+    id: "inline-workspace-images",
+    label: "Inline images",
+    example: "inline-workspace-images",
+  },
   { id: "question-batch", label: "Question batch", example: "question-batch" },
   { id: "question", label: "Optional question", example: "question" },
   {
@@ -52,6 +58,14 @@ const scenarios = [
   { id: "reconnect", label: "Reconnection", example: "reconnect" },
 ] satisfies Scenario[];
 
+const demoWorkspaceImages = reply_images.workspaceResolver(
+  "/Gallery project",
+  (path) =>
+    path === DesktopConversationFixtures.workspaceImagePath
+      ? "/www/2026-10/wind-garden-repaint/preview.webp"
+      : undefined
+);
+
 export function NativeChatPlayground({
   initialScenario,
 }: {
@@ -85,12 +99,14 @@ export function NativeChatPlayground({
         </select>
       </label>
       <ComposerDemoVoice>
-        <DesktopComposerDemo
-          key={scenario.id}
-          scenario={scenario.example}
-          queued={scenario.queued}
-          showcase
-        />
+        <reply_images.Workspace value={demoWorkspaceImages}>
+          <DesktopComposerDemo
+            key={scenario.id}
+            scenario={scenario.example}
+            queued={scenario.queued}
+            showcase
+          />
+        </reply_images.Workspace>
       </ComposerDemoVoice>
     </div>
   );

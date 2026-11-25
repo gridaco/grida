@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DesktopImagePolicy } from "@/lib/desktop/image-policy";
+import { ReplyImageSourceProvider } from "@/kits/agent-chat/reply-images";
 import { NativeChatPlayground } from "./playground";
 
 export const metadata: Metadata = {
@@ -28,9 +30,11 @@ export default async function NativeChatPage({
           Composer playground
         </Link>
       </header>
-      <NativeChatPlayground
-        initialScenario={typeof scenario === "string" ? scenario : undefined}
-      />
+      <ReplyImageSourceProvider sources={DesktopImagePolicy.sources()}>
+        <NativeChatPlayground
+          initialScenario={typeof scenario === "string" ? scenario : undefined}
+        />
+      </ReplyImageSourceProvider>
     </main>
   );
 }

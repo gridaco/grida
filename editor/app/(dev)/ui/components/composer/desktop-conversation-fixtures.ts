@@ -16,6 +16,7 @@ export namespace DesktopConversationFixtures {
     | "question-batch"
     | "multiple-questions"
     | "attachments"
+    | "inline-workspace-images"
     | "svg-selection"
     | "activity"
     | "subagents"
@@ -42,6 +43,7 @@ export namespace DesktopConversationFixtures {
 
   /** Fixed display times keep hover actions deterministic between visits. */
   export const startedAtMs = Date.UTC(2026, 10, 16, 0, 0);
+  export const workspaceImagePath = "Wind Garden.canvas/previews/cover.webp";
   export const suggestedPrompt =
     "Show me two alternate cover layouts. In the first, give the photograph more room and move the title toward the bottom. In the second, let the title lead and use a smaller crop of the photograph. Keep the same typeface and colors so I can compare the layouts side by side.";
   const partialReply = {
@@ -353,6 +355,28 @@ export namespace DesktopConversationFixtures {
           role: "user",
           text: "This older image no longer has a preview.",
           attachments: [missingImage],
+        },
+      ],
+    },
+    {
+      id: "inline-workspace-images",
+      messages: [
+        {
+          messageId: "workspace-image-request",
+          role: "user",
+          text: "Can you show me the Wind Garden cover here in the chat?",
+        },
+        {
+          messageId: "workspace-image-answer",
+          role: "assistant",
+          text: [
+            "Here’s the current cover from the workspace.",
+            `![Wind Garden cover](${encodeURI(workspaceImagePath)})`,
+            "The earlier draft was linked here.",
+            "![Earlier cover draft](Wind%20Garden.canvas/previews/earlier.webp)",
+            "![Dice on Wikimedia Commons](https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png)",
+            "![Mountain landscape](https://www.gstatic.com/webp/gallery/1.jpg)",
+          ].join("\n\n"),
         },
       ],
     },

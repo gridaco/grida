@@ -19,6 +19,8 @@ export function FullscreenImagePreview({
   alt,
   title,
   downloadName,
+  allowTransfer = true,
+  referrerPolicy,
   className,
   children,
 }: (
@@ -28,6 +30,9 @@ export function FullscreenImagePreview({
   alt: string;
   title?: string;
   downloadName?: string;
+  /** Enable copy and download when the source grants access to its bytes. */
+  allowTransfer?: boolean;
+  referrerPolicy?: React.HTMLAttributeReferrerPolicy;
   className?: string;
   children: ReactNode;
 }) {
@@ -111,12 +116,15 @@ export function FullscreenImagePreview({
             {title ?? alt}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Fullscreen image preview with zoom, copy, and download actions.
+            {allowTransfer
+              ? "Fullscreen image preview with zoom, copy, and download actions."
+              : "Fullscreen image preview with zoom."}
           </DialogPrimitive.Description>
           {visibleSource ? (
             <ZoomableImage
               src={visibleSource}
               alt={alt}
+              referrerPolicy={referrerPolicy}
               className="bg-transparent"
               imageClassName="shadow-2xl"
               onBackgroundClick={() => onOpenChange(false)}
@@ -129,30 +137,34 @@ export function FullscreenImagePreview({
             </p>
           )}
           <div className="desktop-no-drag absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-md border border-white/10 bg-black/55 p-1 text-white shadow-sm backdrop-blur-md">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-white/75 hover:bg-white/10 hover:text-white"
-              aria-label={copied ? "Copied" : "Copy image"}
-              title={copied ? "Copied" : "Copy image"}
-              disabled={!transferSource}
-              onClick={() => void onCopy()}
-            >
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-white/75 hover:bg-white/10 hover:text-white"
-              aria-label="Download image"
-              title="Download image"
-              disabled={!transferSource}
-              onClick={() => void onDownload()}
-            >
-              <DownloadIcon />
-            </Button>
+            {allowTransfer && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-white/75 hover:bg-white/10 hover:text-white"
+                  aria-label={copied ? "Copied" : "Copy image"}
+                  title={copied ? "Copied" : "Copy image"}
+                  disabled={!transferSource}
+                  onClick={() => void onCopy()}
+                >
+                  {copied ? <CheckIcon /> : <CopyIcon />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-white/75 hover:bg-white/10 hover:text-white"
+                  aria-label="Download image"
+                  title="Download image"
+                  disabled={!transferSource}
+                  onClick={() => void onDownload()}
+                >
+                  <DownloadIcon />
+                </Button>
+              </>
+            )}
             <DialogPrimitive.Close asChild>
               <Button
                 type="button"

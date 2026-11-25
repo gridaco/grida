@@ -121,6 +121,7 @@ function ComposerExamples() {
       <Example id="compaction" title="Compaction">
         <div className="flex flex-col gap-4 rounded-xl border bg-background p-4">
           <CompactionNotice summary="The gallery handout is for a self-guided tour." />
+          <CompactionNotice failed />
           <CompactionProgress />
         </div>
         <p className="text-sm text-muted-foreground">
