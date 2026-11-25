@@ -325,10 +325,17 @@ pub(super) async fn submit(
         directory = Some(
             tokio::task::spawn_blocking(move || {
                 if let Err(error) = dir.gateway_record("submission.json", &receipt) {
+                    let mut error = Error::from(error);
+                    if error.value["directory"].is_string() {
+                        error.value["submission"] = json!(dir.path.join("submission.json"));
+                    }
+                    error.value["message"] = json!(
+                        "Could not save the local receipt before sending this attempt. Retry the same command with a new --out directory."
+                    );
                     dir.abandon();
                     return Err(error);
                 }
-                Ok(dir)
+                Ok::<_, Error>(dir)
             })
             .await
             .map_err(|_| unavailable())??,

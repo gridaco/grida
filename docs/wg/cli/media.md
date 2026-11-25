@@ -42,13 +42,15 @@ choosing inputs; a catalogue card does not promise an executable operation.
 | `text-to-speech` | ElevenLabs speech with an explicit voice.                                |
 | `three-d`        | Exact fal text/image contracts returning a primary GLB.                  |
 
-`ai models list` presents bundled executable operations. `--modality` accepts
+`ai models list` presents executable operations. `--modality` accepts
 `image`, `video`, `audio` or `3d`; `--kind` distinguishes the audio operations.
-Staged models remain marked `staged`. Listing and inspection use no credentials,
-network, account storage or provider probes.
+Staged models remain marked `staged`. Listings that include `grida` or `gg`,
+including an unfiltered list, read the public Gateway catalogue over the
+network. Inspecting either provider also uses live discovery. Other providers
+use bundled descriptors. Standard listing and inspection require no credentials.
 
 Listing shows each operation's accepted local-image flags; JSON rows include
-`local_image_flags` (`--reference`, `--image`, or an empty list). `--local-image`
+`local_image_flags` (`--reference`, `--image`, `--file`, or an empty list). `--local-image`
 filters to operations accepting a local image in either form and combines with
 the other filters. This is derived from the selected input schema, not provider
 or model names; it establishes supported input, not provider access.

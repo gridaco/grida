@@ -1011,6 +1011,7 @@ struct FaultJournal {
 enum RacePoint {
     Boundary,
     Start,
+    DelayStartUntil(Instant),
     Reject,
     RejectThenStop,
 }
@@ -1030,34 +1031,40 @@ impl TurnJournal for FaultJournal {
                     RacePoint::Boundary => {
                         matches!(action, JournalAction::Settle(_) | JournalAction::Suspend)
                     }
-                    RacePoint::Start => matches!(action, JournalAction::StartAttempt { .. }),
+                    RacePoint::Start | RacePoint::DelayStartUntil(_) => {
+                        matches!(action, JournalAction::StartAttempt { .. })
+                    }
                     RacePoint::Reject | RacePoint::RejectThenStop => {
                         matches!(action, JournalAction::RejectPrepared { .. })
                     }
                 })
                 && !self.raced.swap(true, Ordering::SeqCst)
             {
-                let state = self.lease.journal().load().await?;
-                control
-                    .change(
-                        ChangeId::new("race-pause").unwrap(),
-                        state.controls().revision,
-                        ControlDirective::Pause,
-                    )
-                    .await?;
-                if !matches!(point, RacePoint::Boundary) {
+                if let RacePoint::DelayStartUntil(until) = point {
+                    tokio::time::sleep_until((*until).into()).await;
+                } else {
                     let state = self.lease.journal().load().await?;
                     control
                         .change(
-                            ChangeId::new("race-followup").unwrap(),
+                            ChangeId::new("race-pause").unwrap(),
                             state.controls().revision,
-                            if matches!(point, RacePoint::RejectThenStop) {
-                                ControlDirective::Cancel
-                            } else {
-                                ControlDirective::Resume
-                            },
+                            ControlDirective::Pause,
                         )
                         .await?;
+                    if !matches!(point, RacePoint::Boundary) {
+                        let state = self.lease.journal().load().await?;
+                        control
+                            .change(
+                                ChangeId::new("race-followup").unwrap(),
+                                state.controls().revision,
+                                if matches!(point, RacePoint::RejectThenStop) {
+                                    ControlDirective::Cancel
+                                } else {
+                                    ControlDirective::Resume
+                                },
+                            )
+                            .await?;
+                    }
                 }
             }
             if count == self.fault_at && self.unresolved {
@@ -3374,6 +3381,53 @@ impl Tool for DeadlineTool {
             success()
         })
     }
+}
+
+#[tokio::test]
+async fn a_headless_wait_refuses_to_run_if_committing_its_attempt_used_its_time_budget() {
+    let tool = Arc::new(DeadlineTool {
+        definition: CounterTool::new(None).definition.clone(),
+        deadline: Mutex::new(None),
+    });
+    let executor: Arc<dyn Tool> = tool.clone();
+    let runtime = runtime_with(
+        ScriptedProvider::complete(),
+        captured(&[executor]),
+        Duration::from_secs(120),
+    );
+    let latest_start = Instant::now() + Duration::from_secs(1);
+    let outer = latest_start + Duration::from_secs(305);
+    let (lease, _) = fault_lease(
+        0,
+        false,
+        Some(RacePoint::DelayStartUntil(
+            latest_start + Duration::from_millis(25),
+        )),
+    );
+    let turn = runtime
+        .open_with_wait_deadline(lease, Some(outer))
+        .await
+        .unwrap()
+        .turn;
+    let key = OperationKey::new("late-headless-wait").unwrap();
+    let InvokeOutcome::Complete(outcome) = turn
+        .operations()
+        .invoke(key.clone(), invocation(1))
+        .await
+        .unwrap()
+    else {
+        panic!("expected a definite refusal");
+    };
+    assert_eq!(outcome.status, OutcomeStatus::Failed);
+    assert_eq!(
+        outcome.content.first(),
+        ToolOutcome::failed("wait_exceeds_run_deadline")
+            .content
+            .first()
+    );
+    assert!(tool.deadline.lock().unwrap().is_none());
+    let operation = turn.operations().operation_id(&key).unwrap();
+    assert_eq!(turn.view().state.operations()[&operation].attempts.len(), 1);
 }
 
 #[tokio::test]

@@ -53,7 +53,7 @@ impl GatewaySubmission {
     pub(crate) fn prepare(
         descriptor: &Value,
         mut value: Value,
-        files: Vec<GatewayFile>,
+        mut files: Vec<GatewayFile>,
         boundary: &str,
     ) -> Result<Self> {
         let op = &descriptor["gateway_operation"];
@@ -90,8 +90,24 @@ impl GatewaySubmission {
         if !edit && files.len() > 4 {
             return Err(input::bad());
         }
-        for file in &files {
+        for file in &mut files {
             let field = &file.field;
+            let data = &file.asset.data;
+            if field == "mesh" {
+                if data.len() > 60_000_000 {
+                    return Err(input::bad());
+                }
+                input::validate_glb(data).map_err(|_| input::bad())?;
+                file.asset.media_type = "model/gltf-binary".into();
+            } else if data.len() > 20_000_000
+                || !matches!(
+                    file.asset.media_type.as_str(),
+                    "image/png" | "image/jpeg" | "image/webp"
+                )
+                || media::image_mime(data) != Some(file.asset.media_type.as_str())
+            {
+                return Err(input::bad());
+            }
             if edit {
                 if field != "image[]" {
                     return Err(input::bad());
@@ -124,21 +140,6 @@ impl GatewaySubmission {
                     },
                 );
                 placeholders.push(field);
-            }
-            let data = &file.asset.data;
-            if field == "mesh" {
-                if data.len() > 60_000_000 {
-                    return Err(input::bad());
-                }
-                input::validate_glb(data).map_err(|_| input::bad())?;
-            } else if data.len() > 20_000_000
-                || !matches!(
-                    file.asset.media_type.as_str(),
-                    "image/png" | "image/jpeg" | "image/webp"
-                )
-                || media::image_mime(data) != Some(file.asset.media_type.as_str())
-            {
-                return Err(input::bad());
             }
         }
         let mut value = input::normalize(&schema, value)?;
@@ -396,9 +397,10 @@ impl MediaClient {
         let job = read_job(&session, key, id).await?;
         let receipt = job_receipt(&job, id)?;
         if collect && job["result_status"] == "available" {
+            let request_id = job["request_id"].as_str();
             return saveable(&session, &job, receipt)
                 .await
-                .map_err(|e| e.task(id));
+                .map_err(|e| with_request(e.task(id), request_id));
         }
         Ok(GatewayOutput {
             media: None,
@@ -663,6 +665,57 @@ mod tests {
         json!({"object":"job","id":JOB,"request_id":REQUEST,"operation_id":"video.lab.model.image",
             "model":"lab/model","interface":"videos","status":status,"result_status":result,
             "billing":{"status":"pending","charged_mills":null}})
+    }
+
+    #[test]
+    fn multipart_mesh_uses_the_validated_glb_type() {
+        let mut document = br#"{"asset":{"version":"2.0"}}"#.to_vec();
+        document.resize(document.len().next_multiple_of(4), b' ');
+        let mut bytes = b"glTF".to_vec();
+        bytes.extend_from_slice(&2_u32.to_le_bytes());
+        bytes.extend_from_slice(&(20 + document.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&(document.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(b"JSON");
+        bytes.extend_from_slice(&document);
+        let descriptor = json!({
+            "gateway_operation":{"standalone":true,"id":"three-d.tripo.rig-check",
+                "path":"/v1/endpoints/three-d.tripo.rig-check","interface":"endpoints","file_fields":["mesh"]},
+            "input_schema":{"type":"object","additionalProperties":false,"required":["mesh"],"properties":{
+                "mesh":{"type":"object","properties":{"url":{"type":"string"},"media_type":{"type":"string","enum":["model/gltf-binary"]}}}
+            }},
+        });
+        let request = GatewaySubmission::prepare(
+            &descriptor,
+            json!({}),
+            vec![GatewayFile {
+                field: "mesh".into(),
+                asset: Asset {
+                    data: bytes,
+                    media_type: "application/octet-stream".into(),
+                },
+            }],
+            "fixture-boundary",
+        )
+        .unwrap();
+        let body = String::from_utf8_lossy(request.body());
+        assert!(body.contains("Content-Type: model/gltf-binary\r\n"));
+        assert!(!body.contains("application/octet-stream"));
+    }
+
+    #[tokio::test]
+    async fn collecting_a_job_preserves_both_ids_when_its_result_is_unusable() {
+        let fixture = Arc::new(Fixture(Mutex::new(VecDeque::from([(
+            "GET",
+            "/v1/jobs/req_fixture-job",
+            Some(job("succeeded", "available")),
+        )]))));
+        let error = MediaClient::new(fixture)
+            .gateway_job(KEY, JOB, true, CancellationToken::new())
+            .await
+            .err()
+            .expect("the job has no usable result");
+        assert_eq!(error.task_id.as_deref(), Some(JOB));
+        assert_eq!(error.request_id.as_deref(), Some(REQUEST));
     }
 
     #[test]

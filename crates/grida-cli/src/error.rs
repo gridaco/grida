@@ -146,6 +146,9 @@ impl From<grida_ai::Failure> for Error {
             }
             "key_budget_exceeded" => "This Gateway key reached its configured spending limit.",
             "cost_limit_exceeded" => "Gateway could not admit the request under its cost limit.",
+            "job_not_found" => {
+                "Gateway could not find this job. Check the job ID and use a Media key for the organization that submitted it."
+            }
             "job_expired" => {
                 "Gateway can no longer return this job. Use its request ID to inspect billing in Console."
             }

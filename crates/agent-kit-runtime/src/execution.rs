@@ -1050,9 +1050,10 @@ impl TurnOperations {
             }
             Err(error) => return Err(error),
         };
-        let deadline = wait_timeout
-            .and_then(|timeout| Instant::now().checked_add(timeout))
-            .map_or(deadline, |wait| deadline.max(wait));
+        let wait_end = wait_timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+        let wait_no_longer_fits =
+            headless_wait.is_some_and(|(_, outer)| wait_end.is_none_or(|wait| wait > outer));
+        let deadline = wait_end.map_or(deadline, |wait| deadline.max(wait));
         let deadline = headless_wait.map_or(deadline, |(_, outer)| deadline.min(outer));
         let input_activity = CancellationToken::new();
         let context = InvocationContext {
@@ -1066,6 +1067,9 @@ impl TurnOperations {
             let mut outcome = ToolOutcome::failed(&error.code);
             outcome.status = OutcomeStatus::Cancelled;
             outcome
+        } else if wait_no_longer_fits {
+            // The journal has recorded an attempt, but the tool has not run.
+            Self::tool_rejection("wait_exceeds_run_deadline")
         } else {
             let invocation = async {
                 if let Some(after) = input_after.filter(|_| wait_timeout.is_some()) {
@@ -1105,15 +1109,20 @@ impl TurnOperations {
         Ok(InvokeOutcome::Complete(outcome))
     }
 
+    fn tool_rejection(code: &str) -> ToolOutcome {
+        let mut outcome = ToolOutcome::failed(code);
+        if code == "wait_exceeds_run_deadline" {
+            outcome.content.push(agent_kit_core::messages::ResultContent::Text(
+                "The wait would exceed the time left in this run. Use a shorter wait or finish with the current results.".into(),
+            ));
+        }
+        outcome
+    }
+
     async fn reject_tool(&self, owner: &Owner, code: &str) -> Result<InvokeOutcome> {
         let mut code = code;
         loop {
-            let mut outcome = ToolOutcome::failed(code);
-            if code == "wait_exceeds_run_deadline" {
-                outcome.content.push(agent_kit_core::messages::ResultContent::Text(
-                    "The wait would exceed the time left in this run. Use a shorter wait or finish with the current results.".into(),
-                ));
-            }
+            let outcome = Self::tool_rejection(code);
             let rejected = self
                 .inner
                 .reject(

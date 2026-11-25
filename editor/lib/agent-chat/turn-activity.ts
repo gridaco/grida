@@ -275,8 +275,15 @@ export namespace turn_activity {
    * Old standalone compaction records can contain the summary model's usage.
    */
   export function contextUsage(
-    records: readonly NativeChatTurnRecord[]
+    records: readonly NativeChatTurnRecord[],
+    modelCapacity?: number
   ): { tokens?: number; window?: number } | undefined {
+    // Match the default working window in the native agent until it reports
+    // the actual window, which can reflect a user override.
+    const estimatedWindow =
+      modelCapacity === undefined
+        ? undefined
+        : Math.min(modelCapacity, 272_000);
     let estimated = false;
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
@@ -290,13 +297,15 @@ export namespace turn_activity {
       )
         return {
           tokens: record.contextTokens,
-          window: record.contextWindowTokens,
+          window: record.contextWindowTokens ?? estimatedWindow,
         };
       if (record.contextWindowTokens !== undefined)
         return { window: record.contextWindowTokens };
       if (compacted) estimated = true;
     }
-    return undefined;
+    return estimatedWindow === undefined
+      ? undefined
+      : { window: estimatedWindow };
   }
 
   /** Commentary in order, with consecutive tool calls joined into one line. */

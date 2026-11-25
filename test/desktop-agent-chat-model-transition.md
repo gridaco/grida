@@ -61,8 +61,11 @@ rendering, focus or interaction behavior.
    stays available for retry. On an older host that requires replacing its
    worker, confirm the refusal identifies the blocking work and keeps the draft.
 4. With both Grida sign-in and a saved Gateway API key, select the same model
-   in each group. Queue a turn on the API-key connection, then switch the
-   future choice to the signed-in connection. Remove the saved key and confirm
-   that the queued turn asks for its original connection. Restore that key and
+   in each group. Start a signed-in turn that requests a tool approval and
+   leave the approval open. Select the API-key connection, send a turn, and
+   confirm it appears in the queue. Switch the future choice back to the
+   signed-in connection. Remove the saved key while the approval is still
+   open. Answer the approval and let the active turn finish. Confirm that the
+   queued turn asks for its original connection. Restore that key and
    confirm the queued turn resumes under the API-key connection. Confirm the
    next turn uses Grida sign-in when it is the selected connection.

@@ -100,6 +100,7 @@ pub fn domain_failure(
             ("task_id", "Task"),
             ("request_id", "Request"),
             ("directory", "Output"),
+            ("submission", "Submission record"),
         ] {
             if e[key].is_string() {
                 writeln!(stderr, "  {label}: {}", safe(key))?;

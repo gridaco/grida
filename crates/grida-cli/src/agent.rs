@@ -246,9 +246,11 @@ fn model_context_window(catalogue: &Value, model: &str) -> Option<NonZeroU64> {
         return None;
     }
     entry["gg"]["limits"]["context_tokens"]
-        .as_u64()
-        .filter(|capacity| *capacity <= 9_007_199_254_740_991)
-        .and_then(NonZeroU64::new)
+        .as_f64()
+        .filter(|capacity| {
+            (1.0..=9_007_199_254_740_991.0).contains(capacity) && capacity.fract() == 0.0
+        })
+        .and_then(|capacity| NonZeroU64::new(capacity as u64))
 }
 
 pub async fn dispatch_external(command: ExternalAgentCommand) -> Result<u8> {
@@ -355,11 +357,18 @@ mod tests {
                 .get(),
             131_072
         );
+        assert_eq!(
+            model_context_window(&response(json!(131_072.0)), "example/chat")
+                .unwrap()
+                .get(),
+            131_072
+        );
         for model in ["example/unknown", "example/media", "chat"] {
             assert!(model_context_window(&response(json!(131_072)), model).is_none());
         }
         for context in [
             json!(0),
+            json!(-1.0),
             json!(1.5),
             json!(9_007_199_254_740_992_u64),
             json!(null),

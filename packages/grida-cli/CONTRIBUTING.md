@@ -114,9 +114,11 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 
 ## Media access and files
 
-`grida ai models list` and `ai models inspect` are offline and credential-free.
-Listing shows accepted local-image flags; `ai models list --local-image` keeps only
-operations accepting `--reference FILE` or `--image FILE`. The column, JSON
+`grida ai models list` and `ai models inspect` are credential-free by default.
+Listings that include `grida` or `gg` and inspection of either provider read the
+live public Gateway catalogue. Other providers use bundled descriptors.
+`ai models list --local-image` keeps operations that accept `--reference FILE`,
+`--image FILE`, or `--file FIELD=PATH`. The column, JSON
 `local_image_flags`, filter and inspection guidance derive from the SDK schema.
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
 variants, availability and result rules. Installed help stays minimal.

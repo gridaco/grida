@@ -417,7 +417,10 @@ impl Directory {
         #[cfg(unix)]
         fs::File::open(&self.path)
             .and_then(|dir| dir.sync_all())
-            .map_err(|_| Error::new("output_unavailable"))?;
+            .map_err(|_| Error {
+                directory: Some(self.path.clone()),
+                ..Error::new("output_unavailable")
+            })?;
         Ok(())
     }
     /// Once paid bytes exist, this synchronous publication must finish despite signals.

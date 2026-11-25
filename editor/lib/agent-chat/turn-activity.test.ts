@@ -874,6 +874,28 @@ describe("transcript time dividers", () => {
 });
 
 describe("turn_activity.contextUsage", () => {
+  it("estimates the working window before the agent reports its actual window", () => {
+    expect(turn_activity.contextUsage([], 1_000_000)).toEqual({
+      window: 272_000,
+    });
+    expect(turn_activity.contextUsage([], 131_072)).toEqual({
+      window: 131_072,
+    });
+    expect(
+      turn_activity.contextUsage(
+        [
+          {
+            turnId: "a",
+            status: "succeeded",
+            startedAtMs: 0,
+            contextWindowTokens: 400_000,
+          },
+        ],
+        1_000_000
+      )
+    ).toEqual({ window: 400_000 });
+  });
+
   it("uses the latest captured working window to estimate absent provider usage", () => {
     expect(
       turn_activity.contextUsage([

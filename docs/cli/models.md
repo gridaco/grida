@@ -62,11 +62,10 @@ it in the input JSON. Inspect the intended variant: image/video inspection
 defaults to text input where that variant exists. Generation's `--reference`
 and `--image` flags select compatible variants automatically.
 
-GG's generic adapter supports JSON image generation, video, music and 3D
-operations. Multipart-only image editing is not advertised by that adapter;
-existing native Tripo file and rigging operations retain their separate contracts.
-GG discovery does not require a separate Gateway API key. Generation uses your
-Grida session and selected organization.
+Gateway discovery is public for both providers. For generation, use
+`--provider grida` to use your Grida session and selected organization.
+Use `--provider gg` with a standalone Gateway API key. The key determines the
+funding organization, so `gg` rejects `--org` and `--org-id`.
 
 The selected operation's schema is authoritative. A provider's model page may
 advertise options Grida does not expose. There is no raw provider passthrough
