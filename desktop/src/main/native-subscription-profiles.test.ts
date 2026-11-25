@@ -32,6 +32,10 @@ const sidecar = vi.hoisted(() => ({
     vi.fn<
       typeof import("./services-sidecar-supervisor").nativeAgentSubscriptionSettings
     >(),
+  nativeAgentGatewayApiKeySettings:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayApiKeySettings
+    >(),
   nativeAgentGatewayConnection:
     vi.fn<
       typeof import("./services-sidecar-supervisor").nativeAgentGatewayConnection

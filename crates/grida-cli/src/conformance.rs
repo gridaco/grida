@@ -73,7 +73,7 @@ pub fn project(invocation: &Invocation) -> Value {
         Command::Version => "version",
         Command::Fx => "fx",
         Command::Agent(agent) => {
-            put(&mut object, "provider", "gg");
+            put(&mut object, "provider", "grida");
             put(&mut object, "model", agent.model.as_str());
             put(&mut object, "stateDir", json!(agent.state_dir));
             put(&mut object, "maxOutputTokens", agent.max_output_tokens);
@@ -197,6 +197,8 @@ pub fn project(invocation: &Invocation) -> Value {
             model: value,
             source,
             out,
+            retry_submission,
+            gateway_files,
             key_stdin,
             selector: selected,
         } => {
@@ -206,9 +208,31 @@ pub fn project(invocation: &Invocation) -> Value {
                 GenerationSource::Flags(value) => put(&mut object, "request", request(value)),
             }
             put(&mut object, "out", out.as_str());
+            optional(&mut object, "retrySubmission", retry_submission.as_deref());
+            if !gateway_files.is_empty() {
+                put(
+                    &mut object,
+                    "gatewayFiles",
+                    gateway_files
+                        .iter()
+                        .map(|input| json!({"field":input.field,"path":input.value}))
+                        .collect::<Vec<_>>(),
+                );
+            }
             put(&mut object, "keyStdin", *key_stdin);
             selector(&mut object, selected);
             "ai generate"
+        }
+        Command::GatewayJob {
+            job_id,
+            out,
+            key_stdin,
+        } => {
+            put(&mut object, "provider", "gg");
+            put(&mut object, "jobId", job_id.as_str());
+            optional(&mut object, "out", out.as_deref());
+            put(&mut object, "keyStdin", *key_stdin);
+            "ai jobs get"
         }
         Command::VoicesList { key_stdin } => {
             put(&mut object, "provider", "elevenlabs");
@@ -254,12 +278,14 @@ pub fn project(invocation: &Invocation) -> Value {
             model,
             source,
             out,
+            retry_submission,
             key_stdin,
             selector: value,
         } => {
             put(&mut object, "provider", provider.as_str());
             put(&mut object, "model", model.as_str());
             put(&mut object, "out", out.as_str());
+            optional(&mut object, "retrySubmission", retry_submission.as_deref());
             put(&mut object, "keyStdin", *key_stdin);
             selector(&mut object, value);
             match source {

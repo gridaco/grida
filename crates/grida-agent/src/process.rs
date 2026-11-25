@@ -121,7 +121,7 @@ pub async fn run_with_input(
         {
             Ok((scoped, workspace)) => {
                 options.cwd = workspace;
-                run_once(&scoped, options, input_file, initial_title, signal).await
+                run_once(scoped, options, input_file, initial_title, signal).await
             }
             Err(error) => Err(error),
         }
@@ -191,7 +191,7 @@ async fn serve_stdio(
 }
 
 async fn run_once(
-    host: &Host,
+    mut host: Host,
     options: RunOptions,
     input_file: Option<PathBuf>,
     initial_title: Option<String>,
@@ -202,9 +202,10 @@ async fn run_once(
         RunQuestions::Batch => 2,
     };
     let deadline = tokio::time::Instant::now() + options.timeout;
+    host.set_run_deadline(deadline.into_std());
     tokio::pin!(signal);
     let mut accepted = tokio::select! {
-        result = tokio::time::timeout_at(deadline, admit_run(host, options, input_file, initial_title)) => result
+        result = tokio::time::timeout_at(deadline, admit_run(&host, options, input_file, initial_title)) => result
             .map_err(|_| problem(ErrorKind::Unavailable, "run_deadline_reached"))??,
         result = &mut signal => {
             result?;
@@ -337,7 +338,7 @@ async fn admit_run(
             .into_iter()
             .map(|reference| PromptPart::Skill { reference }),
     );
-    host.start_prompt_with_initial_title(
+    host.start_headless_prompt(
         PromptRequest {
             id: change_id()?,
             session,

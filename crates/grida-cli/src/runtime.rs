@@ -1,6 +1,8 @@
 // GRIDA-SEC-006 / GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-014 / GRIDA-SEC-015
 // GRIDA-GG: provider — explicit scoped invocation authority; no account token or credential persistence.
 // Parse/input admission precedes custody; host lends one invocation's authority.
+mod gateway;
+
 use crate::{
     credentials::Credentials,
     error::{Error, Origin, Result},
@@ -56,6 +58,7 @@ impl grida_ai::Transport for MediaTransport {
                 grida_ai::Lane::Provider | grida_ai::Lane::Upload => http::Lane::Provider,
                 grida_ai::Lane::Download => http::Lane::Download,
                 grida_ai::Lane::Discovery => http::Lane::Discovery,
+                grida_ai::Lane::StandaloneGateway => http::Lane::StandaloneGateway,
             };
             let mut request =
                 http::Request::new(r.method.parse().map_err(|_| failure())?, r.url, r.body);
@@ -101,7 +104,8 @@ pub async fn run(invocation: Invocation) -> Result<Output> {
         Command::ModelsInspect(_)
         | Command::ModelsList { .. }
         | Command::Generate { .. }
-        | Command::VoicesList { .. } => Some(false),
+        | Command::VoicesList { .. }
+        | Command::GatewayJob { .. } => Some(false),
         Command::RiggingList { .. }
         | Command::RiggingInspect { .. }
         | Command::RiggingCheck { .. }
@@ -141,18 +145,41 @@ async fn execute(
     token: CancellationToken,
     interrupted: Arc<AtomicBool>,
 ) -> Result<Output> {
+    let replay = match &invocation.command {
+        Command::Generate {
+            retry_submission: Some(source),
+            ..
+        }
+        | Command::RiggingRun {
+            retry_submission: Some(source),
+            ..
+        } => Some(gateway::Replay::read(source, &token).await?),
+        _ => None,
+    };
     let live_gateway = match &invocation.command {
         Command::ModelsInspect(model) | Command::Generate { model, .. } => {
-            model.provider == Provider::Gg
+            matches!(model.provider, Provider::Grida | Provider::Gg)
         }
-        Command::ModelsList { provider, .. } => provider.is_none_or(|p| p == Provider::Gg),
-        Command::RiggingList { provider, .. } => provider.is_none_or(|p| p == MeshProvider::Gg),
+        Command::ModelsList { provider, .. } => {
+            provider.is_none_or(|p| matches!(p, Provider::Grida | Provider::Gg))
+        }
+        Command::RiggingList { provider, .. } => {
+            provider.is_none_or(|p| matches!(p, MeshProvider::Grida | MeshProvider::Gg))
+        }
         Command::RiggingInspect { provider, .. }
         | Command::RiggingCheck { provider, .. }
-        | Command::RiggingRun { provider, .. } => *provider == MeshProvider::Gg,
+        | Command::RiggingRun { provider, .. } => {
+            matches!(provider, MeshProvider::Grida | MeshProvider::Gg)
+        }
         _ => false,
     };
-    let catalog = if live_gateway {
+    let frozen = match &replay {
+        Some(replay) => replay.catalogue()?,
+        None => None,
+    };
+    let catalog = if let Some(catalog) = frozen {
+        catalog
+    } else if live_gateway {
         let fixture_origin = if env.contains_key("GRIDA_CLI_LOCAL_CONFIG") {
             Some(Host::open(&env)?.config.api_origin)
         } else {
@@ -164,7 +191,7 @@ async fn execute(
         } else {
             client.gateway_catalogue(token.clone()).await?
         };
-        offered.overlay(Catalog::bundled())
+        offered.cli_catalogue()
     } else {
         Catalog::bundled()
     };
@@ -193,7 +220,7 @@ async fn execute(
             });
             let mut access = json!({"checked":false});
             if available {
-                if provider == Some(Provider::Gg) {
+                if provider == Some(Provider::Grida) {
                     let credit = read_credits(&env, selector.as_ref(), &token).await?;
                     let eligible = credit["billing_gate"]["allowed"].as_bool() == Some(true);
                     access = json!({"checked":true,"basis":"cached_credits","eligible":eligible,"provider_access":"unverified","credits":credit});
@@ -285,10 +312,10 @@ async fn execute(
             lines.extend([
                 "Stored keys use shared plaintext credentials.toml with private permissions."
                     .into(),
-                "Native --provider gg execution requires Grida login and an organization. Access was not checked.".into(),
+                "--provider grida uses Grida sign-in. --provider gg uses a standalone Gateway API key.".into(),
             ]);
             Ok(Output::new(
-                json!({"providers":providers,"storage":"shared_plaintext_file","gg":{"authentication":"grida_login","checked":false}}),
+                json!({"providers":providers,"storage":"shared_plaintext_file","grida":{"authentication":"grida_login","checked":false}}),
                 lines,
             ))
         }
@@ -354,14 +381,36 @@ async fn execute(
             model,
             source,
             out,
+            gateway_files,
             key_stdin,
             selector,
+            ..
         } => {
             let d = input::inspect(&catalog, &model, Some(&source))?;
-            let value = input::read(&d, &source, &token).await?;
-            let parsed = catalog.parse_input(&input::selector(&d), value)?;
-            generate(parsed, Some(out), key_stdin, selector, &env, &token).await
+            if model.provider == Provider::Gg {
+                let value = gateway::read_input(&d, source, gateway_files, &token).await?;
+                gateway::submit(
+                    &catalog,
+                    &d,
+                    value,
+                    Some(out),
+                    replay,
+                    key_stdin,
+                    &env,
+                    &token,
+                )
+                .await
+            } else {
+                let value = input::read(&d, &source, &token).await?;
+                let parsed = catalog.parse_input(&input::selector(&d), value)?;
+                generate(parsed, Some(out), key_stdin, selector, &env, &token).await
+            }
         }
+        Command::GatewayJob {
+            job_id,
+            out,
+            key_stdin,
+        } => gateway::get(&job_id, out, key_stdin, &env, &token).await,
         Command::RiggingList { provider, feature } => {
             let mut rows = catalog.list(&Filter {
                 provider: provider.map(|p| p.as_str().into()),
@@ -430,7 +479,26 @@ async fn execute(
             selector,
         } => {
             let selection = rig_selector(provider, &MeshOperation::Check);
-            catalog.inspect(&selection)?;
+            let descriptor = catalog.inspect(&selection)?;
+            if provider == MeshProvider::Gg {
+                let value = match source {
+                    MeshSource::Json(s) => {
+                        gateway::Input::json(files::read_input(&s, &token).await?)
+                    }
+                    MeshSource::Mesh(path) => gateway::Input::mesh(json!({}), path),
+                };
+                return gateway::submit(
+                    &catalog,
+                    &descriptor,
+                    value,
+                    None,
+                    None,
+                    key_stdin,
+                    &env,
+                    &token,
+                )
+                .await;
+            }
             let value = match source {
                 MeshSource::Json(s) => files::read_input(&s, &token).await?,
                 MeshSource::Mesh(path) => json!({"mesh":encoded_mesh(&path,&token).await?}),
@@ -445,9 +513,33 @@ async fn execute(
             out,
             key_stdin,
             selector,
+            ..
         } => {
             let selection = rig_selector(provider, &MeshOperation::Rig { model });
-            catalog.inspect(&selection)?;
+            let descriptor = catalog.inspect(&selection)?;
+            if provider == MeshProvider::Gg {
+                let value = match source {
+                    RiggingSource::Json(s) => {
+                        gateway::Input::json(files::read_input(&s, &token).await?)
+                    }
+                    RiggingSource::Mesh {
+                        path,
+                        rig_type,
+                        spec,
+                    } => gateway::Input::mesh(json!({"rig_type":rig_type,"spec":spec}), path),
+                };
+                return gateway::submit(
+                    &catalog,
+                    &descriptor,
+                    value,
+                    Some(out),
+                    replay,
+                    key_stdin,
+                    &env,
+                    &token,
+                )
+                .await;
+            }
             let value = match source {
                 RiggingSource::Json(s) => files::read_input(&s, &token).await?,
                 RiggingSource::Mesh {
@@ -523,7 +615,7 @@ async fn authority(
     env: &Environment,
     token: &CancellationToken,
 ) -> Result<(ExecutionAuthority, Option<String>)> {
-    if provider == "gg" {
+    if provider == "grida" {
         account::with_gg(env.clone(), selector.cloned(), token.clone(), |_, grant| {
             let origin = grant.api_origin().to_owned();
             Ok((

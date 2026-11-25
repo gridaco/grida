@@ -254,6 +254,8 @@ struct Continuation {
     /// History position captured with the most recent prepared request.
     /// None only before the turn prepares its first request.
     request_history: Option<HistoryPosition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_position: Option<agent_kit_core::turn::JournalPosition>,
     request_generation: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     hook_diagnostics: Vec<lifecycle_hooks::HookResult>,
@@ -754,6 +756,7 @@ impl Master {
             }
             if continuation.request.is_none() {
                 continuation.request_history = Some(input_view.state.history().position());
+                continuation.request_position = Some(input_view.state.position());
                 // An earlier pause cannot have interrupted a request that was
                 // not prepared yet.
                 continuation.interrupted = false;
@@ -782,6 +785,7 @@ impl Master {
             };
             let step = turn
                 .step(StepPlan {
+                    input_after: continuation.request_position,
                     key: OperationKey::new(step_key.clone())?,
                     request,
                     inference_grants: self.authority.inference.clone(),
@@ -1183,6 +1187,7 @@ impl Master {
                 interrupted: false,
                 outcome: None,
                 request_history: None,
+                request_position: None,
                 request_generation: 0,
                 hook_diagnostics: Vec::new(),
                 retry: None,
@@ -1235,13 +1240,7 @@ impl Master {
             .view()
             .state
             .history()
-            .records()
-            .iter()
-            .enumerate()
-            .any(|(index, record)| {
-                let HistoryRecord::Message(message) = record;
-                message.role == Role::User && index as u64 >= request_history.0
-            });
+            .has_user_input_after(request_history);
         if !new_input
             && !operation.as_ref().is_some_and(paused_before_generation)
             && request.binding().authority == self.authority.inference.authority
@@ -1904,19 +1903,8 @@ fn paused_before_generation(operation: &OperationState) -> bool {
 /// Whether a user message arrived after the most recent prepared request.
 /// Before the first request, every user message is new.
 fn has_new_input(turn: &Turn, continuation: &Continuation) -> bool {
-    let after = continuation
-        .request_history
-        .map_or(0, |position| position.0);
-    turn.view()
-        .state
-        .history()
-        .records()
-        .iter()
-        .enumerate()
-        .any(|(index, record)| {
-            let HistoryRecord::Message(message) = record;
-            index as u64 >= after && message.role == Role::User
-        })
+    let after = continuation.request_history.unwrap_or_default();
+    turn.view().state.history().has_user_input_after(after)
 }
 
 pub fn read_account(envelope: &Envelope) -> Result<Account> {

@@ -409,6 +409,20 @@ impl Directory {
         }
         result
     }
+    pub fn gateway_record(&self, name: &str, value: &Value) -> Result<(), Error> {
+        let bytes =
+            serde_json::to_vec_pretty(value).map_err(|_| Error::new("output_unavailable"))?;
+        self.publish(name, &bytes)
+            .map_err(|_| Error::new("output_unavailable"))?;
+        #[cfg(unix)]
+        fs::File::open(&self.path)
+            .and_then(|dir| dir.sync_all())
+            .map_err(|_| Error {
+                directory: Some(self.path.clone()),
+                ..Error::new("output_unavailable")
+            })?;
+        Ok(())
+    }
     /// Once paid bytes exist, this synchronous publication must finish despite signals.
     pub fn save(&mut self, metadata: &Value, artifacts: &[Artifact]) -> Result<Value, Error> {
         let mut saved = Vec::new();
@@ -440,6 +454,9 @@ impl Directory {
             }
             if metadata["feature"] == "rigging" {
                 receipt["feature"] = json!("rigging");
+            }
+            if let Some(gateway) = metadata.get("gateway") {
+                receipt["gateway"] = gateway.clone();
             }
             if let Some(task) = metadata.get("task") {
                 receipt["task"] = task.clone();
@@ -497,6 +514,28 @@ mod tests {
     fn metadata() -> Value {
         serde_json::json!({"kind":"image","model_id":"test","provider_id":"fal","binding_id":"test","variant":"text"})
     }
+    #[test]
+    fn gateway_submission_and_acceptance_are_recoverable_without_overwrite() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = Directory::prepare(&root.path().join("output")).unwrap();
+        let submission = json!({"idempotency_key":"synthetic"});
+        let job = json!({"job_id":"req_fixture","request_id":"req_original"});
+        directory
+            .gateway_record("submission.json", &submission)
+            .unwrap();
+        directory.gateway_record("job.json", &job).unwrap();
+        assert!(
+            directory
+                .gateway_record("job.json", &json!({"job_id":"req_other"}))
+                .is_err()
+        );
+        directory.abandon();
+        for (file, expected) in [("submission.json", submission), ("job.json", job)] {
+            let bytes = fs::read(directory.path.join(file)).unwrap();
+            assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), expected);
+        }
+    }
+
     #[test]
     fn content_admission_checks_dimensions_and_ignores_extensions() {
         assert_eq!(image_type(&png()), Some("image/png"));

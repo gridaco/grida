@@ -107,7 +107,7 @@ async fn headless_selected_skills_apply_without_granting_tool_capabilities() {
     assert!(!messages.contains("Build a Grida slides deck"));
     // Without workspace tools the turn lists no skills to read on its own.
     assert!(!messages.contains("## Skills"));
-    assert!(request.get("tools").is_none());
+    assert_only_clock_tools(&request);
     endpoint.done().await;
 }
 

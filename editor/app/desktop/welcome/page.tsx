@@ -1158,6 +1158,7 @@ function WelcomeSurface({
                         active: profileId,
                         subscriptionIssue: profiles?.subscriptionIssue,
                         openAiIssue: profiles?.openAiIssue,
+                        gatewayApiKeyIssue: profiles?.gatewayApiKeyIssue,
                         choices: profiles?.choices ?? [],
                         saved: profiles?.saved ?? [],
                       },

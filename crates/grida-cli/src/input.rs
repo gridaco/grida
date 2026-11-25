@@ -92,6 +92,26 @@ fn text<'a>(v: &'a Value, k: &str) -> &'a str {
     v[k].as_str().unwrap_or("")
 }
 pub fn local_flags(d: &Value) -> Vec<&'static str> {
+    let gateway = &d["gateway_operation"];
+    if gateway["standalone"] == true {
+        if gateway["interface"] == "images.edits" {
+            return vec!["--reference"];
+        }
+        if gateway["file_fields"]
+            .as_array()
+            .is_some_and(|fields| fields.iter().any(|field| field == "image"))
+        {
+            return vec!["--image"];
+        }
+        if gateway["file_fields"].as_array().is_some_and(|fields| {
+            fields
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|field| field.starts_with("images."))
+        }) {
+            return vec!["--file"];
+        }
+    }
     let p = &d["input_schema"]["properties"];
     let mut result = vec![];
     if p["references"]["items"]["x-grida-url"]["schemes"]
@@ -182,7 +202,7 @@ async fn image(
         .await
         .map_err(|e| file_error(e, flag))
 }
-fn https(v: &str) -> bool {
+pub(crate) fn https(v: &str) -> bool {
     v.get(..8)
         .is_some_and(|s| s.eq_ignore_ascii_case("https://"))
 }
@@ -197,12 +217,20 @@ pub async fn read(
         };
         return Ok(files::read_input(s, token).await?);
     };
-    read_flags(descriptor, r, token).await
+    read_flags(descriptor, r, None, token).await
 }
-async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result<Value> {
+pub(crate) async fn read_flags(
+    d: &Value,
+    r: &Request,
+    gateway_image_flag: Option<&str>,
+    token: &CancellationToken,
+) -> Result<Value> {
     let p = &d["input_schema"]["properties"];
     let mut claimed = HashSet::new();
     let mut value = Map::new();
+    if let Some(flag) = gateway_image_flag {
+        claim(p, &mut claimed, "image", flag)?;
+    }
     for (yes, field, flag) in [
         (
             r.prompt.is_some() || r.prompt_file.is_some(),
@@ -354,7 +382,7 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
         let missing: Vec<_> = required
             .iter()
             .filter_map(Value::as_str)
-            .filter(|f| !value.contains_key(*f))
+            .filter(|f| !value.contains_key(*f) && !(*f == "image" && gateway_image_flag.is_some()))
             .collect();
         if !missing.is_empty() {
             return Err(Error::usage(format!(
@@ -368,6 +396,15 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
 
 pub fn describe(d: &Value) -> Vec<String> {
     let canonical = d.get("gateway_operation").is_some();
+    let gateway = &d["gateway_operation"];
+    let direct = gateway["standalone"] == true;
+    let edit = direct && gateway["interface"] == "images.edits";
+    let file_fields: Vec<_> = gateway["file_fields"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
     let p = &d["input_schema"]["properties"];
     let local = local_flags(d);
     let required = d["input_schema"]["required"].as_array();
@@ -423,7 +460,13 @@ pub fn describe(d: &Value) -> Vec<String> {
                 "image_url" => details.push("--image HTTPS-URL".into()),
                 "image" => {
                     details.push(
-                        if s["type"] == "string" {
+                        if edit {
+                            "--reference FILE (repeat in order)"
+                        } else if direct && local.contains(&"--image") && s["type"] == "string" {
+                            "--image FILE or HTTPS-URL"
+                        } else if direct && local.contains(&"--image") {
+                            "--image FILE or an HTTPS source in --input JSON"
+                        } else if s["type"] == "string" {
                             "--image HTTPS-URL"
                         } else if canonical {
                             "use --input JSON"
@@ -466,8 +509,22 @@ pub fn describe(d: &Value) -> Vec<String> {
     if d["variant"] != "text" {
         example.extend(["--variant".into(), quote(text(d, "variant"))]);
     }
-    if canonical || d["variant"] == "multiview" {
+    if edit {
+        example.extend([
+            "--prompt".into(),
+            quote("Describe the edit"),
+            "--reference".into(),
+            "./reference.png".into(),
+        ]);
+    } else if canonical || d["variant"] == "multiview" {
         example.extend(["--input".into(), "@input.json".into()]);
+        if direct && local.contains(&"--image") {
+            example.extend(["--file".into(), "image=./input.png".into()]);
+        } else if direct && local.contains(&"--file") {
+            for field in &file_fields {
+                example.extend(["--file".into(), quote(&format!("{field}=./{field}.png"))]);
+            }
+        }
     } else if p.get("prompt").is_some() {
         example.extend(["--prompt".into(), quote("Describe what to generate")]);
     }
@@ -496,10 +553,19 @@ pub fn describe(d: &Value) -> Vec<String> {
     }
     example.extend(["--out".into(), "./result".into()]);
     lines.extend(["".into(),"Example:".into(),format!("  {}",example.join(" ")),"".into(),"--param FIELD=VALUE sets an advertised scalar input. Use --input @file|- for complex JSON.".into()]);
-    if d["variant"] == "multiview" {
+    if direct && !edit && !file_fields.is_empty() {
+        lines.push(format!(
+            "Use --file FIELD=PATH with --input for local files. Omit those fields from JSON. File fields: {}.",
+            file_fields.join(", ")
+        ));
+    } else if d["variant"] == "multiview" {
         lines.push("Multiview inputs use --input JSON with inline image data; JSON strings do not grant local file reads.".into());
     }
-    lines.extend(if local.is_empty(){["This operation does not accept local image files.","Total assembled input: 16 MiB."]}else{["Local images: PNG/JPEG/static WebP, at most 8 MiB each (operation limits may be lower).","Total assembled input: 16 MiB including base64. Paths are relative to the working directory."]}.map(String::from));
+    if direct && !local.is_empty() {
+        lines.push("Local images: PNG/JPEG/static WebP, at most 8 MiB each (operation limits may be lower). Paths are relative to the working directory.".into());
+    } else {
+        lines.extend(if local.is_empty(){["This operation does not accept local image files.","Total assembled input: 16 MiB."]}else{["Local images: PNG/JPEG/static WebP, at most 8 MiB each (operation limits may be lower).","Total assembled input: 16 MiB including base64. Paths are relative to the working directory."]}.map(String::from));
+    }
     lines
 }
 #[cfg(test)]
@@ -526,7 +592,7 @@ mod tests {
             field: "prompt".into(),
             value: "x".into(),
         });
-        let e = read_flags(&d, &r, &CancellationToken::new())
+        let e = read_flags(&d, &r, None, &CancellationToken::new())
             .await
             .unwrap_err();
         assert_eq!(
@@ -536,7 +602,7 @@ mod tests {
         r.parameters.clear();
         r.image = Some("/also-not-read".into());
         assert!(
-            read_flags(&d, &r, &CancellationToken::new())
+            read_flags(&d, &r, None, &CancellationToken::new())
                 .await
                 .unwrap_err()
                 .value["message"]
@@ -544,6 +610,27 @@ mod tests {
                 .unwrap()
                 .starts_with("--image in this file or URL form is not supported")
         );
+    }
+    #[test]
+    fn direct_gateway_inspection_examples_use_supported_file_flags() {
+        let edit = json!({
+            "provider_id":"gg", "model_id":"image/model", "variant":"references",
+            "input_schema":{"properties":{"image":{"type":"array"}}},
+            "gateway_operation":{"standalone":true,"interface":"images.edits"}
+        });
+        let edit = describe(&edit).join("\n");
+        assert!(edit.contains("--reference ./reference.png"));
+        assert!(!edit.contains("use --input JSON"));
+
+        let multiview = json!({
+            "provider_id":"gg", "model_id":"three-d/model", "variant":"multiview",
+            "input_schema":{"properties":{"images":{"type":"object"}}},
+            "gateway_operation":{"standalone":true,"interface":"endpoints","file_fields":["images.front","images.left"]}
+        });
+        assert_eq!(local_flags(&multiview), vec!["--file"]);
+        let multiview = describe(&multiview).join("\n");
+        assert!(multiview.contains("--input @input.json --file 'images.front=./images.front.png' --file 'images.left=./images.left.png'"));
+        assert!(!multiview.contains("inline image data"));
     }
     #[test]
     fn scalar_parameters_never_grant_structured_values() {

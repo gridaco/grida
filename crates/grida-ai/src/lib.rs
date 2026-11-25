@@ -7,6 +7,7 @@ mod gateway;
 mod input;
 mod media;
 mod sse;
+mod standalone;
 mod tripo;
 pub use catalogue::{Catalog, Filter, Parsed, Selector};
 pub use discovery::{VoiceFilter, normalize_key};
@@ -14,6 +15,7 @@ pub use gateway::GatewayCatalogue;
 pub use media::{Asset, ExecutionAuthority, MediaClient, MediaResult, TaskReceipt};
 use serde::{Deserialize, Serialize};
 pub use sse::{SseEventFramer, first_sse_event_end};
+pub use standalone::{GatewayFile, GatewayOutput, GatewaySubmission, gateway_id};
 use std::{collections::BTreeMap, fmt, future::Future, pin::Pin};
 
 pub type HttpFuture<'a> =
@@ -28,6 +30,7 @@ pub trait Transport: Send + Sync {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane {
     Discovery,
+    StandaloneGateway,
     Provider,
     Download,
     Upload,
@@ -67,7 +70,9 @@ pub struct Failure {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub completed_task: Option<TaskReceipt>,
+    pub request_id: Option<Box<str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_task: Option<Box<TaskReceipt>>,
 }
 impl Failure {
     pub(crate) fn new(code: &str) -> Self {
@@ -75,6 +80,7 @@ impl Failure {
             code: code.into(),
             message: code.into(),
             task_id: None,
+            request_id: None,
             completed_task: None,
         }
     }
@@ -82,8 +88,12 @@ impl Failure {
         self.task_id = Some(id.into());
         self
     }
+    pub(crate) fn request(mut self, id: &str) -> Self {
+        self.request_id = Some(id.into());
+        self
+    }
     pub(crate) fn completed(mut self, receipt: Option<TaskReceipt>) -> Self {
-        self.completed_task = receipt;
+        self.completed_task = receipt.map(Box::new);
         self
     }
 }

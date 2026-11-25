@@ -114,9 +114,11 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 
 ## Media access and files
 
-`grida ai models list` and `ai models inspect` are offline and credential-free.
-Listing shows accepted local-image flags; `ai models list --local-image` keeps only
-operations accepting `--reference FILE` or `--image FILE`. The column, JSON
+`grida ai models list` and `ai models inspect` are credential-free by default.
+Listings that include `grida` or `gg` and inspection of either provider read the
+live public Gateway catalogue. Other providers use bundled descriptors.
+`ai models list --local-image` keeps operations that accept `--reference FILE`,
+`--image FILE`, or `--file FIELD=PATH`. The column, JSON
 `local_image_flags`, filter and inspection guidance derive from the SDK schema.
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
 variants, availability and result rules. Installed help stays minimal.
@@ -142,9 +144,10 @@ Stored BYOK currently supports macOS/Linux only; Windows CLI users can supply
 explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate.
 First-party Tripo uses `TRIPO_API_KEY`, `--key-stdin`, or the shared `tripo` slot.
 The CLI does not load dotenv files.
-GG needs account login and an organization through the selected registration
-above. The auth owner hands a scoped grant into
-one invocation's memory store; account tokens never enter provider execution.
+The `grida` provider uses account login and an organization through the selected
+registration above. The auth owner passes a scoped grant in memory for that
+invocation. The `gg` provider uses a standalone Gateway key from `GG_API_KEY`,
+`--key-stdin`, or the shared `gg` slot.
 
 For manual file configuration, follow the
 [provider file format and editing instructions](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md).
@@ -162,11 +165,12 @@ shows inputs and an example; `--json` keeps the full descriptor.
 The fal Veo 3.1 Lite route accepts `--param generate_audio=false` for silent video;
 omission retains the provider's audio-enabled default. Unadvertised routes refuse it.
 
-Tripo model generation uses `--provider tripo` for BYOK or `--provider gg` for
-Grida credits, independently of fal's 3D routes.
+Tripo model generation uses `--provider tripo` with a Tripo key,
+`--provider grida` with Grida sign-in, or `--provider gg` with a standalone
+Gateway key. fal has its own 3D routes.
 `ai models list --provider tripo` lists its executable models and variants. Text uses
 `--prompt`; a supported single-image variant uses `--image` with a local PNG/JPEG.
-Multiview uses `--variant multiview --input @input.json` with the advertised inline
+With `--provider tripo`, multiview uses `--variant multiview --input @input.json` with the advertised inline
 image schema. JSON does not expand paths or read referenced local files. With
 BYOK, uploaded images and generation requests go to Tripo's fixed API; result
 downloads use the SDK's reviewed Tripo data origin. The CLI saves returned GLB bytes with its usual
@@ -182,27 +186,27 @@ grida ai rigging check --provider tripo --mesh ./character.glb --json
 grida ai rigging run --provider tripo --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./rigged --json
 ```
 
-Listing and inspection are offline. Eligibility has no model identity and returns
+Tripo listing and inspection are offline. Eligibility has no model identity and returns
 `riggable`, `rig_type` and a provider task receipt; a negative eligibility result
 is a successful check (exit 0). Checking never starts rigging. `ai rigging run`
 explicitly submits paid rigging and saves the returned GLB with feature, model,
 binding, hashes and safe task ID/consumed-credit metadata in `receipt.json`.
 The model's SDK schema determines accepted rig types and specifications. These
 operations use the existing Tripo environment, stdin and shared-store key resolver
-when `--provider tripo` is selected. With `--provider gg`, they use the existing
-Grida login and `--org` / `--org-id` organization selector. GG does not inspect
-BYOK keys, accept `--key-stdin`, or fall back to the Tripo account.
+when `--provider tripo` is selected. With `--provider grida`, they use Grida
+login and the `--org` or `--org-id` organization selector. With `--provider gg`,
+they use a Media-scoped Gateway API key and the key’s organization.
 
 ```sh
-grida ai rigging check --provider gg --org studio --mesh ./character.glb --json
-grida ai rigging run --provider gg --org studio --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./funded-rigged --json
+grida ai rigging check --provider grida --org studio --mesh ./character.glb --json
+grida ai rigging run --provider grida --org studio --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./funded-rigged --json
 ```
 
-GG obtains a signed upload receipt using the selected organization, uploads
+The signed-in Grida adapter obtains a signed upload receipt using the selected organization, uploads
 actual bounded bytes to the exact Tripo S3 origin with no credential headers,
 and submits one hosted operation. Hosted output is decoded from bounded JSON
 into the same GLB files and receipts. Scoped-token expiry and insufficient
-credits stop execution without automatic retries. GG Tripo requests allow up
+credits stop execution without automatic retries. Signed-in Tripo requests allow up
 to thirteen minutes for upload and provider completion.
 
 `--mesh` snapshots one regular GLB file up to 60,000,000 bytes, with the same

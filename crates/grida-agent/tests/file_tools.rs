@@ -129,6 +129,7 @@ fn context() -> InvocationContext {
     InvocationContext {
         attempt: AttemptId::new("file-attempt").unwrap(),
         cancellation: CancellationToken::new(),
+        input_activity: agent_kit_core::CancellationToken::new(),
         deadline: None,
         max_output_bytes: 64 * 1024,
     }

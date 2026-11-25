@@ -32,7 +32,7 @@ Desktop as ordinary CLI operations:
 grida auth login
 grida account credits --org studio
 grida ai models list --modality image
-grida ai generate --provider gg --model openai/gpt-image-2 \
+grida ai generate --provider grida --model openai/gpt-image-2 \
   --org studio --input @image.json --out ./images
 ```
 

@@ -873,10 +873,73 @@ describe("transcript time dividers", () => {
   });
 });
 
-describe("turn_activity.measuredContext", () => {
+describe("turn_activity.contextUsage", () => {
+  it("estimates the working window before the agent reports its actual window", () => {
+    expect(turn_activity.contextUsage([], 1_000_000)).toEqual({
+      window: 272_000,
+    });
+    expect(turn_activity.contextUsage([], 131_072)).toEqual({
+      window: 131_072,
+    });
+    expect(
+      turn_activity.contextUsage(
+        [
+          {
+            turnId: "a",
+            status: "succeeded",
+            startedAtMs: 0,
+            contextWindowTokens: 400_000,
+          },
+        ],
+        1_000_000
+      )
+    ).toEqual({ window: 400_000 });
+  });
+
+  it("uses the latest captured working window to estimate absent provider usage", () => {
+    expect(
+      turn_activity.contextUsage([
+        {
+          turnId: "a",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 42_000,
+          contextWindowTokens: 1_000_000,
+        },
+        {
+          turnId: "b",
+          status: "succeeded",
+          startedAtMs: 1,
+          contextWindowTokens: 272_000,
+        },
+      ])
+    ).toEqual({ window: 272_000 });
+  });
+
+  it("keeps the foreground window for estimates after standalone compaction", () => {
+    expect(
+      turn_activity.contextUsage([
+        {
+          turnId: "a",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 42_000,
+          contextWindowTokens: 272_000,
+        },
+        {
+          turnId: "compact",
+          status: "succeeded",
+          startedAtMs: 1,
+          contextTokens: 512,
+          compaction: { summary: "s", automatic: false },
+        },
+      ])
+    ).toEqual({ window: 272_000 });
+  });
+
   it("uses the latest turn's reported size and resets after a compaction", () => {
     expect(
-      turn_activity.measuredContext([
+      turn_activity.contextUsage([
         {
           turnId: "a",
           status: "succeeded",
@@ -893,7 +956,7 @@ describe("turn_activity.measuredContext", () => {
       ])
     ).toEqual({ tokens: 42_000, window: 128_000 });
     expect(
-      turn_activity.measuredContext([
+      turn_activity.contextUsage([
         {
           turnId: "a",
           status: "succeeded",
@@ -910,7 +973,7 @@ describe("turn_activity.measuredContext", () => {
       ])
     ).toBeUndefined();
     expect(
-      turn_activity.measuredContext([
+      turn_activity.contextUsage([
         {
           turnId: "c",
           status: "succeeded",
@@ -926,7 +989,7 @@ describe("turn_activity.measuredContext", () => {
       ])
     ).toEqual({ tokens: 18_000, window: undefined });
     expect(
-      turn_activity.measuredContext([
+      turn_activity.contextUsage([
         {
           turnId: "inline",
           modelId: "fixture",

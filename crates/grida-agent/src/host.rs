@@ -7,6 +7,7 @@ mod attachment_batch;
 mod before_tool;
 mod bundled_skills;
 mod catalog;
+mod clock;
 pub(crate) mod command_actions;
 pub(crate) mod compaction;
 mod completion_checks;
@@ -238,6 +239,7 @@ pub struct Host {
     effort: EffortPreset,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
+    run_deadline: Option<std::time::Instant>,
     /// A temporary host that only makes tool-free model requests (see `titles`).
     inference_only: bool,
     #[cfg(unix)]
@@ -561,6 +563,9 @@ struct StoredPrompt {
     questions: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     question_batches: bool,
+    // Keep the tool offer that was available when this input was accepted.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    wait_tools: bool,
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
@@ -702,6 +707,13 @@ impl InputAuthority {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PromptAdmission {
+    Immediate,
+    Identified,
+    Headless,
+}
+
 enum Launch {
     Prompt {
         initial_title: Option<String>,
@@ -711,6 +723,7 @@ enum Launch {
         publish_text: bool,
     },
     Identified {
+        headless: bool,
         initial_title: Option<String>,
         id: ChangeId,
         parts: Vec<PromptPart>,
@@ -782,6 +795,7 @@ struct PreparedInput {
     context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
+    wait_tools: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -1017,6 +1031,7 @@ impl Host {
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
+            run_deadline: None,
             inference_only: false,
             #[cfg(unix)]
             guidance_root: None,
@@ -1427,17 +1442,71 @@ impl Host {
         self.start_prompt_with_initial_title(request, None).await
     }
 
-    /// Accept a prompt with an optional catalog label for its first submission.
+    /// Start a direct prompt with an optional first-submission catalog label.
     pub async fn start_prompt_with_initial_title(
         &self,
         request: PromptRequest,
         initial_title: Option<String>,
     ) -> Result<AcceptedRun> {
+        self.start_accepted_prompt(request, initial_title, PromptAdmission::Immediate)
+            .await
+    }
+
+    /// Start a one-shot prompt, awaiting any preceding maintenance before returning
+    /// the foreground turn's receipt.
+    pub(crate) async fn start_headless_prompt(
+        &self,
+        request: PromptRequest,
+        initial_title: Option<String>,
+    ) -> Result<AcceptedRun> {
+        self.start_accepted_prompt(request, initial_title, PromptAdmission::Headless)
+            .await
+    }
+
+    async fn start_accepted_prompt(
+        &self,
+        request: PromptRequest,
+        initial_title: Option<String>,
+        mode: PromptAdmission,
+    ) -> Result<AcceptedRun> {
         let policy = self.submission_policy(&request, false)?;
-        let ticket = self
-            .register_prompt(request, false, policy, initial_title)
+        let mut ticket = self
+            .register_prompt(request, mode, policy, initial_title)
             .await?;
-        let acceptance = prompt_acceptance(ticket.admission).await?;
+        let mut acceptance = prompt_acceptance(ticket.admission).await?;
+        if mode == PromptAdmission::Headless && acceptance.disposition == InputDisposition::Queued {
+            // This run owns the handoff. Await the maintenance worker so the next
+            // ticket describes the original input's execution and completion.
+            match ticket
+                .completion
+                .await
+                .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))??
+            {
+                RunResult::Settled(_) => {}
+                _ => {
+                    return Err(problem(
+                        ErrorKind::Unavailable,
+                        "run_compaction_interrupted",
+                    ));
+                }
+            }
+            let session = acceptance.session.clone();
+            let queued = Acceptance {
+                session: session.clone(),
+                input: acceptance.input,
+                position: acceptance.position,
+            };
+            let mut work = self.settled_work(&session).await?;
+            ticket = self.register(
+                &mut work,
+                session,
+                TurnId::new(uuid())?,
+                Launch::Queued(Some(queued), None),
+            )?;
+            drop(work);
+            acceptance = prompt_acceptance(ticket.admission).await?;
+        }
+
         let InputDisposition::Claimed { turn } = acceptance.disposition else {
             return Err(problem(ErrorKind::Uncertain, "prompt_claim_missing"));
         };
@@ -1454,7 +1523,7 @@ impl Host {
     async fn register_prompt(
         &self,
         request: PromptRequest,
-        identified: bool,
+        mode: PromptAdmission,
         policy: SubmissionPolicy,
         initial_title: Option<String>,
     ) -> Result<LaunchTicket> {
@@ -1463,8 +1532,11 @@ impl Host {
             id, session, parts, ..
         } = request;
         validate_prompt_parts(&parts)?;
-        let launch = if identified && compaction::ordinary_text(policy.effort.is_some(), &parts) {
+        let launch = if mode != PromptAdmission::Immediate
+            && compaction::ordinary_text(policy.effort.is_some(), &parts)
+        {
             Launch::Identified {
+                headless: mode == PromptAdmission::Headless,
                 id,
                 parts,
                 policy,
@@ -1475,7 +1547,7 @@ impl Host {
                 id,
                 parts,
                 policy,
-                publish_text: identified,
+                publish_text: mode == PromptAdmission::Identified,
                 initial_title,
             }
         };
@@ -1556,10 +1628,12 @@ impl Host {
             );
             let live = match &launch {
                 Launch::Prompt { publish_text, .. } => *publish_text,
+                Launch::Identified { headless: true, .. } => false,
                 _ => true,
             }
             .then(|| host.live_updates.clone());
             let identified = matches!(&launch, Launch::Identified { .. });
+            let headless = matches!(&launch, Launch::Identified { headless: true, .. });
             let queue_recovery = match &launch {
                 Launch::Queued(_, revision) => *revision,
                 _ => None,
@@ -1715,7 +1789,7 @@ impl Host {
                 let _ = completion_tx.send(result);
             }
             host.wake_ready().await;
-            if settled {
+            if settled && !(headless && automatic_compaction) {
                 host.kick_queue(worker_session).await;
             } else if suspended {
                 host.kick_stopped(worker_session, worker_turn).await;
@@ -1774,6 +1848,7 @@ impl Host {
                 parts,
                 policy,
                 initial_title,
+                ..
             } => {
                 let _admission = self.configuration_admission.lock().await;
                 let view = self.store.inspect(session.clone()).await?;
@@ -2244,6 +2319,12 @@ impl Host {
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
             .transpose()?;
+        let clock = (prepared.wait_tools
+            && !cancellation_only
+            && !self.inference_only
+            && (!prepared.subagent || prepared.worker))
+            .then(|| clock::Access::bind(claim.lease.binding()))
+            .transpose()?;
         let mut authority = execution.authority.clone();
         let mut inventory = Inventory::new();
         let capture_image = execution
@@ -2389,7 +2470,14 @@ impl Host {
             .delegation
             .as_ref()
             .filter(|_| !cancellation_only)
-            .map(|policy| delegation::Access::bind(self, claim.lease.binding(), policy.clone()))
+            .map(|policy| {
+                delegation::Access::bind(
+                    self,
+                    claim.lease.binding(),
+                    policy.clone(),
+                    prepared.wait_tools,
+                )
+            })
             .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
@@ -2399,7 +2487,10 @@ impl Host {
                 file: file.clone(),
                 skills: skill_reader.clone(),
             },
-            wakeups.clone(),
+            permissions::WaitTools {
+                scheduled: wakeups.clone(),
+                clock: clock.clone(),
+            },
             permissions::HookTools {
                 completion: completion.clone(),
                 before_tool: before_tool.clone(),
@@ -2521,6 +2612,9 @@ impl Host {
         if let Some(wakeups) = &wakeups {
             wakeups.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
+        if let Some(clock) = &clock {
+            clock.insert(&mut inventory, &mut authority.tools)?;
+        }
         for host_tools in host_tools {
             host_tools.insert(&mut inventory, &mut authority.tools)?;
         }
@@ -2556,6 +2650,9 @@ impl Host {
         }
         if !closing && let Some(wakeups) = &wakeups {
             wakeups.reconcile(&operations, &tools).await?;
+        }
+        if !closing && let Some(clock) = &clock {
+            clock.reconcile(&operations, &tools).await?;
         }
         if let Some(disclosure) = history.disclosure {
             if !prepared.config.instructions.is_empty() {
@@ -2704,6 +2801,10 @@ impl Host {
         }))
     }
 
+    pub(crate) fn set_run_deadline(&mut self, deadline: std::time::Instant) {
+        self.run_deadline = Some(deadline);
+    }
+
     async fn open_owned_turn_with_runtime(
         &self,
         session: &SessionId,
@@ -2712,7 +2813,7 @@ impl Host {
         runtime: &Runtime,
     ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
         let opened = runtime
-            .open(lease)
+            .open_with_wait_deadline(lease, self.run_deadline)
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_open_failed"))?;
         let closing = {
@@ -3090,6 +3191,7 @@ impl Host {
                 operating_regime,
                 questions,
                 question_batches,
+                wait_tools: true,
                 allow_wakeups,
                 allow_library_selection,
                 unavailable_library_selection_requested,
@@ -3161,6 +3263,7 @@ impl Host {
             context_limits,
             questions,
             question_batches,
+            wait_tools,
             allow_wakeups,
             allow_library_selection,
             permission_capture,
@@ -3641,6 +3744,7 @@ impl Host {
                     },
                     stored.questions,
                     stored.question_batches,
+                    stored.wait_tools,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
                     !cancellation_only && stored.allow_library_selection,
                     if cancellation_only {
@@ -3724,6 +3828,7 @@ impl Host {
             context_limits,
             questions,
             question_batches,
+            wait_tools,
             allow_wakeups,
             allow_library_selection,
             permission_capture,
@@ -3927,7 +4032,12 @@ impl Host {
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
             let ticket = host
-                .register_prompt(request.clone(), true, policy, context.initial_title.clone())
+                .register_prompt(
+                    request.clone(),
+                    PromptAdmission::Identified,
+                    policy,
+                    context.initial_title.clone(),
+                )
                 .await?;
             prompt_acceptance(ticket.admission).await
         }

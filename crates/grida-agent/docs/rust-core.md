@@ -972,6 +972,33 @@ recovery guarantees must pass through the scoped execution operations. Rust
 trait boundaries cannot prevent application code from opening an unrelated
 socket or file.
 
+### Waiting during an active turn
+
+Passive wait executors declare a bounded timeout after ordinary admission and
+authority validation. They share separate bounded capacity so observing a
+worker does not take its execution slot. The runtime observes the
+turn's committed input activity after the originating request's journal
+position. Steering and resolved interactions, including approval decisions,
+wake that turn's waits. The native store publishes this position only after
+commit. Opening an interaction and queuing the next turn leave the current
+wait running. Pausing or stopping signals cancellation through the same context.
+
+An empty `write_stdin` waits from five seconds to five minutes and can return
+on process exit. Steering or stopping the wait leaves the process and its
+unread output in the command session. `clock_sleep` waits for a bounded
+duration using a monotonic timer and reports elapsed time. `clock_curr_time`
+reports current UTC time. Neither acquires workspace or provider authority.
+When a headless run cannot fit the requested wait before its deadline,
+the tool returns a failed result so the model can choose a shorter wait.
+The turn journal retains recorded wait outcomes. Reopening does not arm a
+timer or dispatch a provider request. Explicit resume of a paused wait uses
+the recorded result. A lost clock attempt is reconciled as interrupted
+without restarting its timer when an eligible continuation is recovered.
+
+The host binds the available clock tools and worker wait schema to the
+accepted input. Durable scheduled wakeups remain a separate control for
+suspending a task and checking later.
+
 ### Configured lifecycle hooks
 
 A trusted launch profile can select up to eight ordered lifecycle hooks. Each
@@ -1277,18 +1304,20 @@ claims admit each child from one live source tool operation. Reconciliation read
 the retained destination before attempting a new admission. One source operation
 has one destination; several spawn calls can create separate children.
 
-| Tool                 | Arguments              | Result                                                                                |
-| -------------------- | ---------------------- | ------------------------------------------------------------------------------------- |
-| `spawn_agent`        | `name`, `instructions` | An assignment identifying the child session, accepted input and execution turn.       |
-| `send_agent_message` | `child`, `text`        | A durable append receipt for the current active assignment; this starts no idle work. |
-| `wait_agent`         | `children`             | Bounded collected terminal assignment results and explicit pending assignments.       |
-| `stop_agent`         | `child`                | A control and the observed assignment result, or explicit pending settlement.         |
+| Tool                 | Arguments                         | Result                                                                                                                                                  |
+| -------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spawn_agent`        | `name`, `instructions`            | An assignment identifying the child session, accepted input and execution turn.                                                                         |
+| `send_agent_message` | `child`, `text`                   | A durable append receipt for the current active assignment; this starts no idle work.                                                                   |
+| `wait_agent`         | `children`, optional `timeout_ms` | Returns when any requested assignment settles, on input activity, or at the timeout. Includes available terminal results and exact pending assignments. |
+| `stop_agent`         | `child`                           | A control and the observed assignment result, or explicit pending settlement.                                                                           |
 
 A successful tool operation counts as assignment or collection evidence only
 under the captured definition and exact live grant. Collection identifies the
 original child, input and turn; a later child result cannot satisfy earlier work.
-The master supplies remaining decisions to collect or stop outstanding work
-before successful completion. Exhaustion records incomplete work rather than
+The worker wait defaults to 30 seconds with a 10-second floor and five-minute
+ceiling. It wakes on settlement, including successful resource retirement, or
+on active input. The master supplies remaining decisions to collect or stop
+outstanding work before successful completion. Exhaustion records incomplete work rather than
 silently claiming completion.
 
 General-worker information delivery appends one user message to the exact

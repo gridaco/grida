@@ -583,6 +583,17 @@ describe("desktop bridge client contract", () => {
       default_id: 1,
       cancel_id: 1,
     });
+    await expect(secrets.confirmDeleteKey("gg", "Grida Gateway")).resolves.toBe(
+      true
+    );
+    expect(confirm).toHaveBeenLastCalledWith({
+      message: "Remove Grida Gateway key?",
+      detail:
+        "This removes the saved key from Desktop and the Grida CLI when they share the same Grida home.",
+      buttons: ["Remove", "Cancel"],
+      default_id: 1,
+      cancel_id: 1,
+    });
   });
 
   it("does not expose a secret read path", () => {

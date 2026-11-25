@@ -271,28 +271,41 @@ export namespace turn_activity {
   }
 
   /**
-   * The latest reported foreground context and the window captured with it.
+   * The latest foreground context, including a captured window for estimates.
    * Old standalone compaction records can contain the summary model's usage.
    */
-  export function measuredContext(
-    records: readonly NativeChatTurnRecord[]
-  ): { tokens: number; window?: number } | undefined {
+  export function contextUsage(
+    records: readonly NativeChatTurnRecord[],
+    modelCapacity?: number
+  ): { tokens?: number; window?: number } | undefined {
+    // Match the default working window in the native agent until it reports
+    // the actual window, which can reflect a user override.
+    const estimatedWindow =
+      modelCapacity === undefined
+        ? undefined
+        : Math.min(modelCapacity, 272_000);
+    let estimated = false;
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
       const compacted = record.compactions?.length
         ? record.compactions.some((item) => item.status === "succeeded")
         : Boolean(record.compaction);
       if (
+        !estimated &&
         record.contextTokens !== undefined &&
         (!compacted || record.modelId !== undefined)
       )
         return {
           tokens: record.contextTokens,
-          window: record.contextWindowTokens,
+          window: record.contextWindowTokens ?? estimatedWindow,
         };
-      if (compacted) return undefined;
+      if (record.contextWindowTokens !== undefined)
+        return { window: record.contextWindowTokens };
+      if (compacted) estimated = true;
     }
-    return undefined;
+    return estimatedWindow === undefined
+      ? undefined
+      : { window: estimatedWindow };
   }
 
   /** Commentary in order, with consecutive tool calls joined into one line. */

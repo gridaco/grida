@@ -122,6 +122,9 @@ mod subagents;
 #[path = "process/summaries.rs"]
 mod summaries;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/waits.rs"]
+mod waits;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/wakeups.rs"]
 mod wakeups;
 
@@ -181,6 +184,8 @@ enum Reply {
     Question(&'static str),
     #[cfg(unix)]
     Tool(&'static str, &'static str),
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    Tools(Vec<(&'static str, Value)>),
     #[cfg(unix)]
     Choose(Box<dyn FnOnce(&Value) -> Reply + Send>),
     #[cfg(unix)]
@@ -654,6 +659,15 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
             }
             return fixture_tool_body(name, arguments);
         }
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        Reply::Tools(calls) => {
+            assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
+            return fixture_tool_calls(
+                calls
+                    .into_iter()
+                    .map(|(name, args)| (name, args.to_string())),
+            );
+        }
         #[cfg(unix)]
         Reply::Question(name) => {
             assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
@@ -761,9 +775,17 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
 
 #[cfg(unix)]
 fn fixture_tool_body(name: &str, arguments: &str) -> String {
+    fixture_tool_calls([(name, arguments)])
+}
+
+#[cfg(unix)]
+fn fixture_tool_calls<'a, T: AsRef<str>>(calls: impl IntoIterator<Item = (&'a str, T)>) -> String {
+    let calls: Vec<_> = calls.into_iter().enumerate().map(|(index, (name, arguments))| {
+        let id = if index == 0 { "fixture-call".to_owned() } else { format!("fixture-call-{index}") };
+        json!({"index":index,"id":id,"type":"function","function":{"name":name,"arguments":arguments.as_ref()}})
+    }).collect();
     let delta = json!({"id":"fixture-response", "choices":[{"index":0,"delta":{
-        "role":"assistant", "tool_calls":[{"index":0,"id":"fixture-call","type":"function",
-        "function":{"name":name,"arguments":arguments}}]
+        "role":"assistant", "tool_calls":calls
     },"finish_reason":null}]});
     let finish = json!({"id":"fixture-response","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]});
     format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n")
@@ -808,6 +830,22 @@ fn spawn_serve(state: &Path, endpoint: &str) -> Child {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap()
+}
+
+#[cfg(unix)]
+fn assert_only_clock_tools(request: &Value) {
+    let names: Vec<_> = request["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|offer| {
+            offer["name"]
+                .as_str()
+                .or_else(|| offer["function"]["name"].as_str())
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(names, ["clock_curr_time", "clock_sleep"]);
 }
 
 async fn finish_child(child: Child) -> std::process::Output {

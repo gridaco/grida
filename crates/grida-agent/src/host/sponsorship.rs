@@ -1001,7 +1001,7 @@ impl Host {
                     file: None,
                     skills: None,
                 },
-                None,
+                permissions::WaitTools::default(),
                 permissions::HookTools {
                     completion: None,
                     before_tool: None,

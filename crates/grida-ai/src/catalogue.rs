@@ -57,6 +57,38 @@ impl Catalog {
                 .expect("validated bundled operation contracts"),
         }
     }
+    /// Restore the public operation contract captured by a standalone Gateway
+    /// submission. The caller must still verify the prepared body and key
+    /// against the original receipt before issuing an explicit replay.
+    pub fn gateway_replay(descriptor: Value) -> Result<Self> {
+        let gateway = &descriptor["gateway_operation"];
+        let id = gateway["id"]
+            .as_str()
+            .filter(|id| crate::gateway_id(id))
+            .ok_or_else(input::bad)?;
+        let path = match (descriptor["kind"].as_str(), gateway["interface"].as_str()) {
+            (Some("image"), Some("images.generations")) => "/v1/images/generations".into(),
+            (Some("image"), Some("images.edits")) => "/v1/images/edits".into(),
+            (Some("video"), Some("videos")) => "/v1/videos".into(),
+            (Some("three-d"), Some("endpoints")) if id.starts_with("three-d.") => {
+                format!("/v1/endpoints/{id}")
+            }
+            _ => return Err(input::bad()),
+        };
+        let schema = &descriptor["input_schema"];
+        if descriptor["provider_id"] != "gg"
+            || gateway["standalone"] != true
+            || gateway["path"] != path
+            || schema["type"] != "object"
+            || !schema["properties"].is_object()
+            || schema["additionalProperties"] != false
+        {
+            return Err(input::bad());
+        }
+        Ok(Self {
+            operations: vec![descriptor],
+        })
+    }
     pub fn list(&self, filter: &Filter) -> Result<Vec<Value>> {
         validate_filter(filter)?;
         Ok(self
@@ -91,7 +123,7 @@ impl Catalog {
         }) {
             return Err(Failure::new("invalid_input"));
         }
-        if (selector.provider == "tripo" || selector.provider == "gg")
+        if matches!(selector.provider.as_str(), "tripo" | "gg" | "grida")
             && selector.kind == "three-d"
             && (selector.feature.is_none()
                 || selector.feature.as_deref() == Some("model-generation")
@@ -115,6 +147,15 @@ impl Catalog {
             .find(|d| d["variant"].as_str() == variant)
             .cloned()
             .ok_or_else(|| Failure::new("operation_unavailable"))
+    }
+    pub fn prepare_gateway(
+        &self,
+        selector: &Selector,
+        value: Value,
+        files: Vec<crate::GatewayFile>,
+        boundary: &str,
+    ) -> Result<crate::GatewaySubmission> {
+        crate::GatewaySubmission::prepare(&self.inspect(selector)?, value, files, boundary)
     }
     pub fn parse_input(&self, selector: &Selector, value: Value) -> Result<Parsed> {
         let descriptor = self.inspect(selector)?;
@@ -140,7 +181,15 @@ fn validate_filter(f: &Filter) -> Result<()> {
         "rig-check",
         "rigging",
     ];
-    let providers = ["gg", "openrouter", "vercel", "fal", "elevenlabs", "tripo"];
+    let providers = [
+        "grida",
+        "gg",
+        "openrouter",
+        "vercel",
+        "fal",
+        "elevenlabs",
+        "tripo",
+    ];
     if f.kind
         .as_ref()
         .is_some_and(|v| !kinds.contains(&v.as_str()))

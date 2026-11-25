@@ -36,6 +36,9 @@ export namespace ProviderNetworkPolicy {
   export const PROVIDER_ASSET_GRANT_ID = "download:provider-assets";
   export const CHATGPT_SUBSCRIPTION_GRANT_ID = "provider:chatgpt-subscription";
   export const OPENAI_PROJECT_GRANT_ID = "provider:openai-project";
+  export const GG_API_CHAT_GRANT_ID = "provider:standalone-gg-chat";
+  export const GG_API_BASE = "https://gateway.grida.ai/v1";
+  export const GG_API_CHAT_URL = `${GG_API_BASE}/chat/completions`;
   export const OPENAI_API_BASE = "https://api.openai.com/v1";
   export const OPENAI_MODELS_URL = `${OPENAI_API_BASE}/models`;
   export const OPENAI_IMAGE_URL = `${OPENAI_API_BASE}/images/generations`;
@@ -209,6 +212,11 @@ export namespace ProviderNetworkPolicy {
         lane: "provider",
         origins: [new URL(OPENAI_API_BASE).origin],
       },
+      {
+        id: GG_API_CHAT_GRANT_ID,
+        lane: "provider",
+        origins: [GG_DISCOVERY_ORIGIN],
+      },
       ...Object.values(voiceRoutes).map(({ grantId, url }) => ({
         id: grantId,
         lane: "provider" as const,
@@ -300,6 +308,19 @@ export namespace ProviderNetworkPolicy {
         [...headers.keys()].some((name) => !OPENAI_PROJECT_HEADERS.has(name)))
     )
       throw new Error("OpenAI image request is not allowed");
+    if (
+      grant.id === GG_API_CHAT_GRANT_ID &&
+      (method !== "POST" ||
+        url.href !== GG_API_CHAT_URL ||
+        headers.get("content-type") !== "application/json" ||
+        !/^Bearer sk-gg-v1-[!-~]+$/.test(headers.get("authorization") ?? "") ||
+        !/^[a-f0-9-]{36}$/.test(headers.get("idempotency-key") ?? "") ||
+        [...headers.keys()].some(
+          (name) =>
+            name !== "idempotency-key" && !OPENAI_PROJECT_HEADERS.has(name)
+        ))
+    )
+      throw new Error("Standalone Gateway chat request is not allowed");
     const voiceRoute = voiceRoutesByGrant.get(grant.id);
     if (
       voiceRoute &&

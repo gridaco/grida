@@ -241,7 +241,7 @@ with `--org` or `--org-id` when your account has multiple organizations.
 
 ```sh
 printf '%s' 'Explain this concept briefly.' | target/debug/grida agent run \
-  --provider gg --model MODEL_ID --org ORGANIZATION_SLUG \
+  --provider grida --model MODEL_ID --org ORGANIZATION_SLUG \
   --state-dir /absolute/path/to/agent-state --cwd /absolute/path/to/project \
   --no-input
 ```

@@ -604,7 +604,7 @@ async fn a_matching_digest_cannot_authorize_a_user_owned_hook_program() {
 }
 
 #[tokio::test]
-async fn a_required_completion_check_records_its_decision_without_offering_a_tool() {
+async fn a_required_completion_check_records_its_decision_without_offering_the_check() {
     let directory = TempDir::new().unwrap();
     let state = directory.path().join("state");
     let workspace = TempDir::new().unwrap();
@@ -658,7 +658,7 @@ async fn a_required_completion_check_records_its_decision_without_offering_a_too
         if exit_code == 1 {
             assert_eq!(account["failure"]["code"], "completion_check_blocked");
         }
-        assert!(endpoint.request().await.get("tools").is_none());
+        assert_only_clock_tools(&endpoint.request().await);
     }
     endpoint.done().await;
 }

@@ -756,6 +756,7 @@ async fn reopened_turn_reconciles_existing_registration_and_leaves_missing_evide
             let worker = tokio::spawn(async move {
                 let step = opened
                     .step(StepPlan {
+                        input_after: None,
                         key: OperationKey::new("question-step").unwrap(),
                         request,
                         inference_grants: grants(),

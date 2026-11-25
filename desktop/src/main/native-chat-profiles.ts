@@ -19,7 +19,10 @@ import {
   ChatModels,
 } from "@grida/ai/catalogue";
 import type { ModelCatalogueSnapshot } from "@grida/ai/model-catalogue";
-import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai/providers";
+import {
+  DESKTOP_GG_API_KEY_PROVIDER_ID,
+  OPENAI_PROJECT_PROVIDER_ID,
+} from "@grida/ai/providers";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -50,6 +53,19 @@ export namespace NativeChatProfiles {
 
   export function validId(id: unknown): id is string {
     return typeof id === "string" && PROFILE_ID.test(id);
+  }
+
+  export function displayLabel(
+    value: string | undefined,
+    fallback: string
+  ): string {
+    return (
+      (value ?? fallback)
+        .replace(/\p{C}/gu, "")
+        .trim()
+        .slice(0, 128)
+        .replace(/\p{Cs}$/u, "") || fallback
+    );
   }
 
   export function binding(providerId: string, launch: Launch): string {
@@ -121,7 +137,7 @@ export namespace NativeChatProfiles {
       providerId: CHATGPT_PROVIDER_ID,
       modelId: model.modelId,
       connection: "ChatGPT Subscription",
-      model: label(model.label, model.modelId),
+      model: displayLabel(model.label, model.modelId),
     }));
   }
 
@@ -172,7 +188,7 @@ export namespace NativeChatProfiles {
           providerId: GG_PROVIDER_ID,
           modelId: model.id,
           connection: GG_PROVIDER_METADATA.label,
-          model: label(model.label, model.id),
+          model: displayLabel(model.label, model.id),
           ...(window !== undefined && { contextWindow: window }),
         };
       });
@@ -248,7 +264,7 @@ export namespace NativeChatProfiles {
           providerId: id,
           modelId: model.modelId,
           connection,
-          model: label(model.label, model.modelId),
+          model: displayLabel(model.label, model.modelId),
         });
       }
     }
@@ -274,8 +290,8 @@ export namespace NativeChatProfiles {
           id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,
           modelId: model.id,
-          connection: label(endpoint.label, endpoint.id),
-          model: label(model.label, model.id),
+          connection: displayLabel(endpoint.label, endpoint.id),
+          model: displayLabel(model.label, model.id),
           ...(positive(window) && { contextWindow: window }),
         });
       }
@@ -341,12 +357,9 @@ export namespace NativeChatProfiles {
       throw new Error("native_chat_profile_limit");
     // The receipt keeps only its identity; display facts are derived again.
     const { id, providerId, modelId, connection, model } = profile;
-    const encoded = Buffer.from(
-      JSON.stringify([
-        ...entries,
-        { id, providerId, modelId, connection, model },
-      ])
-    );
+    const receipt = { id, providerId, modelId, connection, model };
+    if (!saved(receipt)) throw invalid();
+    const encoded = Buffer.from(JSON.stringify([...entries, receipt]));
     if (encoded.length > MAX_BYTES) throw invalid();
     const target = path.join(directory, FILENAME);
     const stage = path.join(directory, `.chat-profiles-${randomUUID()}.tmp`);
@@ -395,12 +408,6 @@ async function privateDirectory(directory: string) {
   return stat;
 }
 
-function label(value: string | undefined, fallback: string): string {
-  return (
-    (value ?? fallback).replace(/\p{C}/gu, "").trim().slice(0, 128) || fallback
-  );
-}
-
 function modelId(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -418,6 +425,7 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     NativeChatProfiles.validId(entry.id) &&
     typeof entry.providerId === "string" &&
     (entry.providerId === GG_PROVIDER_ID ||
+      entry.providerId === DESKTOP_GG_API_KEY_PROVIDER_ID ||
       (entry.providerId === CHATGPT_PROVIDER_ID &&
         isChatModelIdentifier(entry.modelId)) ||
       isValidEndpointProviderId(entry.providerId) ||

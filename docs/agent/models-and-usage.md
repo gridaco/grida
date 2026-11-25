@@ -16,7 +16,7 @@ The model connection decides which inputs and tools a Desktop chat offers.
 Desktop can run chat on:
 
 - your connected **ChatGPT subscription**;
-- **Grida Gateway**, under your Grida account;
+- **Grida Gateway**, under your Grida account or through a saved Gateway API key;
 - a saved **OpenAI API**, **OpenRouter**, or **Vercel AI Gateway** key;
 - an approved compatible endpoint, which can use a key saved under its own ID.
 
@@ -82,7 +82,9 @@ preference for ordinary project chats.
 The list groups models by the connection that runs them. A model offered by
 two connections appears in both groups. Choose the account or key you want
 to use. ChatGPT Subscription lists compatible models offered by your signed-in
-account. **OpenAI API · Project billing** lists compatible models available to
+account. **Grida Gateway · API key** uses the Gateway organization attached to
+the saved key. A Gateway model offered through your signed-in Grida account can
+also appear in that group. **OpenAI API · Project billing** lists compatible models available to
 your OpenAI project key and supports streamed text and agent tool calls.
 OpenRouter and Vercel AI Gateway list compatible models for that provider once
 you add its key. Grida Gateway and your configured endpoints supply their own
@@ -206,9 +208,11 @@ request again; review any partial work before asking again.
 
 ## See how full the context is
 
-The ring beside the model picker shows context usage. A reported measurement
-uses the context window resolved for that turn. Otherwise the ring estimates
-usage from the visible conversation and the selected model's known window.
+The ring beside the model picker shows context usage. It uses the working
+window captured for the turn, or the selected model’s known window before
+that capture is available. If the provider supplies no measurement, the ring
+estimates usage from the visible conversation. The default working window is
+272,000 tokens, or the model’s capacity if it is smaller. [Set context size and compaction](./settings.md)
 The tooltip and breakdown say whether the value is **Estimated** or
 **Reported by provider**. Hover for the percentage and token count. Open the
 breakdown to see how the visible content accounts for the measured request.

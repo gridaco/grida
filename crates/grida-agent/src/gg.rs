@@ -1093,8 +1093,14 @@ mod tests {
                 let tools = body["tools"]
                     .as_array()
                     .expect("retained image crop inventory");
-                assert_eq!(tools.len(), 1);
-                assert_eq!(tools[0]["function"]["name"], "crop_retained_image");
+                let names: Vec<_> = tools
+                    .iter()
+                    .map(|tool| tool["function"]["name"].as_str().unwrap())
+                    .collect();
+                assert_eq!(
+                    names,
+                    ["clock_curr_time", "clock_sleep", "crop_retained_image"]
+                );
                 assert_eq!(
                     body["messages"][1]["content"][1],
                     json!({

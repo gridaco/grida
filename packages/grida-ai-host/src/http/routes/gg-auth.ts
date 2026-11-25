@@ -30,8 +30,15 @@ export function registerGridaAuthRoutes(app: Hono, deps: GridaAuthRoutesDeps) {
       expires_at: v.number,
     });
     if (!r.ok) return r.res;
-    if (r.data.access_token.trim().length === 0) {
+    const token = r.data.access_token.trim();
+    if (token.length === 0) {
       return c.json({ error: "access_token must not be empty" }, 400);
+    }
+    if (token.startsWith("sk-gg-v1-")) {
+      return c.json(
+        { error: "access_token must be a scoped Gateway grant" },
+        400
+      );
     }
     if (
       !Number.isFinite(r.data.expires_at) ||

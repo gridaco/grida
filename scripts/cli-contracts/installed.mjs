@@ -463,7 +463,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         source,
       }
     );
-    assert.deepEqual(status.gg, {
+    assert.deepEqual(status.grida, {
       authentication: "grida_login",
       checked: false,
     });
@@ -517,7 +517,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   async function checkAgent() {
     const settings = [
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "openai/fixture-chat",
       "--state-dir",
@@ -1103,7 +1103,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       "models",
       "list",
       "--provider",
-      "gg",
+      "grida",
       "--available",
       "--json",
     ]);
@@ -1112,7 +1112,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       "ai",
       "generate",
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "bfl/flux-2-pro",
       "--prompt",
@@ -1130,7 +1130,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
           "models",
           "list",
           "--provider",
-          "gg",
+          "grida",
           "--available",
           "--json",
         ])
@@ -1146,7 +1146,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
             "ai",
             "generate",
             "--provider",
-            "gg",
+            "grida",
             "--model",
             "bfl/flux-2-pro",
             "--input",
@@ -1166,7 +1166,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       "ai",
       "generate",
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "bfl/flux-2-pro",
       "--prompt",

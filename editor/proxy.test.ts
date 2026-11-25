@@ -18,7 +18,11 @@ import { buildDesktopCsp } from "./lib/desktop/csp";
 describe("desktop CSP (GRIDA-SEC-004)", () => {
   const csp = buildDesktopCsp("test-nonce");
   const fxShowcase = "https://fx-cdn.grida.co/showcase/";
-  const baseImgSrc = `img-src 'self' data: blob: grida-workspace: ${fxShowcase}`;
+  const publicImages = [
+    "https://images.unsplash.com",
+    "https://upload.wikimedia.org",
+  ];
+  const baseImgSrc = `img-src 'self' data: blob: grida-workspace: ${fxShowcase} ${publicImages.join(" ")}`;
 
   const directive = (name: string): string => {
     const found = csp
@@ -81,6 +85,17 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     }
   });
 
+  it("allows only the named public image hosts and only for image loads", () => {
+    for (const entry of csp.split(";")) {
+      const [name, ...sources] = entry.trim().split(" ");
+      expect(sources.filter((source) => publicImages.includes(source))).toEqual(
+        name === "img-src" ? publicImages : []
+      );
+    }
+    expect(directive("img-src").split(" ")).not.toContain("https:");
+    expect(directive("img-src")).not.toMatch(/\*/);
+  });
+
   // The first-party Grida Library's selected storage origin IS allowed in
   // img-src: reference pins are kept as URLs and rendered directly. It is one
   // first-party origin, image-only — distinct from generation-provider CDNs.
@@ -115,6 +130,9 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
         "https://library.grida.co",
         "https://library.grida.co/unused/path",
         "https://evil.example.com; script-src 'unsafe-inline'",
+        "https://evil.example.com;/image",
+        "https://*.evil.example.com/image",
+        "//evil.example.com/image",
       ]);
       expect(directiveOf(src, "img-src")).toBe(
         `${baseImgSrc} https://library.grida.co`

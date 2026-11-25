@@ -70,6 +70,17 @@ remain replaceable without changing execution invariants.
 
 ## Regression obligations
 
+Native [wait tests](../tests/process/waits.rs) count provider requests while a
+clock or worker wait is pending. They cover first-worker settlement with
+siblings pending, an impossible headless deadline and a shorter retry, queued
+input, steering, stopping, and reopening a paused wait. The
+[approval test](../tests/process/approvals.rs) resolves a pending approval
+while a sibling clock tool waits. The
+[command test](../tests/process/processes.rs) waits beyond the short poll
+interval, steers without stopping the command, and collects final output
+when it exits. These claims are independent of a particular provider or
+application view.
+
 These are product situations the native implementation preserves. Each states what
 a person should be able to observe, followed by the existing evidence and its
 limits. The mechanics of a supporting test can change while that expectation
@@ -801,12 +812,15 @@ attachment and after restart return the same turn. The
 exercises an unfocused workspace. Automatic compaction stays silent on
 success and failure, while the following reply and manual compaction notify.
 The [context limits cases](../tests/process/compaction/limits.rs) exercise the
-exact threshold, the context window ceiling, a model downshift, and queued
-work accepted before a settings reload. When an earlier tool result puts
-the current turn over its threshold, a summary can replace that result in
-model context while the reopened transcript retains the original. The
-compactor receives the active request and the tool call paired with its
-result. The active request also remains in foreground context. If the
+exact threshold for both built-in and explicit defaults, the context window
+ceiling, a model downshift, and queued work accepted before a settings
+reload. A one-shot run with an existing session checks that its foreground
+request follows the maintenance attempt and uses the installed summary or
+the retained original after failure. When an earlier tool result puts the
+current turn over its threshold,
+a summary can replace that result in model context while the reopened
+transcript retains the original. The compactor receives the active request
+and the tool call paired with its result. The active request also remains in foreground context. If the
 summary fails, the next request still receives the original result. A
 same-turn summary produces no additional lifecycle settlement. The
 compaction item regression covers multiple starts and completions in the

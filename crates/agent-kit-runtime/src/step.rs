@@ -4,7 +4,7 @@ use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{
     Content, Message, Provenance, ProvenanceKind, ResultContent, Role, ToolArguments, ToolResult,
 };
-use agent_kit_core::turn::{OperationInput, OperationOutcome};
+use agent_kit_core::turn::{JournalPosition, OperationInput, OperationOutcome};
 use agent_kit_core::{MessageId, ToolCallId};
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use std::collections::BTreeSet;
@@ -36,11 +36,15 @@ impl Turn {
                 return Err(Error::new(ErrorKind::Conflict, "step_inventory_mismatch"));
             }
         }
+        let input_after = plan
+            .input_after
+            .unwrap_or_else(|| self.view().state.position());
         let step = StepCalls {
             operations: &operations,
             plan: &plan,
             origin: &origin,
             available: &available,
+            input_after,
             replay,
         };
         let (sender, mut receiver) = mpsc::channel(self.inner_capacity());
@@ -208,6 +212,7 @@ struct StepCalls<'a> {
     plan: &'a StepPlan,
     origin: &'a OperationId,
     available: &'a BTreeSet<ToolId>,
+    input_after: JournalPosition,
     replay: bool,
 }
 
@@ -232,6 +237,7 @@ impl StepCalls<'_> {
         let offered = self.available.contains(&call.tool);
         let selected_grants = plan.tool_grants.get(&call.tool).cloned();
         let origin = self.origin.clone();
+        let input_after = self.input_after;
         let replay = self.replay;
         let operation_id = operations.operation_id(&tool_key)?;
         work.push(Box::pin(async move {
@@ -289,6 +295,7 @@ impl StepCalls<'_> {
                     inventory,
                     Some(origin),
                     Some(call.id.clone()),
+                    Some(input_after),
                 )
                 .await;
             let result = match result {

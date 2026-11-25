@@ -97,6 +97,7 @@ fn cache_key(session: &str, turn: &str) -> CacheKey {
 pub(crate) struct TurnCache {
     entries: BTreeMap<CacheKey, (u64, Cached)>,
     staged: BTreeMap<CacheKey, Cached>,
+    input_activity: Vec<(TurnBinding, JournalPosition)>,
     clock: u64,
     bytes: usize,
     turns_limit: usize,
@@ -114,6 +115,7 @@ impl TurnCache {
         Self {
             entries: BTreeMap::new(),
             staged: BTreeMap::new(),
+            input_activity: Vec::new(),
             clock: 0,
             bytes: 0,
             turns_limit,
@@ -181,16 +183,23 @@ impl TurnCache {
         self.entries.insert(key, (now, entry));
     }
 
+    pub(crate) fn stage_input_activity(&mut self, state: &TurnState) {
+        self.input_activity
+            .push((state.binding().clone(), state.input_activity()));
+    }
+
     /// Keep what the transaction that just committed staged.
-    pub(crate) fn publish(&mut self) {
+    pub(crate) fn publish(&mut self) -> Vec<(TurnBinding, JournalPosition)> {
         for (key, entry) in std::mem::take(&mut self.staged) {
             self.insert(key, entry);
         }
+        std::mem::take(&mut self.input_activity)
     }
 
     /// Drop what a transaction that did not commit staged.
     pub(crate) fn discard(&mut self) {
         self.staged.clear();
+        self.input_activity.clear();
     }
 }
 
@@ -443,6 +452,9 @@ fn head(state: &TurnState) -> Result<Value> {
     let mut head = Map::new();
     head.insert("binding".into(), to_value(state.binding())?);
     head.insert("position".into(), to_value(&state.position())?);
+    if state.input_activity() != JournalPosition::default() {
+        head.insert("input_activity".into(), to_value(&state.input_activity())?);
+    }
     head.insert("controls".into(), to_value(state.controls())?);
     head.insert("history".into(), Value::Object(Map::new()));
     head.insert("waits".into(), to_value(state.waits())?);

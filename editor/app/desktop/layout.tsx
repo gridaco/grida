@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { Toaster } from "@app/ui/components/sonner";
 import { desktopCompatibility } from "@/lib/desktop/compatibility";
+import { DesktopImagePolicy } from "@/lib/desktop/image-policy";
+import { ReplyImageSourceProvider } from "@/kits/agent-chat/reply-images";
 import { DesktopBridgeGate } from "@/scaffolds/desktop/desktop-bridge-gate";
 import "../editor.css";
 
@@ -60,7 +62,9 @@ export default async function DesktopRootLayout({
         <ThemeProvider nonce={nonce}>
           <TooltipProvider>
             <DesktopBridgeGate compatibility={desktopCompatibility}>
-              {children}
+              <ReplyImageSourceProvider sources={DesktopImagePolicy.sources()}>
+                {children}
+              </ReplyImageSourceProvider>
             </DesktopBridgeGate>
             <Toaster />
           </TooltipProvider>

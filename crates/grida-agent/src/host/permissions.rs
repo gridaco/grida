@@ -33,7 +33,7 @@ pub(super) struct ToolAuthority {
     base: Arc<ExecutionAuthority>,
     permissions: Option<Arc<TurnPermissions>>,
     material: MaterialTools,
-    wakeups: Option<Arc<wakeups::WakeupAccess>>,
+    waits: WaitTools,
     hooks: HookTools,
     host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
@@ -46,6 +46,12 @@ pub(super) struct MaterialTools {
     pub(super) image: Option<Arc<image_tools::TurnImage>>,
     pub(super) file: Option<Arc<retained_file::TurnFile>>,
     pub(super) skills: Option<Arc<bundled_skills::TurnSkills>>,
+}
+
+#[derive(Default)]
+pub(super) struct WaitTools {
+    pub(super) scheduled: Option<Arc<wakeups::WakeupAccess>>,
+    pub(super) clock: Option<clock::Access>,
 }
 
 pub(super) struct HookTools {
@@ -64,7 +70,7 @@ impl ToolAuthority {
         base: Arc<ExecutionAuthority>,
         permissions: Option<Arc<TurnPermissions>>,
         material: MaterialTools,
-        wakeups: Option<Arc<wakeups::WakeupAccess>>,
+        waits: WaitTools,
         hooks: HookTools,
         host_tools: Vec<Arc<host_tools::TurnTools>>,
         delegation: DelegationTools,
@@ -77,7 +83,8 @@ impl ToolAuthority {
             && material.image.is_none()
             && material.file.is_none()
             && material.skills.is_none()
-            && wakeups.is_none()
+            && waits.scheduled.is_none()
+            && waits.clock.is_none()
             && hooks.completion.is_none()
             && hooks.before_tool.is_none()
             && hooks.lifecycle.is_none()
@@ -91,7 +98,7 @@ impl ToolAuthority {
             base,
             permissions,
             material,
-            wakeups,
+            waits,
             hooks,
             host_tools,
             delegation,
@@ -143,9 +150,15 @@ impl AuthorityValidator for ToolAuthority {
             return Box::pin(async { Ok(()) });
         }
         if self
-            .wakeups
+            .waits
+            .scheduled
             .as_ref()
             .is_some_and(|scope| scope.accepts(&request.selection))
+            || self
+                .waits
+                .clock
+                .as_ref()
+                .is_some_and(|scope| scope.accepts(&request.selection))
         {
             return Box::pin(async { Ok(()) });
         }
@@ -229,8 +242,17 @@ impl ToolAuthority {
         {
             return Box::pin(async move { before_tool.admit(&admission, &context) });
         }
+        if let Some(clock) = self
+            .waits
+            .clock
+            .as_ref()
+            .filter(|scope| scope.accepts(&admission.grants))
+        {
+            return Box::pin(async move { clock.decide(&admission) });
+        }
         if let Some(wakeups) = self
-            .wakeups
+            .waits
+            .scheduled
             .as_ref()
             .filter(|scope| scope.accepts(&admission.grants))
         {

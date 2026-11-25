@@ -23,8 +23,8 @@ macro_rules! choices {
         }
     };
 }
-choices!(Provider { OpenRouter => "openrouter", Vercel => "vercel", Fal => "fal", ElevenLabs => "elevenlabs", Tripo => "tripo", Gg => "gg" });
-choices!(MeshProvider { Tripo => "tripo", Gg => "gg" });
+choices!(Provider { OpenRouter => "openrouter", Vercel => "vercel", Fal => "fal", ElevenLabs => "elevenlabs", Tripo => "tripo", Grida => "grida", Gg => "gg" });
+choices!(MeshProvider { Tripo => "tripo", Grida => "grida", Gg => "gg" });
 choices!(Kind { Image => "image", Video => "video", Music => "music", SoundEffect => "sound-effect", TextToSpeech => "text-to-speech", ThreeD => "three-d" });
 choices!(Variant { Text => "text", References => "references", Image => "image", Multiview => "multiview" });
 choices!(Modality { Image => "image", Video => "video", Audio => "audio", ThreeD => "3d" });
@@ -178,8 +178,15 @@ pub enum Command {
         model: ModelSelection,
         source: GenerationSource,
         out: String,
+        gateway_files: Vec<Parameter>,
+        retry_submission: Option<String>,
         key_stdin: bool,
         selector: Option<Selector>,
+    },
+    GatewayJob {
+        job_id: String,
+        out: Option<String>,
+        key_stdin: bool,
     },
     VoicesList {
         key_stdin: bool,
@@ -203,6 +210,7 @@ pub enum Command {
         model: String,
         source: RiggingSource,
         out: String,
+        retry_submission: Option<String>,
         key_stdin: bool,
         selector: Option<Selector>,
     },
@@ -226,6 +234,8 @@ const STRINGS: &[&str] = &[
     "org",
     "org-id",
     "provider",
+    "job-id",
+    "retry-submission",
     "model",
     "feature",
     "mesh",
@@ -252,7 +262,7 @@ const STRINGS: &[&str] = &[
     "deadline-ms",
     "max-output-tokens",
 ];
-const REPEATED: &[&str] = &["reference", "param", "skill"];
+const REPEATED: &[&str] = &["reference", "param", "file", "skill"];
 const REQUEST_FLAGS: &[&str] = &[
     "prompt",
     "prompt-file",
@@ -411,6 +421,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         "ai providers",
         "ai voices",
         "ai rigging",
+        "ai jobs",
         "agent",
     ]
     .contains(&topic.as_str())
@@ -490,7 +501,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
             let available = tokens.flag("available");
             let selector = tokens.organization()?;
             if (available && provider.is_none())
-                || (selector.is_some() && (!available || provider != Some(Provider::Gg)))
+                || (selector.is_some() && (!available || provider != Some(Provider::Grida)))
             {
                 return Err(Failure::usage());
             }
@@ -501,6 +512,23 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 available,
                 local_image: tokens.flag("local-image"),
                 selector,
+            }
+        }
+        "ai jobs get" => {
+            tokens.allowed(true, &["provider", "job-id", "out", "key-stdin"])?;
+            let id = tokens.required("job-id")?;
+            if tokens.required("provider")? != "gg"
+                || !grida_ai::gateway_id(id)
+                || tokens
+                    .value("out")
+                    .is_some_and(|value| value.is_empty() || value.contains('\0'))
+            {
+                return Err(Failure::usage());
+            }
+            Command::GatewayJob {
+                job_id: id.into(),
+                out: tokens.value("out").map(str::to_owned),
+                key_stdin: tokens.flag("key-stdin"),
             }
         }
         "ai voices list" => {
@@ -537,6 +565,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 let configure = *action == "configure";
                 tokens.allowed(true, if configure { &["key-stdin"] } else { &[] })?;
                 let provider = Provider::parse(provider)?;
+                if provider == Provider::Grida {
+                    return Err(Failure::usage());
+                }
                 if configure {
                     let key_stdin = tokens.flag("key-stdin");
                     if !key_stdin && (options.json || options.no_input) {
@@ -590,7 +621,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
         allowed.push("stdio");
     }
     tokens.allowed(false, &allowed)?;
-    if tokens.required("provider")? != "gg" || (!run && !tokens.flag("stdio")) {
+    if tokens.required("provider")? != "grida" || (!run && !tokens.flag("stdio")) {
         return Err(Failure::usage());
     }
     if tokens.seen("input-png") && tokens.seen("input-file") {
@@ -678,7 +709,7 @@ fn parse_external_agent(tokens: &Tokens) -> Result<ExternalAgentCommand, Failure
 fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {
     let mut allowed = vec!["provider", "mesh", "input", "key-stdin", "org", "org-id"];
     if run {
-        allowed.extend(["model", "out", "rig-type", "spec"]);
+        allowed.extend(["model", "out", "rig-type", "spec", "retry-submission"]);
     }
     tokens.allowed(true, &allowed)?;
     let provider = MeshProvider::parse(tokens.required("provider")?)?;
@@ -686,8 +717,8 @@ fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {
     let input = tokens.value("input").map(rigging_value).transpose()?;
     let key_stdin = tokens.flag("key-stdin");
     let selector = tokens.organization()?;
-    if (key_stdin && provider == MeshProvider::Gg)
-        || (selector.is_some() && provider != MeshProvider::Gg)
+    if (key_stdin && provider == MeshProvider::Grida)
+        || (selector.is_some() && provider != MeshProvider::Grida)
     {
         return Err(Failure::usage());
     }
@@ -719,11 +750,13 @@ fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {
             spec: rigging_value(tokens.required("spec")?)?,
         },
     };
+    let retry_submission = retry_submission(tokens, provider == MeshProvider::Gg)?;
     Ok(Command::RiggingRun {
         provider,
         model,
         source,
         out,
+        retry_submission,
         key_stdin,
         selector,
     })
@@ -732,7 +765,15 @@ fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {
 fn parse_media(tokens: &Tokens, generate: bool) -> Result<Command, Failure> {
     let mut allowed = vec!["provider", "model", "kind", "variant"];
     if generate {
-        allowed.extend(["input", "out", "key-stdin", "org", "org-id"]);
+        allowed.extend([
+            "input",
+            "out",
+            "key-stdin",
+            "org",
+            "org-id",
+            "retry-submission",
+            "file",
+        ]);
         allowed.extend(REQUEST_FLAGS);
     }
     tokens.allowed(true, &allowed)?;
@@ -760,8 +801,8 @@ fn parse_media(tokens: &Tokens, generate: bool) -> Result<Command, Failure> {
         || (input.is_some() && has_request)
         || out.is_empty()
         || out.contains('\0')
-        || (key_stdin && (input == Some("-") || provider == Provider::Gg))
-        || (selector.is_some() && provider != Provider::Gg)
+        || (key_stdin && (input == Some("-") || provider == Provider::Grida))
+        || (selector.is_some() && provider != Provider::Grida)
     {
         return Err(Failure::usage());
     }
@@ -780,13 +821,44 @@ fn parse_media(tokens: &Tokens, generate: bool) -> Result<Command, Failure> {
             message: "Only one input can read stdin; use a file for the other input.",
         });
     }
+    let retry_submission = retry_submission(tokens, provider == Provider::Gg)?;
+    let mut gateway_files = Vec::new();
+    if let Some(values) = tokens.values("file") {
+        if provider != Provider::Gg || !matches!(source, GenerationSource::Json(_)) {
+            return Err(Failure::usage());
+        }
+        for value in values {
+            let (field, path) = value.split_once('=').ok_or_else(Failure::usage)?;
+            if field.is_empty() || path.is_empty() || path.contains('\0') {
+                return Err(Failure::usage());
+            }
+            gateway_files.push(Parameter {
+                field: field.to_owned(),
+                value: path.to_owned(),
+            });
+        }
+    }
     Ok(Command::Generate {
         model,
         source,
         out: out.to_owned(),
+        retry_submission,
+        gateway_files,
         key_stdin,
         selector,
     })
+}
+
+fn retry_submission(tokens: &Tokens, standalone: bool) -> Result<Option<String>, Failure> {
+    tokens
+        .value("retry-submission")
+        .map(|path| {
+            if !standalone || !path.starts_with('@') || !json_source(path) || path.contains('\0') {
+                return Err(Failure::usage());
+            }
+            Ok(path.to_owned())
+        })
+        .transpose()
 }
 
 fn request_values(tokens: &Tokens) -> Result<Request, Failure> {
@@ -961,7 +1033,7 @@ mod tests {
         let arguments = [
             "agent",
             "run",
-            "--provider=gg",
+            "--provider=grida",
             "--model=openai/gpt-5.6-sol",
             STATE_DIR,
             CWD,
@@ -998,7 +1070,7 @@ mod tests {
             parse(&args(&[
                 "agent",
                 "serve",
-                "--provider=gg",
+                "--provider=grida",
                 "--model=openai/gpt-5.6-sol",
                 STATE_DIR,
                 "--stdio",
@@ -1013,7 +1085,7 @@ mod tests {
         let base = [
             "agent",
             "run",
-            "--provider=gg",
+            "--provider=grida",
             "--model=fixture",
             STATE_DIR,
             CWD,
@@ -1045,7 +1117,7 @@ mod tests {
         let invocation = parsed(&[
             "agent",
             "run",
-            "--provider=gg",
+            "--provider=grida",
             "--model=fixture",
             STATE_DIR,
             CWD,
@@ -1070,7 +1142,7 @@ mod tests {
             parse(&args(&[
                 "agent",
                 "run",
-                "--provider=gg",
+                "--provider=grida",
                 "--model=fixture",
                 STATE_DIR,
                 CWD,
@@ -1098,7 +1170,12 @@ mod tests {
                 deadline_ms: 120_000,
             })
         );
-        for unsupported in ["--provider=gg", "--org-id=5", "--json", "--deadline-ms=0"] {
+        for unsupported in [
+            "--provider=grida",
+            "--org-id=5",
+            "--json",
+            "--deadline-ms=0",
+        ] {
             let mut rejected = base.to_vec();
             rejected.push(unsupported);
             assert_eq!(parse(&args(&rejected)).unwrap_err(), Failure::usage());
@@ -1232,19 +1309,64 @@ mod tests {
     }
 
     #[test]
+    fn grida_and_gg_require_distinct_authority() {
+        let generate = |provider, option| {
+            args(&[
+                "ai",
+                "generate",
+                provider,
+                "--model=lab/model",
+                "--out=./result",
+                "--prompt=synthetic",
+                option,
+            ])
+        };
+        assert!(parse(&generate("--provider=gg", "--key-stdin")).is_ok());
+        assert!(parse(&generate("--provider=grida", "--org=studio")).is_ok());
+        assert!(parse(&generate("--provider=gg", "--org=studio")).is_err());
+        assert!(parse(&generate("--provider=grida", "--key-stdin")).is_err());
+        let job = |provider| args(&["ai", "jobs", "get", provider, "--job-id=req_fixture"]);
+        assert!(matches!(
+            parse(&job("--provider=gg")).unwrap().command,
+            Command::GatewayJob { .. }
+        ));
+        assert!(parse(&job("--provider=grida")).is_err());
+        assert!(parse(&args(&["ai", "providers", "remove", "grida"])).is_err());
+        let multipart = |provider, input| {
+            args(&[
+                "ai",
+                "generate",
+                provider,
+                "--model=lab/model",
+                "--out=./result",
+                input,
+                "--file=images.front=./front.png",
+            ])
+        };
+        assert!(matches!(
+            parse(&multipart("--provider=gg", "--input=@input.json")).unwrap().command,
+            Command::Generate { gateway_files, .. } if gateway_files == vec![Parameter {
+                field: "images.front".into(), value: "./front.png".into(),
+            }]
+        ));
+        assert!(parse(&multipart("--provider=grida", "--input=@input.json")).is_err());
+        assert!(parse(&multipart("--provider=gg", "--prompt=synthetic")).is_err());
+    }
+
+    #[test]
     fn rigging_sources_and_provider_custody_are_explicit() {
         let check = parsed(&[
             "ai",
             "rigging",
             "check",
-            "--provider=gg",
+            "--provider=grida",
             "--mesh=./mesh.glb",
             "--org=studio",
         ]);
         assert!(matches!(
             check.command,
             Command::RiggingCheck {
-                provider: MeshProvider::Gg,
+                provider: MeshProvider::Grida,
                 source: MeshSource::Mesh(_),
                 selector: Some(_),
                 ..
@@ -1255,7 +1377,7 @@ mod tests {
                 "ai",
                 "rigging",
                 "check",
-                "--provider=gg",
+                "--provider=grida",
                 "--mesh=mesh.glb",
                 "--key-stdin",
             ],

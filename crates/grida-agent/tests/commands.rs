@@ -225,6 +225,7 @@ fn context(cancellation: CancellationToken) -> InvocationContext {
     InvocationContext {
         attempt: AttemptId::new("attempt").unwrap(),
         cancellation,
+        input_activity: CancellationToken::new(),
         deadline: Some(Instant::now() + WAIT),
         max_output_bytes: 16 * 1024,
     }

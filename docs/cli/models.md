@@ -28,8 +28,8 @@ grida ai models list --provider fal --modality video --local-image
 ```
 
 Rows identify provider, model, input variant, status, and accepted local-image
-flags. `--local-image` selects operations accepting a local `--reference` or
-`--image` file. It does not mean every model from that provider accepts files.
+flags. `--local-image` selects operations that accept `--reference`, `--image`,
+or a named `--file` image. File support varies by operation.
 Use `--json` for structured rows and `--kind` for operations such as `music`,
 `sound-effect`, `text-to-speech`, or `three-d`.
 
@@ -40,12 +40,11 @@ grida ai models list --provider fal --available
 grida ai models list --provider openrouter --modality image --available --json
 ```
 
-`--available` requires a provider. For BYOK it checks effective key presence
-after static validation, without contacting the provider. For GG it checks
-cached organization eligibility online using your Grida session. Neither
-guarantees provider permission, provider credit, or a successful request.
-A missing provider key does not prevent offline discovery or use of another
-configured provider.
+`--available` requires a provider. For providers that use API keys, including
+`gg`, it checks effective key presence after static validation. With
+`--provider grida`, it checks credit eligibility for the selected organization
+using your Grida session. Gateway checks scopes, spending limits, and credit at
+execution.
 
 ## Inspect accepted inputs
 
@@ -63,11 +62,10 @@ it in the input JSON. Inspect the intended variant: image/video inspection
 defaults to text input where that variant exists. Generation's `--reference`
 and `--image` flags select compatible variants automatically.
 
-GG's generic adapter supports JSON image generation, video, music and 3D
-operations. Multipart-only image editing is not advertised by that adapter;
-existing native Tripo file and rigging operations retain their separate contracts.
-GG discovery does not require a separate Gateway API key. Generation uses your
-Grida session and selected organization.
+Gateway discovery is public for both providers. For generation, use
+`--provider grida` to use your Grida session and selected organization.
+Use `--provider gg` with a standalone Gateway API key. The key determines the
+funding organization, so `gg` rejects `--org` and `--org-id`.
 
 The selected operation's schema is authoritative. A provider's model page may
 advertise options Grida does not expose. There is no raw provider passthrough

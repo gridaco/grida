@@ -49,6 +49,7 @@ sha2 = "0.11"
 sse-stream = "=0.2.6"
 subtle = "2"
 tempfile = "3"
+time = { version = "0.3", features = ["formatting"] }
 toml_edit = "=0.25.15"
 tokio = { version = "1", features = [
   "io-std",
@@ -79,7 +80,7 @@ serde_json.workspace = true
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }
 socket2 = "0.6"
-tokio = { version = "1", features = ["net", "process"] }
+tokio = { version = "1", features = ["net", "process", "test-util"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 
 [lints]

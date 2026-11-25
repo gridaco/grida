@@ -10,6 +10,10 @@
  */
 export type ByokModality = "text" | "image" | "video";
 
+/** Desktop connection identity. The shared credential lives in the gg slot. */
+export const DESKTOP_GG_API_KEY_PROVIDER_ID =
+  "desktop-grida-gateway-api-key-connection";
+
 /** Distinct from the headless `openai` slot and outside the custom endpoint ID range. */
 export const OPENAI_PROJECT_PROVIDER_ID = "desktop-openai-project-credential";
 

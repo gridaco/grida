@@ -6,6 +6,10 @@ Commands:
   generate   Generate media into a new local directory
   voices     List available speech voices
   rigging    Check mesh eligibility and create a rigged GLB
+  jobs       Read direct Gateway job status and results
 
 --no-input suppresses terminal interaction; the OS keyring may still request access.
 Documentation: https://grida.co/docs/cli
+
+Use --provider grida for Grida sign-in or --provider gg for direct Gateway with GG_API_KEY.
+Use grida ai jobs get --help to recover direct Gateway results.

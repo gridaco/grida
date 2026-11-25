@@ -7,7 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio_util::sync::DropGuard;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -104,6 +104,8 @@ impl ToolOutcome {
 pub struct InvocationContext {
     pub attempt: AttemptId,
     pub cancellation: CancellationToken,
+    /// Signals new input for the active turn without cancelling the invocation.
+    pub input_activity: CancellationToken,
     pub deadline: Option<Instant>,
     pub max_output_bytes: usize,
 }
@@ -183,6 +185,11 @@ pub trait Tool: Send + Sync {
     fn definition(&self) -> &ToolDefinition;
     /// Validate the declared input schema without effects. Execution preconditions remain with the tool.
     fn validate(&self, arguments: &ToolArguments) -> Result<()>;
+    /// Passive observation can request its own bounded execution timeout and receive
+    /// active-turn input signals. Admission and recovery keep their normal limits.
+    fn wait_timeout(&self, _arguments: &ToolArguments) -> Option<Duration> {
+        None
+    }
     fn invoke(
         &self,
         invocation: Invocation,
@@ -313,6 +320,10 @@ pub struct PreparedInvocation {
 impl PreparedInvocation {
     pub fn invocation(&self) -> &Invocation {
         &self.invocation
+    }
+
+    pub fn wait_timeout(&self) -> Option<Duration> {
+        self.executor.wait_timeout(self.invocation.arguments())
     }
 
     /// Scope `context` to this one execution: a child cancellation that ends

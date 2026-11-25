@@ -3529,3 +3529,97 @@ async fn a_panicking_projection_leaves_the_store_usable() {
         .unwrap();
     assert_eq!(store.inspect(session()).await.unwrap().queued.len(), 1);
 }
+
+#[tokio::test]
+async fn turn_input_activity_observes_committed_decisions_only_on_the_owned_turn() {
+    let (_directory, store) = store().await;
+    let input = submission("first", "first turn");
+    store.submit(session(), input.clone()).await.unwrap();
+    let first = claim(&store, "claim-first", vec![input.id]).await;
+    let journal = first.lease.journal();
+    let before = journal.load().await.unwrap().position();
+
+    // Open requests and queue submissions are independent of active-turn input.
+    let wait = open_wait(&first, "first-approval").await;
+    store
+        .submit(session(), submission("later", "queued"))
+        .await
+        .unwrap();
+    let mut activity = journal.input_activity_after(before);
+    tokio::select! {
+        biased;
+        _ = &mut activity => panic!("opening a wait or queueing input woke the turn"),
+        () = std::future::ready(()) => {}
+    }
+
+    let other_session = SessionId::new("other").unwrap();
+    store
+        .create(CreateSession {
+            id: other_session.clone(),
+            request: change("create-other"),
+            configuration: payload("configuration"),
+        })
+        .await
+        .unwrap();
+    let input = submission("other-input", "another turn");
+    store
+        .submit(other_session.clone(), input.clone())
+        .await
+        .unwrap();
+    let ClaimOutcome::Acquired(other) = store
+        .claim(ClaimRequest {
+            id: change("claim-other"),
+            session: other_session.clone(),
+            expected_revision: store.inspect(other_session).await.unwrap().revision,
+            selection: TurnSelection::New {
+                turn: turn(),
+                inputs: vec![input.id],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected a new owner");
+    };
+    let other_wait = open_wait(&other, "other-approval").await;
+    answer(&other, &other_wait).await;
+    tokio::select! {
+        biased;
+        _ = &mut activity => panic!("another session woke the turn"),
+        () = std::future::ready(()) => {}
+    }
+
+    let decision = store
+        .control(ControlRequest {
+            id: change("answer-first"),
+            session: session(),
+            expected_revision: store.inspect(session()).await.unwrap().revision,
+            action: SessionControl::Resolve {
+                turn: turn(),
+                expected: journal.load().await.unwrap().controls().revision,
+                wait,
+                answer: payload("decision"),
+            },
+        })
+        .await
+        .unwrap();
+    let decision_position = decision.turn.unwrap().record().position;
+    assert_eq!(
+        journal.load().await.unwrap().input_activity(),
+        decision_position
+    );
+    tokio::time::timeout(Duration::from_secs(1), activity)
+        .await
+        .unwrap()
+        .unwrap();
+    // A listener that starts after the answer still sees the committed decision.
+    tokio::time::timeout(Duration::from_secs(1), journal.input_activity_after(before))
+        .await
+        .unwrap()
+        .unwrap();
+    tokio::select! {
+        biased;
+        _ = journal.input_activity_after(decision_position) => panic!("replayed an old decision"),
+        () = std::future::ready(()) => {}
+    }
+}

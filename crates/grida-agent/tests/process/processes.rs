@@ -561,3 +561,74 @@ async fn process_numbers_continue_after_a_restart_and_in_a_side_chat() {
     client.close().await;
     endpoint.done().await;
 }
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn long_process_wait_uses_one_request_and_steering_preserves_the_process() {
+    let fixture = fixture();
+    // The test releases the process independently of the model and its waits.
+    let command = r#"printf ready; while [ ! -e emit ]; do /bin/sleep 0.05; done; printf 'buffered output'; : > emitted; while [ ! -e release ]; do /bin/sleep 0.05; done; printf 'final output'"#;
+    let launch = json!({"cmd":command,"access":"read_write","yield_time_ms":250}).to_string();
+    let poll = r#"{"session_id":1,"chars":"","yield_time_ms":60000}"#;
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("exec_command", launch.leak()),
+        Reply::Tool("write_stdin", poll),
+        Reply::Tool("write_stdin", poll),
+        Reply::Finished("The process is done."),
+    ])
+    .await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let mut updates = Updates::default();
+    let session = session(&mut updates, &mut client, &fixture.primary).await;
+    let accepted = super::waits::call(
+        &mut client,
+        "_co.grida/session/submit",
+        super::lifecycle::prompt_request(&session, "wait", "Wait for the process."),
+    )
+    .await;
+    endpoint.request().await;
+    assert!(tool_text(&endpoint.request().await).contains("session ID 1"));
+    super::waits::tool_started(&mut client, "write_stdin").await;
+    // Pass the ordinary five-second poll boundary without another inference.
+    super::waits::quiet_for(&mut endpoint, Duration::from_secs(6)).await;
+    fs::write(fixture.primary.join("emit"), "").unwrap();
+    wait_for_file(&fixture.primary.join("emitted")).await;
+    super::waits::quiet_for(&mut endpoint, Duration::from_millis(100)).await;
+    let steer = super::waits::steer(&mut client, &session, "Keep the process running.").await;
+    assert_eq!(steer["turnId"], accepted["turnId"]);
+    let continued = timeout(Duration::from_secs(5), endpoint.request())
+        .await
+        .unwrap();
+    let poll_result = tool_text(&continued);
+    assert!(
+        poll_result.contains("Wait interrupted by new input."),
+        "{poll_result}"
+    );
+    assert!(
+        poll_result.contains("Process running with session ID 1"),
+        "{poll_result}"
+    );
+    assert_eq!(
+        continued["messages"]
+            .to_string()
+            .matches("Keep the process running.")
+            .count(),
+        1
+    );
+
+    super::waits::tool_started(&mut client, "write_stdin").await;
+    super::waits::quiet_for(&mut endpoint, Duration::from_millis(150)).await;
+    fs::write(fixture.primary.join("release"), "").unwrap();
+    let collected = timeout(Duration::from_secs(5), endpoint.request())
+        .await
+        .unwrap();
+    let final_result = tool_text(&collected);
+    assert!(
+        final_result.contains("Process exited with code 0"),
+        "{final_result}"
+    );
+    assert!(final_result.contains("buffered output"), "{final_result}");
+    assert!(final_result.contains("final output"), "{final_result}");
+    client.close().await;
+    endpoint.done().await;
+}

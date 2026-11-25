@@ -21,7 +21,7 @@ fn registry(path: &Path, workspaces: &[(&Path, &Path)]) {
     fs::rename(temporary, path).unwrap();
 }
 
-async fn observer(url: &str, filter: Option<&Path>) -> SharedSocket {
+async fn catalog_connection(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
@@ -34,6 +34,11 @@ async fn observer(url: &str, filter: Option<&Path>) -> SharedSocket {
         reply["result"]["agentCapabilities"]["_meta"][WATCH], 1,
         "{reply}"
     );
+    socket
+}
+
+async fn observer(url: &str, filter: Option<&Path>) -> SharedSocket {
+    let mut socket = catalog_connection(url).await;
     let reply = ws_rpc(
         &mut socket,
         2,
@@ -73,11 +78,15 @@ async fn list(socket: &mut SharedSocket) -> Value {
     page["result"].clone()
 }
 
-async fn first_after_change(socket: &mut SharedSocket, verify: impl Fn(&Value) -> bool) -> Value {
+async fn first_after_change(
+    notifications: &mut SharedSocket,
+    queries: &mut SharedSocket,
+    verify: impl Fn(&Value) -> bool,
+) -> Value {
     timeout(WAIT, async {
         loop {
-            changed(socket).await;
-            let page = list(socket).await;
+            changed(notifications).await;
+            let page = list(queries).await;
             if verify(&page) {
                 return page;
             }
@@ -115,8 +124,11 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     let (service, url) = spawn_shared_server(command).await;
     let mut global = observer(&url, None).await;
     let mut scoped = observer(&url, Some(&b)).await;
+    // RPC replies and invalidations share the wire. Keep this observer's
+    // frames available while an authoritative list request is in flight.
+    let mut queries = catalog_connection(&url).await;
     assert!(
-        list(&mut global).await["sessions"]
+        list(&mut queries).await["sessions"]
             .as_array()
             .unwrap()
             .is_empty()
@@ -143,7 +155,7 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     )
     .await["result"]["sessionId"]
         .clone();
-    first_after_change(&mut global, |page| {
+    first_after_change(&mut global, &mut queries, |page| {
         page["sessions"][0]["sessionId"] == a_session
     })
     .await;
@@ -165,7 +177,7 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     // previously missing store directories shared a watched ancestor.
     let first = changed(&mut scoped).await;
     assert_eq!(first["cwds"], json!([b]));
-    let page = first_after_change(&mut global, |page| {
+    let page = first_after_change(&mut global, &mut queries, |page| {
         page["sessions"][0]["sessionId"] == b_session
     })
     .await;
@@ -175,7 +187,7 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
         "end_turn"
     );
     endpoint.request().await;
-    let page = first_after_change(&mut global, |page| {
+    let page = first_after_change(&mut global, &mut queries, |page| {
         page["sessions"][0]["sessionId"] == a_session
             && page["sessions"][0]["_meta"]["co.grida/readState"]["unread"] == true
     })
@@ -185,7 +197,7 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
         "cwd": a, "sessionId": a_session, "action": "acknowledge",
         "revision": read["revision"], "replyId": read["replyId"]
     });
-    let ack = ws_rpc(&mut global, 11, "_co.grida/session/read-state", seen).await;
+    let ack = ws_rpc(&mut queries, 11, "_co.grida/session/read-state", seen).await;
     assert_eq!(ack["result"]["unread"], false, "{ack}");
 
     let submit = ws_rpc(
@@ -198,30 +210,30 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     assert!(submit["result"].is_object(), "{submit}");
     endpoint.request().await;
     endpoint.request().await;
-    first_after_change(&mut global, |p| {
+    first_after_change(&mut global, &mut queries, |p| {
         p["_meta"]["co.grida/runningSessionIds"] == json!([a_session])
             && p["_meta"]["co.grida/inputNeededSessionIds"] == json!([a_session])
     })
     .await;
     writer_a.kill().await.unwrap();
     writer_a.wait().await.unwrap();
-    first_after_change(&mut global, |p| {
+    first_after_change(&mut global, &mut queries, |p| {
         p["_meta"]["co.grida/runningSessionIds"] == json!([])
     })
     .await;
     registry(&manifest, &[(&b, &state_b)]);
-    first_after_change(&mut global, |p| {
+    first_after_change(&mut global, &mut queries, |p| {
         p["sessions"][0]["sessionId"] == b_session && p["nextCursor"].is_null()
     })
     .await;
-    let mut reconnected = observer(&url, None).await;
+    let mut reconnected = catalog_connection(&url).await;
     assert_eq!(
         list(&mut reconnected).await["sessions"][0]["sessionId"],
         b_session
     );
     assert!(
         ws_rpc(
-            &mut global,
+            &mut queries,
             12,
             "_co.grida/session/read-state",
             json!({"cwd":a,"sessionId":a_session,"action":"markUnread"})
@@ -233,6 +245,7 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     drop(b_client);
     drop(global);
     drop(scoped);
+    drop(queries);
     drop(reconnected);
     lifecycle::terminate_shared_server(writer_b).await;
     lifecycle::terminate_shared_server(service).await;

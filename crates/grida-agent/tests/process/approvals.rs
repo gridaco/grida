@@ -777,13 +777,9 @@ async fn changed_secondary_rule_cannot_resume_a_retained_read() {
 async fn unrelated_cwd_does_not_inherit_launch_permissions() {
     let fixture = Fixture::new(false);
     let unrelated = tempfile::tempdir().unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Finished("No local tools.")]).await;
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("No workspace tools.")]).await;
     fixture.run(&endpoint.url, unrelated.path(), 0).await;
-    assert!(
-        endpoint.request().await["tools"]
-            .as_array()
-            .is_none_or(Vec::is_empty)
-    );
+    assert_only_clock_tools(&endpoint.request().await);
     endpoint.done().await;
 }
 
@@ -1247,5 +1243,91 @@ async fn stopped_approval_settles_without_reinstalling_the_permission_profile() 
     assert_eq!(cancelled["latest"]["status"], "cancelled");
     drop(observer);
     terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn answering_an_approval_interrupts_a_passive_wait_in_the_same_step() {
+    let fixture = external_read_fixture();
+    let outside = fixture.primary.parent().unwrap().join("reference.txt");
+    fs::write(&outside, "approved wait fixture text").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tools(vec![
+            ("clock_sleep", json!({"duration_ms":60000})),
+            (
+                "read_file",
+                json!({"directory":"external-file","path":outside.strip_prefix("/").unwrap()}),
+            ),
+        ]),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let mut client = Stdio::start(&fixture, &endpoint.url);
+    let mut init = initialize();
+    init["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
+    waits::call(&mut client, "initialize", init).await;
+    let session = waits::call(
+        &mut client,
+        "session/new",
+        json!({"cwd":fixture.primary,"mcpServers":[]}),
+    )
+    .await["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let accepted = waits::call(
+        &mut client,
+        "_co.grida/session/submit",
+        lifecycle::prompt_request(&session, "first", "Wait while opening the reference."),
+    )
+    .await;
+    endpoint.request().await;
+    waits::tool_started(&mut client, "clock_sleep").await;
+    let turn = &accepted["turnId"];
+    let listed = timeout(WAIT, async {
+        loop {
+            let available = waits::call(
+                &mut client,
+                "_co.grida/session/approvals",
+                json!({"sessionId":session,"turnId":turn}),
+            )
+            .await;
+            if available["approvals"][0]["waitId"].is_string() {
+                break available;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    waits::quiet_for(&mut endpoint, Duration::from_millis(120)).await;
+    let snapshot = waits::snapshot(&mut client, &session).await;
+    waits::call(
+        &mut client,
+        "_co.grida/session/answer-approval",
+        json!({
+            "sessionId":session,"turnId":turn,"waitId":listed["approvals"][0]["waitId"],
+            "requestId":"answer-during-wait","expectedSessionRevision":snapshot["sessionRevision"],
+            "expectedControlRevision":listed["controlRevision"],"decision":"approve_once",
+        }),
+    )
+    .await;
+
+    let continuation = timeout(Duration::from_secs(5), endpoint.request())
+        .await
+        .unwrap();
+    assert_eq!(
+        waits::results(&continuation)
+            .filter(|result| result["structured"]["status"] == "input")
+            .count(),
+        1
+    );
+    assert!(
+        continuation["messages"]
+            .to_string()
+            .contains("approved wait fixture text")
+    );
+    settle(&mut client, &session).await;
+    client.close().await;
     endpoint.done().await;
 }

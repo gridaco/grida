@@ -44,10 +44,11 @@ installed offline adapter inventory. GG list/inspect and generation refresh the
 public GG offering and operation schemas, then show only executable native
 interfaces. An unfiltered model list joins those two inventories. A discovery
 outage fails the GG read without silently substituting a stale model or provider.
-No credential is acquired for public discovery. `--available --provider gg`
-additionally checks cached organization eligibility; it is not a generation or
-provider-access probe. GG generation retains Grida login and organization-scoped
-authority; no separate public GG key is needed.
+Public discovery runs anonymously. `--provider grida --available` checks
+cached organization eligibility. `--provider gg --available` checks only
+whether a standalone key is configured. Generation through `grida` uses a
+scoped grant and the selected Grida organization. Generation through `gg`
+uses its own Media-scoped key directly against the official Gateway.
 
 ## Build and verify
 

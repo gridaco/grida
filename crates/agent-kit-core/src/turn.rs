@@ -23,6 +23,12 @@ pub struct TurnBinding {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JournalPosition(pub u64);
 
+impl JournalPosition {
+    fn is_initial(&self) -> bool {
+        self.0 == 0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ControlRevision(pub u64);
 
@@ -418,6 +424,8 @@ impl CommitReceipt {
 pub struct TurnState {
     binding: TurnBinding,
     position: JournalPosition,
+    #[serde(skip_serializing_if = "JournalPosition::is_initial")]
+    input_activity: JournalPosition,
     controls: ControlSnapshot,
     history: History,
     operations: BTreeMap<OperationId, OperationState>,
@@ -452,6 +460,7 @@ impl TurnState {
             },
             binding,
             position: JournalPosition(0),
+            input_activity: JournalPosition(0),
             history: History::new(),
             operations: BTreeMap::new(),
             waits: BTreeMap::new(),
@@ -467,6 +476,10 @@ impl TurnState {
     }
     pub fn position(&self) -> JournalPosition {
         self.position
+    }
+    /// The journal position of the latest accepted input or interaction decision.
+    pub fn input_activity(&self) -> JournalPosition {
+        self.input_activity
     }
     pub fn controls(&self) -> &ControlSnapshot {
         &self.controls
@@ -543,6 +556,12 @@ impl TurnState {
             return Err(Error::new(
                 ErrorKind::InvalidState,
                 "invalid_control_interruption",
+            ));
+        }
+        if self.input_activity > self.position {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                "invalid_input_activity",
             ));
         }
         self.history.validate()?;
@@ -758,6 +777,10 @@ impl TurnState {
                 "multiple_driver_state_changes",
             ));
         }
+        let resolved = change
+            .actions
+            .iter()
+            .any(|action| matches!(action, JournalAction::ResolveWait { .. }));
         let mut next = self.clone();
         for action in change.actions {
             next.apply_action(action)?;
@@ -766,6 +789,9 @@ impl TurnState {
             JournalPosition(self.position.0.checked_add(1).ok_or_else(|| {
                 Error::new(ErrorKind::LimitExceeded, "journal_position_overflow")
             })?);
+        if resolved || next.history.has_user_input_after(self.history.position()) {
+            next.input_activity = next.position;
+        }
         let record = RecordedPosition {
             change: change.id.clone(),
             binding: next.binding.clone(),
@@ -1092,6 +1118,8 @@ impl<'de> Deserialize<'de> for TurnState {
         struct Data {
             binding: TurnBinding,
             position: JournalPosition,
+            #[serde(default)]
+            input_activity: JournalPosition,
             controls: ControlSnapshot,
             history: History,
             operations: BTreeMap<OperationId, OperationState>,
@@ -1107,6 +1135,7 @@ impl<'de> Deserialize<'de> for TurnState {
         let state = Self {
             binding: value.binding,
             position: value.position,
+            input_activity: value.input_activity,
             controls: value.controls,
             history: value.history,
             operations: value.operations,
@@ -1126,6 +1155,11 @@ pub trait TurnJournal: Send + Sync {
     fn binding(&self) -> &TurnBinding;
     fn load(&self) -> BoxFuture<'_, Result<TurnState>>;
     fn commit(&self, change: JournalChange) -> BoxFuture<'_, Result<CommitReceipt>>;
+    /// Wait for an input or interaction decision committed after this journal position.
+    /// Adapters without external input delivery may leave this pending.
+    fn input_activity_after(&self, _after: JournalPosition) -> BoxFuture<'_, Result<()>> {
+        Box::pin(std::future::pending())
+    }
     fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>>;
 }
 
@@ -1169,18 +1203,32 @@ pub fn bind_lease(
 struct MemoryState {
     state: TurnState,
     listeners: Vec<oneshot::Sender<ControlSnapshot>>,
+    input_listeners: Vec<(JournalPosition, oneshot::Sender<()>)>,
 }
 
 impl MemoryState {
     /// Apply a change and wake control observers when the controls moved.
     fn apply(&mut self, change: JournalChange) -> Result<CommitReceipt> {
         let old = self.state.controls.revision;
+        let input_activity = self.state.input_activity();
         let receipt = self.state.apply(change)?;
         if self.state.controls.revision != old {
             let snapshot = self.state.controls.clone();
             for listener in self.listeners.drain(..) {
                 let _ = listener.send(snapshot.clone());
             }
+        }
+        if self.state.input_activity() > input_activity {
+            let position = self.state.input_activity();
+            let mut pending = Vec::new();
+            for (after, listener) in self.input_listeners.drain(..) {
+                if position > after {
+                    let _ = listener.send(());
+                } else if !listener.is_canceled() {
+                    pending.push((after, listener));
+                }
+            }
+            self.input_listeners = pending;
         }
         Ok(receipt)
     }
@@ -1246,6 +1294,29 @@ impl TurnJournal for MemoryJournal {
                 .apply(change)
         })
     }
+    fn input_activity_after(&self, after: JournalPosition) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let receiver = {
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
+                if inner.state.input_activity() > after {
+                    return Ok(());
+                }
+                inner
+                    .input_listeners
+                    .retain(|(_, sender)| !sender.is_canceled());
+                let (sender, receiver) = oneshot::channel();
+                inner.input_listeners.push((after, sender));
+                receiver
+            };
+            receiver
+                .await
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_closed"))
+        })
+    }
+
     fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
         Box::pin(async move {
             Ok(self
@@ -1310,6 +1381,7 @@ impl EphemeralJournal {
         let inner = Arc::new(Mutex::new(MemoryState {
             state: TurnState::new(binding.clone())?,
             listeners: vec![],
+            input_listeners: vec![],
         }));
         let journal = MemoryJournal {
             binding: binding.clone(),

@@ -18,6 +18,10 @@ vi.mock("../env", () => ({
   EDITOR_BASE_URL: "https://editor.fixture.invalid",
 }));
 vi.mock("./services-sidecar-supervisor", () => ({
+  nativeAgentGatewayApiKeySettings:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayApiKeySettings
+    >(),
   getServicesSidecarInfo: launch.compatibility,
 }));
 

@@ -16,6 +16,10 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 const sidecar = vi.hoisted(() => ({
   selectNativeChat:
     vi.fn<typeof import("./services-sidecar-supervisor").selectNativeChat>(),
+  nativeAgentGatewayApiKeySettings:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayApiKeySettings
+    >(),
   nativeAgentGatewayConnection:
     vi.fn<
       typeof import("./services-sidecar-supervisor").nativeAgentGatewayConnection

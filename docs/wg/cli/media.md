@@ -24,9 +24,9 @@ not need to run, and no Grida agent or Canvas is involved.
 grida ai models list --modality image
 grida ai models list --modality audio
 grida ai models list --modality video --local-image
-grida ai models inspect --provider gg --model openai/gpt-image-2 --json
+grida ai models inspect --provider grida --model openai/gpt-image-2 --json
 
-grida ai generate --provider gg --model openai/gpt-image-2 \
+grida ai generate --provider grida --model openai/gpt-image-2 \
   --org studio --prompt "A blue ceramic teapot" --out ./images
 ```
 
@@ -42,13 +42,15 @@ choosing inputs; a catalogue card does not promise an executable operation.
 | `text-to-speech` | ElevenLabs speech with an explicit voice.                                |
 | `three-d`        | Exact fal text/image contracts returning a primary GLB.                  |
 
-`ai models list` presents bundled executable operations. `--modality` accepts
+`ai models list` presents executable operations. `--modality` accepts
 `image`, `video`, `audio` or `3d`; `--kind` distinguishes the audio operations.
-Staged models remain marked `staged`. Listing and inspection use no credentials,
-network, account storage or provider probes.
+Staged models remain marked `staged`. Listings that include `grida` or `gg`,
+including an unfiltered list, read the public Gateway catalogue over the
+network. Inspecting either provider also uses live discovery. Other providers
+use bundled descriptors. Standard listing and inspection require no credentials.
 
 Listing shows each operation's accepted local-image flags; JSON rows include
-`local_image_flags` (`--reference`, `--image`, or an empty list). `--local-image`
+`local_image_flags` (`--reference`, `--image`, `--file`, or an empty list). `--local-image`
 filters to operations accepting a local image in either form and combines with
 the other filters. This is derived from the selected input schema, not provider
 or model names; it establishes supported input, not provider access.
@@ -161,8 +163,9 @@ BYOK needs no Grida login. Configure a shared key with
 `grida ai providers configure fal`, or supply an invocation-only environment key
 or `--key-stdin`. Desktop and CLI share `providers/credentials.toml` under Grida
 home; the [custody contract](./credential-custody.md#provider-credentials) owns
-configuration, removal, platform support and migration. GG requires a separate
-native CLI login and organization.
+configuration, removal, platform support and migration. The `grida` provider
+uses a separate native CLI login and organization. The `gg` provider uses a
+standalone Grida Gateway API key.
 
 | Provider     | Explicit environment slot |
 | ------------ | ------------------------- |
@@ -202,12 +205,12 @@ filter requires a provider:
 
 ```sh
 grida ai models list --provider fal --available
-grida ai models list --provider gg --org studio --available
+grida ai models list --provider grida --org studio --available
 ```
 
-For BYOK, `--available` includes routes with a configured key. For GG, it reads
-the selected organization's cached credit eligibility and includes routes when
-the existing gate allows them. Results report the basis and keep provider access
+For API-key providers, including `gg`, `--available` includes routes with a
+configured key. For `grida`, it reads the selected organization's cached credit
+eligibility and includes routes when the existing gate allows them. Results report the basis and keep provider access
 `unverified`. Missing keys or a blocked gate produce an empty filtered list;
 failed account reads remain errors rather than a claim of no access.
 
@@ -299,17 +302,18 @@ and billing modes; native execution therefore follows the endpoint's provider
 billing rules. It never spends Grida credits. See [input definitions](https://fal.ai/docs/documentation/development/handle-inputs-and-outputs)
 and [deployment modes](https://fal.ai/docs/documentation/deployment/deploy-to-production).
 
-**GG remains curated.** An unknown GG model fails. Native provider execution is
-selected by the user, not triggered automatically by a GG failure. A failed
-native request never retries through GG.
+Direct Gateway execution uses the current public offering and the operations the
+installed adapter can execute. An unknown Gateway model fails before execution.
+Only an explicit provider selection can give a request a different credential
+or funding source.
 
 ## Planned: detached jobs and lifecycle commands
 
 Job IDs remain useful after a command exits. Expose later status/result/cancel
 commands only where the adapter supports them. Timing out or stopping a local
 wait does not prove upstream cancellation; never automatically resubmit a
-possibly accepted paid request. Current GG routes need additional lifecycle
-support before detached execution can be promised. None of this requires
+possibly accepted paid request. Standalone Gateway job IDs support later status and original result retrieval.
+A local timeout leaves the original job running or awaiting reconciliation. None of this requires
 Grida Desktop or a local agent loop.
 
 ## Choices to ratify

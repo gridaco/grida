@@ -1,4 +1,4 @@
-use crate::messages::{Content, Message};
+use crate::messages::{Content, Message, Role};
 use crate::{Error, ErrorKind, MessageId, Result, ToolCallId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -59,6 +59,14 @@ impl History {
     pub fn records(&self) -> &[HistoryRecord] {
         &self.records
     }
+    /// Whether this journal contains user input beyond the given request basis.
+    pub fn has_user_input_after(&self, after: HistoryPosition) -> bool {
+        self.records.iter().enumerate().any(|(index, record)| {
+            let HistoryRecord::Message(message) = record;
+            index as u64 >= after.0 && message.role == Role::User
+        })
+    }
+
     pub fn selection(&self) -> HistorySelection {
         HistorySelection {
             start: HistoryPosition(0),

@@ -1,0 +1,6 @@
+Usage: grida ai jobs get --provider gg --job-id ID [--out DIRECTORY] [--key-stdin] [--json]
+
+Reads a job from the official Gateway using a media-scoped API key. With --out,
+save the available result to a new directory. This command submits no work.
+
+Documentation: https://grida.co/docs/cli/generate

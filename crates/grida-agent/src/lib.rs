@@ -24,6 +24,7 @@ pub mod skills;
 mod supervised_provider;
 pub mod surface_tools;
 pub mod tool_host;
+mod waiting;
 pub mod workspace;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub mod workspace_file;

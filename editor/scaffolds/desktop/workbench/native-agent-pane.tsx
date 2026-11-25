@@ -851,20 +851,22 @@ function NativeChatPane({
   const selectedProfile =
     state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
     state.profiles?.choices.find((p) => p.id === state.profiles?.active);
-  const measuredContext = turn_activity.measuredContext(state.turnRecords);
-  const contextWindow =
-    measuredContext?.window ??
+  const modelCapacity =
     selectedProfile?.contextWindow ??
     (state.profiles?.active === null
       ? state.profiles.defaultContextWindow
       : undefined);
+  const recordedContext = turn_activity.contextUsage(
+    state.turnRecords,
+    modelCapacity
+  );
   const contextUsage = computeContextUsage(
     state.messages.map((message) => ({
       role: message.role,
       parts: [{ type: "text", text: message.text }],
     })),
-    contextWindow,
-    measuredContext?.tokens
+    recordedContext?.window,
+    recordedContext?.tokens
   );
   const blocks = turn_activity.group(
     state.messages,

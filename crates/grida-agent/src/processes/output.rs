@@ -77,6 +77,7 @@ pub(super) fn highest_number(text: &str) -> u64 {
 /// Where the process stands at the end of an interaction.
 pub(super) enum Standing<'a> {
     Running(u64),
+    WaitInterrupted(u64),
     Ended(&'a Ending),
 }
 
@@ -91,6 +92,10 @@ pub(super) fn render(
     let mut header = vec![format!("Wall time: {:.4} seconds", wall.as_secs_f64())];
     match standing {
         Standing::Running(id) => header.push(format!("Process running with {NUMBER_LABEL}{id}")),
+        Standing::WaitInterrupted(id) => {
+            header.push(format!("Process running with {NUMBER_LABEL}{id}"));
+            header.push("Wait interrupted by new input.".into());
+        }
         Standing::Ended(ending) => {
             match (ending.completion, ending.stopped) {
                 (_, Some(StopReason::Deadline)) => {
@@ -156,11 +161,11 @@ pub(super) fn outcome(
         content: vec![ResultContent::Text(render(wall, standing, output, budget))],
         structured: match standing {
             Standing::Ended(ending) => Some(ending.details.clone()),
-            Standing::Running(_) => None,
+            Standing::Running(_) | Standing::WaitInterrupted(_) => None,
         },
         receipt: match standing {
             Standing::Ended(ending) => Some(crate::command::receipt(&ending.details)),
-            Standing::Running(_) => None,
+            Standing::Running(_) | Standing::WaitInterrupted(_) => None,
         },
         truncated: false,
     };

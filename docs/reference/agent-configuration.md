@@ -28,16 +28,17 @@ model_auto_compact_token_limit = 48000
 | `model_context_window`           | Context capacity used for usage and compaction | Optional integer from `1` through `9007199254740991` |
 | `model_auto_compact_token_limit` | Token usage that triggers automatic compaction | Optional integer from `1` through `9007199254740991` |
 
-The effective window is the smaller of the known model window and the
-configured value when both exist. A configured window supplies the capacity
-when model metadata is unavailable. With a window, the automatic threshold
-defaults to 90% rounded down, with a minimum of one token. An explicit
-threshold can lower that value. With an unknown window, an explicit
-threshold can still trigger compaction.
+The working window defaults to 272,000 tokens, bounded by the selected route’s
+context capacity. An explicit window can raise or lower the default within
+that capacity. When the capacity is unknown, the ceiling is 272,000 tokens.
+The automatic threshold defaults to 90% of the working window, rounded down
+to at least one token. An explicit threshold can lower that value. The host
+captures both values with each accepted input, including queued inputs.
 
 The host uses reported foreground context use where available and estimates
-the rest. It may summarize older chat material before a turn and earlier
-tool exchanges during a turn. The current user messages and the visible
+the rest. It may summarize older chat material before a turn, including when
+resuming a conversation with `grida agent run --session`. It can also
+summarize earlier tool exchanges during a turn. The current user messages and the visible
 transcript stay available. These settings govern when compaction is attempted.
 The provider enforces the request's actual capacity.
 

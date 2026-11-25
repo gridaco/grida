@@ -377,6 +377,8 @@ export type NativeChatProfileCatalog = Readonly<{
     | "keyRejected"
     | "modelsForbidden"
     | "noCompatibleModels";
+  /** Discovery status for the configured standalone Gateway connection. */
+  gatewayApiKeyIssue?: "unavailable" | "noCompatibleModels";
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */

@@ -18,6 +18,7 @@
 "use client";
 
 import {
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -74,6 +75,7 @@ import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { Source } from "@app/ui/ai-elements/sources";
 import { ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
+import { CollapsibleContent } from "@app/ui/components/collapsible";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
@@ -95,6 +97,7 @@ import {
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 import { workspace_links } from "./workspace-links";
+import { reply_images } from "./reply-images";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import { AttachmentImagePreview } from "./attachment-image-preview";
 import { EditorSelectionIndicator } from "./editor-selection-indicator";
@@ -423,19 +426,7 @@ export function ChatMessageView({
       <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {
-            return (
-              <MessageResponse
-                key={group.key}
-                className={markdown.className}
-                controls={markdown.controls}
-                lineNumbers={false}
-                plugins={markdown.plugins}
-                rehypePlugins={markdown.rehypePlugins}
-                components={markdown.components}
-              >
-                {group.text}
-              </MessageResponse>
-            );
+            return <AssistantMessageText key={group.key} text={group.text} />;
           }
           return (
             <ToolCallGroupView
@@ -479,6 +470,20 @@ export function ChatMessageView({
         </MessageActions>
       )}
     </Message>
+  );
+}
+
+function AssistantMessageText({ text }: { text: string }) {
+  const resolve = useContext(reply_images.Workspace);
+  const sources = useContext(reply_images.WebSources);
+  return (
+    <MessageResponse
+      {...markdown}
+      {...((resolve || sources) && reply_images.markdown)}
+      lineNumbers={false}
+    >
+      {text}
+    </MessageResponse>
   );
 }
 
@@ -891,14 +896,13 @@ export function PendingTurnIndicator({
   );
 }
 
-const compactionRowClassName =
-  "flex w-fit items-center gap-2 text-sm text-muted-foreground";
+const activityRowClassName =
+  "flex items-center gap-2 text-muted-foreground text-xs";
 
 export function CompactionProgress() {
   return (
-    <div role="status" className={cn(compactionRowClassName, "select-none")}>
-      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
-      <Shimmer as="span">Compacting context</Shimmer>
+    <div role="status" className={cn(activityRowClassName, "select-none")}>
+      <ActivityLabel icon={ScrollTextIcon} title="Compacting context" shimmer />
     </div>
   );
 }
@@ -918,31 +922,22 @@ export function CompactionNotice({
     : elapsedMs === undefined
       ? "Context compacted"
       : `Context compacted · ${formatElapsed(Math.floor(elapsedMs / 1000))}`;
-  const marker = (
-    <>
-      <ScrollTextIcon aria-hidden className="size-4 shrink-0" />
-      {label}
-    </>
-  );
-  if (!summary) return <div className={compactionRowClassName}>{marker}</div>;
-  return (
-    <details className="group/compaction w-full">
-      <summary
-        className={cn(
-          compactionRowClassName,
-          "cursor-pointer list-none transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
-        )}
-      >
-        {marker}
-        <ChevronRightIcon
-          aria-hidden
-          className="size-3 shrink-0 opacity-0 transition-[opacity,rotate] group-open/compaction:rotate-90 group-open/compaction:opacity-100 group-hover/compaction:opacity-100 group-focus-within/compaction:opacity-100"
-        />
-      </summary>
-      <div className="mt-2 whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs leading-5 text-foreground/80">
-        {summary}
+  if (!summary) {
+    return (
+      <div className={activityRowClassName}>
+        <ActivityLabel icon={ScrollTextIcon} title={label} />
       </div>
-    </details>
+    );
+  }
+  return (
+    <Task defaultOpen={false} className="w-full">
+      <TaskTrigger title={label}>
+        {triggerRow(ScrollTextIcon, label)}
+      </TaskTrigger>
+      <CollapsibleContent className="mt-2 whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs leading-5 text-foreground/80">
+        {summary}
+      </CollapsibleContent>
+    </Task>
   );
 }
 
@@ -1132,15 +1127,40 @@ function triggerRow(
   return (
     <button
       type="button"
-      className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-left text-muted-foreground text-xs transition-colors hover:text-foreground"
+      className={cn(
+        activityRowClassName,
+        "group/tool-trigger w-full cursor-pointer text-left transition-colors hover:text-foreground"
+      )}
     >
-      {options?.busy ? (
+      <ActivityLabel icon={Icon} title={title} {...options} />
+      <ChevronRightIcon
+        aria-hidden
+        className="size-3 shrink-0 opacity-0 transition-[opacity,transform] duration-150 group-hover/tool-trigger:opacity-50 group-focus-visible/tool-trigger:opacity-50 group-data-[state=open]/tool-trigger:rotate-90 motion-reduce:transition-none"
+      />
+    </button>
+  );
+}
+
+function ActivityLabel({
+  icon: Icon,
+  title,
+  busy,
+  shimmer,
+}: {
+  icon: LucideIcon;
+  title: string;
+  busy?: boolean;
+  shimmer?: boolean;
+}) {
+  return (
+    <>
+      {busy ? (
         <ToolActivitySpinner className="size-3.5 shrink-0" />
       ) : (
-        <Icon className="size-3.5 shrink-0" />
+        <Icon aria-hidden className="size-3.5 shrink-0" />
       )}
       <span className="min-w-0 truncate">
-        {options?.shimmer ? (
+        {shimmer ? (
           <Shimmer as="span" className="max-w-full truncate align-bottom">
             {title}
           </Shimmer>
@@ -1148,8 +1168,7 @@ function triggerRow(
           title
         )}
       </span>
-      <ChevronRightIcon className="size-3 shrink-0 opacity-0 transition-[opacity,transform] duration-150 group-hover/tool-trigger:opacity-50 group-focus-visible/tool-trigger:opacity-50 group-data-[state=open]/tool-trigger:rotate-90 motion-reduce:transition-none" />
-    </button>
+    </>
   );
 }
 

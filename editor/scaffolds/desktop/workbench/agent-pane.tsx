@@ -13,7 +13,12 @@
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@app/ui/lib/utils";
-import { useDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
+import {
+  useDesktopBridge,
+  workspaces,
+  type Workspace,
+} from "@/lib/desktop/bridge";
+import { reply_images } from "@/kits/agent-chat/reply-images";
 import type { NativeChatEditorSurfaces } from "@/lib/agent-chat/native-chat-controller";
 import type { SideChatPlacement } from "./side-chat-placement";
 import type { SubagentPlacement } from "./subagent-placement";
@@ -54,6 +59,14 @@ export function AgentPane({
   const chat = bridge?.nativeChat;
   // Read per workspace; the chat takes the complete request when it sends.
   const workspaceId = workspace.id;
+  const workspaceRoot = workspace.root;
+  const resolveImage = useMemo(
+    () =>
+      reply_images.workspaceResolver(workspaceRoot, (path) =>
+        workspaces.mediaUrl(workspaceId, path)
+      ),
+    [workspaceId, workspaceRoot]
+  );
   const firstMessage = useMemo<NativeFirstMessage | undefined>(() => {
     const pending = initialSession
       ? null
@@ -98,20 +111,22 @@ export function AgentPane({
         </p>
       )}
       {chat && ready && (
-        <NativeAgentPaneGate
-          key={workspace.id}
-          bridge={chat}
-          selectionKey={workspace.id}
-          workspaceId={workspace.id}
-          workingDirectory={workspace.root}
-          initialSession={initialSession}
-          editorSurfaces={surfaceHost}
-          sideChatPlacement={sideChatPlacement}
-          subagentPlacement={subagentPlacement}
-          firstMessage={firstMessage}
-          onProjectOnly={onProjectOnly}
-          onProcessesChange={onProcessesChange}
-        />
+        <reply_images.Workspace value={resolveImage}>
+          <NativeAgentPaneGate
+            key={workspaceId}
+            bridge={chat}
+            selectionKey={workspaceId}
+            workspaceId={workspaceId}
+            workingDirectory={workspaceRoot}
+            initialSession={initialSession}
+            editorSurfaces={surfaceHost}
+            sideChatPlacement={sideChatPlacement}
+            subagentPlacement={subagentPlacement}
+            firstMessage={firstMessage}
+            onProjectOnly={onProjectOnly}
+            onProcessesChange={onProcessesChange}
+          />
+        </reply_images.Workspace>
       )}
     </div>
   );

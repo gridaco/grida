@@ -130,16 +130,20 @@ fn signal_change(file: &File) {
 
 /// Mirrors the lifetime of the journal handle across process boundaries. The
 /// OS releases the lock on process death, even if the path survives the writer.
-pub(super) struct TurnOwner(Option<(File, PathBuf)>);
+pub(super) struct TurnOwner {
+    lease: Option<(File, PathBuf)>,
+    pub(super) input_activity: tokio::sync::watch::Sender<JournalPosition>,
+}
 
 impl TurnOwner {
-    pub(super) fn acquire(
-        inner: &Inner,
-        tx: &Transaction<'_>,
-        binding: &TurnBinding,
-    ) -> Result<Self> {
+    pub(super) fn acquire(inner: &Inner, tx: &Transaction<'_>, state: &TurnState) -> Result<Self> {
+        let binding = state.binding();
+        let input_activity = tokio::sync::watch::Sender::new(state.input_activity());
         let Some(marker) = &inner.catalog_marker else {
-            return Ok(Self(None));
+            return Ok(Self {
+                lease: None,
+                input_activity,
+            });
         };
         let public: bool = tx
             .prepare_cached("SELECT conversation_group IS NOT NULL FROM sessions WHERE id=?1")
@@ -147,15 +151,22 @@ impl TurnOwner {
             .query_row([binding.session.as_str()], |row| row.get(0))
             .map_err(database_error)?;
         if !public {
-            return Ok(Self(None));
+            return Ok(Self {
+                lease: None,
+                input_activity,
+            });
         }
         // A recovered claim can keep the same active_turn. Wake after its
         // new binding is committed as well as when the lease disappears.
         Marker::stage_turn(tx, &binding.session)?;
-        Self::publish(&marker.leases, binding)
+        let lease = Self::publish(&marker.leases, binding)?;
+        Ok(Self {
+            lease: Some(lease),
+            input_activity,
+        })
     }
 
-    fn publish(leases: &LeaseFiles, binding: &TurnBinding) -> Result<Self> {
+    fn publish(leases: &LeaseFiles, binding: &TurnBinding) -> Result<(File, PathBuf)> {
         // The store serializes claims under its writer lock. Lock a private
         // staging inode first; an observer of an older SQLite snapshot can
         // never contend with a new claim, even if a deleted identity is reused.
@@ -166,13 +177,13 @@ impl TurnOwner {
             .map_err(|_| error(ErrorKind::Conflict, "turn_still_owned"))?;
         std::fs::rename(staging, &path)
             .map_err(|_| error(ErrorKind::Unavailable, "catalog_lease_unavailable"))?;
-        Ok(Self(Some((file, path))))
+        Ok((file, path))
     }
 }
 
 impl Drop for TurnOwner {
     fn drop(&mut self) {
-        if let Some((file, path)) = &self.0 {
+        if let Some((file, path)) = &self.lease {
             let _ = std::fs::remove_file(path);
             let _ = file.unlock();
         }

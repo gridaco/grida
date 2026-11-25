@@ -4,13 +4,14 @@
  *
  * Pins: set→status→clear roundtrip (status never echoes the token),
  * validation 400s (empty token, past expiry), and the DELIBERATE gate
- * split — `/secrets/set` keeps REJECTING the hosted provider's id (nobody may store a key under the
- * hosted provider's id).
+ * split — scoped grants stay in memory and standalone keys use the shared
+ * provider slot on platforms that support it.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { registerGridaAuthRoutes } from "./gg-auth";
 import { registerSecretsRoutes } from "./secrets";
+import { isKnownProviderId } from "../../providers/endpoints";
 import { GridaGatewaySessionStore } from "../../providers/gg-session";
 import type { SecretsStore } from "@grida/daemon/server";
 
@@ -94,19 +95,79 @@ describe("/auth/gg/*", () => {
 });
 
 describe("secrets boundary split (GRIDA-SEC-006)", () => {
-  it("/secrets/set keeps rejecting the grida id", async () => {
-    const secretsApp = new Hono();
-    registerSecretsRoutes(secretsApp, {
+  const key = "sk-gg-v1-synthetic";
+  let keys: Map<string, string>;
+
+  beforeEach(() => {
+    keys = new Map();
+    registerSecretsRoutes(app, {
       store: {
-        has: async () => false,
-        set: async () => {},
+        has: async (id: string) => keys.has(id),
+        set: async (id: string, value: string) => void keys.set(id, value),
+        delete: async (id: string) => void keys.delete(id),
       } as unknown as SecretsStore,
     });
-    const res = await secretsApp.request("/secrets/set", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider_id: "gg", key: "sneaky" }),
-    });
-    expect(res.status).toBe(400);
   });
+
+  it("rejects scoped grants in the standalone slot and standalone keys in scoped custody", async () => {
+    const write = await post("/secrets/set", {
+      provider_id: "gg",
+      key: "synthetic.scoped.grant",
+    });
+    expect(write.status).toBe(400);
+    expect(keys.size).toBe(0);
+
+    const grant = await post("/auth/gg/set", {
+      access_token: ` ${key} `,
+      expires_at: Date.now() + 1000,
+    });
+    expect(grant.status).toBe(400);
+    expect(store.getAccessToken()).toBeNull();
+  });
+
+  it.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "uses the shared standalone slot without registering a generic provider or returning the key",
+    async () => {
+      const selection = { provider_id: "gg" };
+      expect(await isKnownProviderId(selection.provider_id)).toBe(false);
+      const write = await post("/secrets/set", {
+        ...selection,
+        key: ` ${key} `,
+      });
+      expect(write.status).toBe(200);
+      expect(await write.json()).toEqual({ ok: true });
+      expect(keys.get("gg")).toBe(key);
+      for (const invalid of [
+        "sk-gg-v1-",
+        "sk-gg-v1-bad key",
+        "　".repeat(1366) + key,
+      ]) {
+        expect(
+          (await post("/secrets/set", { ...selection, key: invalid })).status
+        ).toBe(400);
+        expect(keys.get("gg")).toBe(key);
+      }
+      expect(await (await post("/secrets/has", selection)).json()).toEqual({
+        has: true,
+      });
+      expect((await post("/secrets/get", selection)).status).toBe(404);
+      expect(await (await post("/secrets/delete", selection)).json()).toEqual({
+        ok: true,
+      });
+      expect(await (await post("/secrets/has", selection)).json()).toEqual({
+        has: false,
+      });
+      expect(store.getAccessToken()).toBeNull();
+    }
+  );
+
+  it.skipIf(process.platform === "darwin" || process.platform === "linux")(
+    "keeps the standalone slot unavailable without shared provider custody",
+    async () => {
+      expect(
+        (await post("/secrets/set", { provider_id: "gg", key })).status
+      ).toBe(400);
+      expect(keys.size).toBe(0);
+    }
+  );
 });
