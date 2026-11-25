@@ -1825,6 +1825,7 @@ pixels through this reader, with no additional filesystem or model grant.
   [crates/grida-ai/src/lib.rs](crates/grida-ai/src/lib.rs),
   [crates/grida-ai/src/media.rs](crates/grida-ai/src/media.rs),
   [crates/grida-ai/src/sse.rs](crates/grida-ai/src/sse.rs),
+  [standalone Gateway media](crates/grida-ai/src/standalone.rs),
   [crates/grida-ai/src/tripo.rs](crates/grida-ai/src/tripo.rs).
   These preserve this boundary. Rust conformance adapters, where present, are
   feature-gated and excluded from the distributed executable.
@@ -4038,15 +4039,17 @@ generation receipts without a fixed projection.
    use the published field type, then the same normative SDK parser as JSON. It
    accepts no literal key argument, custom provider origin or raw provider-option
    passthrough. In execution commands, `--key-stdin` cannot share stdin with
-   JSON/text or select GG. Bundled `MediaOperations` descriptors and the SDK's
+   JSON/text or select the signed-in `grida` provider. Direct Gateway files use
+   explicit command-line flags, including `--file` alongside JSON for named
+   multipart fields. Bundled `MediaOperations` descriptors and the SDK's
    normative parser establish the exact executable route and validate JSON
    before credential custody is opened.
    Ordinary listing/inspection needs no credential or network. An availability
    filter reports key presence or cached organization eligibility explicitly;
    neither establishes provider access or generation success.
-2. **Invocation-owned credentials.** `ProviderCredentials` reads the five
+2. **Invocation-owned credentials.** `ProviderCredentials` reads the six
    named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
-   `FAL_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`), an explicitly allocated stdin key, or the
+   `FAL_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`, `GG_API_KEY`), an explicitly allocated stdin key, or the
    shared provider owner under GRIDA-SEC-014. Execution
    inspects only its selected provider. Provider settings also admit the
    standalone Grida Gateway key (`GG_API_KEY`) for shared-store consumers.
@@ -4062,7 +4065,7 @@ generation receipts without a fixed projection.
    trusted SDK key reader receives secret strings. Status projects presence and
    source and plaintext storage mode; disposal drops private references. Explicit
    configure/remove commands mutate shared custody without opening account auth.
-   Native GG execution obtains an org-bound grant through
+   The `grida` provider obtains an org-bound grant through
    the auth owner's guarded fixed exchange into invocation-owned media authority
    without opening a BYOK reader. The media transport never receives the account JWT.
 3. **Destination-bound egress.** The native HTTP owner admits credential-bearing requests
@@ -4081,7 +4084,10 @@ generation receipts without a fixed projection.
    caller-selected Host header. Each connection and download redirect resolves
    fresh DNS, rejects the entire answer if any address is non-public, and pins one
    validated address for the native connection while retaining the original TLS
-   hostname and certificate verification, including hosted GG. The explicitly selected local GG fixture is the sole
+   hostname and certificate verification, including hosted GG. The direct
+   `gg` provider has a separate HTTPS allowlist on `gateway.grida.ai` for the
+   supported media POST routes and GET `/v1/jobs/{id}`. Its credential is
+   distinct from the Grida grant and is never sent to discovery or download. The explicitly selected local GG fixture is the sole
    private-address exception. Direct requests use no ambient fetch, proxy agent,
    cookie jar or pooled connection. Header/body sizes, DNS/connect time, total
    request lifetime and streamed responses are bounded; SDK-specific limits may
@@ -4110,7 +4116,13 @@ generation receipts without a fixed projection.
    regular file once and have a 30-second lifetime including open/stat; late opens
    are closed after cancellation. No path is expanded from JSON/text, no image is
    transcoded, and no URL is fetched as input. HTTPS inputs pass through only under
-   the SDK's declared input contract; local files are encoded inline. A new private output directory
+   the SDK's declared input contract. Direct Gateway sends bounded multipart
+   inputs with at most 81 MiB total, 20,000,000 bytes per image and 60,000,000
+   bytes per mesh. It records the submission identity and public input schema
+   before sending. Explicit replay reconstructs the body from user-selected
+   inputs and matches the original route, body digest and key fingerprint.
+   Receipts store no input contents or credentials. Read-only recovery uses
+   the original job ID. A new private output directory
    must have an existing parent. Before opening keys or account custody, a probe
    exercises the same exclusive write/fsync/hard-link publication used for results.
    Saving checks the reserved directory's identity, writes private temporary
@@ -4180,6 +4192,9 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [Input lowering](crates/grida-cli/src/input.rs), [file grants/publication](crates/grida-cli/src/files.rs),
   [credential selection](crates/grida-cli/src/credentials.rs), [domain errors](crates/grida-cli/src/error.rs)
   and [runtime](crates/grida-cli/src/runtime.rs) retain preflight, explicit authority and paid-result publication.
+  [Standalone Gateway replay](crates/grida-cli/src/runtime/gateway.rs) keeps
+  the original submission identity, bounds local input, and validates the
+  replay contract before sending to the fixed Gateway origin.
 - Rust [HTTP adapter](crates/grida-cli/src/http.rs), [bounded framing guard](crates/grida-cli/src/http_wire.rs)
   and [transport tests](crates/grida-cli/src/http_tests.rs): one admitted connection, all-address DNS validation,
   original-name TLS, no proxy/pool/retry, credential-free redirects and owned bounded response bytes.
@@ -4238,9 +4253,9 @@ The CLI rigging entry and its boundary tests are
 [command runtime](crates/grida-cli/src/runtime.rs) and
 [installed acceptance proof](scripts/cli-contracts/installed.mjs).
 They consume the neutral rigging SDK with explicit CLI file grants and a chosen
-BYOK or GG funding source. GG requires explicit organization selection and the
-existing native account exchange into invocation-only scoped authority; it never
-inspects BYOK keys or falls back to them. `ai rigging check` returns structured
+funding source. The signed-in `grida` provider uses the existing native account
+exchange into invocation-only organization-scoped authority. The direct `gg`
+provider uses its Gateway API key on the fixed public routes. `ai rigging check` returns structured
 eligibility; `ai rigging run` is the explicit paid submission and publishes GLB bytes through the existing safe
 output directory. `--mesh` snapshots one regular file under the SDK's
 60,000,000-byte bound; JSON input retains its 16 MiB limit. Syntax, mesh/options
@@ -4292,6 +4307,14 @@ never credentials or grants, and inherit the native/Desktop data-root tool
 denials. Preparing an attached image does not broaden those denials or the
 separate generation-reference transfer contract. Existing account/provider
 custody and captured dispatch authority remain unchanged.
+
+The [standalone Gateway chat connection](desktop/src/main/native-gateway-api-key.ts)
+reads the shared `gg` key in Electron Main and captures its identity for the
+selected model. The [Main-only network policy](desktop/src/provider-network-policy.ts)
+admits only the official Gateway Chat Completions POST. The renderer and native
+worker receive the connection identity without the key. Opening or resuming
+work checks the captured key before dispatch.
+[Custody and route test](desktop/src/main/native-gateway-api-key.test.ts)
 
 **What it protects.** Independent native applications share BYOK API keys in one
 private plaintext TOML authority per Grida home. Account OAuth (GRIDA-SEC-010),
@@ -4506,6 +4529,9 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [supervised provider transport](crates/grida-agent/src/supervised_provider.rs),
   [private Desktop broker](desktop/src/main/native-provider-egress.ts),
   [Desktop provider selection](desktop/src/main/native-provider-selection.ts),
+  [standalone Gateway chat custody](desktop/src/main/native-gateway-api-key.ts),
+  [standalone Gateway chat fixtures](desktop/src/main/native-gateway-api-key.test.ts),
+  [standalone Gateway CLI custody](crates/grida-cli/src/runtime/gateway.rs),
   [OpenAI project discovery](desktop/src/main/native-openai-models.ts),
   [OpenAI discovery fixtures](desktop/src/main/native-openai-models.test.ts),
   [Desktop stored-key fixtures](desktop/src/main/native-provider-selection.test.ts),

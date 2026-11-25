@@ -38,7 +38,7 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { catalog as models } from "@grida/ai/catalogue";
 import { OPENAI_PROJECT_PROVIDER_ID } from "@grida/ai-host";
-import { OllamaLogo, OpenAILogo } from "@grida/react-icons/logos";
+import { GridaLogo, OllamaLogo, OpenAILogo } from "@grida/react-icons/logos";
 import {
   DesktopBridgeMissingError,
   getDesktopBridge,
@@ -184,6 +184,13 @@ export default function DesktopSettingsPage() {
                 onKeyChanged={onProviderKeyChanged}
                 leading={<ChatGptProviderRow />}
               >
+                {bridge?.caps?.native.gg_api_key && (
+                  <ByokRow
+                    providerId="gg"
+                    openAiImages={false}
+                    onKeyChanged={onProviderKeyChanged}
+                  />
+                )}
                 <OllamaProviderRow />
               </ProviderList>
             </SettingsSection>
@@ -460,7 +467,7 @@ function AccountSection() {
 type ProviderModality = "text" | "image" | "video";
 
 const BYOK_PROVIDER_SETUP: Record<
-  ByokProviderId,
+  ByokProviderId | "gg",
   {
     label: string;
     article: "an" | "a";
@@ -491,6 +498,14 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleHref: "https://platform.openai.com/api-keys",
     placeholder: "sk-proj-…",
     note: "Chat usage is billed to your OpenAI project. A restricted key needs permission to list models and create Responses.",
+  },
+  gg: {
+    label: "Grida Gateway · API key",
+    article: "an",
+    consoleLabel: "Grida Gateway in Console",
+    consoleHref: "https://console.grida.co/_/ai-gateway",
+    placeholder: "sk-gg-v1-…",
+    note: "Chat uses the organization billed by this key. The key needs Text access.",
   },
   fal: {
     label: "fal",
@@ -572,7 +587,7 @@ function ProviderList({
         {byokProviders.map((provider) => (
           <ByokRow
             key={provider.id}
-            provider={provider}
+            providerId={provider.id}
             openAiImages={openAiImages}
             onKeyChanged={onKeyChanged}
           />
@@ -592,15 +607,14 @@ type RowState =
   | { kind: "error"; message: string; previous: "empty" | "configured" };
 
 function ByokRow({
-  provider,
+  providerId,
   openAiImages,
   onKeyChanged,
 }: {
-  provider: ByokProviderMetadata;
+  providerId: ByokProviderId | "gg";
   openAiImages: boolean;
   onKeyChanged?: () => void;
 }) {
-  const providerId = provider.id;
   // Several providers appear in both the LLM and media cards, so assigning an
   // id to every row would create duplicate hash targets. ElevenLabs and Tripo
   // each have one media row and their own feature setup destination.
@@ -610,6 +624,7 @@ function ByokRow({
       : undefined;
   const setup = BYOK_PROVIDER_SETUP[providerId];
   const label = setup.label;
+  const providerName = providerId === "gg" ? "Grida Gateway" : label;
   const openAi = providerId === OPENAI_PROJECT_PROVIDER_ID;
   const note =
     openAi && openAiImages
@@ -679,7 +694,7 @@ function ByokRow({
   const handleRemove = useCallback(async () => {
     let confirmed = false;
     try {
-      confirmed = await secrets.confirmDeleteKey(providerId, label);
+      confirmed = await secrets.confirmDeleteKey(providerId, providerName);
     } catch (err) {
       setState({
         kind: "error",
@@ -702,7 +717,7 @@ function ByokRow({
         previous: "configured",
       });
     }
-  }, [providerId, label, refresh, onKeyChanged]);
+  }, [providerId, providerName, refresh, onKeyChanged]);
 
   const handleErrorDismiss = useCallback(() => {
     void refresh();
@@ -726,7 +741,11 @@ function ByokRow({
           className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
-            <ProviderLogo providerId={providerId} label={label} />
+            {providerId === "gg" ? (
+              <GridaLogo className="size-5 shrink-0" />
+            ) : (
+              <ProviderLogo providerId={providerId} label={label} />
+            )}
             <span className="truncate text-base font-medium">{label}</span>
             {statusKind === "configured" && (
               <CheckIcon className="size-4 shrink-0 text-emerald-600" />
@@ -749,7 +768,7 @@ function ByokRow({
               ? openAi
                 ? "Your OpenAI project key is saved."
                 : `${label} is connected.`
-              : `To use Grida with ${label}, add ${setup.article} API key.`}
+              : `To use Grida with ${providerName}, add ${setup.article} API key.`}
           </p>
           {note && <p className="mt-2">{note}</p>}
           {statusKind !== "configured" && (

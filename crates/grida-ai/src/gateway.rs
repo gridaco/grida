@@ -5,13 +5,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-const ORIGIN: &str = "https://gateway.grida.ai";
+pub(crate) const ORIGIN: &str = "https://gateway.grida.ai";
 const LIMIT: usize = 2 * 1024 * 1024;
 
 /// Current public offerings intersected with native interfaces. Model identity is
 /// data; supporting a new wire protocol still requires a client release.
 pub struct GatewayCatalogue {
     operations: Vec<Value>,
+    standalone: Vec<Value>,
     pub revision: String,
     rigging: BTreeMap<String, Value>,
 }
@@ -38,6 +39,7 @@ impl GatewayCatalogue {
         }
         let mut seen = BTreeSet::new();
         let mut operations = Vec::new();
+        let mut standalone = Vec::new();
         let mut schema_budget = 8 * 1024 * 1024;
         for entry in entries {
             let Some(model_id) = entry["model_id"].as_str() else {
@@ -60,7 +62,12 @@ impl GatewayCatalogue {
             {
                 continue;
             }
-            if entry["content_type"] != "application/json" || entry["request_view"] != "json" {
+            let json_request =
+                entry["content_type"] == "application/json" && entry["request_view"] == "json";
+            let edit_request = entry["content_type"] == "multipart/form-data"
+                && entry["request_view"] == "normalized_multipart"
+                && entry["path"] == "/v1/images/edits";
+            if !json_request && !edit_request {
                 continue;
             }
             let kind = entry["kind"].as_str().unwrap_or("");
@@ -139,7 +146,14 @@ impl GatewayCatalogue {
             if kind == "three-d" {
                 descriptor["feature"] = json!("model-generation");
             }
-            operations.push(descriptor);
+            if matches!(kind, "image" | "video" | "three-d")
+                && (edit_request || interface != "images.edits")
+            {
+                standalone.push(standalone_descriptor(descriptor.clone(), entry));
+            }
+            if json_request {
+                operations.push(descriptor);
+            }
         }
         operations.sort_by(|a, b| {
             a["gateway_operation"]["id"]
@@ -148,6 +162,7 @@ impl GatewayCatalogue {
         });
         Ok(Self {
             operations,
+            standalone,
             revision,
             rigging: BTreeMap::new(),
         })
@@ -161,6 +176,19 @@ impl GatewayCatalogue {
             .as_array()
             .filter(|a| a.len() <= 2048)
             .ok_or_else(invalid)?;
+        current.standalone.retain(|descriptor| {
+            if descriptor["gateway_operation"]["interface"] != "endpoints" {
+                return true;
+            }
+            endpoints.iter().any(|endpoint| {
+                endpoint["object"] == "endpoint"
+                    && endpoint["id"] == descriptor["operation_id"]
+                    && endpoint["operation"] == descriptor["operation_id"]
+                    && endpoint["model"] == descriptor["model_id"]
+                    && endpoint["kind"] == descriptor["kind"]
+                    && endpoint["variant"] == descriptor["variant"]
+            })
+        });
         let mut seen = BTreeSet::new();
         let mut schema_budget = 8 * 1024 * 1024;
         let installed = Catalog::bundled();
@@ -232,10 +260,39 @@ impl GatewayCatalogue {
             };
             if compatible {
                 current.rigging.insert(id.to_owned(), endpoint.clone());
+                let feature = entry["feature"].as_str().ok_or_else(invalid)?;
+                current.standalone.push(standalone_descriptor(json!({
+                    "kind": "three-d", "feature": feature,
+                    "model_id": entry["model_id"], "provider_id": "gg",
+                    "binding_id": entry["model_id"], "variant": "mesh", "status": "listed",
+                    "operation_id": id, "input_schema": request,
+                    "output": if feature == "rig-check" {
+                        json!({"representation":"structured","schema":result})
+                    } else {
+                        json!({"representation":"native","field":"glb","cardinality":"one",
+                               "media_types":["model/gltf-binary"],"max_total_bytes":crate::media::MEDIA_BYTES})
+                    },
+                    "gateway_operation":{"id":id,"interface":"endpoints","result_schema":result},
+                    "catalogue_revision":current.revision,
+                    "pricing":endpoint["pricing"], "pricing_context":endpoint["pricing_context"],
+                }), entry));
             }
         }
         Ok(current)
     }
+    /// Compose the CLI's distinct sign-in and direct Gateway selections.
+    pub fn cli_catalogue(mut self) -> Catalog {
+        let standalone = std::mem::take(&mut self.standalone);
+        let mut catalog = self.overlay(Catalog::bundled());
+        for descriptor in &mut catalog.operations {
+            if descriptor["provider_id"] == "gg" {
+                descriptor["provider_id"] = json!("grida");
+            }
+        }
+        catalog.operations.extend(standalone);
+        catalog
+    }
+
     /// Replace all bundled GG choices. Discovery failure never falls back to a
     /// stale offering; BYOK remains the installed adapter snapshot.
     pub fn overlay(self, mut catalogue: Catalog) -> Catalog {
@@ -289,6 +346,14 @@ impl GatewayCatalogue {
         catalogue
     }
 }
+fn standalone_descriptor(mut descriptor: Value, entry: &Value) -> Value {
+    let gateway = &mut descriptor["gateway_operation"];
+    gateway["standalone"] = json!(true);
+    gateway["path"] = entry["path"].clone();
+    gateway["file_fields"] = entry["x-gg-multipart-file-fields"].clone();
+    descriptor
+}
+
 impl MediaClient {
     pub async fn gateway_catalogue(
         &self,

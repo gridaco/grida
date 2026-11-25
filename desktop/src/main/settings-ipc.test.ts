@@ -50,6 +50,10 @@ vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://fixture.invalid" }));
 vi.mock("../window", () => ({ isSafeExternalUrl: vi.fn<() => boolean>() }));
 vi.mock("./services-sidecar-client", () => ({ servicesSidecarClient: {} }));
 vi.mock("./services-sidecar-supervisor", () => ({
+  nativeAgentGatewayApiKeySettings:
+    vi.fn<
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayApiKeySettings
+    >(),
   agentProviderEndpointSettings: () => fixture.endpoints,
 }));
 vi.mock("./agent-provider-endpoint-mutation", () => ({

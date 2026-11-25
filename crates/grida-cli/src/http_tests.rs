@@ -1215,3 +1215,50 @@ async fn gg_chat_deadline_still_applies_after_response_headers() {
     );
     server.await.unwrap();
 }
+
+#[test]
+fn standalone_gateway_admits_only_official_routes_and_its_own_credential() {
+    let transport = Transport::new(Some(API)).unwrap();
+    let destination = Url::parse("https://gateway.grida.ai/v1/videos").unwrap();
+    assert!(
+        transport
+            .admit(Lane::Provider, &destination, &Method::POST)
+            .is_err()
+    );
+    let route = transport
+        .admit(Lane::StandaloneGateway, &destination, &Method::POST)
+        .unwrap();
+    for url in [
+        "https://grida.co/api/v1/ai/operations",
+        "https://gateway.grida.ai/v1/models",
+        "https://gateway.grida.ai/v1/videos?redirect=1",
+        "https://gateway.grida.ai.example/v1/videos",
+    ] {
+        assert!(
+            transport
+                .admit(
+                    Lane::StandaloneGateway,
+                    &Url::parse(url).unwrap(),
+                    &Method::POST
+                )
+                .is_err()
+        );
+    }
+    let mut request = Request::new(Method::POST, destination.as_str(), b"{}".to_vec());
+    request
+        .headers
+        .insert("content-type", "application/json".parse().unwrap());
+    request
+        .headers
+        .insert("idempotency-key", "fixture".parse().unwrap());
+    request.headers.insert(
+        "authorization",
+        "Bearer synthetic.scoped.grant".parse().unwrap(),
+    );
+    assert!(snapshot(route, &destination, &mut request).is_err());
+    request.headers.insert(
+        "authorization",
+        "Bearer sk-gg-v1-fixture-key".parse().unwrap(),
+    );
+    assert!(snapshot(route, &destination, &mut request).is_ok());
+}

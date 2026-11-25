@@ -40,6 +40,13 @@ Multipart-only operations are not advertised by this JSON adapter. Existing
 Tripo local-file adapters remain explicit native contracts, intersected with the
 current GG model and variant before selection.
 
+The native CLI exposes those product routes as `grida`. Its direct `gg` adapter
+intersects public image, video and 3D contracts with supported JSON and
+multipart shapes. The native host owns input files, credentials and submission
+records. The adapter uses the supplied idempotency key and original job ID
+throughout polling and result collection. Recovery reads use the public job
+route and artifact downloads remain credential-free.
+
 Normal Cargo builds require neither Node nor schema generation. See
 [data/README.md](data/README.md) for generated asset ownership and
 [tests/fixtures/README.md](tests/fixtures/README.md) for the shared provider contracts.

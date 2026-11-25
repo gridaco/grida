@@ -9,8 +9,9 @@ format: md
 # Grida Agent from the CLI
 
 The source-built native CLI supports `grida agent run` for scripts and
-`grida agent serve --stdio` for Agent Client Protocol clients. Select a Gateway
-model and, when needed, a funding organization. Use a private state directory
+`grida agent serve --stdio` for Agent Client Protocol clients. For both commands,
+use `--provider grida` with a Gateway model and, when needed, a funding
+organization. Use a private state directory
 to keep your chats across launches.
 
 Pass `--initial-title "Draft comparison"` to `grida agent run` to give the

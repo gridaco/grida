@@ -1,0 +1,8 @@
+Read a standalone Grida Gateway job and retrieve its original result.
+
+Commands:
+  get    Read status and optionally save the result of an existing job
+
+Run grida ai jobs get --help for usage.
+
+Documentation: https://grida.co/docs/cli/generate

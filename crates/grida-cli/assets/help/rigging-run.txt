@@ -1,4 +1,4 @@
-Usage: grida ai rigging run --provider tripo|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--json]
+Usage: grida ai rigging run --provider tripo|grida|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--org <slug> | --org-id <id>] [--retry-submission @FILE] [--json]
 
 Explicitly submit a paid rigging operation and save its GLB and task receipt.
 Run rigging check first to inspect eligibility; check and run are separate commands.
@@ -6,9 +6,14 @@ Run rigging inspect for the model's supported rig types and specification.
 Local GLBs: at most 60,000,000 bytes; JSON input: at most 16 MiB.
 JSON mode cannot mix with mesh, rig-type or spec flags.
 --out must be a new directory under an existing parent. No files are overwritten.
-BYOK key precedence: stdin, TRIPO_API_KEY, shared credentials.toml.
-GG uses Grida login and --org or --org-id; --key-stdin is BYOK only.
+API key precedence: stdin, provider environment variable, shared credentials.toml.
+Use --provider gg for a direct Gateway API key (GG_API_KEY), or --provider tripo
+with TRIPO_API_KEY. Use --provider grida for Grida sign-in and --org or --org-id.
 No automatic retry. An interrupted request may still be charged.
 
 --no-input suppresses terminal interaction; the OS keyring may still request access.
 Documentation: https://grida.co/docs/cli/generate
+
+Direct Gateway (--provider gg) writes submission.json. To replay an uncertain
+submission, pass --retry-submission @FILE with the same key and input. If you
+already have a job ID, use grida ai jobs get.

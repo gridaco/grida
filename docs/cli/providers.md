@@ -12,8 +12,13 @@ format: md
 
 Use `grida ai providers` to manage keys for OpenRouter, Vercel AI Gateway, fal,
 ElevenLabs, Tripo, and standalone Grida Gateway. For the Gateway API key, use
-provider `gg`. Native `grida ai` execution with `--provider gg` uses your
-[Grida session](./auth.md) and selected organization.
+provider `gg`.
+
+**Upgrading to 0.10.0.** Replace `--provider gg` with `--provider grida` in
+commands that use [Grida sign-in](./auth.md). Keep `--provider gg` for direct
+Gateway API-key execution. That command bills the organization associated with the
+key and rejects `--org` and `--org-id`. Create a key with Media access in
+[Grida Gateway in Console](https://console.grida.co/_/ai-gateway).
 
 ## Configure a provider
 

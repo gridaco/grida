@@ -758,6 +758,12 @@ export function NativeModelPicker({
       : profiles?.subscriptionIssue === "reauthenticationRequired"
         ? "Sign in to ChatGPT again to load its models."
         : undefined);
+  const gatewayApiKeyError =
+    profiles?.gatewayApiKeyIssue === "unavailable"
+      ? "Couldn’t load models for the Grida Gateway API-key connection."
+      : profiles?.gatewayApiKeyIssue === "noCompatibleModels"
+        ? "Grida Gateway has no compatible chat models available."
+        : undefined;
   const openAiIssue = profiles?.openAiIssue;
   const openAiLoading = openAiIssue === "loading" && !refreshError;
   const openAiModelError =
@@ -1178,26 +1184,28 @@ export function NativeModelPicker({
                 Loading OpenAI API models…
               </p>
             )}
-            {showModels && (modelListError || openAiModelError) && (
-              <div
-                role="alert"
-                className="flex items-center gap-2 px-3 py-2 text-xs"
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground">
-                  {modelListError && <span>{modelListError}</span>}
-                  {openAiModelError && <span>{openAiModelError}</span>}
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={busy}
-                  onClick={onRefresh}
+            {showModels &&
+              (modelListError || openAiModelError || gatewayApiKeyError) && (
+                <div
+                  role="alert"
+                  className="flex items-center gap-2 px-3 py-2 text-xs"
                 >
-                  Retry
-                </Button>
-              </div>
-            )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground">
+                    {modelListError && <span>{modelListError}</span>}
+                    {openAiModelError && <span>{openAiModelError}</span>}
+                    {gatewayApiKeyError && <span>{gatewayApiKeyError}</span>}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    disabled={busy}
+                    onClick={onRefresh}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
           </div>
         </motion.div>
       </PopoverContent>

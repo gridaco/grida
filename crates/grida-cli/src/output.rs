@@ -96,7 +96,11 @@ pub fn domain_failure(
         let e = &error.value;
         let safe = |k: &str| terminal_text(e[k].as_str().unwrap_or(""));
         writeln!(stderr, "grida: {} ({})", safe("message"), safe("code"))?;
-        for (key, label) in [("task_id", "Task"), ("directory", "Output")] {
+        for (key, label) in [
+            ("task_id", "Task"),
+            ("request_id", "Request"),
+            ("directory", "Output"),
+        ] {
             if e[key].is_string() {
                 writeln!(stderr, "  {label}: {}", safe(key))?;
             }
@@ -187,6 +191,20 @@ mod tests {
         assert_eq!(
             terminal_text("雪 é\n\u{1b}\u{7f}\u{85}\u{200b}\u{202e}\u{2028}\u{2029}"),
             "雪 é��������"
+        );
+    }
+
+    #[test]
+    fn gateway_error_reports_the_original_request_id_in_terminal_output() {
+        let mut error =
+            crate::error::Error::new("already_submitted", "Gateway accepted the request.");
+        error.value["request_id"] = json!("req_original");
+        let mut stderr = Vec::new();
+        domain_failure(error, false, &mut Vec::new(), &mut stderr).unwrap();
+        assert!(
+            String::from_utf8(stderr)
+                .unwrap()
+                .contains("Request: req_original")
         );
     }
 

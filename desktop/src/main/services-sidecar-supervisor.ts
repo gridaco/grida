@@ -221,6 +221,19 @@ export class ServicesSidecarSupervisor {
     return this.endpointConsent;
   }
 
+  nativeGatewayApiKeySettings() {
+    if (!this.nativeChat || this.isShuttingDown) return;
+    if (process.platform !== "darwin" && process.platform !== "linux") return;
+    return {
+      home: this.profile.providerHome,
+      network: () =>
+        ProviderNetworkHost.nativeProviderNetwork(
+          this.networkAuthority,
+          ProviderNetworkPolicy.GG_API_CHAT_GRANT_ID
+        ),
+    };
+  }
+
   nativeByokSettings(openAiProject = false) {
     return {
       credentialHome: this.profile.providerHome,
@@ -780,6 +793,10 @@ export function getServicesSidecarMode(): ServicesSidecarMode | null {
 
 export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
   return sidecar().nativeEndpointNetwork(id, baseUrl);
+}
+
+export function nativeAgentGatewayApiKeySettings() {
+  return supervisor?.nativeGatewayApiKeySettings();
 }
 
 export function nativeAgentByokSettings(openAiProject?: boolean) {

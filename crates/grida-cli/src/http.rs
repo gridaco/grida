@@ -42,6 +42,7 @@ const API: &str = "https://grida.co";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane {
     Discovery,
+    StandaloneGateway,
     Provider,
     Download,
     Account,
@@ -113,6 +114,7 @@ enum Route {
     Tripo,
     Upload,
     Gg,
+    StandaloneGateway,
     Download,
     Token,
     Logout,
@@ -238,6 +240,29 @@ impl Transport {
                     "/v1/models" | "/v1/endpoints" | "/schemas/operations.json"
                 ) {
                 Ok(Route::Discovery)
+            } else {
+                Err(Error::Failed)
+            };
+        }
+        if lane == Lane::StandaloneGateway {
+            let path = url.path();
+            let endpoint = path
+                .strip_prefix("/v1/endpoints/")
+                .is_some_and(grida_ai::gateway_id);
+            let job = path
+                .strip_prefix("/v1/jobs/")
+                .is_some_and(grida_ai::gateway_id);
+            return if url.origin().ascii_serialization() == "https://gateway.grida.ai"
+                && url.query().is_none()
+                && ((*method == Method::POST
+                    && (endpoint
+                        || matches!(
+                            path,
+                            "/v1/images/generations" | "/v1/images/edits" | "/v1/videos"
+                        )))
+                    || (*method == Method::GET && job))
+            {
+                Ok(Route::StandaloneGateway)
             } else {
                 Err(Error::Failed)
             };
@@ -704,6 +729,9 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
                     && value.as_bytes() == b"1"
                     && request.headers.get_all(name).iter().count() == 1
             }
+            Route::StandaloneGateway => {
+                common || name == "authorization" || name == "idempotency-key"
+            }
             Route::Vercel => {
                 common
                     || name == "authorization"
@@ -767,7 +795,10 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
                     "Bearer "
                 })
                 .ok_or(Error::Failed)?;
-            if credential.is_empty() || credential.chars().any(char::is_whitespace) {
+            if credential.is_empty()
+                || credential.chars().any(char::is_whitespace)
+                || (route == Route::Gg && credential.starts_with("sk-gg-v1-"))
+            {
                 return Err(Error::Failed);
             }
             if route == Route::Logout
@@ -778,6 +809,29 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
             }
         }
     }
+    if route == Route::StandaloneGateway {
+        let auth = request.headers["authorization"]
+            .to_str()
+            .map_err(|_| Error::Failed)?;
+        grida_ai::normalize_key("gg", auth.strip_prefix("Bearer ").ok_or(Error::Failed)?)
+            .map_err(|_| Error::Failed)?;
+        if request.method == Method::POST {
+            let key = request
+                .headers
+                .get("idempotency-key")
+                .and_then(|v| v.to_str().ok())
+                .ok_or(Error::Failed)?;
+            if request.headers.get_all("idempotency-key").iter().count() != 1
+                || !grida_ai::gateway_id(key)
+                || key.len() > 128
+                || request.body.is_empty()
+            {
+                return Err(Error::Failed);
+            }
+        } else if request.headers.contains_key("idempotency-key") {
+            return Err(Error::Failed);
+        }
+    }
     let account = matches!(route, Route::Account | Route::Token | Route::Logout);
     if request.body.len() > if account { ACCOUNT_LIMIT } else { MAX_BODY } {
         return Err(Error::Failed);
@@ -786,7 +840,10 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
         if request.method != Method::POST {
             return Err(Error::Failed);
         }
-        let multipart = route == Route::Tripo && target.path() == "/v3/files";
+        let multipart = route == Route::Tripo && target.path() == "/v3/files"
+            || route == Route::StandaloneGateway
+                && target.path() != "/v1/images/generations"
+                && content_type.starts_with("multipart/form-data;");
         if multipart {
             let boundary = content_type
                 .strip_prefix("multipart/form-data; boundary=")

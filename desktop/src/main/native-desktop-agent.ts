@@ -32,6 +32,7 @@ import type { DesktopAccountSession } from "./account-session";
 import { servicesSidecarClient } from "./services-sidecar-client";
 import {
   nativeAgentGatewayConnection,
+  nativeAgentGatewayApiKeySettings,
   nativeAgentOpenAiOffer,
   nativeAgentSubscriptionSettings,
 } from "./services-sidecar-supervisor";
@@ -43,6 +44,7 @@ import { NativeChatStore } from "./native-chat-store";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import type { ModelCatalogueStore } from "@grida/ai-host/model-catalogue";
+import { NativeGatewayApiKey } from "./native-gateway-api-key";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeImagePlacement } from "./native-image-placement";
@@ -641,11 +643,13 @@ export class NativeDesktopAgent {
           workspace.id,
           workspace.root
         );
-        const [{ choices, subscriptionIssue, openAiIssue }, saved] =
-          await Promise.all([
-            this.availableProfiles(workspace.id),
-            NativeChatProfiles.read(directory),
-          ]);
+        const [
+          { choices, subscriptionIssue, openAiIssue, gatewayApiKeyIssue },
+          saved,
+        ] = await Promise.all([
+          this.availableProfiles(workspace.id),
+          NativeChatProfiles.read(directory),
+        ]);
         requireCurrent();
         const savedProfiles = await Promise.all(
           saved.map(async (profile) => {
@@ -681,6 +685,7 @@ export class NativeDesktopAgent {
           }),
           ...(subscriptionIssue && { subscriptionIssue }),
           ...(openAiIssue && { openAiIssue }),
+          ...(gatewayApiKeyIssue && { gatewayApiKeyIssue }),
           ...subscriptionRecommendation(choices),
           ...(defaultWindow !== undefined && {
             defaultContextWindow: defaultWindow,
@@ -844,10 +849,15 @@ export class NativeDesktopAgent {
    */
   async welcomeProfiles() {
     this.requireProfiles();
-    const { subscription, builtIn, configured, openAiIssue } =
+    const { subscription, builtIn, configured, openAiIssue, gatewayApiKey } =
       await this.workspaceIndependentProfiles();
     const { subscriptionIssue } = subscription;
-    const choices = [...subscription.choices, ...builtIn, ...configured];
+    const choices = [
+      ...subscription.choices,
+      ...gatewayApiKey.choices,
+      ...builtIn,
+      ...configured,
+    ];
     const defaultWindow = NativeChatProfiles.contextWindow(
       DEFAULT_GATEWAY_MODEL
     );
@@ -858,6 +868,7 @@ export class NativeDesktopAgent {
       }),
       ...(subscriptionIssue && { subscriptionIssue }),
       ...(openAiIssue && { openAiIssue }),
+      ...(gatewayApiKey.issue && { gatewayApiKeyIssue: gatewayApiKey.issue }),
       ...subscriptionRecommendation(choices),
       ...(defaultWindow !== undefined && {
         defaultContextWindow: defaultWindow,
@@ -969,7 +980,18 @@ export class NativeDesktopAgent {
       workspace.requireDirectoryCurrent?.();
     };
     const resolve = async () => {
-      if (builtIn) {
+      if (profile.providerId === NativeGatewayApiKey.providerId) {
+        const settings = nativeAgentGatewayApiKeySettings();
+        if (settings) {
+          const launch = await new NativeGatewayApiKey(settings.home).launch(
+            profile,
+            servicesSidecarClient.listGatewayModels,
+            settings.network
+          );
+          requireRoute();
+          return launch;
+        }
+      } else if (builtIn) {
         const launch = await this.byokLaunch(
           profile.providerId,
           profile.modelId,
@@ -1169,7 +1191,8 @@ export class NativeDesktopAgent {
 
   private async workspaceIndependentProfiles() {
     const snapshot = this.modelFacts();
-    const [subscription, { builtIn, openAiIssue }, configured] =
+    const settings = nativeAgentGatewayApiKeySettings();
+    const [subscription, { builtIn, openAiIssue }, configured, gatewayApiKey] =
       await Promise.all([
         this.subscriptionProfiles(snapshot),
         this.builtInProfiles(snapshot),
@@ -1181,8 +1204,13 @@ export class NativeDesktopAgent {
               servicesSidecarClient.nativeConfiguredEndpoint
             )
           ),
+        settings
+          ? new NativeGatewayApiKey(settings.home).offer(
+              servicesSidecarClient.listGatewayModels
+            )
+          : { choices: [], issue: undefined },
       ]);
-    return { subscription, builtIn, configured, openAiIssue };
+    return { subscription, builtIn, configured, openAiIssue, gatewayApiKey };
   }
 
   private async builtInProfiles(
@@ -1355,25 +1383,28 @@ export class NativeDesktopAgent {
     const gatewayScope =
       this.owners?.gatewayScope(workspaceId) ??
       this.gatewayScopes.get(workspaceId);
-    const [{ subscription, builtIn, configured, openAiIssue }, gateway] =
-      await Promise.all([
-        this.workspaceIndependentProfiles(),
-        gatewayScope
-          ? servicesSidecarClient
-              .listGatewayModels()
-              .then((models) =>
-                NativeChatProfiles.gatewayChoices(
-                  models,
-                  gatewayScope,
-                  DEFAULT_GATEWAY_MODEL
-                )
+    const [
+      { subscription, builtIn, configured, openAiIssue, gatewayApiKey },
+      gateway,
+    ] = await Promise.all([
+      this.workspaceIndependentProfiles(),
+      gatewayScope
+        ? servicesSidecarClient
+            .listGatewayModels()
+            .then((models) =>
+              NativeChatProfiles.gatewayChoices(
+                models,
+                gatewayScope,
+                DEFAULT_GATEWAY_MODEL
               )
-              .catch(() => [])
-          : [],
-      ]);
+            )
+            .catch(() => [])
+        : [],
+    ]);
     return {
       subscriptionIssue: subscription.subscriptionIssue,
       openAiIssue,
+      gatewayApiKeyIssue: gatewayApiKey.issue,
       choices: [
         ...subscription.choices,
         ...(generation === this.accountGeneration &&
@@ -1382,6 +1413,7 @@ export class NativeDesktopAgent {
             this.gatewayScopes.get(workspaceId))
           ? gateway
           : []),
+        ...gatewayApiKey.choices,
         ...builtIn,
         ...configured,
       ],

@@ -1,4 +1,4 @@
-Usage: grida agent run --provider gg --model ID --state-dir DIRECTORY --cwd DIRECTORY
+Usage: grida agent run --provider grida --model ID --state-dir DIRECTORY --cwd DIRECTORY
 
 Options:
   --prompt TEXT             Use this prompt. Omit to read bounded UTF-8 from stdin.

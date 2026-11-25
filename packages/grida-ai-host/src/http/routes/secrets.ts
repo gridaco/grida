@@ -12,6 +12,7 @@
  *
  * Allowed provider ids — a closed set:
  *   - the shared first-party BYOK provider ids
+ *   - the standalone Gateway's `gg` slot on shared-store platforms
  *   - ids of CONFIGURED endpoint providers — a self-hosted
  *     gateway may need a key; Ollama doesn't, but its slot still accepts
  *     one harmlessly.
@@ -30,6 +31,7 @@ import type { Hono } from "hono";
 import { ProviderCredentials } from "@grida/ai/providers";
 import {
   BYOK_PROVIDER_IDS,
+  GG_PROVIDER_ID,
   OPENAI_PROJECT_PROVIDER_ID,
 } from "../../protocol/provider-ids";
 import {
@@ -48,16 +50,25 @@ export type SecretsRoutesDeps = {
 
 export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
   const { store, endpoints } = deps;
+  const sharedGatewaySlot =
+    process.platform === "darwin" || process.platform === "linux";
+  const knownIds = sharedGatewaySlot
+    ? [...BYOK_PROVIDER_IDS, GG_PROVIDER_ID]
+    : BYOK_PROVIDER_IDS;
 
   const allowedProviderId = async (
     id: string
   ): Promise<{ ok: true } | { ok: false; res: Response }> => {
-    if (await isKnownProviderId(id, endpoints)) return { ok: true };
+    const known =
+      id === GG_PROVIDER_ID
+        ? sharedGatewaySlot
+        : await isKnownProviderId(id, endpoints);
+    if (known) return { ok: true };
     return {
       ok: false,
       res: Response.json(
         {
-          error: `provider_id must be one of: ${BYOK_PROVIDER_IDS.join(", ")}, or a configured endpoint id`,
+          error: `provider_id must be one of: ${knownIds.join(", ")}, or a configured endpoint id`,
         },
         { status: 400 }
       ),
@@ -84,7 +95,17 @@ export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
       return c.json({ error: "key must not be empty or whitespace-only" }, 400);
     }
     let key = r.data.key;
-    if (r.data.provider_id === OPENAI_PROJECT_PROVIDER_ID) {
+    if (r.data.provider_id === GG_PROVIDER_ID) {
+      const trimmed = key.trim();
+      if (
+        key.length > 4096 ||
+        new TextEncoder().encode(key).byteLength > 4096 ||
+        !/^sk-gg-v1-[!-~]+$/.test(trimmed)
+      ) {
+        return c.json({ error: "Invalid Grida Gateway API key." }, 400);
+      }
+      key = trimmed;
+    } else if (r.data.provider_id === OPENAI_PROJECT_PROVIDER_ID) {
       try {
         key = ProviderCredentials.normalize(OPENAI_PROJECT_PROVIDER_ID, key);
       } catch {

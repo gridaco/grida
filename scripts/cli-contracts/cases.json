@@ -32,7 +32,7 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida agent run --provider gg",
+          "Usage: grida agent run --provider grida",
           "--skill NAME",
           "--questions-v2",
           "Results are JSON Lines",
@@ -65,7 +65,7 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida agent serve --stdio --provider gg",
+          "Usage: grida agent serve --stdio --provider grida",
           "Stdin and stdout carry ACP",
           "Documentation: https://grida.co/docs/cli/agent"
         ]
@@ -572,7 +572,9 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida ai generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image|multiview] [--key-stdin] [--org <slug> | --org-id <id>] [--json]",
+          "Usage: grida ai generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image|multiview] [--key-stdin] [--org <slug> | --org-id <id>] [--retry-submission @FILE] [--json]",
+          "Use --provider grida for Grida sign-in",
+          "Use --provider gg for a direct Gateway API key (GG_API_KEY)",
           "Documentation: https://grida.co/docs/cli/generate",
           "--no-input suppresses terminal interaction;"
         ]
@@ -676,7 +678,7 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida ai rigging list [--provider tripo|gg] [--feature rig-check|rigging] [--json]",
+          "Usage: grida ai rigging list [--provider tripo|grida|gg] [--feature rig-check|rigging] [--json]",
           "Documentation: https://grida.co/docs/cli/models",
           "--no-input suppresses terminal interaction;"
         ]
@@ -702,7 +704,7 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida ai rigging inspect --provider tripo|gg --feature rig-check|rigging [--model <id>] [--json]",
+          "Usage: grida ai rigging inspect --provider tripo|grida|gg --feature rig-check|rigging [--model <id>] [--json]",
           "Documentation: https://grida.co/docs/cli/models",
           "--no-input suppresses terminal interaction;"
         ]
@@ -728,7 +730,9 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida ai rigging check --provider tripo|gg (--mesh FILE | --input @file|-) [--key-stdin] [--json]",
+          "Usage: grida ai rigging check --provider tripo|grida|gg (--mesh FILE | --input @file|-) [--key-stdin] [--org <slug> | --org-id <id>] [--json]",
+          "Use --provider grida for Grida sign-in and --org or --org-id.",
+          "Use --provider gg for a direct Gateway API key (GG_API_KEY)",
           "Documentation: https://grida.co/docs/cli/generate",
           "--no-input suppresses terminal interaction;"
         ]
@@ -754,7 +758,9 @@
       "exit": 0,
       "stdout": {
         "includes": [
-          "Usage: grida ai rigging run --provider tripo|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--json]",
+          "Usage: grida ai rigging run --provider tripo|grida|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--org <slug> | --org-id <id>] [--retry-submission @FILE] [--json]",
+          "Use --provider grida for Grida sign-in and --org or --org-id.",
+          "Use --provider gg for a direct Gateway API key (GG_API_KEY)",
           "Documentation: https://grida.co/docs/cli/generate",
           "--no-input suppresses terminal interaction;"
         ]
@@ -1369,7 +1375,7 @@
       "ai",
       "generate",
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "tripo/v3.1",
       "--out",
@@ -1508,7 +1514,7 @@
       "rigging",
       "check",
       "--provider",
-      "gg",
+      "grida",
       "--mesh",
       "x.glb",
       "--key-stdin"
@@ -2038,7 +2044,7 @@
       "models",
       "list",
       "--provider",
-      "gg",
+      "grida",
       "--available",
       "--org",
       "studio"
@@ -2052,7 +2058,7 @@
             "json": false,
             "noInput": false,
             "command": "ai models list",
-            "provider": "gg",
+            "provider": "grida",
             "available": true,
             "localImage": false,
             "selector": {
@@ -2201,7 +2207,7 @@
       "ai",
       "generate",
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "tripo/v3.1",
       "--out",
@@ -2220,7 +2226,7 @@
             "json": false,
             "noInput": false,
             "command": "ai generate",
-            "provider": "gg",
+            "provider": "grida",
             "model": "tripo/v3.1",
             "request": {
               "prompt": "a mesh",
@@ -2655,7 +2661,7 @@
       "rigging",
       "check",
       "--provider",
-      "gg",
+      "grida",
       "--input",
       "-",
       "--org",
@@ -2670,7 +2676,7 @@
             "json": false,
             "noInput": false,
             "command": "ai rigging check",
-            "provider": "gg",
+            "provider": "grida",
             "keyStdin": false,
             "selector": {
               "name": "studio"
@@ -2689,7 +2695,7 @@
       "rigging",
       "run",
       "--provider",
-      "gg",
+      "grida",
       "--model",
       "tripo/rig-v1.0",
       "--out",
@@ -2712,7 +2718,7 @@
             "json": false,
             "noInput": false,
             "command": "ai rigging run",
-            "provider": "gg",
+            "provider": "grida",
             "model": "tripo/rig-v1.0",
             "out": "./out",
             "keyStdin": false,

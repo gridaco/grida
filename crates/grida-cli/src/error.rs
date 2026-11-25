@@ -32,9 +32,9 @@ impl Error {
         let code = self.value["code"].as_str().unwrap_or("unavailable");
         let message = match self.origin {
             Origin::Auth => Some(if mesh {
-                "GG needs an available Grida session. Run grida auth login."
+                "The grida provider needs an available Grida session. Run grida auth login."
             } else if matches!(code, "signed_out" | "token_rejected") {
-                "GG needs a Grida session. Run grida auth login."
+                "The grida provider needs a Grida session. Run grida auth login."
             } else {
                 "Grida account access failed. Inspect auth status and credential storage before retrying."
             }),
@@ -54,26 +54,32 @@ impl Error {
                 }
                 _ => return self,
             }),
-            Origin::Ai if mesh => Some(match code {
-                "invalid_input" => {
-                    "Input does not match this operation. Run grida ai rigging inspect for its schema."
-                }
-                "operation_unavailable" => {
-                    "This rigging operation is unavailable. Run grida ai rigging list."
-                }
-                "catalogue_unavailable" => {
-                    "Gateway model discovery is unavailable. Retry the read later; no generation was submitted."
-                }
-                "provider_key_required" => {
-                    "Configure Tripo with grida ai providers configure tripo, or supply TRIPO_API_KEY or --key-stdin."
-                }
-                "insufficient_credits" => {
-                    "Credits are insufficient for the selected funding account."
-                }
-                _ => {
-                    "Mesh operation failed. An accepted request may still be charged; no automatic retry was made."
-                }
-            }),
+            Origin::Ai
+                if mesh
+                    && self.value.get("idempotency_key").is_none()
+                    && self.value["provider"] != "gg" =>
+            {
+                Some(match code {
+                    "invalid_input" => {
+                        "Input does not match this operation. Run grida ai rigging inspect for its schema."
+                    }
+                    "operation_unavailable" => {
+                        "This rigging operation is unavailable. Run grida ai rigging list."
+                    }
+                    "catalogue_unavailable" => {
+                        "Gateway model discovery is unavailable. Retry the read later; no generation was submitted."
+                    }
+                    "provider_key_required" => {
+                        "Configure Tripo with grida ai providers configure tripo, or supply TRIPO_API_KEY or --key-stdin."
+                    }
+                    "insufficient_credits" => {
+                        "Credits are insufficient for the selected funding account."
+                    }
+                    _ => {
+                        "Mesh operation failed. An accepted request may still be charged; no automatic retry was made."
+                    }
+                })
+            }
             _ => None,
         };
         if let Some(message) = message {
@@ -132,11 +138,32 @@ impl From<grida_ai::Failure> for Error {
                 "Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin."
             }
             "insufficient_credits" => "Credits are insufficient for the selected funding account.",
+            "invalid_api_key" => {
+                "Gateway rejected the API key. Check its expiry or revocation in Console."
+            }
+            "provider_access_denied" => {
+                "Gateway denied access. Check the key's Media scope and organization status."
+            }
+            "key_budget_exceeded" => "This Gateway key reached its configured spending limit.",
+            "cost_limit_exceeded" => "Gateway could not admit the request under its cost limit.",
+            "job_expired" => {
+                "Gateway can no longer return this job. Use its request ID to inspect billing in Console."
+            }
+            "already_submitted" => {
+                "Gateway already admitted this request. The original synchronous result cannot be replayed."
+            }
+            "idempotency_conflict" => "The original Gateway submission used different inputs.",
+            "gateway_receipt_unavailable" => {
+                "Gateway accepted the job but the local receipt could not be saved. Recover the original job by ID."
+            }
             _ => {
                 "Media operation failed. An accepted request may still be charged; no automatic retry was made."
             }
         };
         let mut result = Self::new(&e.code, message).origin(Origin::Ai);
+        if let Some(id) = e.request_id {
+            result.value["request_id"] = json!(id);
+        }
         if let Some(id) = e.task_id {
             result.value["task_id"] = json!(id);
         }

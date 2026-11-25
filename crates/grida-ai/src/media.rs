@@ -86,6 +86,13 @@ impl MediaClient {
             variant: parsed.descriptor["variant"].as_str().map(String::from),
             feature: parsed.descriptor["feature"].as_str().map(String::from),
         };
+        if parsed.descriptor["gateway_operation"]["standalone"] == true {
+            return Err(Failure::new("provider_unavailable"));
+        }
+        let mut selector = selector;
+        if selector.provider == "grida" {
+            selector.provider = "gg".into();
+        }
         let parsed = if let Some(frozen) = &parsed.frozen_descriptor {
             if &parsed.descriptor != frozen {
                 return Err(input::bad());
@@ -99,7 +106,11 @@ impl MediaClient {
             Catalog::bundled().parse_input(&selector, parsed.input.clone())?
         };
         let duration = if parsed.kind() == "three-d" {
-            if parsed.provider() == "gg" { 780 } else { 600 }
+            if matches!(parsed.provider(), "gg" | "grida") {
+                780
+            } else {
+                600
+            }
         } else if parsed.provider() == "fal"
             && parsed.binding_id().starts_with("openai/gpt-image-2.5/")
         {
@@ -121,7 +132,8 @@ impl MediaClient {
         session.check()?;
         let (key, base) = match authority {
             ExecutionAuthority::Byok { provider, key }
-                if provider == parsed.provider() && provider != "gg" =>
+                if provider == parsed.provider()
+                    && !matches!(provider.as_str(), "gg" | "grida") =>
             {
                 let normalized = input::js_trim(&key).to_string();
                 if normalized.is_empty() || normalized.bytes().any(|b| !(33..=126).contains(&b)) {
@@ -139,7 +151,7 @@ impl MediaClient {
                 token,
                 base_url,
                 expires_at_ms,
-            } if parsed.provider() == "gg" => {
+            } if matches!(parsed.provider(), "gg" | "grida") => {
                 if token.is_empty() || token.bytes().any(|b| !(33..=126).contains(&b)) {
                     return Err(Failure::new("gg_token_expired"));
                 }
@@ -995,7 +1007,7 @@ fn consume_bytes(remaining: &mut usize, size: usize) -> Result<()> {
     *remaining = remaining.checked_sub(size).ok_or_else(invalid)?;
     Ok(())
 }
-fn image_base64(b: &str, remaining: &mut usize) -> Result<Asset> {
+pub(crate) fn image_base64(b: &str, remaining: &mut usize) -> Result<Asset> {
     let data = output_base64(b, *remaining, true)?;
     consume_bytes(remaining, data.len())?;
     let mime = image_mime(&data).unwrap_or("image/png");
@@ -1004,7 +1016,7 @@ fn image_base64(b: &str, remaining: &mut usize) -> Result<Asset> {
         data,
     })
 }
-fn image_mime(b: &[u8]) -> Option<&'static str> {
+pub(crate) fn image_mime(b: &[u8]) -> Option<&'static str> {
     if b.starts_with(b"\x89PNG") {
         Some("image/png")
     } else if b.starts_with(&[255, 216]) {
@@ -1025,7 +1037,7 @@ fn image_mime(b: &[u8]) -> Option<&'static str> {
         None
     }
 }
-fn bounded_items(v: &Value, n: usize) -> Result<&Vec<Value>> {
+pub(crate) fn bounded_items(v: &Value, n: usize) -> Result<&Vec<Value>> {
     v.as_array()
         .filter(|v| !v.is_empty() && v.len() <= n)
         .ok_or_else(invalid)
@@ -1038,7 +1050,7 @@ fn video_base64(b: &str, mime: &str, maximum: usize) -> Result<Asset> {
     validate_video(&a)?;
     Ok(a)
 }
-fn validate_video(a: &Asset) -> Result<()> {
+pub(crate) fn validate_video(a: &Asset) -> Result<()> {
     if a.data.is_empty()
         || !regex::Regex::new("(?i)^video/[a-z0-9.+-]+$")
             .expect("constant regex")

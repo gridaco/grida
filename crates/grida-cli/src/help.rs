@@ -26,7 +26,7 @@ macro_rules! topics {
                         let mut words = value.split(' ');
                         match (words.next(), words.next(), words.next(), words.next(), words.next()) {
                             (Some("ai"), Some("providers"), Some(action), Some(provider), None)
-                                if ["openrouter", "vercel", "fal", "elevenlabs", "tripo"].contains(&provider) => {
+                                if ["openrouter", "vercel", "fal", "elevenlabs", "tripo", "gg"].contains(&provider) => {
                                     match action {
                                         "configure" => Ok(Self::ProvidersConfigure),
                                         "remove" => Ok(Self::ProvidersRemove),
@@ -70,6 +70,8 @@ topics! {
     Voices => ("ai voices", "voices", "/models"),
     VoicesList => ("ai voices list", "voices-list", "/models"),
     Rigging => ("ai rigging", "rigging", "/generate"),
+    Jobs => ("ai jobs", "jobs", "/generate"),
+    JobsGet => ("ai jobs get", "jobs-get", "/generate"),
     RiggingList => ("ai rigging list", "rigging-list", "/models"),
     RiggingInspect => ("ai rigging inspect", "rigging-inspect", "/models"),
     RiggingCheck => ("ai rigging check", "rigging-check", "/generate"),

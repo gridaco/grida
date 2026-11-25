@@ -114,6 +114,8 @@ export type DesktopNativeCapabilities = {
   browser?: boolean;
   /** Named OpenAI API project key custody and native chat support. */
   openai_api?: boolean;
+  /** Named standalone Grida Gateway chat using the shared gg credential. */
+  gg_api_key?: boolean;
 };
 
 export type DesktopCapabilities = {

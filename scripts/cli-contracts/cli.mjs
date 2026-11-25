@@ -71,7 +71,8 @@ export function validateCases(cases) {
       words[0] === "ai" &&
       ["models", "rigging"].includes(words[1]) &&
       words[2] === "list";
-    const currentGG = provider === undefined || provider === "gg";
+    const currentGG =
+      provider === undefined || provider === "gg" || provider === "grida";
     const control = value.argv.some((arg) =>
       ["--help", "-h", "--version", "-V"].includes(arg)
     );

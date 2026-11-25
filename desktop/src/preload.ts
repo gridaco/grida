@@ -582,6 +582,7 @@ const bridge: DesktopBridge = {
       workspace_watch: true,
       browser: true,
       openai_api: openAiProjectSupported,
+      gg_api_key: appPlatform === "darwin" || appPlatform === "linux",
     },
   },
 

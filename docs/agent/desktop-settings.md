@@ -92,6 +92,20 @@ order. A restricted key needs write
 access to the Images API for generation. Removing the key from either
 Settings tab disconnects it from both. [Choose a model](./models-and-usage.md#choose-a-model)
 
+## Grida Gateway API key
+
+On macOS or Linux, open **LLM Providers → Grida Gateway · API key**. Create a
+key with Text access, paste it into Settings, and choose **Save**. A key saved
+with `grida ai providers configure gg` is available in Desktop when both use
+the same Grida home. Removing it in Desktop also removes that shared key.
+[Grida Gateway in Console](https://console.grida.co/_/ai-gateway)
+
+Choose **Grida Gateway · API key** in the chat model picker. Usage is billed to
+the organization associated with the key. Sign in to Grida as usual to open
+Desktop. Restore the original key if a queued or interrupted turn needs that
+connection again.
+[Choose a model](./models-and-usage.md#choose-a-model)
+
 ## Voice dictation
 
 Open **Voice**, then choose **Configure** next to **GPT-Transcribe**. Create

@@ -363,7 +363,9 @@ export namespace secrets {
     const choice = await bridgeOrThrow().dialog.confirm({
       message: `Remove ${label} key?`,
       detail:
-        "The desktop app will stop using this key. You can add it back any time.",
+        providerId === "gg"
+          ? "This removes the saved key from Desktop and the Grida CLI when they share the same Grida home."
+          : "The desktop app will stop using this key. You can add it back any time.",
       buttons: ["Remove", "Cancel"],
       default_id: 1,
       cancel_id: 1,
