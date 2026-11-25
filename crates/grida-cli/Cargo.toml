@@ -27,6 +27,8 @@ required-features = ["agent-tui"]
 conformance = []
 agent-tui = [
   "dep:agent-client-protocol",
+  "dep:percent-encoding",
+  "dep:pulldown-cmark",
   "dep:ratatui",
   "crossterm/event-stream",
   "tokio/process",
@@ -35,6 +37,8 @@ agent-tui = [
 
 [dependencies]
 agent-client-protocol = { version = "=5.0.0", optional = true }
+percent-encoding = { version = "2", optional = true }
+pulldown-cmark = { version = "0.10", default-features = false, optional = true }
 ratatui = { version = "=0.30.2", default-features = false, features = [
   "crossterm_0_29",
   "unstable-rendered-line-info",

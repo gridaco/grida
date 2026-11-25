@@ -10,7 +10,7 @@ use agent_client_protocol::v1::schema::SessionNotification;
 use agent_client_protocol::{ByteStreams, Client, Error, Result, on_receive_notification};
 use clap::{Arg, ArgAction, Command as Cli, value_parser};
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use file_picker::FilePicker;
+use file_picker::{FilePicker, inserted_path};
 use futures_util::future::{FutureExt, LocalBoxFuture};
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use grida_agent::workspace_search::WorkspaceSearch;
@@ -434,14 +434,7 @@ impl App {
         self.file_picker.key(key, |start, path| {
             let draft = state.input();
             draft.truncate(start);
-            let quote = path.chars().any(char::is_whitespace) && !path.contains('"');
-            if quote {
-                draft.push('"');
-            }
-            draft.push_str(path);
-            if quote {
-                draft.push('"');
-            }
+            draft.push_str(&inserted_path(path));
             draft.push(' ');
         })
     }

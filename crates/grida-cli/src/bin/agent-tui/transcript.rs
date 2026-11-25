@@ -180,7 +180,12 @@ impl Transcript {
                 items.sort_by_key(|item| item.order.unwrap_or(u64::MAX));
                 items.into_iter().flat_map(|item| match &item.body {
                     Body::Message { by_user, text } => {
-                        format!("{} {}", if *by_user { "You:" } else { "Agent:" }, text)
+                        let (prefix, text) = if *by_user {
+                            ("You:", crate::file_picker::project_paths(text))
+                        } else {
+                            ("Agent:", std::borrow::Cow::Borrowed(text.as_str()))
+                        };
+                        format!("{prefix} {text}")
                             .lines()
                             .map(str::to_owned)
                             .collect::<Vec<_>>()

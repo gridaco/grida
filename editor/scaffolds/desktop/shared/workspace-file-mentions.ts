@@ -24,7 +24,7 @@ export namespace WorkspaceFileMentions {
         if (results !== null)
           return results.map(({ path, kind }) => ({
             id: path,
-            label: path,
+            label: path.slice(path.lastIndexOf("/") + 1),
             kind: kind === "directory" ? "folder" : "file",
             path,
           }));
@@ -72,7 +72,7 @@ export namespace WorkspaceFileMentions {
         }
         mentions.push({
           id: path,
-          label: path,
+          label: entry.name,
           kind: entry.kind === "directory" ? "folder" : "file",
           path,
         });
@@ -80,7 +80,7 @@ export namespace WorkspaceFileMentions {
       }
     }
     return mentions.sort((left, right) =>
-      left.label.localeCompare(right.label)
+      (left.path ?? left.id).localeCompare(right.path ?? right.id)
     );
   }
 }

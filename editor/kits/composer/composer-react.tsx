@@ -2,6 +2,7 @@
 
 import { Kbd } from "@app/ui/components/kbd";
 import { cn } from "@app/ui/lib/utils";
+import type { JSONContent } from "@tiptap/core";
 import markdownStyles from "@/components/chat-markdown.module.css";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
@@ -295,7 +296,10 @@ export function ComposerContent({
   placeholder = "Compose...",
   triggerMenuId,
   autofocus,
+  initialDocument,
+  editorAriaLabel,
   onSubmitRequest,
+  onPromptChange,
   onLinkClick,
   suggestion,
   onDraftChange,
@@ -308,6 +312,9 @@ export function ComposerContent({
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
   autofocus?: boolean;
+  /** The document to mount when the composer opens. */
+  initialDocument?: JSONContent;
+  editorAriaLabel?: string;
   /** Keep the mounted document visible while its submission is being confirmed. */
   readOnly?: boolean;
   /** Fade clipped content when the editor has a constrained height. */
@@ -315,6 +322,8 @@ export function ComposerContent({
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /** The complete authored prompt after each document edit. */
+  onPromptChange?: (text: string) => void;
   /** Optional handler for the formatting menu's Open link action. */
   onLinkClick?: MouseEventHandler<HTMLAnchorElement>;
   /** Faint text outside the document. Only plain Tab accepts the full text. */
@@ -362,6 +371,10 @@ export function ComposerContent({
   suggestionRef.current = suggestion;
   const draftChangeRef = useRef(onDraftChange);
   draftChangeRef.current = onDraftChange;
+  const promptChangeRef = useRef(onPromptChange);
+  promptChangeRef.current = onPromptChange;
+  const submitRef = useRef(onSubmitRequest);
+  submitRef.current = onSubmitRequest;
   const onTransferRef = useRef(onTransfer);
   onTransferRef.current = onTransfer;
   const onFilesRef = useRef(onFiles);
@@ -375,6 +388,7 @@ export function ComposerContent({
   const editor = useEditor({
     immediatelyRender: false,
     editable: !readOnly,
+    content: initialDocument,
     extensions,
     editorProps: {
       attributes: {
@@ -382,6 +396,7 @@ export function ComposerContent({
         "aria-autocomplete": "list",
         "aria-controls": resolvedTriggerMenuId,
         "aria-expanded": "false",
+        ...(editorAriaLabel && { "aria-label": editorAriaLabel }),
         class: cn(
           "outline-none",
           scrollFade &&
@@ -398,7 +413,7 @@ export function ComposerContent({
           triggerIndex: core.getSnapshot().triggerIndex,
           moveTriggerIndex: (delta) => core.moveTriggerIndex(delta),
           submit() {
-            onSubmitRequest?.();
+            submitRef.current?.();
           },
           onCommandSelect: commandSelection.current,
         });
@@ -460,11 +475,16 @@ export function ComposerContent({
         editor.commands.focus("end");
       }
     },
-    onUpdate({ editor }) {
+    onUpdate({ editor, transaction }) {
       draftChangeRef.current?.(
         !editor.view.composing && ComposerTiptap.hasEmptyParagraph(editor)
       );
       ComposerTiptap.syncCore(core, editor);
+      if (transaction.docChanged && promptChangeRef.current)
+        promptChangeRef.current(
+          ComposerTiptap.formattedMarkdown(editor.state.doc) ??
+            editor.getText({ blockSeparator: "\n" })
+        );
     },
     onSelectionUpdate({ editor }) {
       ComposerTiptap.inspectCore(core, editor);

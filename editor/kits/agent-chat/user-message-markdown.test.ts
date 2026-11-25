@@ -54,7 +54,21 @@ describe("user message skill placement", () => {
       text,
       context: [bound],
       links: new Map(),
+      hasWorkspaceMentions: false,
     });
+  });
+
+  it("keeps workspace mentions inline in the sent message and recognizes only Markdown links", () => {
+    const file = '[AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")';
+    const text = "Read " + file;
+    expect(projectUserMessageSkills(text)).toMatchObject({
+      text,
+      context: [],
+      hasWorkspaceMentions: true,
+    });
+    expect(
+      projectUserMessageSkills("`" + file + "`").hasWorkspaceMentions
+    ).toBe(false);
   });
 
   it("refreshes projected Markdown when the host confirms a skill source", () => {

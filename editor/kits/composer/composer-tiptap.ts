@@ -24,6 +24,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { WorkspaceMention } from "./workspace-mention";
 import { chatWebLinkIcon } from "../../components/chat-web-link";
 import {
   ComposerTiptapHistory,
@@ -94,19 +95,31 @@ const ComposerMentionNode = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const workspace =
+      HTMLAttributes.path &&
+      (HTMLAttributes.kind === "file" || HTMLAttributes.kind === "folder");
     return [
       "span",
       mergeAttributes(HTMLAttributes, {
         "data-composer-mention": HTMLAttributes.id,
         "data-composer-chip": "mention",
         class: "composer-chip composer-mention",
-        ...(HTMLAttributes.source && { title: HTMLAttributes.source }),
+        ...(workspace
+          ? { "data-workspace-mention": "", title: HTMLAttributes.path }
+          : HTMLAttributes.source && { title: HTMLAttributes.source }),
       }),
-      `${HTMLAttributes.sigil === "$" ? "" : "@"}${HTMLAttributes.label || HTMLAttributes.id}`,
+      workspace
+        ? WorkspaceMention.name(HTMLAttributes.path)
+        : `${HTMLAttributes.sigil === "$" ? "" : "@"}${HTMLAttributes.label || HTMLAttributes.id}`,
     ];
   },
 
   renderText({ node }) {
+    if (
+      node.attrs.path &&
+      (node.attrs.kind === "file" || node.attrs.kind === "folder")
+    )
+      return WorkspaceMention.name(node.attrs.path);
     return `${node.attrs.sigil === "$" ? "$" : "@"}${node.attrs.label || node.attrs.id}`;
   },
 });
@@ -307,12 +320,27 @@ const markdown = new MarkdownSerializer(
           (character) => (character === "(" ? "%28" : "%29")
         );
         state.text(`[$${state.esc(label)}](${target})`, false);
+      } else if (
+        node.attrs.path &&
+        (node.attrs.kind === "file" || node.attrs.kind === "folder")
+      ) {
+        const name = WorkspaceMention.name(node.attrs.path);
+        state.text(
+          `[${WorkspaceMention.escapeLabel(state.esc(name))}](${WorkspaceMention.target(node.attrs.path, node.attrs.kind)})`,
+          false
+        );
       } else {
         state.text(`@${label}`, false);
       }
     },
     composerFileReference(state, node) {
-      state.text(node.attrs.name || node.attrs.path, false);
+      const name = node.attrs.name || node.attrs.path;
+      if (node.attrs.path)
+        state.text(
+          `[${WorkspaceMention.escapeLabel(state.esc(name))}](${WorkspaceMention.target(node.attrs.path, "file")})`,
+          false
+        );
+      else state.text(name, false);
     },
   },
   markdownMarks,
@@ -388,7 +416,11 @@ export namespace ComposerTiptap {
         node.type.name === "orderedList" ||
         node.type.name === "blockquote" ||
         node.type.name === "codeBlock" ||
-        (node.type.name === "composerMention" && node.attrs.sigil === "$") ||
+        (node.type.name === "composerMention" &&
+          (node.attrs.sigil === "$" ||
+            (node.attrs.path &&
+              (node.attrs.kind === "file" || node.attrs.kind === "folder")))) ||
+        node.type.name === "composerFileReference" ||
         hasMarkdownMark(node);
       return !formatted;
     });

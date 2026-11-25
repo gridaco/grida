@@ -74,6 +74,8 @@ import { attachedChatActivity } from "./native-chat-activity";
 import { GoalSpending } from "./goal-spending";
 import { ComposerDrafts, type ComposerDraftPending } from "./composer-drafts";
 import type { ComposerHistory } from "@/kits/composer/composer-history";
+import { ComposerTiptap } from "@/kits/composer/composer-tiptap";
+import { WorkspaceMention } from "@/kits/composer/workspace-mention";
 import { isSupportedImageType } from "./image-attachment";
 import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
@@ -1689,7 +1691,9 @@ export class NativeChatController {
     const { text, skills, document } = input;
     const key = this.scopeDraftKey(scope);
     if ((text || skills?.length) && key && this.drafts) {
-      const returned = skills?.length
+      const structured =
+        !!skills?.length || WorkspaceMention.inline(text).length > 0;
+      const returned = structured
         ? document &&
           typeof document === "object" &&
           "type" in document &&
@@ -1697,7 +1701,9 @@ export class NativeChatController {
           "content" in document &&
           Array.isArray(document.content)
           ? document.content
-          : SkillMentions.restoreDocument(text, skills).content
+          : skills?.length
+            ? SkillMentions.restoreDocument(text, skills).content
+            : (ComposerTiptap.markdownDocument(text)?.content ?? [])
         : text.split(/\r?\n/).map((line) => ({
             type: "paragraph",
             ...(line && { content: [{ type: "text", text: line }] }),
@@ -1720,7 +1726,7 @@ export class NativeChatController {
             content: [...saved.content, ...returned],
           });
       } else this.drafts.store.write(key, { type: "doc", content: returned });
-      if (skills?.length) return null;
+      if (structured && returned.length) return null;
     }
     return this.owns(scope) ? text : null;
   }
@@ -7813,10 +7819,11 @@ export class NativeChatController {
             savedAttachments
           )
         : undefined;
-    const original = SkillMentions.retainedDocument(
-      text,
-      message?.displayParts
-    );
+    const original =
+      SkillMentions.retainedDocument(text, message?.displayParts) ??
+      (WorkspaceMention.inline(text).length
+        ? ComposerTiptap.markdownDocument(text)
+        : undefined);
     const document = savedDocument ?? (original && { document: original });
     this.update({
       queueDraft: {

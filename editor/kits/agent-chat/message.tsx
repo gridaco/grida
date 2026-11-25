@@ -102,6 +102,7 @@ import { FullscreenImagePreview } from "@/kits/image-preview";
 import { AttachmentImagePreview } from "./attachment-image-preview";
 import { EditorSelectionIndicator } from "./editor-selection-indicator";
 import { MessageContextParts } from "./message-context-parts";
+import { WorkspaceMention } from "@/kits/composer/workspace-mention";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import { WorkingIndicator } from "./working-indicator";
 import {
@@ -154,6 +155,17 @@ export function UserMessageText({
       components={{
         ...markdown.components,
         a: (props) => {
+          const path = workspace_links.marked(props.href);
+          const mention = path && WorkspaceMention.parse(path, props.title);
+          if (mention)
+            return (
+              <span
+                title={mention.path}
+                className="text-blue-600 dark:text-blue-400"
+              >
+                {props.children}
+              </span>
+            );
           if (!isUserMessageSkillMarker(props.href))
             return <workspace_links.Link {...props} />;
           const skill = props.href && skillLinks?.get(props.href);
@@ -381,7 +393,9 @@ export function ChatMessageView({
                 )}
                 {hasText && (
                   <CopyMessageAction
-                    text={SkillMentions.plainText(text, displayParts)}
+                    text={WorkspaceMention.copyText(
+                      SkillMentions.plainText(text, displayParts)
+                    )}
                   />
                 )}
                 {hasText && actions?.onEdit && (

@@ -30,13 +30,13 @@ it("uses the ranked native results, preserving full paths and empty results", as
   await expect(lookup("cover", signal)).resolves.toEqual([
     {
       id: "z/cover@2x.png",
-      label: "z/cover@2x.png",
+      label: "cover@2x.png",
       path: "z/cover@2x.png",
       kind: "file",
     },
     {
       id: "a/cover drafts",
-      label: "a/cover drafts",
+      label: "cover drafts",
       path: "a/cover drafts",
       kind: "folder",
     },

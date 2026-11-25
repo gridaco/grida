@@ -85,6 +85,8 @@ function ComposerBox() {
 - Type after `@` to see up to eight matches. Exact names and name prefixes
   rank ahead of matches elsewhere in a filename or path. File and folder rows
   show the basename and parent path. Tab and Enter accept the highlighted result.
+  The selected name stays inline in the message with its workspace-relative
+  path as the link destination.
 - File attachments as message parts.
 - Inline file references.
 - Opaque, read-only directory references (never recursive attachments).

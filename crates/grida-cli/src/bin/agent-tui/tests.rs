@@ -234,10 +234,33 @@ fn file_picker_shows_duplicate_names_and_accepts_the_exact_selected_path() {
     assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Tab)));
     assert_eq!(app.file_picker.height(), 0);
     let send = app.state.enter("example").unwrap();
+    let text = send.params["prompt"][0]["text"].as_str().unwrap();
     assert_eq!(
-        send.params["prompt"][0]["text"],
+        text,
         "Inspect \"workspace/print drafts/chapter/sections/Guide.md\" "
     );
+    let user_chunk = || {
+        SessionUpdate::UserMessageChunk(
+            ContentChunk::new(text.to_owned().into()).message_id("selected-file"),
+        )
+    };
+    let mut transcript = Transcript::default();
+    transcript.note(&notification(
+        user_chunk(),
+        protocol::LIVE,
+        json!({"turnId":"active","activityOrder":0,"offsetBytes":0,"replace":false}),
+    ));
+    assert_eq!(transcript.lines(), [format!("You: {text}")]);
+    transcript.begin("reopen".to_owned());
+    transcript.note(&notification(
+        user_chunk(),
+        protocol::WINDOW,
+        json!({"requestId":"reopen","turnId":"active","activityOrder":0}),
+    ));
+    assert!(!transcript.finish(&json!({
+        "requestId":"reopen","turns":[{"turnId":"active","status":"succeeded"}],
+    })));
+    assert_eq!(transcript.lines(), [format!("You: {text}")]);
 }
 
 #[test]
@@ -254,6 +277,42 @@ fn completion_leaves_enter_available_when_the_picker_cannot_be_drawn() {
     assert_eq!(app.state.completion_draft(), Some("Inspect @Guide"));
     assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Enter)));
     assert_eq!(app.state.completion_draft(), Some("Inspect docs/Guide.md "));
+}
+
+#[test]
+fn desktop_file_mentions_replay_as_terminal_paths() {
+    let text = "Read [AGENTS.md](<./pet-fx notes/AGENTS.md> \"Workspace file\") and [print](<./print> \"Workspace folder\").";
+    let update = || {
+        SessionUpdate::UserMessageChunk(
+            ContentChunk::new(text.to_owned().into()).message_id("desktop-file"),
+        )
+    };
+    let expected = ["You: Read \"pet-fx notes/AGENTS.md\" and print."];
+    let mut transcript = Transcript::default();
+    transcript.note(&notification(
+        update(),
+        protocol::LIVE,
+        json!({"turnId":"active","activityOrder":0,"offsetBytes":0,"replace":false}),
+    ));
+    assert_eq!(transcript.lines(), expected);
+    transcript.begin("reopen".to_owned());
+    transcript.note(&notification(
+        update(),
+        protocol::WINDOW,
+        json!({"requestId":"reopen","turnId":"active","activityOrder":0}),
+    ));
+    assert!(!transcript.finish(&json!({
+        "requestId":"reopen","turns":[{"turnId":"active","status":"succeeded"}],
+    })));
+    assert_eq!(transcript.lines(), expected);
+    assert_eq!(
+        crate::file_picker::project_paths(&format!("`{text}`")),
+        format!("`{text}`")
+    );
+    assert_eq!(
+        crate::file_picker::project_paths("[Q4](<./drafts/Q4%20%231> \"Workspace file\")"),
+        "\"drafts/Q4 #1\""
+    );
 }
 
 #[test]

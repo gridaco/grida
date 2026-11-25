@@ -2,6 +2,61 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use grida_agent::workspace_search::{WorkspaceSearch, WorkspaceSearchEntry};
+use percent_encoding::percent_decode_str;
+use pulldown_cmark::{Event, LinkType, Parser, Tag};
+use std::borrow::Cow;
+
+pub(super) fn inserted_path(path: &str) -> Cow<'_, str> {
+    if path.chars().any(char::is_whitespace) && !path.contains('"') {
+        format!("\"{path}\"").into()
+    } else {
+        Cow::Borrowed(path)
+    }
+}
+
+/// A Desktop-authored reference appears as a path in the terminal, like an
+/// ordinary terminal completion. The retained prompt stays intact.
+pub(super) fn project_paths(text: &str) -> Cow<'_, str> {
+    if !text.contains("\"Workspace ") {
+        return Cow::Borrowed(text);
+    }
+    let mut rendered = String::new();
+    let mut start = 0;
+    for (event, range) in Parser::new(text).into_offset_iter() {
+        let Event::Start(Tag::Link {
+            link_type: LinkType::Inline,
+            dest_url,
+            title,
+            ..
+        }) = event
+        else {
+            continue;
+        };
+        if !matches!(title.as_ref(), "Workspace file" | "Workspace folder") {
+            continue;
+        }
+        let Some(relative) = dest_url.strip_prefix("./") else {
+            continue;
+        };
+        let Ok(path) = percent_decode_str(relative).decode_utf8() else {
+            continue;
+        };
+        if path.contains('\\')
+            || path.chars().any(char::is_control)
+            || path.split('/').any(|part| matches!(part, "" | "." | ".."))
+        {
+            continue;
+        }
+        rendered.push_str(&text[start..range.start]);
+        rendered.push_str(&inserted_path(&path));
+        start = range.end;
+    }
+    if start == 0 {
+        return Cow::Borrowed(text);
+    }
+    rendered.push_str(&text[start..]);
+    Cow::Owned(rendered)
+}
 
 #[derive(PartialEq, Eq)]
 struct Query {

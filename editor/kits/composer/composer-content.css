@@ -163,7 +163,8 @@
 }
 
 /* Use the surrounding text baseline and keep the icon with the skill name. */
-.composer-content [data-composer-mention][sigil="$"] {
+.composer-content [data-composer-mention][sigil="$"],
+.composer-content [data-workspace-mention] {
   display: inline;
   margin-inline: 0;
   padding: 0;

@@ -1,8 +1,13 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LoaderCircleIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
+import { ComposerContent, ComposerProvider } from "@/kits/composer";
+import { ComposerTiptap } from "@/kits/composer/composer-tiptap";
+import { WorkspaceMention } from "@/kits/composer/workspace-mention";
+
+const revisionCatalog = { commands: [], mentions: [] };
 
 /** A controlled edit of a sent user message; the consumer owns resubmission. */
 export type ChatMessageEdit = {
@@ -18,6 +23,11 @@ export type ChatMessageEdit = {
 };
 
 export function ChatMessageEditor({ edit }: { edit: ChatMessageEdit }) {
+  const [document] = useState(() =>
+    WorkspaceMention.inline(edit.text).length
+      ? ComposerTiptap.markdownDocument(edit.text)
+      : undefined
+  );
   const input = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const field = input.current;
@@ -47,26 +57,43 @@ export function ChatMessageEditor({ edit }: { edit: ChatMessageEdit }) {
         }
       }}
     >
-      <textarea
-        aria-label="Replacement message"
-        ref={input}
-        className="field-sizing-content min-h-24 max-h-80 w-full resize-none bg-transparent text-[15px] leading-6 outline-none"
-        value={edit.text}
-        readOnly={locked}
-        onChange={(event) => edit.onChange(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (
-            event.key === "Enter" &&
-            !event.shiftKey &&
-            !event.nativeEvent.isComposing &&
-            event.keyCode !== 229
-          ) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (canSubmit) edit.onSubmit();
-          }
-        }}
-      />
+      {document ? (
+        <ComposerProvider catalog={revisionCatalog}>
+          <ComposerContent
+            initialDocument={document}
+            editorAriaLabel="Replacement message"
+            editorClassName="min-h-24 max-h-80 overflow-y-auto text-[15px] leading-6"
+            placeholder=""
+            autofocus
+            readOnly={locked}
+            onPromptChange={edit.onChange}
+            onSubmitRequest={() => {
+              if (canSubmit) edit.onSubmit();
+            }}
+          />
+        </ComposerProvider>
+      ) : (
+        <textarea
+          aria-label="Replacement message"
+          ref={input}
+          className="field-sizing-content min-h-24 max-h-80 w-full resize-none bg-transparent text-[15px] leading-6 outline-none"
+          value={edit.text}
+          readOnly={locked}
+          onChange={(event) => edit.onChange(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing &&
+              event.keyCode !== 229
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (canSubmit) edit.onSubmit();
+            }
+          }}
+        />
+      )}
       <footer className="flex flex-wrap items-end justify-end gap-x-4 gap-y-3">
         {edit.note && (
           <div className="min-w-40 flex-1 space-y-1 text-xs text-muted-foreground">
