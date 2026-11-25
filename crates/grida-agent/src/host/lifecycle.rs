@@ -120,7 +120,7 @@ mod tests {
         let competing = prompt("competing");
         let policy = host.submission_policy(&competing, false).unwrap();
         let first = host
-            .register_prompt(competing, false, policy, None)
+            .register_prompt(competing, PromptAdmission::Immediate, policy, None)
             .await
             .unwrap();
         let receipt = stop().await.unwrap();
@@ -142,7 +142,7 @@ mod tests {
         let another = prompt("another");
         let policy = host.submission_policy(&another, false).unwrap();
         let second = host
-            .register_prompt(another, false, policy, None)
+            .register_prompt(another, PromptAdmission::Immediate, policy, None)
             .await
             .unwrap();
         {

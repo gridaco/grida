@@ -23,6 +23,7 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::num::NonZeroU64;
 
+const DEFAULT_CONTEXT_WINDOW: NonZeroU64 = NonZeroU64::new(272_000).unwrap();
 const MAX_SOURCE_BYTES: usize = 256 * 1024;
 const MAX_SUMMARY_BYTES: usize = 32 * 1024;
 const MAX_SUMMARY_TOKENS: u64 = 2_048;
@@ -44,20 +45,20 @@ impl ContextLimits {
         defaults: &crate::configuration::UserDefaults,
         model_window: Option<NonZeroU64>,
     ) -> Self {
-        let window = match (defaults.model_context_window, model_window) {
-            (Some(configured), Some(model)) => Some(configured.min(model)),
-            (configured, model) => configured.or(model),
-        };
-        let ceiling = window.map(|window| {
-            NonZeroU64::new(window.get() - window.get().div_ceil(10)).unwrap_or(NonZeroU64::MIN)
-        });
-        let auto_compact = match (defaults.model_auto_compact_token_limit, ceiling) {
-            (Some(configured), Some(ceiling)) => Some(configured.min(ceiling)),
-            (configured, ceiling) => configured.or(ceiling),
-        };
+        let model_ceiling = model_window.unwrap_or(DEFAULT_CONTEXT_WINDOW);
+        let window = defaults
+            .model_context_window
+            .unwrap_or(DEFAULT_CONTEXT_WINDOW)
+            .min(model_ceiling);
+        let threshold =
+            NonZeroU64::new(window.get() - window.get().div_ceil(10)).unwrap_or(NonZeroU64::MIN);
+        let auto_compact = defaults
+            .model_auto_compact_token_limit
+            .unwrap_or(threshold)
+            .min(threshold);
         Self {
-            window,
-            auto_compact,
+            window: Some(window),
+            auto_compact: Some(auto_compact),
         }
     }
 }
@@ -157,34 +158,33 @@ mod tests {
     use crate::configuration::UserDefaults;
 
     #[test]
-    fn resolves_limits_with_and_without_model_metadata() {
-        let mut defaults = UserDefaults::default();
-        let known = NonZeroU64::new(10_000);
-        assert_eq!(
-            ContextLimits::resolve(&defaults, None),
-            ContextLimits::default()
-        );
-        assert_eq!(
-            ContextLimits::resolve(&defaults, known).auto_compact,
-            NonZeroU64::new(9_000)
-        );
-
-        defaults.model_auto_compact_token_limit = NonZeroU64::new(12_000);
-        assert_eq!(
-            ContextLimits::resolve(&defaults, None).auto_compact,
-            NonZeroU64::new(12_000)
-        );
-        defaults.model_context_window = NonZeroU64::new(20_000);
-        assert_eq!(ContextLimits::resolve(&defaults, known).window, known);
-
-        defaults.model_context_window = NonZeroU64::new(8_001);
-        assert_eq!(
-            ContextLimits::resolve(&defaults, known),
-            ContextLimits {
-                window: NonZeroU64::new(8_001),
-                auto_compact: NonZeroU64::new(7_200)
-            },
-        );
+    fn selects_a_working_window_and_bounds_explicit_overrides() {
+        // Route capacity, configured window and threshold, captured window and threshold.
+        for (capacity, window, threshold, expected_window, expected_threshold) in [
+            (None, None, None, 272_000, 244_800),
+            (Some(128_000), None, None, 128_000, 115_200),
+            (Some(1_000_000), None, None, 272_000, 244_800),
+            (Some(1_000_000), Some(500_000), None, 500_000, 450_000),
+            (Some(128_000), Some(500_000), None, 128_000, 115_200),
+            (None, Some(500_000), None, 272_000, 244_800),
+            (None, Some(8_001), Some(12_000), 8_001, 7_200),
+            (None, None, Some(12_000), 272_000, 12_000),
+            (Some(1), None, None, 1, 1),
+        ] {
+            assert_eq!(
+                ContextLimits::resolve(
+                    &UserDefaults {
+                        model_context_window: window.and_then(NonZeroU64::new),
+                        model_auto_compact_token_limit: threshold.and_then(NonZeroU64::new),
+                    },
+                    capacity.and_then(NonZeroU64::new),
+                ),
+                ContextLimits {
+                    window: NonZeroU64::new(expected_window),
+                    auto_compact: NonZeroU64::new(expected_threshold),
+                }
+            );
+        }
     }
 
     #[test]

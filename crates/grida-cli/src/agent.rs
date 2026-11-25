@@ -13,8 +13,11 @@ use grida_agent::gg::{GgConnection, GgGrantRenewal};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::process::{self, RunOptions};
 use grida_auth::{AuthClient, GgGrant, GgGrantScope};
+use serde_json::Value;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 struct GgTransport {
@@ -153,28 +156,39 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
         }
         connection = &mut grant => connection?,
     });
-    let http = http::Transport::new(Some(&connection.api_origin())).map_err(|_| {
+    let api_origin = connection.api_origin();
+    let http = http::Transport::new(Some(&api_origin)).map_err(|_| {
         Error::new(
             "gg_transport_unavailable",
             "Gateway chat transport is unavailable.",
         )
     })?;
+    let context_window = tokio::select! {
+        biased;
+        result = &mut signal => {
+            result.map_err(failure)?;
+            return Ok(130);
+        }
+        window = gateway_context_window(&http, &api_origin, command.model.as_str(), &cancel) => window,
+    };
     let transport = Arc::new(GgTransport {
         connection: connection.clone(),
         http,
     });
-    let host = Arc::new(
-        Host::open_gg(
-            &command.state_dir,
-            GgOptions {
-                model: command.model,
-                max_output_tokens: command.max_output_tokens,
-            },
-            connection,
-            transport,
-        )
-        .map_err(failure)?,
-    );
+    let host = Host::open_gg(
+        &command.state_dir,
+        GgOptions {
+            model: command.model,
+            max_output_tokens: command.max_output_tokens,
+        },
+        connection,
+        transport,
+    )
+    .map_err(failure)?;
+    let host = Arc::new(match context_window {
+        Some(window) => host.with_model_context_window(window).map_err(failure)?,
+        None => host,
+    });
     if let Some((run, input_file, initial_title)) = run {
         process::run_with_input(&host, run, input_file, initial_title, signal)
             .await
@@ -182,6 +196,59 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
     } else {
         process::serve(host, None, signal).await.map_err(failure)
     }
+}
+
+async fn gateway_context_window(
+    transport: &http::Transport,
+    api_origin: &str,
+    model: &str,
+    cancel: &CancellationToken,
+) -> Option<NonZeroU64> {
+    let origin = if api_origin == http::LOCAL_GG {
+        http::LOCAL_GG
+    } else {
+        "https://gateway.grida.ai"
+    };
+    let mut request = http::Request::new(::http::Method::GET, format!("{origin}/v1/models"), "");
+    request.headers.insert(
+        "accept",
+        ::http::HeaderValue::from_static("application/json"),
+    );
+    request.deadline = Some(Instant::now() + Duration::from_secs(3));
+    request.max_response_bytes = 2 * 1024 * 1024;
+    let response = transport
+        .send(http::Lane::Discovery, request, cancel)
+        .await
+        .ok()?;
+    if response.status != 200 {
+        return None;
+    }
+    let catalogue = serde_json::from_slice(&response.body).ok()?;
+    model_context_window(&catalogue, model)
+}
+
+fn model_context_window(catalogue: &Value, model: &str) -> Option<NonZeroU64> {
+    if catalogue["object"] != "list" {
+        return None;
+    }
+    let models = catalogue["data"]
+        .as_array()
+        .filter(|models| models.len() <= 1024)?;
+    let mut entries = models.iter().filter(|entry| entry["id"] == model);
+    let entry = entries.next()?;
+    if entries.next().is_some()
+        || entry["object"] != "model"
+        || !entry["gg"]["interfaces"]
+            .as_array()?
+            .iter()
+            .any(|interface| interface == "chat.completions")
+    {
+        return None;
+    }
+    entry["gg"]["limits"]["context_tokens"]
+        .as_u64()
+        .filter(|capacity| *capacity <= 9_007_199_254_740_991)
+        .and_then(NonZeroU64::new)
 }
 
 pub async fn dispatch_external(command: ExternalAgentCommand) -> Result<u8> {
@@ -254,4 +321,50 @@ fn failure(error: agent_kit_core::Error) -> Error {
         failure.exit = 5;
     }
     failure
+}
+
+#[cfg(test)]
+mod tests {
+    use super::model_context_window;
+    use serde_json::json;
+
+    #[test]
+    fn discovers_only_the_selected_chat_models_capacity() {
+        let response = |context| {
+            json!({
+                "object": "list",
+                "data": [
+                    {"object":"model","id":"example/neighbor","gg":{
+                        "interfaces":["chat.completions"],
+                        "limits":{"context_tokens":16_384},
+                    }},
+                    {"object":"model","id":"example/chat","gg":{
+                        "interfaces":["chat.completions"],
+                        "limits":{"context_tokens":context}
+                    }},
+                    {"object":"model","id":"example/media","gg":{
+                        "interfaces":["images.generations"],
+                        "limits":{"context_tokens":32_768},
+                    }},
+                ],
+            })
+        };
+        assert_eq!(
+            model_context_window(&response(json!(131_072)), "example/chat")
+                .unwrap()
+                .get(),
+            131_072
+        );
+        for model in ["example/unknown", "example/media", "chat"] {
+            assert!(model_context_window(&response(json!(131_072)), model).is_none());
+        }
+        for context in [
+            json!(0),
+            json!(1.5),
+            json!(9_007_199_254_740_992_u64),
+            json!(null),
+        ] {
+            assert!(model_context_window(&response(context), "example/chat").is_none());
+        }
+    }
 }

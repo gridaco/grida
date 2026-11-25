@@ -707,6 +707,13 @@ impl InputAuthority {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PromptAdmission {
+    Immediate,
+    Identified,
+    Headless,
+}
+
 enum Launch {
     Prompt {
         initial_title: Option<String>,
@@ -716,6 +723,7 @@ enum Launch {
         publish_text: bool,
     },
     Identified {
+        headless: bool,
         initial_title: Option<String>,
         id: ChangeId,
         parts: Vec<PromptPart>,
@@ -1434,17 +1442,71 @@ impl Host {
         self.start_prompt_with_initial_title(request, None).await
     }
 
-    /// Accept a prompt with an optional catalog label for its first submission.
+    /// Start a direct prompt with an optional first-submission catalog label.
     pub async fn start_prompt_with_initial_title(
         &self,
         request: PromptRequest,
         initial_title: Option<String>,
     ) -> Result<AcceptedRun> {
+        self.start_accepted_prompt(request, initial_title, PromptAdmission::Immediate)
+            .await
+    }
+
+    /// Start a one-shot prompt, awaiting any preceding maintenance before returning
+    /// the foreground turn's receipt.
+    pub(crate) async fn start_headless_prompt(
+        &self,
+        request: PromptRequest,
+        initial_title: Option<String>,
+    ) -> Result<AcceptedRun> {
+        self.start_accepted_prompt(request, initial_title, PromptAdmission::Headless)
+            .await
+    }
+
+    async fn start_accepted_prompt(
+        &self,
+        request: PromptRequest,
+        initial_title: Option<String>,
+        mode: PromptAdmission,
+    ) -> Result<AcceptedRun> {
         let policy = self.submission_policy(&request, false)?;
-        let ticket = self
-            .register_prompt(request, false, policy, initial_title)
+        let mut ticket = self
+            .register_prompt(request, mode, policy, initial_title)
             .await?;
-        let acceptance = prompt_acceptance(ticket.admission).await?;
+        let mut acceptance = prompt_acceptance(ticket.admission).await?;
+        if mode == PromptAdmission::Headless && acceptance.disposition == InputDisposition::Queued {
+            // This run owns the handoff. Await the maintenance worker so the next
+            // ticket describes the original input's execution and completion.
+            match ticket
+                .completion
+                .await
+                .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))??
+            {
+                RunResult::Settled(_) => {}
+                _ => {
+                    return Err(problem(
+                        ErrorKind::Unavailable,
+                        "run_compaction_interrupted",
+                    ));
+                }
+            }
+            let session = acceptance.session.clone();
+            let queued = Acceptance {
+                session: session.clone(),
+                input: acceptance.input,
+                position: acceptance.position,
+            };
+            let mut work = self.settled_work(&session).await?;
+            ticket = self.register(
+                &mut work,
+                session,
+                TurnId::new(uuid())?,
+                Launch::Queued(Some(queued), None),
+            )?;
+            drop(work);
+            acceptance = prompt_acceptance(ticket.admission).await?;
+        }
+
         let InputDisposition::Claimed { turn } = acceptance.disposition else {
             return Err(problem(ErrorKind::Uncertain, "prompt_claim_missing"));
         };
@@ -1461,7 +1523,7 @@ impl Host {
     async fn register_prompt(
         &self,
         request: PromptRequest,
-        identified: bool,
+        mode: PromptAdmission,
         policy: SubmissionPolicy,
         initial_title: Option<String>,
     ) -> Result<LaunchTicket> {
@@ -1470,8 +1532,11 @@ impl Host {
             id, session, parts, ..
         } = request;
         validate_prompt_parts(&parts)?;
-        let launch = if identified && compaction::ordinary_text(policy.effort.is_some(), &parts) {
+        let launch = if mode != PromptAdmission::Immediate
+            && compaction::ordinary_text(policy.effort.is_some(), &parts)
+        {
             Launch::Identified {
+                headless: mode == PromptAdmission::Headless,
                 id,
                 parts,
                 policy,
@@ -1482,7 +1547,7 @@ impl Host {
                 id,
                 parts,
                 policy,
-                publish_text: identified,
+                publish_text: mode == PromptAdmission::Identified,
                 initial_title,
             }
         };
@@ -1563,10 +1628,12 @@ impl Host {
             );
             let live = match &launch {
                 Launch::Prompt { publish_text, .. } => *publish_text,
+                Launch::Identified { headless: true, .. } => false,
                 _ => true,
             }
             .then(|| host.live_updates.clone());
             let identified = matches!(&launch, Launch::Identified { .. });
+            let headless = matches!(&launch, Launch::Identified { headless: true, .. });
             let queue_recovery = match &launch {
                 Launch::Queued(_, revision) => *revision,
                 _ => None,
@@ -1722,7 +1789,7 @@ impl Host {
                 let _ = completion_tx.send(result);
             }
             host.wake_ready().await;
-            if settled {
+            if settled && !(headless && automatic_compaction) {
                 host.kick_queue(worker_session).await;
             } else if suspended {
                 host.kick_stopped(worker_session, worker_turn).await;
@@ -1781,6 +1848,7 @@ impl Host {
                 parts,
                 policy,
                 initial_title,
+                ..
             } => {
                 let _admission = self.configuration_admission.lock().await;
                 let view = self.store.inspect(session.clone()).await?;
@@ -3964,7 +4032,12 @@ impl Host {
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
             let ticket = host
-                .register_prompt(request.clone(), true, policy, context.initial_title.clone())
+                .register_prompt(
+                    request.clone(),
+                    PromptAdmission::Identified,
+                    policy,
+                    context.initial_title.clone(),
+                )
                 .await?;
             prompt_acceptance(ticket.admission).await
         }

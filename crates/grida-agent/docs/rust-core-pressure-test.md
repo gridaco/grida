@@ -812,12 +812,15 @@ attachment and after restart return the same turn. The
 exercises an unfocused workspace. Automatic compaction stays silent on
 success and failure, while the following reply and manual compaction notify.
 The [context limits cases](../tests/process/compaction/limits.rs) exercise the
-exact threshold, the context window ceiling, a model downshift, and queued
-work accepted before a settings reload. When an earlier tool result puts
-the current turn over its threshold, a summary can replace that result in
-model context while the reopened transcript retains the original. The
-compactor receives the active request and the tool call paired with its
-result. The active request also remains in foreground context. If the
+exact threshold for both built-in and explicit defaults, the context window
+ceiling, a model downshift, and queued work accepted before a settings
+reload. A one-shot run with an existing session checks that its foreground
+request follows the maintenance attempt and uses the installed summary or
+the retained original after failure. When an earlier tool result puts the
+current turn over its threshold,
+a summary can replace that result in model context while the reopened
+transcript retains the original. The compactor receives the active request
+and the tool call paired with its result. The active request also remains in foreground context. If the
 summary fails, the next request still receives the original result. A
 same-turn summary produces no additional lifecycle settlement. The
 compaction item regression covers multiple starts and completions in the

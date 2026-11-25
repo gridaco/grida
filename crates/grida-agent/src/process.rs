@@ -338,7 +338,7 @@ async fn admit_run(
             .into_iter()
             .map(|reference| PromptPart::Skill { reference }),
     );
-    host.start_prompt_with_initial_title(
+    host.start_headless_prompt(
         PromptRequest {
             id: change_id()?,
             session,

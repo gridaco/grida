@@ -12,11 +12,11 @@ model's context capacity before accepting a new input.
 
 ## Field review
 
-| Field                            | Meaning                                                   | Default and bounds                                                                                                                                                                                            |
-| -------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema_version`                 | Version of this file's schema.                            | Required version `1` when the file exists.                                                                                                                                                                    |
-| `model_context_window`           | Context capacity used for usage and automatic compaction. | Optional positive safe integer. Omission uses the known model window. An explicit value supplies an unknown window or lowers a known one.                                                                     |
-| `model_auto_compact_token_limit` | Usage that triggers automatic compaction.                 | Optional positive safe integer. With a resolved window, the default and maximum are 90% of the window, rounded down with a minimum of one token. With an unknown window, an explicit threshold still applies. |
+| Field                            | Meaning                                                   | Default and bounds                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`                 | Version of this file's schema.                            | Required version `1` when the file exists.                                                                                                                                      |
+| `model_context_window`           | Context capacity used for usage and automatic compaction. | Optional positive safe integer. Defaults to 272,000 tokens, bounded by model capacity. An explicit value can use up to the known capacity, or 272,000 when capacity is unknown. |
+| `model_auto_compact_token_limit` | Usage that triggers automatic compaction.                 | Optional positive safe integer. Defaults to 90% of the working window, rounded down to at least one token. An explicit value can lower the threshold.                           |
 
 Each optional field accepts integers from `1` through `9007199254740991`.
 The native host captures the resolved values with accepted input. Reported

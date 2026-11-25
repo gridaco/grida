@@ -3,6 +3,7 @@ use super::lifecycle::{
     wait_for_snapshot,
 };
 use super::*;
+use crate::summaries::reported_usage_answer;
 use agent_kit_core::history::HistoryRecord;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message;
@@ -122,7 +123,7 @@ async fn prime_automatic_history(
     socket: &mut SharedSocket,
     session: &str,
 ) -> String {
-    let older = format!("Earlier requirements {}", "a".repeat(105_000));
+    let older = "Earlier requirements for the original archive.".to_owned();
     for (id, text) in [(3, older.as_str()), (4, "Keep this recent turn verbatim.")] {
         let result = prompt(socket, id, session, text).await;
         assert_eq!(result["result"]["stopReason"], "end_turn", "{result}");
@@ -184,7 +185,7 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
         let workspace = TempDir::new().unwrap();
         let endpoint = Endpoint::start(vec![
             Reply::Finished("First original answer."),
-            Reply::Finished("Recent original answer."),
+            reported_usage_answer("Recent original answer.", 245_000, 20),
             summary,
             Reply::Finished("The queued chat reply."),
             Reply::Finished("A manual context summary."),
@@ -206,8 +207,8 @@ async fn lifecycle_distinguishes_automatic_compaction_from_chat_and_manual_compa
             .await;
         let session = created["result"]["sessionId"].as_str().unwrap();
         for text in [
-            "Earlier requirements. ".repeat(5_200),
-            "Recent request.".into(),
+            "Earlier requirements for the original archive.",
+            "Recent request.",
         ] {
             let (_, facts, items) = observe(
                 &mut client,
@@ -383,7 +384,7 @@ async fn identified_submit_compacts_in_regime(
         Reply::Release("Initial direct answer.", initial_held),
         Reply::Finished("First original answer."),
         Reply::Finished("Recent original answer."),
-        Reply::Finished("Synchronous prompt answer."),
+        reported_usage_answer("Synchronous prompt answer.", 245_000, 20),
         Reply::Release("Earlier work and unresolved decisions.", held),
         Reply::Finished("Direct input answer."),
         Reply::Finished("Unexpected replay request."),
@@ -560,7 +561,7 @@ async fn automatic_compaction_keeps_queue_inputs_and_the_recent_context_exact() 
     let (release, held) = tokio::sync::oneshot::channel();
     let mut endpoint = Endpoint::start(vec![
         Reply::Finished("First original answer."),
-        Reply::Finished("Recent original answer."),
+        reported_usage_answer("Recent original answer.", 245_000, 20),
         Reply::Release("Earlier work and unresolved decisions.", held),
         Reply::Finished("First queued answer."),
         Reply::Finished("Second queued answer."),
@@ -723,7 +724,7 @@ async fn automatic_compaction_fails_once_and_uses_the_previous_context() {
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Finished("First original answer."),
-        Reply::Finished("Recent original answer."),
+        reported_usage_answer("Recent original answer.", 245_000, 20),
         Reply::Stop("length"),
         Reply::Finished("Handled the original input."),
     ])
@@ -780,7 +781,7 @@ async fn paused_automatic_compaction_keeps_queue(regime: &str) {
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Finished("First original answer."),
-        Reply::Finished("Recent original answer."),
+        reported_usage_answer("Recent original answer.", 245_000, 20),
         Reply::Hold("Partial maintenance candidate."),
         Reply::Finished("Continued after explicit queue release."),
     ])

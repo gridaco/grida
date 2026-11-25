@@ -35,8 +35,8 @@ fn route_changed() -> Error {
 }
 
 impl Host {
-    /// Supply the launch model's context capacity from the private supervisor.
-    pub fn with_supervised_context_window(mut self, window: NonZeroU64) -> Result<Self> {
+    /// Supply the launch model's verified context capacity.
+    pub fn with_model_context_window(mut self, window: NonZeroU64) -> Result<Self> {
         let execution = self
             .execution
             .as_mut()

@@ -271,18 +271,20 @@ export namespace turn_activity {
   }
 
   /**
-   * The latest reported foreground context and the window captured with it.
+   * The latest foreground context, including a captured window for estimates.
    * Old standalone compaction records can contain the summary model's usage.
    */
-  export function measuredContext(
+  export function contextUsage(
     records: readonly NativeChatTurnRecord[]
-  ): { tokens: number; window?: number } | undefined {
+  ): { tokens?: number; window?: number } | undefined {
+    let estimated = false;
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
       const compacted = record.compactions?.length
         ? record.compactions.some((item) => item.status === "succeeded")
         : Boolean(record.compaction);
       if (
+        !estimated &&
         record.contextTokens !== undefined &&
         (!compacted || record.modelId !== undefined)
       )
@@ -290,7 +292,9 @@ export namespace turn_activity {
           tokens: record.contextTokens,
           window: record.contextWindowTokens,
         };
-      if (compacted) return undefined;
+      if (record.contextWindowTokens !== undefined)
+        return { window: record.contextWindowTokens };
+      if (compacted) estimated = true;
     }
     return undefined;
   }

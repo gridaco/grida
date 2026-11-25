@@ -21,17 +21,21 @@ async fn queued_compaction_uses_reported_context_and_the_limits_captured_before_
     const OLD: &str = "Keep the printed originals in the archive. The digital collection is a separate source and must retain its own index.";
     const RECENT: &str = "Always keep this recent turn verbatim.";
     const SUMMARY: &str = "Keep the original archive.";
-    // 7,950 reported input + 49 output + one new token in "Next" = 8,000.
-    // A limit above the window falls back to nine tenths of that window.
-    for (window, limit, input, compact) in [
-        (50_000, 8_001, 7_950, false),
-        (20_000, 8_000, 7_950, true),
-        (10_000, 20_000, 8_950, true),
+    // Add 49 reported output tokens and one estimated token for "Next".
+    // With an unknown model and no settings, the default threshold is 244,800.
+    for (settings, captured_window, captured_limit, input, compact) in [
+        (None, 272_000, 244_800, 244_749, false),
+        (None, 272_000, 244_800, 244_750, true),
+        (Some((50_000, 8_001)), 50_000, 8_001, 7_950, false),
+        (Some((20_000, 8_000)), 20_000, 8_000, 7_950, true),
+        (Some((10_000, 20_000)), 10_000, 9_000, 8_950, true),
     ] {
         let temporary = TempDir::new().unwrap();
         let state = temporary.path().join("state");
         let workspace = TempDir::new().unwrap();
-        limits(&fixture_config_home(&state), window, limit);
+        if let Some((window, limit)) = settings {
+            limits(&fixture_config_home(&state), window, limit);
+        }
         let (release, held) = tokio::sync::oneshot::channel();
         let mut replies = vec![
             reported_usage_answer("The originals have their own index.", 1_000, 10),
@@ -75,6 +79,21 @@ async fn queued_compaction_uses_reported_context_and_the_limits_captured_before_
         )
         .await;
         assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let captured = ws_rpc(
+            &mut socket,
+            8,
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":"next"}),
+        )
+        .await;
+        assert_eq!(
+            captured["result"]["settings"]["modelContextWindow"],
+            captured_window
+        );
+        assert_eq!(
+            captured["result"]["settings"]["modelAutoCompactTokenLimit"],
+            captured_limit
+        );
 
         // The inflight input holds the queue while the new configuration takes
         // effect. The accepted input must still apply its original window/limit.
@@ -114,6 +133,77 @@ async fn queued_compaction_uses_reported_context_and_the_limits_captured_before_
         wait_for_snapshot(&mut socket, &session, |view| view["current"].is_null()).await;
         drop(socket);
         terminate_shared_server(host).await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+async fn headless_run_compacts_before_requesting_the_next_reply() {
+    const OLDER: &str = "Keep the original archive records indexed.";
+    const RECENT: &str = "Recent records belong in the second collection.";
+    const SUMMARY: &str = "The original archive is indexed.";
+    for compacts in [true, false] {
+        let root = TempDir::new().unwrap();
+        let state = root.path().join("state");
+        let cwd = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Finished("Older answer."),
+            reported_usage_answer("Recent answer.", 245_000, 20),
+            if compacts {
+                Reply::Finished(SUMMARY)
+            } else {
+                Reply::Stop("length")
+            },
+            Reply::Finished("Foreground reply."),
+        ])
+        .await;
+        let run = |prompt: &str, session: Option<&str>| {
+            let mut child = executable();
+            child
+                .args(["run", "--prompt", prompt, "--cwd"])
+                .arg(cwd.path());
+            if let Some(session) = session {
+                child.args(["--session", session]);
+            }
+            configured(&mut child, &state, &endpoint.url);
+            child
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap()
+        };
+        let first = finish_child(run(OLDER, None)).await;
+        assert!(first.status.success(), "{:?}", first.stderr);
+        let first = records(&first.stdout);
+        let session = first[0]["session_id"].as_str().unwrap();
+        let recent = finish_child(run(RECENT, Some(session))).await;
+        assert!(recent.status.success(), "{:?}", recent.stderr);
+        let foreground = run("Continue.", Some(session));
+        endpoint.request().await;
+        endpoint.request().await;
+        let summary = endpoint.request().await;
+        assert!(summary.get("tools").is_none(), "{summary}");
+        assert!(summary["messages"].to_string().contains(OLDER));
+        assert!(!summary["messages"].to_string().contains(RECENT));
+        let request = endpoint.request().await;
+        assert!(request.get("tools").is_some(), "{request}");
+        assert!(request["messages"].to_string().contains(RECENT));
+        assert_eq!(request["messages"].to_string().contains(SUMMARY), compacts);
+        assert_eq!(request["messages"].to_string().contains(OLDER), !compacts);
+        assert_eq!(
+            request["messages"].as_array().unwrap().last().unwrap()["content"],
+            "Continue."
+        );
+
+        let output = finish_child(foreground).await;
+        assert!(output.status.success(), "{:?}", output.stderr);
+        let records = records(&output.stdout);
+        assert_eq!(records.len(), 2, "{records:?}");
+        assert_eq!(records[0]["kind"], "accepted");
+        assert_eq!(records[1]["kind"], "finished");
+        assert_eq!(records[1]["disposition"], "succeeded");
+        assert_eq!(records[0]["turn_id"], records[1]["turn_id"]);
+        assert!(records[1].to_string().contains("Foreground reply."));
         endpoint.done().await;
     }
 }

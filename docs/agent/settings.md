@@ -30,11 +30,13 @@ summarize sooner. The context ring shows recent usage.
    messages accepted after the restart. Running and queued messages keep the
    settings they started with.
 
-Both settings are optional. `model_context_window` caps the assumed capacity.
-`model_auto_compact_token_limit` controls when Grida tries to summarize the
-context. With a known window, the default and maximum threshold is 90% of
-that window. The provider enforces its own limits. Remove either key to use
-its default. [Agent configuration reference](../reference/agent-configuration.md)
+Grida uses a working window of 272,000 tokens by default and uses the model’s
+capacity when it is smaller. `model_context_window` lets you choose a different
+window within the route’s capacity. If the capacity is unknown, 272,000 tokens
+is the ceiling. `model_auto_compact_token_limit` can trigger compaction earlier
+than the default of 90% of the working window. The provider enforces its own
+limits. Remove either key to restore its default.
+[Agent configuration reference](../reference/agent-configuration.md)
 
 To try compaction, complete two turns with enough text to reach the threshold,
 then send another message. Grida can summarize earlier material while keeping

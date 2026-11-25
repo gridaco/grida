@@ -29,12 +29,12 @@ pub struct FieldDefinition {
 pub const MODEL_CONTEXT_WINDOW: FieldDefinition = FieldDefinition {
     key: "model_context_window",
     label: "Model context window",
-    description: "Context window size for usage and automatic compaction, capped by known model capacity.",
+    description: "Working window for usage and automatic compaction. Explicit values are capped by model capacity or the fallback when capacity is unknown.",
     value_type: "integer",
     units: "tokens",
     minimum: 1,
     maximum: 9_007_199_254_740_991,
-    default_rule: "Use the selected model's known context window.",
+    default_rule: "Use 272,000 tokens or the model capacity, whichever is smaller.",
     scope: "Global agent defaults.",
     activation: "Applies to later accepted inputs.",
 };
@@ -42,7 +42,7 @@ pub const MODEL_CONTEXT_WINDOW: FieldDefinition = FieldDefinition {
 pub const MODEL_AUTO_COMPACT_TOKEN_LIMIT: FieldDefinition = FieldDefinition {
     key: "model_auto_compact_token_limit",
     label: "Automatic compaction threshold",
-    description: "Token usage at which to compact the conversation, capped at 90% of a known effective context window.",
-    default_rule: "Use 90% of the effective model context window, when known.",
+    description: "Token usage at which to compact the conversation, capped at 90% of the working window.",
+    default_rule: "Use 90% of the working window, rounded down to at least one token.",
     ..MODEL_CONTEXT_WINDOW
 };

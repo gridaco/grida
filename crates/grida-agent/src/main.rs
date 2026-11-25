@@ -1091,7 +1091,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             .copied()
             .and_then(NonZeroU64::new)
     }) {
-        Some(window) => host.with_supervised_context_window(window)?,
+        Some(window) => host.with_model_context_window(window)?,
         None => host,
     };
     let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;

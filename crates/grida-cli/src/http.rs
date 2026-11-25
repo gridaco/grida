@@ -34,7 +34,7 @@ mod wire;
 pub const MAX_BODY: usize = 128 * 1024 * 1024;
 pub const MAX_RESPONSE: usize = 256 * 1024 * 1024;
 const ACCOUNT_LIMIT: usize = 65_536;
-const LOCAL_GG: &str = "http://127.0.0.1:3041";
+pub(crate) const LOCAL_GG: &str = "http://127.0.0.1:3041";
 const LOCAL_ISSUER: &str = "http://127.0.0.1:55431/auth/v1";
 const ISSUER: &str = "https://mozagqllybnbytfcmvdh.supabase.co/auth/v1";
 const API: &str = "https://grida.co";

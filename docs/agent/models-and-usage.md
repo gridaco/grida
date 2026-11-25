@@ -208,9 +208,11 @@ request again; review any partial work before asking again.
 
 ## See how full the context is
 
-The ring beside the model picker shows context usage. A reported measurement
-uses the context window resolved for that turn. Otherwise the ring estimates
-usage from the visible conversation and the selected model's known window.
+The ring beside the model picker shows context usage. It uses the working
+window captured for the turn, or the selected model’s known window before
+that capture is available. If the provider supplies no measurement, the ring
+estimates usage from the visible conversation. The default working window is
+272,000 tokens, or the model’s capacity if it is smaller. [Set context size and compaction](./settings.md)
 The tooltip and breakdown say whether the value is **Estimated** or
 **Reported by provider**. Hover for the percentage and token count. Open the
 breakdown to see how the visible content accounts for the measured request.
