@@ -18,6 +18,7 @@ const scenarios = [
   { id: "empty", label: "New chat", example: "empty" },
   { id: "queue", label: "Message queue", example: "text", queued: true },
   { id: "attachments", label: "Attachments", example: "attachments" },
+  { id: "file-mentions", label: "File mentions", example: "file-mentions" },
   {
     id: "inline-workspace-images",
     label: "Inline images",

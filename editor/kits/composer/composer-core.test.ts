@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { ComposerCore, type ComposerAttachmentFilter } from "./composer-core";
+import { describe, expect, it, vi } from "vitest";
+import {
+  ComposerCore,
+  type ComposerAttachmentFilter,
+  type ComposerCatalog,
+  type ComposerMention,
+} from "./composer-core";
 
 describe("ComposerCore", () => {
   it("rejects empty messages by default", () => {
@@ -142,6 +147,129 @@ describe("ComposerCore", () => {
     expect(core.getSnapshot()).toMatchObject({
       triggerIndex: 0,
     });
+  });
+
+  it("shortlists @ mentions, ranks filename matches, and keeps each full path", () => {
+    const paths = [
+      "handout/archive.md",
+      "web/draft-handout.md",
+      "print/handouts.md",
+      "web/handout.md",
+      "print/handout.md",
+      "icons/icon@2x.png",
+      ...Array.from(
+        { length: 10 },
+        (_, index) => `archive/handout-${index}.md`
+      ),
+    ];
+    const core = new ComposerCore({
+      mentions: paths.map((path) => ({
+        id: path,
+        label: path,
+        path,
+        kind: "file",
+      })),
+    });
+    const results = (draft: string) => {
+      core.inspectCursor(draft, draft.length);
+      return core.getSnapshot().trigger?.items.map(({ id }) => id);
+    };
+
+    expect(results("@")).toBeUndefined();
+    expect(results("user@2x")).toBeUndefined();
+    expect(results("@icons/icon@2x")).toEqual(["icons/icon@2x.png"]);
+    expect(results("@handout.md")).toEqual([
+      "web/handout.md",
+      "print/handout.md",
+      "web/draft-handout.md",
+    ]);
+    expect(results("@handout")?.slice(0, 3)).toEqual([
+      "print/handouts.md",
+      "web/handout.md",
+      "print/handout.md",
+    ]);
+    expect(results("@handout")).toHaveLength(8);
+    expect(results("@print/handout")).toEqual([
+      "print/handouts.md",
+      "print/handout.md",
+    ]);
+    expect(results("@unmatched")).toEqual([]);
+  });
+
+  it("keeps asynchronous mention results in source order and discards stale work", async () => {
+    const old = Promise.withResolvers<ComposerMention[]>();
+    const current = Promise.withResolvers<ComposerMention[]>();
+    const searchMentions = vi.fn<(query: string) => Promise<ComposerMention[]>>(
+      (query) => (query === "ha" ? old.promise : current.promise)
+    );
+    const core = new ComposerCore({ searchMentions });
+    const { signal } = new AbortController();
+    core.inspectCursor("@", 1);
+    await core.resolveMentions(signal);
+    expect(searchMentions).not.toHaveBeenCalled();
+    core.inspectCursor("@ha", 3);
+    expect(core.getSnapshot().trigger?.pending).toBe(true);
+    const pending = core.resolveMentions(signal);
+    core.inspectCursor("@handout", 8);
+    const resolving = core.resolveMentions(signal);
+    current.resolve([
+      { id: "z", label: "z", kind: "file", path: "z/handout.md" },
+      { id: "a", label: "a", kind: "file", path: "a/handout.md" },
+    ]);
+    await resolving;
+    old.resolve([{ id: "old", label: "Old" }]);
+    await pending;
+    expect(core.getSnapshot().trigger?.pending).toBe(false);
+    expect(core.getSnapshot().trigger?.items.map(({ id }) => id)).toEqual([
+      "z",
+      "a",
+    ]);
+    core.moveTriggerIndex(1);
+    core.inspectCursor("@handout", 8);
+    expect(core.getSnapshot().triggerIndex).toBe(1);
+  });
+
+  it("clears the picker on workspace changes and ignores a response after dismissal", async () => {
+    const core = new ComposerCore({
+      searchMentions: async () => [{ id: "old", label: "Old" }],
+    });
+    const { signal } = new AbortController();
+    core.inspectCursor("@plan", 5);
+    await core.resolveMentions(signal);
+    expect(core.getSnapshot().trigger?.items).toHaveLength(1);
+    const result = Promise.withResolvers<ComposerMention[]>();
+    core.setCatalog({ searchMentions: () => result.promise });
+    expect(core.getSnapshot().trigger?.items).toEqual([]);
+    const pending = core.resolveMentions(signal);
+    core.dismissTrigger();
+    result.resolve([{ id: "new", label: "New" }]);
+    await pending;
+    expect(core.getSnapshot().trigger).toBeNull();
+  });
+
+  it("discards an earlier lookup when the draft returns to the same query", async () => {
+    const first = Promise.withResolvers<ComposerMention[]>();
+    const latest = Promise.withResolvers<ComposerMention[]>();
+    const searchMentions =
+      vi.fn<NonNullable<ComposerCatalog["searchMentions"]>>();
+    searchMentions
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(latest.promise);
+    const core = new ComposerCore({ searchMentions });
+    const { signal } = new AbortController();
+    core.inspectCursor("@a", 2);
+    const stale = core.resolveMentions(signal);
+    core.inspectCursor("@ab", 3);
+    core.inspectCursor("@a", 2);
+    const current = core.resolveMentions(signal);
+
+    latest.resolve([{ id: "latest", label: "Latest result" }]);
+    await current;
+    first.resolve([{ id: "first", label: "First result" }]);
+    await stale;
+    expect(core.getSnapshot().trigger?.items.map(({ id }) => id)).toEqual([
+      "latest",
+    ]);
   });
 
   it("keeps a dismissed completion hidden through focus/caret and catalog refresh without changing its draft", () => {

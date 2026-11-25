@@ -1361,6 +1361,24 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }
   });
   guarded(
+    IPC_CHANNELS.WORKSPACE_SEARCH_PATHS,
+    async (event, id: unknown, query: unknown) => {
+      if (
+        !workspaceIdValue(id) ||
+        typeof query !== "string" ||
+        Buffer.byteLength(query) > 4096 ||
+        /\p{Cc}/u.test(query)
+      )
+        throw new Error("workspace_search_invalid");
+      return await windowRequest(
+        event,
+        "workspace_read_unavailable",
+        (signal) =>
+          servicesSidecarClient.searchWorkspacePaths(id, query, signal)
+      );
+    }
+  );
+  guarded(
     IPC_CHANNELS.WORKSPACE_READ,
     async (event, id: unknown, relative: unknown, kind: unknown) => {
       if (

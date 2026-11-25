@@ -95,6 +95,12 @@ export namespace ipc_admission {
           return (
             pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
           );
+        if (channel === IPC_CHANNELS.WORKSPACE_SEARCH_PATHS)
+          return (
+            pathname === "/desktop/welcome" ||
+            pathname === "/desktop/workspace" ||
+            pathname === "/desktop/file"
+          );
         if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
           return (
             pathname === "/desktop/workspace" &&

@@ -727,7 +727,7 @@ function NativeChatPane({
     () => (state.attachmentDraft ? controller.attachmentPreview() : null),
     [controller, state.attachmentDraft]
   );
-  const mentions = useWorkspaceFileMentions(
+  const searchMentions = useWorkspaceFileMentions(
     workspaceId,
     readWorkspaceDirectory
   );
@@ -744,10 +744,11 @@ function NativeChatPane({
   const catalog = useMemo(
     () => ({
       commands: NO_COMMANDS,
-      mentions,
+      mentions: [],
+      searchMentions,
       skillMentions: skillMenu.mentions,
     }),
-    [mentions, skillMenu.mentions]
+    [searchMentions, skillMenu.mentions]
   );
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);

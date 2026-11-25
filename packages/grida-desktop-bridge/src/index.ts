@@ -65,6 +65,10 @@ import type { DesktopFxViewer } from "./fx-viewer";
 import type { DesktopVoice } from "./voice";
 
 export { DesktopBrowser } from "./browser";
+export type WorkspacePathMatch = Readonly<{
+  path: string;
+  kind: "file" | "directory";
+}>;
 export * from "./voice";
 export { WebPreview } from "./web-preview";
 export { DesktopCompatibility } from "./compatibility";
@@ -488,6 +492,11 @@ export type DesktopBridge = {
       workspaceId: string,
       relPath?: string
     ) => Promise<WorkspaceFsEntry[]>;
+    /** Ranked workspace-relative matches. Null means native search is unavailable. */
+    search_paths?: (
+      workspaceId: string,
+      query: string
+    ) => Promise<WorkspacePathMatch[] | null>;
     read_file: (
       workspaceId: string,
       relPath: string

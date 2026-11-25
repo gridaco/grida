@@ -1068,6 +1068,12 @@ export namespace workspaces {
   ): Promise<WorkspaceFsEntry[]> {
     return await bridgeOrThrow().workspaces.readdir(workspaceId, relPath);
   }
+  export async function searchPaths(workspaceId: string, query: string) {
+    return (
+      (await bridgeOrThrow().workspaces.search_paths?.(workspaceId, query)) ??
+      null
+    );
+  }
   /**
    * Read a UTF-8 text file inside the workspace. The agent host refuses
    * binary content and files larger than 1 MiB — callers should catch

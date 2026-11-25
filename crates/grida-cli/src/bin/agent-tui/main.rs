@@ -1,3 +1,4 @@
+mod file_picker;
 mod protocol;
 mod screen;
 mod state;
@@ -9,9 +10,12 @@ use agent_client_protocol::v1::schema::SessionNotification;
 use agent_client_protocol::{ByteStreams, Client, Error, Result, on_receive_notification};
 use clap::{Arg, ArgAction, Command as Cli, value_parser};
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use file_picker::FilePicker;
 use futures_util::future::{FutureExt, LocalBoxFuture};
 use futures_util::stream::{FuturesUnordered, StreamExt};
+use grida_agent::workspace_search::WorkspaceSearch;
 use protocol::{LIFECYCLE, Mutation, MutationOutcome, Session, failure, request_id};
+use ratatui::layout::Rect;
 use screen::Screen;
 use serde_json::Value;
 use state::{Observed, State};
@@ -188,6 +192,7 @@ struct Exit {
 }
 
 enum Completed {
+    WorkspacePaths(WorkspaceSearch),
     Observe {
         after_compaction: bool,
         result: Result<Observed>,
@@ -200,6 +205,8 @@ enum Completed {
 struct App {
     state: State,
     transcript: Transcript,
+    file_picker: FilePicker,
+    scanning_workspace: bool,
     status: String,
     pending: Option<Mutation>,
     observing: bool,
@@ -214,6 +221,22 @@ type Jobs = FuturesUnordered<LocalBoxFuture<'static, Completed>>;
 
 impl App {
     fn schedule(&mut self, session: &Session, jobs: &Jobs) {
+        self.file_picker.update(self.state.completion_draft());
+        if self.file_picker.needs_paths() && !self.scanning_workspace {
+            self.scanning_workspace = true;
+            let root = session.workspace().to_owned();
+            jobs.push(
+                async move {
+                    let paths = tokio::task::spawn_blocking(move || WorkspaceSearch::scan(&root))
+                        .await
+                        .ok()
+                        .and_then(|result| result.ok())
+                        .unwrap_or_default();
+                    Completed::WorkspacePaths(paths)
+                }
+                .boxed_local(),
+            );
+        }
         if self.refresh && !self.observing {
             self.refresh = false;
             self.observing = true;
@@ -265,6 +288,10 @@ impl App {
 
     fn completed(&mut self, done: Completed) {
         match done {
+            Completed::WorkspacePaths(paths) => {
+                self.scanning_workspace = false;
+                self.file_picker.set_paths(paths);
+            }
             Completed::Observe {
                 after_compaction,
                 result,
@@ -334,12 +361,15 @@ impl App {
         self.replay |= self.transcript.note(&notification);
     }
 
-    fn key(&mut self, session: &Session, jobs: &Jobs, key: KeyEvent) -> bool {
+    fn key(&mut self, session: &Session, jobs: &Jobs, area: Rect, key: KeyEvent) -> bool {
         if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
             return false;
         }
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             return true;
+        }
+        if self.complete_path(area, key) {
+            return false;
         }
         let state = &mut self.state;
         match key.code {
@@ -396,6 +426,26 @@ impl App {
         false
     }
 
+    fn complete_path(&mut self, area: Rect, key: KeyEvent) -> bool {
+        if screen::picker_height(area, &self.file_picker) == 0 {
+            return false;
+        }
+        let state = &mut self.state;
+        self.file_picker.key(key, |start, path| {
+            let draft = state.input();
+            draft.truncate(start);
+            let quote = path.chars().any(char::is_whitespace) && !path.contains('"');
+            if quote {
+                draft.push('"');
+            }
+            draft.push_str(path);
+            if quote {
+                draft.push('"');
+            }
+            draft.push(' ');
+        })
+    }
+
     fn send(&mut self, session: &Session, jobs: &Jobs, request: Mutation, retry: bool) {
         self.acting = true;
         self.status = "Confirming request…".into();
@@ -430,7 +480,7 @@ async fn interact(
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let disconnected = loop {
         app.schedule(&session, &jobs);
-        screen.draw(&session.id, &app).map_err(io_failure)?;
+        let area = screen.draw(&session.id, &app).map_err(io_failure)?;
         tokio::select! {
             event = updates.recv() => {
                 let Some(event) = event else { break true };
@@ -448,7 +498,7 @@ async fn interact(
             }
             key = keys.next() => {
                 match key {
-                    Some(Ok(Event::Key(key))) if app.key(&session, &jobs, key) => break false,
+                    Some(Ok(Event::Key(key))) if app.key(&session, &jobs, area, key) => break false,
                     Some(Ok(Event::Paste(text))) => app.state.input().push_str(&printable(&text)),
                     Some(Err(error)) => return Err(io_failure(error)),
                     None => break false,

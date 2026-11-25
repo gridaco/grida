@@ -16,6 +16,7 @@ export namespace DesktopConversationFixtures {
     | "question-batch"
     | "multiple-questions"
     | "attachments"
+    | "file-mentions"
     | "inline-workspace-images"
     | "svg-selection"
     | "activity"
@@ -573,6 +574,7 @@ export namespace DesktopConversationFixtures {
         },
       ],
     },
+    { id: "file-mentions", messages: [] },
     { id: "empty", messages: [] },
   ];
 

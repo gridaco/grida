@@ -82,6 +82,9 @@ function ComposerBox() {
 - Mentions from a caller-provided catalog. The optional `skillMentions`
   catalog opens with `$`. A chosen skill is a removable inline reference with
   a book icon. Its payload is lowered separately from the authored message.
+- Type after `@` to see up to eight matches. Exact names and name prefixes
+  rank ahead of matches elsewhere in a filename or path. File and folder rows
+  show the basename and parent path. Tab and Enter accept the highlighted result.
 - File attachments as message parts.
 - Inline file references.
 - Opaque, read-only directory references (never recursive attachments).

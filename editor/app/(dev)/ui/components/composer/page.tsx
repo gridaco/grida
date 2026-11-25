@@ -60,6 +60,13 @@ function ComposerExamples() {
       <Example id="chat-composer" title="Chat composer">
         <DesktopComposerDemo />
       </Example>
+      <Example id="file-mentions" title="File mentions">
+        <p className="text-sm text-muted-foreground">
+          Type <code>@handout</code> to find files with the same name. Use the
+          arrows and press Tab or Enter to pick one.
+        </p>
+        <DesktopComposerDemo scenario="file-mentions" />
+      </Example>
       <Example id="transcript-time-dividers" title="Transcript time dividers">
         <DesktopComposerDemo scenario="time-dividers" />
       </Example>

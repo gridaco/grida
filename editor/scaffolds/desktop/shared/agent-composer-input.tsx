@@ -75,6 +75,7 @@ import {
   type ComposerController,
 } from "@/kits/composer";
 import { AgentComposerSubmission } from "./agent-composer-submission";
+import { WorkspaceFileIcon } from "../workbench/workspace-file-icon";
 
 const ESCAPE_CONFIRM_MS = 2000;
 const MAX_DICTATION_DRAFT_BYTES = 512 * 1024;
@@ -621,7 +622,9 @@ function AgentComposerInner({
         voiceState.active && voiceState.compact && voiceStyles.compact
       )}
     >
-      <ComposerTriggerMenu />
+      <ComposerTriggerMenu
+        renderFileIcon={(path) => <WorkspaceFileIcon relPath={path} />}
+      />
       {(attachments || selectionLabel) && (
         <ComposerAttachmentStrip>
           {attachments}

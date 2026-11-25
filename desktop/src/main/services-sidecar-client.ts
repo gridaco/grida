@@ -189,6 +189,15 @@ export namespace servicesSidecarClient {
       : await client().workspaces.readdir(id, relative);
   }
 
+  export async function searchWorkspacePaths(
+    id: string,
+    query: string,
+    signal: AbortSignal
+  ) {
+    const reads = nativeWorkspaceReader();
+    return reads ? await reads.searchPaths(id, query, signal) : null;
+  }
+
   export async function readWorkspaceSvgDocument(
     id: string,
     relative: string,

@@ -2096,6 +2096,9 @@ Today:
   enumerates one pinned directory without following child symlinks. It verifies
   the directory again before returning the complete bounded listing. Desktop
   uses the same catalog and frame checks as buffered reads.
+  Workspace path search reads each exact relative directory through that
+  pinned reader, omits symlink entries, and revalidates the registered root
+  before returning a bounded list of relative names and kinds.
   The [workspace writer](crates/grida-agent/src/workspace_file/write.rs)
   runs with a separate kernel scope and pins the destination parent. It
   checks the existing target and any supplied fractional modification time

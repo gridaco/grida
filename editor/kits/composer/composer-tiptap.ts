@@ -526,6 +526,18 @@ export namespace ComposerTiptap {
       return true;
     }
 
+    if (
+      trigger?.pending &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      ["Enter", "Tab", "ArrowUp", "ArrowDown"].includes(event.key)
+    ) {
+      event.preventDefault();
+      return true;
+    }
+
     if (trigger && triggerItemsCount > 0) {
       if (input.event.key === "ArrowDown") {
         input.event.preventDefault();
@@ -542,7 +554,7 @@ export namespace ComposerTiptap {
       if (
         !event.shiftKey &&
         (event.key === "Enter" ||
-          (trigger.kind === "skill" &&
+          ((trigger.kind === "skill" || trigger.kind === "mention") &&
             event.key === "Tab" &&
             !event.altKey &&
             !event.ctrlKey &&

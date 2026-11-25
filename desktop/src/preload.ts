@@ -1643,6 +1643,12 @@ const bridge: DesktopBridge = {
         relPath ?? "",
         "directory"
       ),
+    search_paths: (workspaceId, query) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_SEARCH_PATHS,
+        workspaceId,
+        query
+      ),
     read_file: (workspaceId, relPath) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.WORKSPACE_READ,

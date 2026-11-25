@@ -21,7 +21,10 @@ import {
   NativeChatDemoPanelLayout,
   NativeChatDemoPanels,
 } from "../native-chat/panels";
-import { NativeChatWorkspaceFixture } from "../native-chat/workspace-fixture";
+import {
+  NativeChatWorkspaceFixture,
+  readDemoWorkspaceDirectory,
+} from "../native-chat/workspace-fixture";
 import { DesktopChatFixture } from "./desktop-chat-fixture";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
@@ -148,7 +151,10 @@ export function DesktopComposerDemo({
       key={`${root.sessionId}:${openCount}`}
       bridge={workspace?.bridge ?? fixture.bridge}
       workingDirectory={showcase ? "/Gallery project" : undefined}
-      readWorkspaceDirectory={workspace?.readdir}
+      readWorkspaceDirectory={
+        workspace?.readdir ??
+        (scenario === "file-mentions" ? readDemoWorkspaceDirectory : undefined)
+      }
       predictionPreferences={
         scenario === "suggested-prompt" ? suggestionPreferences : undefined
       }

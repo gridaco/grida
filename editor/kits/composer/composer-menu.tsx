@@ -12,7 +12,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { PlusIcon } from "lucide-react";
+import { FileIcon, FolderIcon, PlusIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import {
   Command,
@@ -29,8 +29,8 @@ import {
   useComposer,
   useComposerInternals,
   type ComposerCommand,
-  type ComposerMention,
 } from "./composer-react";
+import { ComposerMention } from "./composer-core";
 
 const Anchor = createContext<HTMLElement | null>(null);
 
@@ -244,9 +244,11 @@ export function ComposerActionMenu({
 export function ComposerTriggerMenu({
   className,
   id,
+  renderFileIcon,
 }: {
   className?: string;
   id?: string;
+  renderFileIcon?: (path: string) => ReactNode;
 }) {
   const composer = useComposer();
   const { triggerMenuId, core } = useComposerInternals();
@@ -254,7 +256,7 @@ export function ComposerTriggerMenu({
   const selectedRef = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   const trigger = composer.trigger;
-  const open = !!trigger && trigger.items.length > 0;
+  const open = !!trigger && (trigger.pending || trigger.items.length > 0);
 
   useEffect(() => {
     if (!open) return;
@@ -275,7 +277,7 @@ export function ComposerTriggerMenu({
     });
   }, [composer.triggerIndex, trigger?.kind, trigger?.query]);
 
-  if (!trigger || trigger.items.length === 0) return null;
+  if (!trigger || !open) return null;
 
   const itemValues = trigger.items.map((item) => `${trigger.kind}:${item.id}`);
   const selectedValue =
@@ -288,8 +290,13 @@ export function ComposerTriggerMenu({
       data-composer-trigger-menu
       id={resolvedId}
     >
+      {trigger.pending && (
+        <div role="status" className="px-3 py-2 text-sm text-muted-foreground">
+          Searching workspace…
+        </div>
+      )}
       <Command
-        className="bg-transparent"
+        className={trigger.pending ? "hidden" : "bg-transparent"}
         shouldFilter={false}
         value={selectedValue}
         onValueChange={(value) => {
@@ -309,10 +316,16 @@ export function ComposerTriggerMenu({
         >
           <CommandGroup className="p-0">
             {trigger.items.map((item, index) => {
-              const description =
-                trigger.kind === "command"
+              const mention = item as ComposerMention;
+              const path =
+                trigger.kind === "mention"
+                  ? ComposerMention.pathParts(mention)
+                  : undefined;
+              const description = path
+                ? path.parent
+                : trigger.kind === "command"
                   ? (item as ComposerCommand).description
-                  : getMentionDescription(item as ComposerMention);
+                  : getMentionDescription(mention);
               return (
                 <CommandItem
                   className="scroll-my-1 items-center py-1"
@@ -326,6 +339,7 @@ export function ComposerTriggerMenu({
                     }
                   }}
                   value={itemValues[index]}
+                  title={path?.path}
                   onMouseDown={(event) => {
                     event.preventDefault();
                   }}
@@ -334,26 +348,42 @@ export function ComposerTriggerMenu({
                     composer.selectTriggerItem(index);
                   }}
                 >
-                  {/* Title takes priority. `shrink-0` keeps it at full width
-                      so the description — the only flexible sibling (`flex-1`)
-                      — is what yields and truncates when the row is tight.
-                      `max-w-full truncate` on the title only kicks in when the
-                      title alone is wider than the whole row. (A `shrink` ratio
-                      doesn't work here: flexbox distributes shrink by
-                      `shrink × content-width`, so a long description still
-                      forces the title to give up space.) */}
-                  <span className="flex w-full min-w-0 items-baseline gap-2">
-                    <span className="shrink-0 font-mono text-muted-foreground">
-                      {trigger.kind === "command"
-                        ? "/"
-                        : trigger.kind === "skill"
-                          ? "$"
-                          : "@"}
-                    </span>
-                    <span className="max-w-full shrink-0 truncate font-normal">
+                  {/* The secondary path takes the space remaining after the filename. */}
+                  <span
+                    className={cn(
+                      "flex w-full min-w-0 gap-2",
+                      path ? "items-center" : "items-baseline"
+                    )}
+                  >
+                    {path ? (
+                      <span
+                        aria-hidden
+                        className="flex size-3.5 shrink-0 items-center text-muted-foreground [&_svg]:size-full"
+                      >
+                        {mention.kind === "folder" ? (
+                          <FolderIcon />
+                        ) : (
+                          (renderFileIcon?.(path.path) ?? <FileIcon />)
+                        )}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 font-mono text-muted-foreground">
+                        {trigger.kind === "command"
+                          ? "/"
+                          : trigger.kind === "skill"
+                            ? "$"
+                            : "@"}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "max-w-full truncate font-normal",
+                        path ? "min-w-0" : "shrink-0"
+                      )}
+                    >
                       {trigger.kind === "command"
                         ? (item as ComposerCommand).title
-                        : (item as ComposerMention).label}
+                        : (path?.name ?? mention.label)}
                     </span>
                     {trigger.kind === "skill" &&
                       (item as ComposerMention).source && (

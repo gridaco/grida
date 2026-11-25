@@ -1,19 +1,49 @@
-import type { ComposerMention } from "@/kits/composer";
+import type { WorkspacePathMatch } from "@grida/desktop-bridge";
+import { ComposerMention, type ComposerCatalog } from "@/kits/composer";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "target"]);
-const MAX_FILES = 800;
+const MAX_MENTIONS = 800;
 const MAX_DEPTH = 4;
 const MAX_DIRECTORIES = 64;
 const MAX_PATH_BYTES = 4096;
 const utf8 = new TextEncoder();
 
 export namespace WorkspaceFileMentions {
+  export function source(
+    readdir: WorkspaceArtifact.Readdir,
+    search?: (query: string) => Promise<WorkspacePathMatch[] | null>
+  ): NonNullable<ComposerCatalog["searchMentions"]> {
+    let useNative = search !== undefined;
+    let compatibility: ComposerMention[] | undefined;
+    return async (query, signal) => {
+      signal.throwIfAborted();
+      if (useNative && search) {
+        const results = await search(query);
+        signal.throwIfAborted();
+        if (results !== null)
+          return results.map(({ path, kind }) => ({
+            id: path,
+            label: path,
+            kind: kind === "directory" ? "folder" : "file",
+            path,
+          }));
+        useNative = false;
+      }
+      if (!compatibility) {
+        const inventory = await list(readdir, signal);
+        signal.throwIfAborted();
+        compatibility = inventory;
+      }
+      return ComposerMention.rank(compatibility, query);
+    };
+  }
+
   export async function list(
     readdir: WorkspaceArtifact.Readdir,
     signal: AbortSignal
   ): Promise<ComposerMention[]> {
-    const files: ComposerMention[] = [];
+    const mentions: ComposerMention[] = [];
     const directories = [{ path: "", depth: 0 }];
     scan: for (const directory of directories) {
       if (signal.aborted) return [];
@@ -30,24 +60,27 @@ export namespace WorkspaceFileMentions {
           continue;
         if (entry.kind === "directory") {
           if (
-            directories.length < MAX_DIRECTORIES &&
-            directory.depth < MAX_DEPTH &&
-            !entry.name.startsWith(".") &&
-            !SKIP_DIRS.has(entry.name)
+            directories.length >= MAX_DIRECTORIES ||
+            directory.depth >= MAX_DEPTH ||
+            entry.name.startsWith(".") ||
+            SKIP_DIRS.has(entry.name)
           )
-            directories.push({ path, depth: directory.depth + 1 });
-        } else if (entry.kind === "file") {
-          files.push({
-            id: path,
-            label: path,
-            kind: "file",
-            path,
-            description: path,
-          });
-          if (files.length === MAX_FILES) break scan;
+            continue;
+          directories.push({ path, depth: directory.depth + 1 });
+        } else if (entry.kind !== "file") {
+          continue;
         }
+        mentions.push({
+          id: path,
+          label: path,
+          kind: entry.kind === "directory" ? "folder" : "file",
+          path,
+        });
+        if (mentions.length === MAX_MENTIONS) break scan;
       }
     }
-    return files.sort((left, right) => left.label.localeCompare(right.label));
+    return mentions.sort((left, right) =>
+      left.label.localeCompare(right.label)
+    );
   }
 }

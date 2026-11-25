@@ -133,6 +133,21 @@ export function ComposerProvider({
     () => coreValue.getSnapshot(),
     () => coreValue.getSnapshot()
   );
+  const pendingMention = snapshot.trigger?.pending
+    ? snapshot.trigger
+    : undefined;
+  useEffect(() => {
+    if (!pendingMention) return;
+    const owner = new AbortController();
+    const debounce = window.setTimeout(
+      () => void coreValue.resolveMentions(owner.signal),
+      80
+    );
+    return () => {
+      window.clearTimeout(debounce);
+      owner.abort();
+    };
+  }, [coreValue, pendingMention]);
 
   const value = useMemo(
     () => ({

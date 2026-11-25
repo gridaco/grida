@@ -1,15 +1,22 @@
 //! Terminal ownership and a view that can also draw to a headless backend.
 
-use crate::{App, printable};
+use crate::{App, file_picker::FilePicker, printable};
 use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use ratatui::layout::{Constraint, Layout};
+use grida_agent::workspace_search::{WorkspaceSearchEntry, WorkspaceSearchKind};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::{Frame, Terminal, backend::CrosstermBackend};
+use std::borrow::Cow;
 use std::io::{self, Stdout};
+
+const MESSAGE_HEIGHT: u16 = 4;
+const FIXED_ROWS: u16 = 5; // Header, minimum transcript, and footer.
 
 pub(super) struct Screen(Terminal<CrosstermBackend<Stdout>>);
 
@@ -21,9 +28,8 @@ impl Screen {
         execute!(io::stdout(), EnterAlternateScreen, EnableBracketedPaste)?;
         Ok(screen)
     }
-    pub(super) fn draw(&mut self, session: &str, app: &App) -> io::Result<()> {
-        self.0.draw(|frame| render(frame, session, app))?;
-        Ok(())
+    pub(super) fn draw(&mut self, session: &str, app: &App) -> io::Result<Rect> {
+        Ok(self.0.draw(|frame| render(frame, session, app))?.area)
     }
 }
 
@@ -38,11 +44,26 @@ impl Drop for Screen {
 pub(super) fn render(frame: &mut Frame<'_>, session: &str, app: &App) {
     let state = &app.state;
     let question = state.question.as_ref().filter(|_| state.question_focused);
-    let input_height = if question.is_some() { 9 } else { 4 };
-    let [header, history, queue, input, footer] = Layout::vertical([
+    let input_height = if question.is_some() {
+        9
+    } else {
+        MESSAGE_HEIGHT
+    };
+    let picker_space = frame
+        .area()
+        .height
+        .saturating_sub(input_height + FIXED_ROWS);
+    let picker_height = picker_height(frame.area(), &app.file_picker);
+    let queue_height = if picker_height == 0 {
+        6
+    } else {
+        6.min(picker_space - picker_height)
+    };
+    let [header, history, queue, picker, input, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(2),
-        Constraint::Length(6),
+        Constraint::Length(queue_height),
+        Constraint::Length(picker_height),
         Constraint::Length(input_height),
         Constraint::Length(2),
     ])
@@ -107,6 +128,10 @@ pub(super) fn render(frame: &mut Frame<'_>, session: &str, app: &App) {
         .unwrap_or_default();
     frame.render_widget(Paragraph::new(rows).block(block(queue_label)), queue);
 
+    if picker_height > 0 {
+        render_file_picker(frame, picker, &app.file_picker);
+    }
+
     let (title, text) = if let Some(question) = question {
         let item = question.current();
         let mut text = format!("{}\n", item.question);
@@ -148,15 +173,121 @@ pub(super) fn render(frame: &mut Frame<'_>, session: &str, app: &App) {
             .wrap(Wrap { trim: false }),
         input,
     );
+    let shortcuts = if picker_height > 0 {
+        "↑/↓ Select · Tab/Enter Insert · Esc Dismiss"
+    } else {
+        "Enter Send/Save · Tab Focus · F8 Refresh · Ctrl+C Quit"
+    };
     frame.render_widget(
-        Paragraph::new(format!(
-            "{}\nEnter Send/Save · Tab Focus · F8 Refresh · Ctrl+C Quit",
-            printable(&app.status)
-        )),
+        Paragraph::new(format!("{}\n{shortcuts}", printable(&app.status))),
         footer,
     );
 }
 
 fn block(title: &str) -> Block<'_> {
     Block::default().borders(Borders::ALL).title(title)
+}
+
+pub(super) fn picker_height(area: Rect, picker: &FilePicker) -> u16 {
+    if area.width < 3 {
+        return 0;
+    }
+    // The picker is available only in the message and queue-edit composers.
+    picker
+        .height()
+        .min(area.height.saturating_sub(MESSAGE_HEIGHT + FIXED_ROWS))
+}
+
+fn render_file_picker(frame: &mut Frame<'_>, area: Rect, picker: &FilePicker) {
+    let dim = Style::default().add_modifier(Modifier::DIM);
+    let mut rows: Vec<_> = picker
+        .visible_paths(area.height)
+        .map(|(path, selected)| {
+            let (name, _) = path.parts();
+            let label = if path.kind == WorkspaceSearchKind::Directory {
+                format!("{name}/")
+            } else {
+                name.to_owned()
+            };
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
+                Style::default().add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            let label = Span::styled(label, style);
+            let available = usize::from(area.width).saturating_sub(label.width() + 4);
+            Line::from(vec![
+                Span::styled(prefix, style),
+                label,
+                Span::styled(format!("  {}", parent_label(picker, path, available)), dim),
+            ])
+        })
+        .collect();
+    if rows.is_empty() {
+        rows.push(Line::styled("  Searching workspace…", dim));
+    }
+    frame.render_widget(Paragraph::new(rows), area);
+}
+
+fn parent_label<'a>(
+    picker: &FilePicker,
+    path: &'a WorkspaceSearchEntry,
+    width: usize,
+) -> Cow<'a, str> {
+    let (name, parent) = path.parts();
+    let label = elide_parent(parent, width);
+    if width < 3 || label == parent {
+        return label;
+    }
+    // If clipping would make two rows identical, spend the space on their
+    // differing parent segments instead of repeating the shared suffix.
+    let shared_suffix = picker
+        .visible_paths(picker.height())
+        .filter_map(|(other, _)| {
+            let (other_name, other_parent) = other.parts();
+            (other_name == name
+                && other.kind == path.kind
+                && other_parent != parent
+                && elide_parent(other_parent, width) == label)
+                .then(|| {
+                    parent
+                        .chars()
+                        .rev()
+                        .zip(other_parent.chars().rev())
+                        .take_while(|(left, right)| left == right)
+                        .map(|(character, _)| character.len_utf8())
+                        .sum::<usize>()
+                })
+        })
+        .min()
+        .unwrap_or(0);
+    if shared_suffix == 0 {
+        return label;
+    }
+    let different = &parent[..parent.len() - shared_suffix];
+    format!("{}…", elide_parent(different, width - 1)).into()
+}
+
+fn elide_parent(parent: &str, width: usize) -> Cow<'_, str> {
+    let span = Span::raw(parent);
+    if span.width() <= width {
+        return parent.into();
+    }
+    if width == 0 {
+        return "".into();
+    }
+    // Keep the end of the parent visible on narrow screens, especially the nearest directory.
+    let mut remaining = width - 1;
+    let mut start = parent.len();
+    let graphemes: Vec<_> = span.styled_graphemes(Style::default()).collect();
+    for grapheme in graphemes.into_iter().rev() {
+        let columns = Span::raw(grapheme.symbol).width();
+        if columns > remaining {
+            break;
+        }
+        remaining -= columns;
+        start -= grapheme.symbol.len();
+    }
+    format!("…{}", &parent[start..]).into()
 }

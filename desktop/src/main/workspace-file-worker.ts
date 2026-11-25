@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import type { WorkspaceFsEntry } from "@grida/daemon";
+import type { WorkspacePathMatch } from "@grida/desktop-bridge";
 import type { WorkspaceFileBody } from "@grida/daemon/server";
 import {
   WorkspaceMediaError,
@@ -24,6 +25,7 @@ type FileRequest = {
   path: string;
   includeModified?: true;
   listDirectory?: true;
+  searchQuery?: string;
   write?: { length: number; expectedMtime?: string };
   publish?: { length: number; sha256: string; parentIdentity: NativeIdentity };
 };
@@ -149,7 +151,37 @@ export class WorkspaceFileWorkers {
     relative: string,
     signal: AbortSignal
   ): Promise<DirectoryEntry[]> {
-    const request = frame(grant, { path: relative, listDirectory: true });
+    return await this.readEntries(
+      grant,
+      { path: relative, listDirectory: true },
+      signal,
+      MAX_DIRECTORY_ENTRIES,
+      isDirectoryEntry
+    );
+  }
+
+  async searchPaths(
+    grant: WorkspaceMediaGrant,
+    query: string,
+    signal: AbortSignal
+  ): Promise<WorkspacePathMatch[]> {
+    return await this.readEntries(
+      grant,
+      { path: "", searchQuery: query },
+      signal,
+      8,
+      isWorkspacePathMatch
+    );
+  }
+
+  private async readEntries<T>(
+    grant: WorkspaceMediaGrant,
+    input: FileRequest,
+    signal: AbortSignal,
+    maxEntries: number,
+    validate: (entry: unknown) => entry is T
+  ): Promise<T[]> {
+    const request = frame(grant, input);
     const { child, abort, exited, output, diagnostic } = await this.launch(
       { workspace: grant },
       request,
@@ -168,8 +200,8 @@ export class WorkspaceFileWorkers {
         Object.keys(response).length !== 1 ||
         !("entries" in response) ||
         !Array.isArray(response.entries) ||
-        response.entries.length > MAX_DIRECTORY_ENTRIES ||
-        !response.entries.every(isDirectoryEntry)
+        response.entries.length > maxEntries ||
+        !response.entries.every(validate)
       )
         throw unavailable();
       return response.entries;
@@ -532,6 +564,23 @@ function isDirectoryEntry(value: unknown): value is DirectoryEntry {
     return false;
   return ["file", "directory", "symlink", "other"].some(
     (kind) => value.kind === kind
+  );
+}
+
+function isWorkspacePathMatch(value: unknown): value is WorkspacePathMatch {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    Object.keys(value).length === 2 &&
+    "path" in value &&
+    typeof value.path === "string" &&
+    Buffer.byteLength(value.path) <= 4096 &&
+    !/[\\\p{Cc}]/u.test(value.path) &&
+    value.path
+      .split("/")
+      .every((part) => part && part !== "." && part !== "..") &&
+    "kind" in value &&
+    (value.kind === "file" || value.kind === "directory")
   );
 }
 

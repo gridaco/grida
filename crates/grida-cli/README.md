@@ -105,6 +105,11 @@ deterministic fixture without model credentials.
   runs.
 - **↑/↓** select a waiting row. **F2** checks it out for editing. **F4**
   restores the accepted original. **F3** steers with an eligible row.
+- Type **@** followed by part of a file or folder name to search the workspace
+  in a new message or queue edit. Use **↑/↓** to highlight a match and **Tab**
+  or **Enter** to insert its workspace-relative path. **Esc** closes the list
+  and leaves the query in the draft. The bounded search skips common build
+  and dependency directories.
 - **Tab** toggles focus between a blocking question and the composer. Type a
   choice number or a freeform answer and press **Enter**. **F6** skips the
   current question.

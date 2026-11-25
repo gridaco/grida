@@ -739,6 +739,17 @@ without following child symlinks. A listing above 8,192 entries or 2 MiB
 returns a limit error before writing any output. The client owns display
 filtering, path presentation, and sorting.
 
+A first input with `searchQuery` and an empty `path` searches file and folder
+names in the registered root. The query is limited to 4,096 UTF-8 bytes and
+rejects control characters. A blank query returns no entries. Search walks
+the same pinned directory scopes as a listing, omits symlinks and workspace
+metadata, and bounds depth and candidate count. It returns an `entries` array
+of up to eight `{path, kind}` records. The relative path preserves the on-disk
+spelling. Exact name, name prefix, name substring, and path substring match
+in that order, ignoring case. Ties use the full relative path. Search works
+before a chat exists and uses the same discovery and ordering as the terminal
+client through the `workspace_search` module.
+
 A first input with `write: { length, expectedMtime? }` instead saves one
 regular file. The optional time is decimal text for an exact floating-point
 round trip. The request is followed by exactly `length` raw UTF-8 bytes and EOF. The

@@ -15,6 +15,7 @@ export {
 
 export { ComposerTransfer } from "./composer-transfer";
 export { ComposerHistory } from "./composer-history";
+export { ComposerMention } from "./composer-core";
 export { Dictation } from "./dictation";
 
 export {
@@ -45,7 +46,6 @@ export type {
   ComposerEditorContext,
   ComposerFileAttachment,
   ComposerFileReference,
-  ComposerMention,
   ComposerMessage,
   ComposerPart,
 } from "./composer-core";
