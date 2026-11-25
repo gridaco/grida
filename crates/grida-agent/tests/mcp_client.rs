@@ -429,6 +429,7 @@ fn context() -> InvocationContext {
     InvocationContext {
         attempt: AttemptId::new("attempt-1").unwrap(),
         cancellation: CancellationToken::new(),
+        input_activity: agent_kit_core::CancellationToken::new(),
         deadline: Some(deadline()),
         max_output_bytes: 8192,
     }

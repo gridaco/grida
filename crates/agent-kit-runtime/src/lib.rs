@@ -52,13 +52,14 @@ pub struct ExecutionLimits {
     /// Inference executions that may run at once across every turn opened
     /// from this runtime and its derived runtimes.
     pub max_concurrent_inferences: usize,
-    /// Tool executions and recoveries that may run at once across every turn
-    /// opened from this runtime and its derived runtimes.
+    /// Concurrent tools and recoveries across turns. Passive waits have a
+    /// separate pool with the same capacity.
     pub max_concurrent_tools: usize,
     /// Output byte allowance given to each provider attempt and executor.
     pub max_output_bytes: usize,
     /// Absolute deadline for one operation, measured from its admission.
-    /// Waiting for capacity, authorization, and execution all count against it.
+    /// Waiting for capacity and authorization counts against it. A passive
+    /// wait may extend its execution deadline after admission.
     pub operation_timeout: Duration,
     /// Updates an observer can fall behind before it receives a snapshot in
     /// place of the updates it missed.
@@ -270,6 +271,9 @@ pub struct StepPlan {
     pub key: OperationKey,
     /// Its offered tools must equal `tools` on a first run.
     pub request: PreparedRequest,
+    /// Journal position captured with the originating request. Passive tools
+    /// wake for input or decisions committed after it. Defaults to step entry.
+    pub input_after: Option<agent_kit_core::turn::JournalPosition>,
     /// Authority for the provider request only.
     pub inference_grants: GrantSelection,
     /// Authority for each offered tool. A call to an offered tool without an

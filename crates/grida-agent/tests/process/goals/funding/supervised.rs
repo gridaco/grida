@@ -251,6 +251,8 @@ impl Worker {
                                 "delegate_review",
                                 "collect_review",
                                 "config_inspect",
+                                "clock_curr_time",
+                                "clock_sleep",
                                 "question",
                                 "question_async"
                             ]

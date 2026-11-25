@@ -515,6 +515,7 @@ async fn goal_tools_are_scoped_and_a_report_only_records_a_proposal() {
     let context = |id, max_output_bytes| InvocationContext {
         attempt: AttemptId::new(id).unwrap(),
         cancellation: CancellationToken::new(),
+        input_activity: agent_kit_core::CancellationToken::new(),
         deadline: None,
         max_output_bytes,
     };

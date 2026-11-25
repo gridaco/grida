@@ -3,6 +3,7 @@
 use super::output::{self, Standing};
 use super::{Entry, Io, ProcessAccess, ProcessSessions, RETAINED_OUTPUT_BYTES};
 use crate::command::{CommandAccess, CommandLimits, valid_path};
+use crate::waiting;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
 use agent_kit_core::tools::{
@@ -30,11 +31,8 @@ const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
 const DEFAULT_SHELL: &str = "/bin/sh";
 const EXEC_YIELD_MS: (u64, u64, u64) = (10_000, 250, 30_000);
 const WRITE_YIELD_MS: (u64, u64, u64) = (250, 250, 30_000);
-const POLL_YIELD_MS: (u64, u64, u64) = (5_000, 5_000, 300_000);
+const POLL_YIELD_MS: (u64, u64, u64) = (5_000, 5_000, waiting::MAX_MS);
 const DEFAULT_OUTPUT_TOKENS: f64 = 10_000.0;
-/// A wait ends this long before the call's own deadline so its output is
-/// still recorded.
-const DEADLINE_MARGIN: Duration = Duration::from_secs(2);
 /// The sandbox's bound for one launch specification. Sessions are not held
 /// to it; their scope's lifetime applies.
 const SPECIFICATION_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -736,18 +734,24 @@ fn yield_until(
     (default, minimum, maximum): (u64, u64, u64),
     deadline: Option<Instant>,
 ) -> Instant {
-    let milliseconds = requested
-        .filter(|value| value.is_finite())
-        .map_or(default, |value| {
-            value.clamp(minimum as f64, maximum as f64) as u64
-        });
-    let until = start + Duration::from_millis(milliseconds);
-    match deadline {
-        Some(deadline) => until
-            .min(deadline.checked_sub(DEADLINE_MARGIN).unwrap_or(deadline))
-            .max(start),
-        None => until,
-    }
+    waiting::until(
+        start,
+        yield_duration(requested, (default, minimum, maximum)),
+        deadline,
+    )
+}
+
+fn yield_duration(
+    requested: Option<f64>,
+    (default, minimum, maximum): (u64, u64, u64),
+) -> Duration {
+    Duration::from_millis(
+        requested
+            .filter(|value| value.is_finite())
+            .map_or(default, |value| {
+                value.clamp(minimum as f64, maximum as f64) as u64
+            }),
+    )
 }
 
 fn output_budget(requested: Option<f64>, maximum: usize) -> usize {
@@ -934,14 +938,7 @@ impl ExecCommand {
             context.deadline,
         );
         let mut io = entry.io.lock().await;
-        let interrupted = collect(
-            &shared.sessions,
-            &entry,
-            &mut io,
-            until,
-            &context.cancellation,
-        )
-        .await;
+        let collected = collect(&shared.sessions, &entry, &mut io, until, context, false).await;
         let output = io.unread.take();
         drop(io);
         unlisted.armed = false;
@@ -960,7 +957,7 @@ impl ExecCommand {
         // chat keeps the process and its buffered output.
         match shared.sessions.register(&entry) {
             Ok(id) => output::outcome(
-                if interrupted {
+                if collected == Collection::Cancelled {
                     OutcomeStatus::Cancelled
                 } else {
                     OutcomeStatus::Succeeded
@@ -1155,19 +1152,26 @@ impl WriteStdin {
             WRITE_YIELD_MS
         };
         let until = yield_until(started, arguments.yield_time_ms, range, context.deadline);
-        let interrupted = collect(
+        let collected = collect(
             &shared.sessions,
             &entry,
             &mut io,
             until,
-            &context.cancellation,
+            context,
+            arguments.chars.is_empty(),
         )
         .await;
-        let output = io.unread.take();
+        let output = if collected == Collection::Ready {
+            io.unread.take()
+        } else {
+            // Interrupting a wait leaves unread output with the process.
+            output::Captured::default()
+        };
+        let ending = entry.ending();
         drop(io);
         entry.touch();
         let wall = started.elapsed();
-        match entry.ending() {
+        match ending {
             Some(ending) => {
                 // The end is reported once; the number is then unknown.
                 shared.sessions.collect(&entry);
@@ -1181,13 +1185,17 @@ impl WriteStdin {
                 )
             }
             None => output::outcome(
-                if interrupted {
+                if collected == Collection::Cancelled {
                     OutcomeStatus::Cancelled
                 } else {
                     OutcomeStatus::Succeeded
                 },
                 wall,
-                &Standing::Running(id),
+                &if collected == Collection::Input {
+                    Standing::WaitInterrupted(id)
+                } else {
+                    Standing::Running(id)
+                },
                 &output,
                 budget,
                 maximum,
@@ -1196,32 +1204,41 @@ impl WriteStdin {
     }
 }
 
+#[derive(PartialEq, Eq)]
+enum Collection {
+    Ready,
+    Input,
+    Cancelled,
+}
+
 /// Read the process until `until`, its end, or cancellation, finalizing it
-/// when it ends. Returns whether cancellation ended the wait.
+/// when it ends. Stopping the wait never signals the process.
 async fn collect(
     sessions: &Arc<ProcessSessions>,
     entry: &Arc<Entry>,
     io: &mut Io,
     until: Instant,
-    cancellation: &CancellationToken,
-) -> bool {
+    context: &InvocationContext,
+    interruptible: bool,
+) -> Collection {
     loop {
         let Some(running) = &io.running else {
-            return false;
+            return Collection::Ready;
         };
         let read = tokio::select! {
             biased;
-            _ = cancellation.cancelled() => return true,
+            _ = context.cancellation.cancelled() => return Collection::Cancelled,
+            _ = context.input_activity.cancelled(), if interruptible => return Collection::Input,
             read = running.read(until, RETAINED_OUTPUT_BYTES) => read,
         };
         let ended = read.ended;
         io.unread.push(read);
         if ended {
             entry.finalize(sessions, io).await;
-            return false;
+            return Collection::Ready;
         }
         if Instant::now() >= until {
-            return false;
+            return Collection::Ready;
         }
     }
 }
@@ -1302,6 +1319,14 @@ impl Tool for WriteStdin {
 
     fn validate(&self, arguments: &ToolArguments) -> Result<()> {
         WriteArguments::parse(arguments, self.definition.max_input_bytes).map(|_| ())
+    }
+
+    fn wait_timeout(&self, arguments: &ToolArguments) -> Option<Duration> {
+        let (arguments, _) =
+            WriteArguments::parse(arguments, self.definition.max_input_bytes).ok()?;
+        arguments.chars.is_empty().then(|| {
+            waiting::execution_timeout(yield_duration(arguments.yield_time_ms, POLL_YIELD_MS))
+        })
     }
 
     fn invoke(

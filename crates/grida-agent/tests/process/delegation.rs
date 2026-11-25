@@ -124,14 +124,20 @@ impl WorkScript {
                 let latest = results.last().unwrap();
                 assert_eq!(latest["status"], "succeeded", "{latest}");
                 if step == 7 {
-                    let collected = latest["structured"]["collected"].as_array().unwrap();
-                    assert_eq!(collected.len(), 5, "{latest}");
-                    assert!(
-                        latest["structured"]["pending"]
-                            .as_array()
-                            .unwrap()
-                            .is_empty()
-                    );
+                    let pending = latest["structured"]["pending"].as_array().unwrap();
+                    if !pending.is_empty() {
+                        self.parent_step -= 1;
+                        let children: Vec<_> =
+                            pending.iter().map(|item| item["child"].clone()).collect();
+                        assert_eq!(latest["structured"]["wait"]["status"], "settled");
+                        return tool_reply("wait_agent", json!({"children": children}));
+                    }
+                    let collected: Vec<_> = results
+                        .iter()
+                        .filter_map(|result| result["structured"]["collected"].as_array())
+                        .flatten()
+                        .collect();
+                    assert_eq!(collected.len(), 5, "{results:?}");
                     for assignment in &self.assignments {
                         assert!(
                             collected.iter().any(|result| {
@@ -440,7 +446,9 @@ async fn ordinary_reasoning_delegates_five_capable_workers_and_integrates_exact_
     )
     .unwrap();
     let script = Arc::new(Mutex::new(WorkScript::default()));
-    let replies = (0..34)
+    // Every worker can settle in its own batch. A request after all five
+    // verified collections would fail the scripted parent assertions.
+    let replies = (0..38)
         .map(|_| {
             let script = script.clone();
             Reply::Choose(Box::new(move |request| {
@@ -612,7 +620,7 @@ async fn ordinary_reasoning_delegates_five_capable_workers_and_integrates_exact_
         fs::read_to_string(fixture.primary.join("combined.txt")).unwrap(),
         combined()
     );
-    endpoint.done().await;
+    endpoint.abort().await;
 }
 
 #[tokio::test]

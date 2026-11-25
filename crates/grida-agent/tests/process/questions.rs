@@ -145,7 +145,7 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     )
     .await;
     assert_eq!(replied["result"]["stopReason"], "end_turn", "{replied}");
-    assert!(endpoint.request().await.get("tools").is_none());
+    assert_only_clock_tools(&endpoint.request().await);
     drop(plain);
 
     let mut first = question_socket(&url, true).await;

@@ -162,7 +162,7 @@ async fn tool_source(
     index: usize,
     arguments: Value,
 ) -> OperationClaimSource {
-    let definition = definition(tool).unwrap();
+    let definition = definition(tool, true).unwrap();
     let mut inventory = Inventory::new();
     inventory
         .insert(Arc::new(RecordedTool(definition.clone())))
@@ -486,15 +486,16 @@ async fn an_admitted_message_recovery_observes_its_receipt_even_if_its_context_i
         .await
         .unwrap();
     let tool = WorkerTool {
-        access: Access::bind(&host, &source.binding, stored.delegation.unwrap()).unwrap(),
+        access: Access::bind(&host, &source.binding, stored.delegation.unwrap(), true).unwrap(),
         operations: opened.turn.operations(),
-        definition: definition(SEND).unwrap(),
+        definition: definition(SEND, true).unwrap(),
     };
     let cancellation = agent_kit_core::CancellationToken::new();
     cancellation.cancel();
     let context = |attempt| InvocationContext {
         attempt,
         cancellation: cancellation.clone(),
+        input_activity: agent_kit_core::CancellationToken::new(),
         deadline: None,
         max_output_bytes: 256 * 1024,
     };
@@ -558,7 +559,7 @@ async fn settle_with_cleanup(
             file: None,
             skills: None,
         },
-        None,
+        permissions::WaitTools::default(),
         permissions::HookTools {
             completion: Some(completion.clone()),
             before_tool: None,
@@ -1604,7 +1605,7 @@ async fn stop_and_wait_preserve_unknown_process_evidence(
     policy: Policy,
 ) {
     let binding = parent.lease.binding().clone();
-    let access = Access::bind(host, &binding, policy).unwrap();
+    let access = Access::bind(host, &binding, policy, true).unwrap();
     let execution = host.execution().unwrap();
     let authorization = permissions::ToolAuthority::bind(
         execution.authorization.clone(),
@@ -1614,7 +1615,7 @@ async fn stop_and_wait_preserve_unknown_process_evidence(
             file: None,
             skills: None,
         },
-        None,
+        permissions::WaitTools::default(),
         permissions::HookTools {
             completion: None,
             before_tool: None,
@@ -1865,7 +1866,7 @@ async fn waiting_collects_terminal_failure_with_resource_uncertainty_without_pol
         cleanups.push(cleanup);
         children.push(child);
     }
-    let access = Access::bind(&host, &binding, policy).unwrap();
+    let access = Access::bind(&host, &binding, policy, true).unwrap();
     let execution = host.execution().unwrap();
     let authorization = permissions::ToolAuthority::bind(
         execution.authorization.clone(),
@@ -1875,7 +1876,7 @@ async fn waiting_collects_terminal_failure_with_resource_uncertainty_without_pol
             file: None,
             skills: None,
         },
-        None,
+        permissions::WaitTools::default(),
         permissions::HookTools {
             completion: None,
             before_tool: None,

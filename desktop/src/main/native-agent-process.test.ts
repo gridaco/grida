@@ -3890,6 +3890,74 @@ function packagedToolResponse(
 }
 
 it.runIf(Boolean(packaged) && process.platform !== "win32")(
+  "observes and steers a native clock wait through Desktop Main",
+  async () => {
+    const directory = state();
+    const root = fs.realpathSync(directory.root);
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const requests: string[] = [];
+    const statuses: string[] = [];
+    let chat: NativeAgentChat | undefined;
+    try {
+      const active = (chat = await NativeAgentChat.start({
+        ...launch(packaged!, path.join(root, "state")),
+        cwd,
+        provider: "responses",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            requests.push(body.toString());
+            return packagedToolResponse(
+              requests.length,
+              requests.length === 1
+                ? { name: "clock_sleep", arguments: { duration_ms: 60000 } }
+                : undefined
+            );
+          },
+        },
+      }));
+      const session = await active.create();
+      const unsubscribe = active.subscribe(session, (update) => {
+        if (
+          update.kind === "activity" &&
+          update.activity.title === "clock_sleep"
+        ) {
+          statuses.push(update.activity.outcome);
+        }
+      });
+      try {
+        const accepted = await active.submit(
+          session,
+          "wait",
+          "Wait a minute.",
+          "act"
+        );
+        await vi.waitFor(() => expect(statuses).toEqual(["running"]));
+        const snapshot = await active.observe(session);
+        expect(snapshot.current?.turnId).toBe(accepted.turnId);
+        expect(requests).toHaveLength(1);
+        await active.steer(session, snapshot, {
+          observationId: "clock-wait-observation",
+          requestId: "clock-wait-steer",
+          text: "Continue now.",
+        });
+        await vi.waitFor(() =>
+          expect(statuses).toEqual(["running", "succeeded"])
+        );
+        await vi.waitFor(() => expect(requests).toHaveLength(2));
+        expect(requests[1]).toContain("Sleep interrupted by new input.");
+        expect(requests[1]).toContain("Continue now.");
+      } finally {
+        unsubscribe();
+      }
+    } finally {
+      await chat?.close();
+      directory.close();
+    }
+  }
+);
+
+it.runIf(Boolean(packaged) && process.platform !== "win32")(
   "keeps same-named Main sources isolated through the packaged MCP carrier",
   async () => {
     const directory = state();

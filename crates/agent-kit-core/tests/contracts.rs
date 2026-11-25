@@ -644,6 +644,7 @@ async fn tool_preflight_precedes_execution_and_retains_definition() {
         .invoke(InvocationContext {
             attempt: AttemptId::new("attempt").unwrap(),
             cancellation: CancellationToken::new(),
+            input_activity: agent_kit_core::CancellationToken::new(),
             deadline: None,
             max_output_bytes: 1024,
         })
@@ -673,6 +674,7 @@ async fn cancelled_tool_never_dispatches() {
             .invoke(InvocationContext {
                 attempt: AttemptId::new("attempt").unwrap(),
                 cancellation: token,
+                input_activity: agent_kit_core::CancellationToken::new(),
                 deadline: None,
                 max_output_bytes: 1024
             })
@@ -1196,6 +1198,7 @@ async fn tool_output_limits_preserve_actual_execution_status() {
         .invoke(InvocationContext {
             attempt: AttemptId::new("attempt").unwrap(),
             cancellation: CancellationToken::new(),
+            input_activity: agent_kit_core::CancellationToken::new(),
             deadline: None,
             max_output_bytes: 1,
         })
@@ -1231,6 +1234,7 @@ async fn unavailable_recovery_does_not_invoke_the_tool_again() {
             InvocationContext {
                 attempt: AttemptId::new("attempt").unwrap(),
                 cancellation: CancellationToken::new(),
+                input_activity: agent_kit_core::CancellationToken::new(),
                 deadline: None,
                 max_output_bytes: 1024,
             },
@@ -1821,6 +1825,7 @@ async fn prepared_tool_preserves_the_attempt_identity_for_its_executor() {
         .invoke(InvocationContext {
             attempt: attempt.clone(),
             cancellation: CancellationToken::new(),
+            input_activity: agent_kit_core::CancellationToken::new(),
             deadline: None,
             max_output_bytes: 1024,
         })

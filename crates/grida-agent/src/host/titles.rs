@@ -240,6 +240,7 @@ impl Host {
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,
+            run_deadline: None,
             inference_only: true,
             #[cfg(unix)]
             guidance_root: None,

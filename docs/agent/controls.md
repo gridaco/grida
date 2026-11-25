@@ -218,6 +218,21 @@ controls; give further instructions in the parent chat. Agent process
 controls live separately in the workspace's **Processes** tab.
 [Work with subagents](./subagents.md)
 
+## Ask the agent to wait
+
+Ask “Check again in a minute” or “Wait for this command to finish.” The running
+turn can wait locally for up to five minutes per check. A command can return
+sooner when it exits. The agent makes no additional model request for the wait
+itself. Each subsequent check can use another model request.
+
+Use **Steer** to interrupt the wait with new instructions. Answering an
+open question or approval for that turn can also end the wait early.
+An ordinary queued message waits for the current turn. Pausing or stopping
+the turn ends its wait. A running command can still be inspected or stopped
+in **Processes**. A headless run can decline a wait that exceeds its deadline.
+For a follow-up that can suspend and later resume a task, see
+[Schedule a follow-up](./scheduled-work.md).
+
 ## Return to background work
 
 With system notifications turned on, Desktop tells you when a workspace chat

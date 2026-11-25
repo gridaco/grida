@@ -54,6 +54,7 @@ async fn headless_presentation_has_the_same_result_through_both_adapters() {
         .invoke(InvocationContext {
             attempt: AttemptId::new("presentation-attempt").unwrap(),
             cancellation: CancellationToken::new(),
+            input_activity: agent_kit_core::CancellationToken::new(),
             deadline: Some(deadline()),
             max_output_bytes: 8192,
         })

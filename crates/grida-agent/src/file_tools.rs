@@ -795,6 +795,7 @@ mod tests {
         let context = || InvocationContext {
             attempt: AttemptId::new("legacy-view-attempt").unwrap(),
             cancellation: CancellationToken::new(),
+            input_activity: agent_kit_core::CancellationToken::new(),
             deadline: None,
             max_output_bytes: MAX_OUTPUT_BYTES,
         };

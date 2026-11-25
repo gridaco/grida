@@ -450,6 +450,7 @@ async fn simple_master_publishes_history_and_checkpoint_atomically() {
     let mut turn = runtime.open(ephemeral.lease).await.unwrap().turn;
     let outcome = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("answer").unwrap(),
             request: request(&provider, &inventory(&tool)),
             inference_grants: grants(),
@@ -586,6 +587,7 @@ async fn early_tool_effect_survives_inference_stream_failure_and_replay() {
         .unwrap()
         .turn;
     let plan = StepPlan {
+        input_after: None,
         key: OperationKey::new("step").unwrap(),
         request: request(&provider, &inventory(&tool)),
         inference_grants: grants(),
@@ -593,6 +595,7 @@ async fn early_tool_effect_survives_inference_stream_failure_and_replay() {
         tools: inventory(&tool),
     };
     let replay = StepPlan {
+        input_after: None,
         key: plan.key.clone(),
         request: plan.request.clone(),
         inference_grants: grants(),
@@ -760,6 +763,7 @@ async fn stopped_step_projects_only_recorded_pairs_without_dispatch_or_gate_work
     let key = OperationKey::new("step").unwrap();
     let outcome = turn
         .step(StepPlan {
+            input_after: None,
             key: key.clone(),
             request: request(&provider, &inventory(&tool)),
             inference_grants: grants(),
@@ -1603,6 +1607,7 @@ async fn completed_step_replays_after_its_tool_inventory_is_removed() {
     let input = request(&provider, &inventory(&tool));
     let first = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("step").unwrap(),
             request: input.clone(),
             inference_grants: grants(),
@@ -1614,6 +1619,7 @@ async fn completed_step_replays_after_its_tool_inventory_is_removed() {
     let empty = Inventory::new().snapshot(&[]).unwrap();
     let repeated = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("step").unwrap(),
             request: input,
             inference_grants: grants(),
@@ -1687,6 +1693,7 @@ async fn orphan_inference_retains_early_tool_call_identity_without_reexecution()
     let key = OperationKey::new("orphan").unwrap();
     let input = request(&provider, &inventory(&tool));
     let mut run = Box::pin(turn.step(StepPlan {
+        input_after: None,
         key: key.clone(),
         request: input.clone(),
         inference_grants: grants(),
@@ -1716,6 +1723,7 @@ async fn orphan_inference_retains_early_tool_call_identity_without_reexecution()
     assert!(outcome.is_uncertain());
     let replay = turn
         .step(StepPlan {
+            input_after: None,
             key,
             request: input,
             inference_grants: grants(),
@@ -1947,6 +1955,7 @@ async fn master_can_order_captured_tool_declarations() {
         .unwrap()
         .turn;
     turn.step(StepPlan {
+        input_after: None,
         key: OperationKey::new("ordered").unwrap(),
         request,
         inference_grants: grants(),
@@ -1991,6 +2000,7 @@ async fn step_keeps_provider_and_tool_authorities_independent() {
     local.authority.principal = PrincipalId::new("local-files").unwrap();
     local.authority.scope = ScopeId::new("file-scope").unwrap();
     turn.step(StepPlan {
+        input_after: None,
         key: OperationKey::new("split-authority").unwrap(),
         request: request(&provider, &inventory(&tool)),
         inference_grants: grants(),
@@ -2027,6 +2037,7 @@ async fn missing_tool_authority_never_uses_provider_grants() {
         .turn;
     let result = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("missing-tool-authority").unwrap(),
             request: request(&provider, &inventory(&tool)),
             inference_grants: grants(),
@@ -2195,6 +2206,7 @@ async fn completed_step_replays_with_replaced_execution_grants() {
     let input = request(&provider, &inventory(&tool));
     let first = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("step").unwrap(),
             request: input.clone(),
             inference_grants: grants(),
@@ -2208,6 +2220,7 @@ async fn completed_step_replays_with_replaced_execution_grants() {
     replacement.grants = vec![GrantId::new("replacement").unwrap()];
     let replay = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("step").unwrap(),
             request: input,
             inference_grants: replacement.clone(),
@@ -2232,6 +2245,7 @@ async fn deferred_step_reuses_recorded_grants_only_with_current_compatible_selec
         let mut turn = runtime.open(ephemeral.lease).await.unwrap().turn;
         let input = request(&provider, &inventory(&tool));
         let plan = |tool_grants| StepPlan {
+            input_after: None,
             key: OperationKey::new("step").unwrap(),
             request: input.clone(),
             inference_grants: grants(),
@@ -2837,6 +2851,7 @@ async fn a_failed_call_lets_admitted_siblings_and_the_response_settle() {
         .unwrap()
         .turn;
     let plan = StepPlan {
+        input_after: None,
         key: OperationKey::new("sibling-failure").unwrap(),
         request: request(&provider, &tools),
         inference_grants: grants(),
@@ -2909,6 +2924,7 @@ async fn a_call_to_an_unoffered_tool_returns_a_correctable_result() {
         .turn;
     let outcome = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("invented-tool").unwrap(),
             request: request(&provider, &inventory(&tool)),
             inference_grants: grants(),
@@ -2964,6 +2980,7 @@ async fn a_malformed_call_returns_a_correctable_result_without_admission() {
         .turn;
     let outcome = turn
         .step(StepPlan {
+            input_after: None,
             key: OperationKey::new("malformed-call").unwrap(),
             request: request(&provider, &inventory(&tool)),
             inference_grants: grants(),
@@ -3328,4 +3345,70 @@ async fn an_unchanged_refresh_publishes_no_snapshot() {
     assert!(
         matches!(update, Some(TurnUpdate::Snapshot(view)) if view.state.waits().contains_key(&question().id))
     );
+}
+
+struct DeadlineTool {
+    definition: ToolDefinition,
+    deadline: Mutex<Option<Duration>>,
+}
+
+impl Tool for DeadlineTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, _: &ToolArguments) -> Result<()> {
+        Ok(())
+    }
+
+    fn wait_timeout(&self, arguments: &ToolArguments) -> Option<Duration> {
+        matches!(arguments, ToolArguments::Json(value) if value["value"] == 1)
+            .then_some(Duration::from_secs(305))
+    }
+
+    fn invoke(&self, _: Invocation, context: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            *self.deadline.lock().unwrap() = context
+                .deadline
+                .map(|until| until.saturating_duration_since(Instant::now()));
+            success()
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_passive_wait_gets_its_own_execution_deadline_without_extending_other_calls() {
+    let tool = Arc::new(DeadlineTool {
+        definition: CounterTool::new(None).definition.clone(),
+        deadline: Mutex::new(None),
+    });
+    let executor: Arc<dyn Tool> = tool.clone();
+    let runtime = runtime_with(
+        ScriptedProvider::complete(),
+        captured(&[executor]),
+        Duration::from_secs(120),
+    );
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    for (value, low, high) in [(1, 300, 305), (2, 115, 120)] {
+        let outcome = turn
+            .operations()
+            .invoke(
+                OperationKey::new(format!("deadline/{value}")).unwrap(),
+                invocation(value),
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(outcome, InvokeOutcome::Complete(result) if result.status == OutcomeStatus::Succeeded)
+        );
+        let remaining = tool.deadline.lock().unwrap().unwrap();
+        assert!(
+            remaining >= Duration::from_secs(low) && remaining <= Duration::from_secs(high),
+            "{remaining:?}"
+        );
+    }
 }

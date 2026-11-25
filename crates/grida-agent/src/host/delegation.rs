@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-014 — bounded, operation-owned delegated work.
 
 use super::*;
+use crate::waiting;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role, ToolArguments,
@@ -100,7 +101,7 @@ pub(super) fn validate_worker_shape(stored: &StoredPrompt) -> Result<()> {
     Ok(())
 }
 
-fn definition(id: &str) -> Result<ToolDefinition> {
+fn definition(id: &str, timed_waits: bool) -> Result<ToolDefinition> {
     let (description, properties, required) = match id {
         SPAWN => (
             "Start one bounded worker with a clear name and self-contained assignment. The worker receives the captured model, reasoning, project guidance, skills and already authorized native capabilities, but no nested delegation or live editor handles. Processes it starts end with this assignment; the parent owns longer-lived work. Use wait_agent to collect its result before completing.",
@@ -111,6 +112,14 @@ fn definition(id: &str) -> Result<ToolDefinition> {
             "Send information to an owned worker without starting idle work. This is information, not another assignment.",
             json!({"child":{"type":"string"},"text":{"type":"string","minLength":1}}),
             json!(["child", "text"]),
+        ),
+        WAIT if timed_waits => (
+            "Wait until at least one requested assignment settles, then collect its result and any others already settled. Wait again with only the pending assignments to collect more. Waiting never starts or resumes a worker. Settled result text can be truncated.",
+            json!({
+                "children":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":8},
+                "timeout_ms":{"type":"integer","description":"Defaults to 30000 ms. Effective range is 10000-300000 ms.","minimum":0}
+            }),
+            json!(["children"]),
         ),
         WAIT => (
             "Wait briefly for the exact owned assignments and collect settled results. Pending work stays pending; waiting never starts or resumes a worker. Settled result text can be truncated; inspect the child's conversation or referenced resources when more detail is needed. Repeat while useful work is outstanding.",
@@ -126,7 +135,7 @@ fn definition(id: &str) -> Result<ToolDefinition> {
     };
     Ok(ToolDefinition {
         id: ToolId::new(id)?,
-        version: 1,
+        version: if id == WAIT && timed_waits { 2 } else { 1 },
         description: description.into(),
         input: InputFormat::Json(
             json!({"type":"object","properties":properties,"required":required,"additionalProperties":false}),
@@ -155,15 +164,22 @@ pub(super) struct Access {
     host: Host,
     binding: TurnBinding,
     policy: Policy,
+    timed_waits: bool,
     grants: BTreeMap<ToolId, GrantSelection>,
 }
 
 impl Access {
-    pub(super) fn bind(host: &Host, binding: &TurnBinding, policy: Policy) -> Result<Arc<Self>> {
+    pub(super) fn bind(
+        host: &Host,
+        binding: &TurnBinding,
+        policy: Policy,
+        timed_waits: bool,
+    ) -> Result<Arc<Self>> {
         Ok(Arc::new(Self {
             host: host.clone(),
             binding: binding.clone(),
             policy,
+            timed_waits,
             grants: [SPAWN, SEND, WAIT, STOP]
                 .into_iter()
                 .map(|id| Ok((ToolId::new(id)?, grant(binding, id)?)))
@@ -183,7 +199,7 @@ impl Access {
         Box::pin(async move {
             let id = admission.invocation.definition().id.as_str();
             if self.grants.get(&admission.invocation.definition().id) != Some(&admission.grants)
-                || admission.invocation.definition() != &definition(id)?
+                || admission.invocation.definition() != &definition(id, self.timed_waits)?
             {
                 return Err(unavailable());
             }
@@ -198,7 +214,7 @@ impl Access {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
     ) -> Result<()> {
         for id in [SPAWN, SEND, WAIT, STOP] {
-            let definition = definition(id)?;
+            let definition = definition(id, self.timed_waits)?;
             grants.insert(definition.id.clone(), self.grants[&definition.id].clone());
             inventory.insert(Arc::new(WorkerTool {
                 access: self.clone(),
@@ -307,27 +323,15 @@ impl WorkerTool {
                     .iter()
                     .map(|id| SessionId::new(id.as_str().ok_or_else(invalid)?))
                     .collect::<Result<Vec<_>>>()?;
-                let deadline = context.deadline.map_or_else(
-                    || Instant::now() + Duration::from_secs(10),
-                    |outer| outer.min(Instant::now() + Duration::from_secs(10)),
-                );
-                loop {
-                    let result = self
+                if recovery {
+                    return self
                         .access
                         .host
                         .worker_results(&self.access.binding, &ids)
-                        .await?;
-                    if result["pending"].as_array().is_some_and(Vec::is_empty)
-                        || Instant::now() + Duration::from_millis(100) >= deadline
-                        || recovery
-                    {
-                        return Ok(result);
-                    }
-                    tokio::select! {
-                        _ = context.cancellation.cancelled() => return Err(problem(ErrorKind::Unavailable,"worker_wait_cancelled")),
-                        _ = tokio::time::sleep(Duration::from_millis(100)) => {}
-                    }
+                        .await;
                 }
+                let duration = worker_wait_duration(arguments, self.access.timed_waits)?;
+                self.wait_for_workers(&ids, duration, &context).await
             }
             STOP => {
                 let child = SessionId::new(string(arguments, "child")?)?;
@@ -405,6 +409,59 @@ impl WorkerTool {
     }
 }
 
+impl WorkerTool {
+    async fn wait_for_workers(
+        &self,
+        ids: &[SessionId],
+        duration: Duration,
+        context: &InvocationContext,
+    ) -> Result<Value> {
+        let host = &self.access.host;
+        let start = tokio::time::Instant::now();
+        let until = waiting::until(start.into_std(), duration, context.deadline);
+        let mut end = None;
+        loop {
+            let changed = host.changed.notified();
+            let mut result = host.worker_results(&self.access.binding, ids).await?;
+            if result["collected"]
+                .as_array()
+                .is_some_and(|entries| !entries.is_empty())
+            {
+                end = Some("settled");
+            }
+            if let Some(reason) = end {
+                if self.access.timed_waits {
+                    result["wait"] =
+                        json!({"status":reason,"elapsed_ms":start.elapsed().as_millis()});
+                }
+                return Ok(result);
+            }
+            end = tokio::select! {
+                biased;
+                _ = context.cancellation.cancelled() => return Err(problem(ErrorKind::Unavailable,"worker_wait_cancelled")),
+                _ = context.input_activity.cancelled() => Some("input"),
+                _ = tokio::time::sleep_until(until.into()) => Some("timeout"),
+                () = changed => None,
+            };
+        }
+    }
+}
+
+fn worker_wait_duration(
+    arguments: &serde_json::Map<String, Value>,
+    timed: bool,
+) -> Result<Duration> {
+    if !timed {
+        return Ok(Duration::from_secs(10));
+    }
+    let millis = arguments
+        .get("timeout_ms")
+        .map(|value| value.as_u64().ok_or_else(invalid))
+        .transpose()?
+        .unwrap_or(30_000);
+    Ok(Duration::from_millis(millis.clamp(10_000, waiting::MAX_MS)))
+}
+
 impl Tool for WorkerTool {
     fn definition(&self) -> &ToolDefinition {
         &self.definition
@@ -432,7 +489,9 @@ impl Tool for WorkerTool {
                 let Some(ids) = args.get("children").and_then(Value::as_array) else {
                     return Err(invalid());
                 };
-                if args.len() != 1
+                let expected =
+                    1 + usize::from(self.access.timed_waits && args.contains_key("timeout_ms"));
+                if args.len() != expected
                     || ids.is_empty()
                     || ids.len() > self.access.policy.max_children()
                 {
@@ -441,6 +500,7 @@ impl Tool for WorkerTool {
                 for id in ids {
                     SessionId::new(id.as_str().ok_or_else(invalid)?)?;
                 }
+                worker_wait_duration(args, self.access.timed_waits)?;
                 Ok(())
             }
             STOP => {
@@ -452,6 +512,15 @@ impl Tool for WorkerTool {
             _ => Err(invalid()),
         }
     }
+    fn wait_timeout(&self, arguments: &ToolArguments) -> Option<Duration> {
+        if self.definition.id.as_str() != WAIT {
+            return None;
+        }
+        worker_wait_duration(object(arguments).ok()?, self.access.timed_waits)
+            .ok()
+            .map(waiting::execution_timeout)
+    }
+
     fn invoke(
         &self,
         invocation: Invocation,
@@ -552,7 +621,7 @@ impl Host {
             },
         };
         let expected_grants = grant(&source.binding, SEND)?;
-        let expected_definition = definition(SEND)?;
+        let expected_definition = definition(SEND, false)?;
         let expected_arguments = ToolArguments::Json(json!({"child":child,"text":text}));
         let operation = source.operation.clone();
         let action = source.action;
@@ -1001,7 +1070,7 @@ impl Host {
         };
         let offers = [SPAWN, SEND, WAIT, STOP]
             .into_iter()
-            .map(|id| definition(id)?.offer())
+            .map(|id| definition(id, true)?.offer())
             .collect::<Result<Vec<_>>>()?;
         let grants = [SPAWN, SEND, WAIT, STOP]
             .into_iter()
@@ -1305,7 +1374,7 @@ impl Host {
         let attempt = source.attempt.clone();
         let action = source.action;
         let grants = grant(&source.binding, SPAWN)?;
-        let definition = definition(SPAWN)?;
+        let definition = definition(SPAWN, false)?;
         let arguments = ToolArguments::Json(json!({"name":name,"instructions":instructions}));
         self.store
             .inspect_turn_with(
@@ -1467,7 +1536,7 @@ impl Host {
         turn: &TurnId,
     ) -> Result<bool> {
         let expected = grant(parent, STOP)?;
-        let definition = definition(STOP)?;
+        let definition = definition(STOP, false)?;
         let child = child.clone();
         let input = input.clone();
         let turn = turn.clone();

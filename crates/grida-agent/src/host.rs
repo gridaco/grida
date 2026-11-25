@@ -7,6 +7,7 @@ mod attachment_batch;
 mod before_tool;
 mod bundled_skills;
 mod catalog;
+mod clock;
 pub(crate) mod command_actions;
 pub(crate) mod compaction;
 mod completion_checks;
@@ -238,6 +239,7 @@ pub struct Host {
     effort: EffortPreset,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
+    run_deadline: Option<std::time::Instant>,
     /// A temporary host that only makes tool-free model requests (see `titles`).
     inference_only: bool,
     #[cfg(unix)]
@@ -561,6 +563,9 @@ struct StoredPrompt {
     questions: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     question_batches: bool,
+    // Keep the tool offer that was available when this input was accepted.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    wait_tools: bool,
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
@@ -782,6 +787,7 @@ struct PreparedInput {
     context_limits: grida_agent_master::compaction::ContextLimits,
     questions: bool,
     question_batches: bool,
+    wait_tools: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -1017,6 +1023,7 @@ impl Host {
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
+            run_deadline: None,
             inference_only: false,
             #[cfg(unix)]
             guidance_root: None,
@@ -2244,6 +2251,12 @@ impl Host {
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
             .transpose()?;
+        let clock = (prepared.wait_tools
+            && !cancellation_only
+            && !self.inference_only
+            && (!prepared.subagent || prepared.worker))
+            .then(|| clock::Access::bind(claim.lease.binding()))
+            .transpose()?;
         let mut authority = execution.authority.clone();
         let mut inventory = Inventory::new();
         let capture_image = execution
@@ -2389,7 +2402,14 @@ impl Host {
             .delegation
             .as_ref()
             .filter(|_| !cancellation_only)
-            .map(|policy| delegation::Access::bind(self, claim.lease.binding(), policy.clone()))
+            .map(|policy| {
+                delegation::Access::bind(
+                    self,
+                    claim.lease.binding(),
+                    policy.clone(),
+                    prepared.wait_tools,
+                )
+            })
             .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
@@ -2399,7 +2419,10 @@ impl Host {
                 file: file.clone(),
                 skills: skill_reader.clone(),
             },
-            wakeups.clone(),
+            permissions::WaitTools {
+                scheduled: wakeups.clone(),
+                clock: clock.clone(),
+            },
             permissions::HookTools {
                 completion: completion.clone(),
                 before_tool: before_tool.clone(),
@@ -2521,6 +2544,9 @@ impl Host {
         if let Some(wakeups) = &wakeups {
             wakeups.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
+        if let Some(clock) = &clock {
+            clock.insert(&mut inventory, &mut authority.tools)?;
+        }
         for host_tools in host_tools {
             host_tools.insert(&mut inventory, &mut authority.tools)?;
         }
@@ -2556,6 +2582,9 @@ impl Host {
         }
         if !closing && let Some(wakeups) = &wakeups {
             wakeups.reconcile(&operations, &tools).await?;
+        }
+        if !closing && let Some(clock) = &clock {
+            clock.reconcile(&operations, &tools).await?;
         }
         if let Some(disclosure) = history.disclosure {
             if !prepared.config.instructions.is_empty() {
@@ -2704,6 +2733,10 @@ impl Host {
         }))
     }
 
+    pub(crate) fn set_run_deadline(&mut self, deadline: std::time::Instant) {
+        self.run_deadline = Some(deadline);
+    }
+
     async fn open_owned_turn_with_runtime(
         &self,
         session: &SessionId,
@@ -2712,7 +2745,7 @@ impl Host {
         runtime: &Runtime,
     ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
         let opened = runtime
-            .open(lease)
+            .open_with_wait_deadline(lease, self.run_deadline)
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_open_failed"))?;
         let closing = {
@@ -3090,6 +3123,7 @@ impl Host {
                 operating_regime,
                 questions,
                 question_batches,
+                wait_tools: true,
                 allow_wakeups,
                 allow_library_selection,
                 unavailable_library_selection_requested,
@@ -3161,6 +3195,7 @@ impl Host {
             context_limits,
             questions,
             question_batches,
+            wait_tools,
             allow_wakeups,
             allow_library_selection,
             permission_capture,
@@ -3641,6 +3676,7 @@ impl Host {
                     },
                     stored.questions,
                     stored.question_batches,
+                    stored.wait_tools,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
                     !cancellation_only && stored.allow_library_selection,
                     if cancellation_only {
@@ -3724,6 +3760,7 @@ impl Host {
             context_limits,
             questions,
             question_batches,
+            wait_tools,
             allow_wakeups,
             allow_library_selection,
             permission_capture,

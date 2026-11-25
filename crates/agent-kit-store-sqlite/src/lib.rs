@@ -22,7 +22,8 @@ use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
-    JournalAction, JournalChange, OperationInput, TurnBinding, TurnJournal, TurnState, bind_lease,
+    JournalAction, JournalChange, JournalPosition, OperationInput, TurnBinding, TurnJournal,
+    TurnState, bind_lease,
 };
 use agent_kit_core::{
     AttemptId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result,
@@ -1022,7 +1023,7 @@ fn prepare_pending_claim(
             (state, inputs)
         }
     };
-    let owner = register_owner(inner, transaction, state.binding())?;
+    let owner = register_owner(inner, transaction, &state)?;
     session.active_turn = Some(state.binding().turn.clone());
     bump_revision(&mut session)?;
     save_session(transaction, &request.session, &session)?;
@@ -1118,7 +1119,7 @@ impl SessionStore for SqliteStore {
                 require_released(inner, state.binding())?;
                 rebind(&mut state)?;
                 save_turn(inner, &transaction, &state)?;
-                let owner = register_owner(inner, &transaction, state.binding())?;
+                let owner = register_owner(inner, &transaction, &state)?;
                 bump_revision(&mut session)?;
                 save_session(&transaction, &request.session, &session)?;
                 save_request(
@@ -1196,7 +1197,7 @@ impl SessionStore for SqliteStore {
 
 struct SqliteJournal {
     // Release the turn lease before the last store handle can release the writer.
-    _owner: Arc<catalog_reader::TurnOwner>,
+    owner: Arc<catalog_reader::TurnOwner>,
     inner: Arc<Inner>,
     binding: TurnBinding,
 }
@@ -1268,6 +1269,18 @@ impl TurnJournal for SqliteJournal {
         })
     }
 
+    fn input_activity_after(&self, after: JournalPosition) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.owner
+                .input_activity
+                .subscribe()
+                .wait_for(|position| *position > after)
+                .await
+                .map_err(|_| error(ErrorKind::Unavailable, "journal_closed"))?;
+            Ok(())
+        })
+    }
+
     fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
         let binding = self.binding.clone();
         execute(Arc::clone(&self.inner), move |inner, connection| {
@@ -1322,7 +1335,7 @@ fn finish_claim(inner: Arc<Inner>, prepared: PreparedClaim) -> Result<ClaimOutco
             let journal = SqliteJournal {
                 inner: Arc::clone(&inner),
                 binding: claim.binding.clone(),
-                _owner: claim.owner,
+                owner: claim.owner,
             };
             let controls = SqliteControls {
                 inner,
@@ -2224,7 +2237,11 @@ fn apply_turn_change(
     };
     let previous_activity = changes_activity.then(|| activity(state));
     checkpoint::release_answered(tx, state.binding(), change.actions())?;
+    let input_activity = state.input_activity();
     let receipt = state.apply(change)?;
+    if state.input_activity() > input_activity {
+        turn_layout::lock(&inner.turns).stage_input_activity(state);
+    }
     if previous_activity.is_some_and(|previous| previous != activity(state)) {
         catalog_reader::Marker::stage_turn(tx, &state.binding().session)?;
     }
@@ -2435,15 +2452,16 @@ fn require_released(inner: &Inner, binding: &TurnBinding) -> Result<()> {
 fn register_owner(
     inner: &Inner,
     tx: &Transaction<'_>,
-    binding: &TurnBinding,
+    state: &TurnState,
 ) -> Result<Arc<catalog_reader::TurnOwner>> {
+    let binding = state.binding();
     let mut owners = owners(inner);
     owners.retain(|_, owner| owner.strong_count() > 0);
     let key = (binding.session.clone(), binding.turn.clone());
     if owners.contains_key(&key) {
         return Err(error(ErrorKind::Conflict, "turn_still_owned"));
     }
-    let owner = Arc::new(catalog_reader::TurnOwner::acquire(inner, tx, binding)?);
+    let owner = Arc::new(catalog_reader::TurnOwner::acquire(inner, tx, state)?);
     owners.insert(key, Arc::downgrade(&owner));
     Ok(owner)
 }
@@ -2518,7 +2536,18 @@ fn commit(inner: &Inner, transaction: Transaction<'_>) -> Result<()> {
         None
     };
     transaction.commit().map_err(commit_error)?;
-    turn_layout::lock(&inner.turns).publish();
+    let activity = turn_layout::lock(&inner.turns).publish();
+    if !activity.is_empty() {
+        let owners = owners(inner);
+        for (binding, position) in activity {
+            if let Some(owner) = owners
+                .get(&(binding.session, binding.turn))
+                .and_then(Weak::upgrade)
+            {
+                owner.input_activity.send_replace(position);
+            }
+        }
+    }
     if let Some(marker) = publish {
         marker.changed();
     }

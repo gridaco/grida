@@ -2089,7 +2089,13 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         .await;
     assert_eq!(crop["result"]["stopReason"], "end_turn", "{crop}");
     let request = endpoint.request().await;
-    assert_eq!(request["tools"][0]["name"], TOOL);
+    assert!(
+        request["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["name"] == TOOL)
+    );
     let result = last_tool_result(endpoint.request().await);
     assert_eq!(result["status"], "succeeded", "{result}");
     let receipt = &result["structured"];
@@ -2201,7 +2207,13 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         .await;
     assert_eq!(resumed["result"]["stopReason"], "end_turn", "{resumed}");
     let retained = endpoint.request().await;
-    assert_eq!(retained["tools"][0]["name"], TOOL);
+    assert!(
+        retained["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["name"] == TOOL)
+    );
     assert!(
         retained["input"]
             .to_string()
@@ -2250,7 +2262,13 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         )
         .await;
     assert_eq!(lost["result"]["stopReason"], "end_turn", "{lost}");
-    assert_eq!(endpoint.request().await["tools"][0]["name"], TOOL);
+    assert!(
+        endpoint.request().await["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["name"] == TOOL)
+    );
     let unavailable = last_tool_result(endpoint.request().await);
     assert_eq!(unavailable["status"], "failed", "{unavailable}");
     assert_eq!(
@@ -2280,7 +2298,7 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         other_chat["result"]["stopReason"], "end_turn",
         "{other_chat}"
     );
-    assert!(endpoint.request().await.get("tools").is_none());
+    assert_only_clock_tools(&endpoint.request().await);
     restarted.close().await;
     assert!(fs::read(&source).unwrap().ends_with(&original));
     assert_eq!(

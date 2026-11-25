@@ -474,7 +474,7 @@ fn check_file_request(request: &Value, name: &str, path: &Path, bytes: &[u8]) {
     assert!(
         offers.iter().all(|offer| matches!(
             offer["function"]["name"].as_str(),
-            Some(TOOL | "question" | "question_async")
+            Some(TOOL | "question" | "question_async" | "clock_curr_time" | "clock_sleep")
         )),
         "{offers:?}"
     );
@@ -665,7 +665,7 @@ async fn exact_text_and_binary_files_resume_or_report_missing_scratch_without_di
             )
             .await;
             read(&mut client, "session/prompt", json!({"sessionId":other["sessionId"],"prompt":[{"type":"text","text":"Inspect a file called selected_file.bin."}]})).await;
-            assert!(endpoint.request().await.get("tools").is_none());
+            assert_only_clock_tools(&endpoint.request().await);
             assert_eq!(fs::read(&work).unwrap(), bytes);
             if bytes == TEXT {
                 let deletion = super::deletion::deletion(&mut client, session, &context).await;

@@ -10,7 +10,8 @@ use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, Prov
 use agent_kit_core::tools::{InvocationContext, InvocationRecovery};
 use agent_kit_core::turn::{
     CommitReceipt, ControlSnapshot, InterruptionReason, JournalAction, JournalChange,
-    JournalContent, OperationInput, OperationOutcome, OperationRecord, TurnLease, WaitRecord,
+    JournalContent, JournalPosition, OperationInput, OperationOutcome, OperationRecord, TurnLease,
+    WaitRecord,
 };
 use agent_kit_core::{AttemptId, CancellationToken, ChangeId, Fingerprint, MessageId};
 use std::num::NonZeroU64;
@@ -24,6 +25,7 @@ pub struct Runtime {
     services: Arc<ExecutionServices>,
     inference_permits: Arc<Semaphore>,
     tool_permits: Arc<Semaphore>,
+    wait_permits: Arc<Semaphore>,
 }
 
 impl Runtime {
@@ -34,6 +36,7 @@ impl Runtime {
         Ok(Self {
             inference_permits: Arc::new(Semaphore::new(services.limits.max_concurrent_inferences)),
             tool_permits: Arc::new(Semaphore::new(services.limits.max_concurrent_tools)),
+            wait_permits: Arc::new(Semaphore::new(services.limits.max_concurrent_tools)),
             services: Arc::new(services),
         })
     }
@@ -55,6 +58,7 @@ impl Runtime {
             }),
             inference_permits: self.inference_permits.clone(),
             tool_permits: self.tool_permits.clone(),
+            wait_permits: self.wait_permits.clone(),
         }
     }
 
@@ -79,6 +83,7 @@ impl Runtime {
             }),
             inference_permits: self.inference_permits.clone(),
             tool_permits: self.tool_permits.clone(),
+            wait_permits: self.wait_permits.clone(),
         })
     }
 
@@ -86,6 +91,15 @@ impl Runtime {
     /// `turn_not_active` when the journal is settled, suspended or bound to
     /// another writer.
     pub async fn open(&self, lease: TurnLease) -> Result<OpenedTurn> {
+        self.open_with_wait_deadline(lease, None).await
+    }
+
+    /// Open a turn whose passive waits must fit within an outer host deadline.
+    pub async fn open_with_wait_deadline(
+        &self,
+        lease: TurnLease,
+        wait_deadline: Option<Instant>,
+    ) -> Result<OpenedTurn> {
         let state = lease.journal().load().await?;
         state.validate()?;
         if state.binding() != lease.binding() || state.outcome().is_some() || state.is_suspended() {
@@ -105,6 +119,8 @@ impl Runtime {
             services: Arc::clone(&self.services),
             inference_permits: Arc::clone(&self.inference_permits),
             tool_permits: Arc::clone(&self.tool_permits),
+            wait_permits: Arc::clone(&self.wait_permits),
+            wait_deadline,
             serial: AsyncMutex::new(()),
             attached: RwLock::new(()),
             active: Mutex::new(BTreeMap::new()),
@@ -890,7 +906,8 @@ impl TurnOperations {
         plan: PlannedInvocation,
         inventory: InventorySnapshot,
     ) -> Result<InvokeOutcome> {
-        self.invoke_captured(key, plan, inventory, None, None).await
+        self.invoke_captured(key, plan, inventory, None, None, None)
+            .await
     }
 
     pub(crate) async fn invoke_captured(
@@ -900,6 +917,7 @@ impl TurnOperations {
         inventory: InventorySnapshot,
         origin: Option<OperationId>,
         source_call: Option<agent_kit_core::ToolCallId>,
+        input_after: Option<JournalPosition>,
     ) -> Result<InvokeOutcome> {
         let id = self.operation_id(&key)?;
         self.inner.ensure_open()?;
@@ -983,18 +1001,47 @@ impl TurnOperations {
                 return self.reject_tool(&owner, &reason.code).await;
             }
         }
+        let wait_timeout = prepared.wait_timeout();
+        let headless_wait = wait_timeout.zip(self.inner.wait_deadline);
+        let mut admission_deadline = deadline;
+        let mut deadline_code = "deadline";
+        if let Some((timeout, outer)) = headless_wait {
+            let Some(latest_start) = outer
+                .checked_sub(timeout)
+                .filter(|start| *start > Instant::now())
+            else {
+                return self.reject_tool(&owner, "wait_exceeds_run_deadline").await;
+            };
+            if latest_start < deadline {
+                admission_deadline = latest_start;
+                deadline_code = "wait_exceeds_run_deadline";
+            }
+        }
+        let capacity = match wait_timeout {
+            Some(_) => &self.inner.wait_permits,
+            None => &self.inner.tool_permits,
+        };
         let permit = tokio::select! {
             _ = owner.admission.cancellation.cancelled() => return self.reject_tool(&owner, owner.admission.cancellation_code()).await,
-            result = Arc::clone(&self.inner.tool_permits).acquire_owned() => result.map_err(|_| Error::new(ErrorKind::Unavailable, "tool_capacity_closed"))?,
-            _ = tokio::time::sleep_until(deadline.into()) => return self.reject_tool(&owner, "deadline").await,
+            result = Arc::clone(capacity).acquire_owned() => result.map_err(|_| Error::new(ErrorKind::Unavailable, "tool_capacity_closed"))?,
+            _ = tokio::time::sleep_until(admission_deadline.into()) => return self.reject_tool(&owner, deadline_code).await,
         };
         if let Err(error) = self
             .inner
-            .authorize(&record, &owner.admission, deadline)
+            .authorize(&record, &owner.admission, admission_deadline)
             .await
         {
             drop(permit);
-            return self.reject_tool(&owner, &error.code).await;
+            let code = if error.code == "deadline" {
+                deadline_code
+            } else {
+                &error.code
+            };
+            return self.reject_tool(&owner, code).await;
+        }
+        if headless_wait.is_some() && Instant::now() >= admission_deadline {
+            drop(permit);
+            return self.reject_tool(&owner, deadline_code).await;
         }
         let attempt = match self.inner.start_attempt(&owner).await {
             Ok(attempt) => attempt,
@@ -1003,9 +1050,15 @@ impl TurnOperations {
             }
             Err(error) => return Err(error),
         };
+        let deadline = wait_timeout
+            .and_then(|timeout| Instant::now().checked_add(timeout))
+            .map_or(deadline, |wait| deadline.max(wait));
+        let deadline = headless_wait.map_or(deadline, |(_, outer)| deadline.min(outer));
+        let input_activity = CancellationToken::new();
         let context = InvocationContext {
             attempt: attempt.clone(),
             cancellation: owner.admission.cancellation.clone(),
+            input_activity: input_activity.clone(),
             deadline: Some(deadline),
             max_output_bytes: self.inner.services.limits.max_output_bytes,
         };
@@ -1014,7 +1067,29 @@ impl TurnOperations {
             outcome.status = OutcomeStatus::Cancelled;
             outcome
         } else {
-            let invocation = prepared.invoke(context);
+            let invocation = async {
+                if let Some(after) = input_after.filter(|_| wait_timeout.is_some()) {
+                    let lease = match self.inner.lease() {
+                        Ok(lease) => lease,
+                        Err(error) => return ToolOutcome::failed(&error.code),
+                    };
+                    let execution = prepared.invoke(context);
+                    tokio::pin!(execution);
+                    tokio::select! {
+                        biased;
+                        signal = lease.journal().input_activity_after(after) => {
+                            if let Err(error) = signal {
+                                return ToolOutcome::failed(&error.code);
+                            }
+                            input_activity.cancel();
+                            execution.await
+                        }
+                        outcome = &mut execution => outcome,
+                    }
+                } else {
+                    prepared.invoke(context).await
+                }
+            };
             settle_executor(
                 invocation,
                 &owner.admission,
@@ -1033,7 +1108,12 @@ impl TurnOperations {
     async fn reject_tool(&self, owner: &Owner, code: &str) -> Result<InvokeOutcome> {
         let mut code = code;
         loop {
-            let outcome = ToolOutcome::failed(code);
+            let mut outcome = ToolOutcome::failed(code);
+            if code == "wait_exceeds_run_deadline" {
+                outcome.content.push(agent_kit_core::messages::ResultContent::Text(
+                    "The wait would exceed the time left in this run. Use a shorter wait or finish with the current results.".into(),
+                ));
+            }
             let rejected = self
                 .inner
                 .reject(
@@ -1343,6 +1423,7 @@ impl TurnOperations {
             InvocationContext {
                 attempt: attempt.clone(),
                 cancellation: owner.admission.cancellation.clone(),
+                input_activity: CancellationToken::new(),
                 deadline: Some(deadline),
                 max_output_bytes: self.inner.services.limits.max_output_bytes,
             },
@@ -1493,6 +1574,8 @@ pub(crate) struct Inner {
     services: Arc<ExecutionServices>,
     inference_permits: Arc<Semaphore>,
     tool_permits: Arc<Semaphore>,
+    wait_permits: Arc<Semaphore>,
+    wait_deadline: Option<Instant>,
     serial: AsyncMutex<()>,
     attached: RwLock<()>,
     active: Mutex<BTreeMap<OperationId, Active>>,
