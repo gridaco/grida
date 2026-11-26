@@ -46,12 +46,12 @@ use grida_agent_master::hooks::{
 };
 use grida_agent_master::{
     Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime, StopReason,
-    approval_review, lifecycle_hooks, read_account, subagents,
+    approval_review, lifecycle_hooks, pending_retry_not_before, read_account, subagents,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -1007,7 +1007,6 @@ impl Fixture {
     }
 }
 
-#[derive(Clone, Copy)]
 enum PublicationInterruption {
     BeforeCommit,
     BeforeSettlement,
@@ -1015,7 +1014,10 @@ enum PublicationInterruption {
     BeforeDispatch,
     AfterRequestCheckpoint,
     ControlAfterCommit(ControlDirective),
-    StopAfterRetryReservation,
+    ControlAfterRetryReservation {
+        directive: ControlDirective,
+        due: Option<Arc<OnceLock<u64>>>,
+    },
     ControlBeforeBoundary(ControlDirective),
     InputAfterCommit,
     QuestionAfterCommit,
@@ -1098,9 +1100,11 @@ impl TurnJournal for InterruptPublication {
                 .actions()
                 .iter()
                 .any(|action| matches!(action, JournalAction::CompleteAttempt { .. })),
-            PublicationInterruption::StopAfterRetryReservation => change.actions().iter().any(|action| {
-                matches!(action, JournalAction::SetCheckpoint(checkpoint) if retry_due_time(checkpoint).is_some())
-            }),
+            PublicationInterruption::ControlAfterRetryReservation { .. } => {
+                change.actions().iter().any(|action| {
+                    matches!(action, JournalAction::SetCheckpoint(checkpoint) if retry_due_time(checkpoint).is_some())
+                })
+            }
             _ => publishes_history && publishes_continuation,
         };
         let interrupt = boundary_matches && self.armed.swap(false, Ordering::SeqCst);
@@ -1130,16 +1134,21 @@ impl TurnJournal for InterruptPublication {
                     Ok(receipt)
                 }
                 PublicationInterruption::ControlAfterCommit(_)
-                | PublicationInterruption::StopAfterRetryReservation => {
+                | PublicationInterruption::ControlAfterRetryReservation { .. } => {
                     let receipt = self.lease.journal().commit(change).await?;
                     let state = self.lease.journal().load().await?;
-                    let directive = match self.interruption {
-                        PublicationInterruption::ControlAfterCommit(directive) => directive,
-                        PublicationInterruption::StopAfterRetryReservation => {
-                            assert!(
-                                grida_agent_master::pending_retry_not_before(&state)?.is_some()
-                            );
-                            ControlDirective::Cancel
+                    let directive = match &self.interruption {
+                        PublicationInterruption::ControlAfterCommit(directive) => *directive,
+                        PublicationInterruption::ControlAfterRetryReservation {
+                            directive,
+                            due,
+                        } => {
+                            let deadline = pending_retry_not_before(&state)?
+                                .expect("the journal committed a retry reservation");
+                            if let Some(due) = due {
+                                due.set(deadline).expect("the retry is captured once");
+                            }
+                            *directive
                         }
                         _ => unreachable!(),
                     };
@@ -2744,33 +2753,29 @@ async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
         let fixture = Fixture::new(Script::AdmissionLimit(1_500));
         let store = fixture.store();
         let claim = fixture.claim(&store).await;
-        let mut opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let due = Arc::new(OnceLock::new());
+        // Observe the committed retry and apply Pause before the master can
+        // proceed, even if the runner is slow to commit or deliver updates.
+        let lease = intercept_publication(
+            claim.lease,
+            PublicationInterruption::ControlAfterRetryReservation {
+                directive: ControlDirective::Pause,
+                due: Some(Arc::clone(&due)),
+            },
+        );
+        let opened = fixture.runtime().open(lease).await.unwrap();
         let master = fixture.master(4, "Be concise");
-        let task = tokio::spawn(async move { master.run(opened.turn, input()).await });
-        let due = wait_for_retry(&mut opened.observer).await;
-        let view = store.inspect(session_id()).await.unwrap();
-        let current = view.current.unwrap();
-        store
-            .control(ControlRequest {
-                id: change_id("pause-backoff"),
-                session: session_id(),
-                expected_revision: view.revision,
-                action: SessionControl::Turn {
-                    turn: turn_id(),
-                    expected: current.controls.revision,
-                    directive: ControlDirective::Pause,
-                },
-            })
-            .await
-            .unwrap();
-        let MasterOutcome::Suspended(receipt) = tokio::time::timeout(Duration::from_secs(1), task)
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap()
+        let MasterOutcome::Suspended(receipt) =
+            tokio::time::timeout(Duration::from_secs(30), master.run(opened.turn, input()))
+                .await
+                .expect("the turn suspends after Pause")
+                .unwrap()
         else {
-            panic!("Pause must interrupt the backoff");
+            panic!("Pause must suspend the reserved retry");
         };
+        let due = *due
+            .get()
+            .expect("the retry deadline was captured before Pause");
         store
             .verify(CommitReceipt::Suspended(receipt))
             .await
@@ -2791,12 +2796,7 @@ async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
         let store = fixture.reopen().await;
         assert_eq!(
             store
-                .inspect_turn_with(session_id(), turn_id(), |state| {
-                    let checkpoint = state.checkpoint().expect("retained retry");
-                    let value: serde_json::Value =
-                        serde_json::from_slice(checkpoint.bytes()).unwrap();
-                    Ok(value["retry"]["not_before_ms"].as_u64())
-                })
+                .inspect_turn_with(session_id(), turn_id(), pending_retry_not_before)
                 .await
                 .unwrap(),
             Some(due)
@@ -2903,7 +2903,10 @@ async fn stopping_at_the_connection_retry_reservation_dispatches_no_retry() {
     // wait starts. This leaves no wall-clock race with the short retry delay.
     let lease = intercept_publication(
         claim.lease,
-        PublicationInterruption::StopAfterRetryReservation,
+        PublicationInterruption::ControlAfterRetryReservation {
+            directive: ControlDirective::Cancel,
+            due: None,
+        },
     );
     let opened = fixture.runtime().open(lease).await.unwrap();
     let MasterOutcome::Settled(receipt) = fixture
