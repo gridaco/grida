@@ -310,9 +310,18 @@ function AgentComposerInner({
     [voice, draftKey, draftStore, submissionScope, editing?.id]
   );
   useLayoutEffect(() => {
-    if (draft && binding.restore(draft, composer) === "restored" && autofocus)
+    if (
+      draft &&
+      binding.restore(
+        draft,
+        composer,
+        editSession.ordinaryEditor(editOwner, composer)
+      ) === "restored" &&
+      autofocus &&
+      !editing
+    )
       composer.focus();
-  }, [binding, composer, draft, autofocus]);
+  }, [binding, composer, draft, autofocus, editSession, editOwner, editing]);
   useEffect(() => {
     if (!draft || !binding.owns(draft)) return;
     const current = readDocument();

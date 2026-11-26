@@ -159,7 +159,17 @@ export interface ComposerDraftBlobs {
   ): Promise<void>;
 }
 
-type DocumentSlot = { readonly document: unknown; readonly revision: string };
+/** An in-memory notification for a refused message already kept in the draft. */
+export type ComposerDraftReturnedMessage = Readonly<{
+  content: readonly unknown[];
+  previous?: ComposerDraftReturnedMessage;
+}>;
+
+type DocumentSlot = {
+  readonly document: unknown;
+  readonly revision: string;
+  readonly returnedFirstMessage?: ComposerDraftReturnedMessage;
+};
 type DocumentSend = { key: string; readonly slot: DocumentSlot | null };
 type InterruptedCapture = Readonly<{
   submission: ComposerDraftPending;
@@ -824,6 +834,26 @@ export class ComposerDrafts {
   /** Identifies this exact persisted edit, including repeated identical text. */
   documentRevision(key: string): string | undefined {
     return this.storedRevision(ComposerDrafts.prefix + key);
+  }
+
+  returnedFirstMessage(key: string): ComposerDraftReturnedMessage | undefined {
+    return this.documentSlot(key)?.returnedFirstMessage;
+  }
+
+  writeReturnedFirstMessage(
+    key: string,
+    document: unknown,
+    content: readonly unknown[]
+  ): void {
+    const previous = this.returnedFirstMessage(key);
+    if (this.read(key) !== document) this.write(key, document);
+    else if (previous) return;
+    const slot = this.memory.get(key);
+    if (slot)
+      this.memory.set(key, {
+        ...slot,
+        returnedFirstMessage: { content, previous },
+      });
   }
 
   /** Capture the actual submitted document, even before its next autosave. */

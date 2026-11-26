@@ -70,17 +70,37 @@ export class AgentComposerEditSession {
       : current;
   }
 
+  /** Reconcile the borrowed draft without replacing the queued edit. */
+  ordinaryEditor(
+    owner: unknown,
+    editor: AgentComposerEditSession.DocumentEditor
+  ): AgentComposerEditSession.DocumentEditor {
+    const active = this.active;
+    if (!active || !Object.is(active.owner, owner)) return editor;
+    return {
+      readDocument: () => active.document,
+      restoreDocument: (document: unknown) => {
+        active.document = document;
+        return true;
+      },
+    };
+  }
+
   owns(id: string, owner: unknown): boolean {
     return this.active?.id === id && Object.is(this.active.owner, owner);
   }
 }
 
 export namespace AgentComposerEditSession {
-  export type Editor = Readonly<{
-    ready: boolean;
+  export type DocumentEditor = Readonly<{
     readDocument(): unknown | null;
     restoreDocument(document: unknown): boolean;
-    clear(): void;
-    focus(): boolean;
   }>;
+
+  export type Editor = DocumentEditor &
+    Readonly<{
+      ready: boolean;
+      clear(): void;
+      focus(): boolean;
+    }>;
 }

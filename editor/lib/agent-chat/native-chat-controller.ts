@@ -73,6 +73,7 @@ import {
 import { attachedChatActivity } from "./native-chat-activity";
 import { GoalSpending } from "./goal-spending";
 import { ComposerDrafts, type ComposerDraftPending } from "./composer-drafts";
+import { ComposerDraftBinding } from "./composer-draft-binding";
 import type { ComposerHistory } from "@/kits/composer/composer-history";
 import { ComposerTiptap } from "../../kits/composer/composer-tiptap";
 import { WorkspaceMention } from "../../kits/composer/workspace-mention";
@@ -1708,25 +1709,15 @@ export class NativeChatController {
             type: "paragraph",
             ...(line && { content: [{ type: "text", text: line }] }),
           }));
-      const saved = this.drafts.store.read(key);
-      if (
-        saved &&
-        typeof saved === "object" &&
-        "type" in saved &&
-        saved.type === "doc" &&
-        "content" in saved &&
-        Array.isArray(saved.content)
-      ) {
-        // Preserve newer rich edits and inline references. A previous fallback
-        // may already be the document's suffix; do not append it twice.
-        const suffix = saved.content.slice(-returned.length);
-        if (JSON.stringify(suffix) !== JSON.stringify(returned))
-          this.drafts.store.write(key, {
-            ...saved,
-            content: [...saved.content, ...returned],
-          });
-      } else this.drafts.store.write(key, { type: "doc", content: returned });
-      if (structured && returned.length) return null;
+      const store = this.drafts.store;
+      const saved = store.read(key);
+      const recovered = ComposerDraftBinding.append(saved, returned);
+      if (structured && returned.length) {
+        store.writeReturnedFirstMessage(key, recovered, returned);
+        if (this.composerDraft()?.key === key) this.update({});
+        return null;
+      }
+      if (recovered !== saved) store.write(key, recovered);
     }
     return this.owns(scope) ? text : null;
   }
