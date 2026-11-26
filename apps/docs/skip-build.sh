@@ -9,10 +9,10 @@
 # runner can branch on an exit code (Vercel ignoreCommand, GitHub Actions).
 # The script itself knows nothing about the host.
 
-# KNOWN CAVEAT: on fresh PR branches VERCEL_GIT_PREVIOUS_SHA is unset and the
-# HEAD^ fallback sees only the tip commit — a docs-only tip commit wrongly
-# skips the build. Planned fix: diff against the merge base with the target
-# branch. (Vercel also runs its own "affected projects" check before this.)
+# Commit range: from the previous built SHA when the host provides one, else
+# from the merge base with the target branch — so a fresh PR branch is judged
+# by all of its commits, not only its tip. (Vercel also runs its own
+# "affected projects" check before this.)
 set -uo pipefail
 
 # ---------------------------------------------------------------------------
@@ -62,7 +62,54 @@ is_dep() {
   return 1
 }
 
-BASE="${PREVIOUS_SHA:-${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}}"
+# The branch a PR merges into. Its merge base with HEAD is the comparison
+# point when no previous built SHA is known.
+TARGET_BRANCH="${TARGET_BRANCH:-main}"
+TARGET_REF="refs/remotes/origin/$TARGET_BRANCH"
+
+# Fetch the target branch from origin into TARGET_REF, passing extra fetch
+# options (e.g. --depth) through.
+fetch_target() {
+  git fetch --quiet --no-tags "$@" origin \
+    "+refs/heads/$TARGET_BRANCH:$TARGET_REF" 2>/dev/null
+}
+
+# Print the merge base of HEAD and the target branch. Hosts such as Vercel
+# check out a shallow clone without the target branch, so fetch it, then
+# deepen both histories (up to ~1,000 commits) until they meet. Returns
+# non-zero if the merge base cannot be found.
+merge_base() {
+  local shallow
+
+  git merge-base HEAD "$TARGET_REF" 2>/dev/null && return 0
+
+  shallow=$(git rev-parse --is-shallow-repository 2>/dev/null) || return 1
+  if [ "$shallow" = true ]; then
+    fetch_target --depth=50 || return 1
+  else
+    fetch_target || return 1
+  fi
+  git merge-base HEAD "$TARGET_REF" 2>/dev/null && return 0
+  [ "$shallow" = true ] || return 1
+
+  for _ in {1..10}; do
+    fetch_target --deepen=100 || return 1
+    git merge-base HEAD "$TARGET_REF" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Compare against the previous deployed/built SHA when the host provides one
+# (Vercel sets VERCEL_GIT_PREVIOUS_SHA), otherwise against the merge base with
+# the target branch. If neither resolves, build to be safe.
+BASE="${PREVIOUS_SHA:-${VERCEL_GIT_PREVIOUS_SHA:-}}"
+if [ -z "$BASE" ]; then
+  if ! BASE=$(merge_base); then
+    echo "[skip-build] could not find the merge base with $TARGET_BRANCH — building."
+    exit 1
+  fi
+  echo "[skip-build] comparing against the merge base with $TARGET_BRANCH ($BASE)."
+fi
 
 if ! CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null); then
   echo "[skip-build] could not diff against $BASE — building."
