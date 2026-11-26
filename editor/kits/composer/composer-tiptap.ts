@@ -14,16 +14,18 @@ import {
   MarkdownSerializer,
   defaultMarkdownSerializer,
 } from "@tiptap/pm/markdown";
-import type {
-  MarkType,
-  Node as ProseMirrorNode,
-  ResolvedPos,
-  Schema,
+import {
+  Fragment,
+  type MarkType,
+  type Node as ProseMirrorNode,
+  type ResolvedPos,
+  type Schema,
 } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { WorkspaceMention } from "./workspace-mention";
 import { chatWebLinkIcon } from "../../components/chat-web-link";
 import {
   ComposerTiptapHistory,
@@ -94,19 +96,31 @@ const ComposerMentionNode = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const workspace =
+      HTMLAttributes.path &&
+      (HTMLAttributes.kind === "file" || HTMLAttributes.kind === "folder");
     return [
       "span",
       mergeAttributes(HTMLAttributes, {
         "data-composer-mention": HTMLAttributes.id,
         "data-composer-chip": "mention",
         class: "composer-chip composer-mention",
-        ...(HTMLAttributes.source && { title: HTMLAttributes.source }),
+        ...(workspace
+          ? { "data-workspace-mention": "", title: HTMLAttributes.path }
+          : HTMLAttributes.source && { title: HTMLAttributes.source }),
       }),
-      `${HTMLAttributes.sigil === "$" ? "" : "@"}${HTMLAttributes.label || HTMLAttributes.id}`,
+      workspace
+        ? WorkspaceMention.name(HTMLAttributes.path)
+        : `${HTMLAttributes.sigil === "$" ? "" : "@"}${HTMLAttributes.label || HTMLAttributes.id}`,
     ];
   },
 
   renderText({ node }) {
+    if (
+      node.attrs.path &&
+      (node.attrs.kind === "file" || node.attrs.kind === "folder")
+    )
+      return WorkspaceMention.name(node.attrs.path);
     return `${node.attrs.sigil === "$" ? "$" : "@"}${node.attrs.label || node.attrs.id}`;
   },
 });
@@ -307,12 +321,27 @@ const markdown = new MarkdownSerializer(
           (character) => (character === "(" ? "%28" : "%29")
         );
         state.text(`[$${state.esc(label)}](${target})`, false);
+      } else if (
+        node.attrs.path &&
+        (node.attrs.kind === "file" || node.attrs.kind === "folder")
+      ) {
+        const name = WorkspaceMention.name(node.attrs.path);
+        state.text(
+          `[${WorkspaceMention.escapeLabel(state.esc(name))}](${WorkspaceMention.target(node.attrs.path, node.attrs.kind)})`,
+          false
+        );
       } else {
         state.text(`@${label}`, false);
       }
     },
     composerFileReference(state, node) {
-      state.text(node.attrs.name || node.attrs.path, false);
+      const name = node.attrs.name || node.attrs.path;
+      if (node.attrs.path)
+        state.text(
+          `[${WorkspaceMention.escapeLabel(state.esc(name))}](${WorkspaceMention.target(node.attrs.path, "file")})`,
+          false
+        );
+      else state.text(name, false);
     },
   },
   markdownMarks,
@@ -326,6 +355,34 @@ export namespace ComposerTiptap {
   export function markdownDocument(text: string): JSONContent | undefined {
     markdownSchema ??= getSchema(extensions({ placeholder: "" }));
     return parseComposerPrompt(markdownSchema, text)?.toJSON();
+  }
+
+  /** Add saved blocks without replacing the document or moving its caret. */
+  export function appendDocument(
+    state: EditorState,
+    blocks: readonly unknown[]
+  ) {
+    if (blocks.length === 0) return;
+    try {
+      const content = Fragment.fromArray(
+        blocks.map((block) => state.schema.nodeFromJSON(block))
+      );
+      const { doc } = state;
+      const empty =
+        doc.childCount === 1 &&
+        doc.firstChild?.type.name === "paragraph" &&
+        !doc.firstChild.content.size;
+      const from = empty ? 0 : doc.childCount;
+      if (!doc.canReplace(from, doc.childCount, content)) return;
+      content.forEach((node) => node.check());
+      return state.tr.replaceWith(
+        empty ? 0 : doc.content.size,
+        doc.content.size,
+        content
+      );
+    } catch {
+      return;
+    }
   }
 
   export function extensions(input: { placeholder: string }) {
@@ -388,7 +445,11 @@ export namespace ComposerTiptap {
         node.type.name === "orderedList" ||
         node.type.name === "blockquote" ||
         node.type.name === "codeBlock" ||
-        (node.type.name === "composerMention" && node.attrs.sigil === "$") ||
+        (node.type.name === "composerMention" &&
+          (node.attrs.sigil === "$" ||
+            (node.attrs.path &&
+              (node.attrs.kind === "file" || node.attrs.kind === "folder")))) ||
+        node.type.name === "composerFileReference" ||
         hasMarkdownMark(node);
       return !formatted;
     });
@@ -526,6 +587,18 @@ export namespace ComposerTiptap {
       return true;
     }
 
+    if (
+      trigger?.pending &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      ["Enter", "Tab", "ArrowUp", "ArrowDown"].includes(event.key)
+    ) {
+      event.preventDefault();
+      return true;
+    }
+
     if (trigger && triggerItemsCount > 0) {
       if (input.event.key === "ArrowDown") {
         input.event.preventDefault();
@@ -542,7 +615,7 @@ export namespace ComposerTiptap {
       if (
         !event.shiftKey &&
         (event.key === "Enter" ||
-          (trigger.kind === "skill" &&
+          ((trigger.kind === "skill" || trigger.kind === "mention") &&
             event.key === "Tab" &&
             !event.altKey &&
             !event.ctrlKey &&

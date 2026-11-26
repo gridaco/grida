@@ -9,6 +9,7 @@ import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
 import { UserMessageText } from "@/kits/agent-chat/message";
 import { projectUserMessageSkills } from "@/kits/agent-chat/user-message-markdown";
 import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
+import { WorkspaceMention } from "@/kits/composer/workspace-mention";
 import { ListEndIcon } from "lucide-react";
 import {
   HoverCard,
@@ -25,6 +26,7 @@ export function NativeQueuedMessagePreview({
   label = preview ?? "Message with other content",
   attachments = [],
   displayParts,
+  snapshotPreview,
   readText,
   readImage,
 }: NativeQueuedMessagePreview.Props) {
@@ -69,6 +71,14 @@ export function NativeQueuedMessagePreview({
   );
   useEffect(() => controller.connect(), [controller]);
   const authored = projectUserMessageSkills(state.text ?? "", displayParts);
+  // The host retains a 2 KiB snapshot prefix, clipped at a UTF-8 boundary.
+  // A complete inspector reply or optimistic message keeps its literal text.
+  const clipped =
+    snapshotPreview &&
+    preview?.endsWith("…") &&
+    new TextEncoder().encode(preview).byteLength >= 2045;
+  const showingClipped = clipped && !state.textLoaded;
+  const labelText = SkillMentions.previewText(label, displayParts);
   return (
     <HoverCard
       open={state.open}
@@ -95,7 +105,9 @@ export function NativeQueuedMessagePreview({
             />
           )}
           <span className="min-w-0 flex-1 truncate">
-            {SkillMentions.previewText(label, displayParts)}
+            {clipped
+              ? WorkspaceMention.previewText(labelText)
+              : WorkspaceMention.plainText(labelText)}
           </span>
         </button>
       </HoverCardTrigger>
@@ -112,10 +124,15 @@ export function NativeQueuedMessagePreview({
           text={
             state.text === null
               ? null
-              : SkillMentions.previewText(state.text, displayParts)
+              : (showingClipped
+                  ? WorkspaceMention.previewText
+                  : WorkspaceMention.plainText)(
+                  SkillMentions.previewText(state.text, displayParts)
+                )
           }
           formattedText={
-            authored.links.size > 0 && (
+            !showingClipped &&
+            (authored.links.size > 0 || authored.hasWorkspaceMentions) && (
               <UserMessageText
                 text={authored.text}
                 skillLinks={authored.links}
@@ -140,6 +157,7 @@ export namespace NativeQueuedMessagePreview {
     label?: string;
     attachments?: readonly NativeChatMessageAttachment[];
     displayParts?: readonly NativeChatDisplayPart[];
+    snapshotPreview?: boolean;
     /** Observer-only read; opening the preview never edits the queued input. */
     readText?: () => Promise<string>;
     /** An attachment capability from this queued message, never a path or URL. */
@@ -157,6 +175,7 @@ export namespace NativeQueuedMessagePreview {
   type State = Readonly<{
     open: boolean;
     text: string | null;
+    textLoaded: boolean;
     loading: boolean;
     unavailable: boolean;
     image: string | null;
@@ -168,7 +187,6 @@ export namespace NativeQueuedMessagePreview {
     private readonly listeners = new Set<() => void>();
     private connection?: object;
     private textRead?: Promise<void>;
-    private textLoaded = false;
     constructor(
       private readonly options: Options,
       private readonly renderImage: (
@@ -184,6 +202,7 @@ export namespace NativeQueuedMessagePreview {
       this.state = {
         open: false,
         text: options.preview,
+        textLoaded: false,
         loading: false,
         unavailable: false,
         image: validPoster(options.image?.poster),
@@ -217,7 +236,7 @@ export namespace NativeQueuedMessagePreview {
     };
     private loadText(): Promise<void> {
       const connection = this.connection;
-      if (!connection || !this.options.readText || this.textLoaded)
+      if (!connection || !this.options.readText || this.state.textLoaded)
         return Promise.resolve();
       if (this.textRead) return this.textRead;
       this.publish({ loading: true, unavailable: false });
@@ -229,8 +248,7 @@ export namespace NativeQueuedMessagePreview {
         })
         .then((text) => {
           if (this.connection !== connection) return;
-          this.textLoaded = true;
-          this.publish({ text, loading: false });
+          this.publish({ text, textLoaded: true, loading: false });
         })
         .catch(() => {
           if (this.connection === connection)

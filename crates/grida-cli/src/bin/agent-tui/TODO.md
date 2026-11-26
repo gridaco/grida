@@ -39,7 +39,7 @@ for current Desktop coverage.
 ## Terminal interaction
 
 - [ ] **Composer.** Add cursor movement and selection, prompt history,
-      undo and redo, multiline paste, file mentions, slash completion, help and
+      undo and redo, multiline paste, slash completion, help and
       discoverable shortcuts. Consider Vim bindings and an external editor.
 - [ ] **Reading and sharing.** Render Markdown, code, tables, diffs, links and
       richer artifacts. Add transcript search, selection, copy and export,

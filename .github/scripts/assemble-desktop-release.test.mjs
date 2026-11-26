@@ -69,6 +69,22 @@ test("uses the same release asset sanitization as Electron Forge", () => {
   );
 });
 
+test("expects the package makers' release candidate asset names", () => {
+  assert.deepEqual(DesktopRelease.expectedAssetNames("0.11.0-rc.1"), [
+    "Grida-0.11.0-rc.1-arm64.dmg",
+    "Grida-0.11.0-rc.1-x64.dmg",
+    "Grida-0.11.0.rc.1-1.arm64.rpm",
+    "Grida-0.11.0.rc.1-1.x86_64.rpm",
+    "Grida-darwin-arm64-0.11.0-rc.1.zip",
+    "Grida-darwin-x64-0.11.0-rc.1.zip",
+    "Grida.Setup.0.11.0-rc.1.x64.exe",
+    "RELEASES",
+    "co.grida.desktop.x64-0.11.0-rc1-full.nupkg",
+    "grida_0.11.0.rc.1_amd64.deb",
+    "grida_0.11.0.rc.1_arm64.deb",
+  ]);
+});
+
 test("refuses duplicate and published releases for one tag", () => {
   assert.throws(
     () =>

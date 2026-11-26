@@ -9,7 +9,7 @@ use agent_client_protocol::{Agent, Error, Result, UntypedMessage};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -45,6 +45,10 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
+    }
+
     pub async fn attach(
         connection: ConnectionTo<Agent>,
         workspace: PathBuf,

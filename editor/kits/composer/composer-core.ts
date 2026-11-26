@@ -14,6 +14,42 @@ export type ComposerMention = {
   payload?: Record<string, unknown>;
 };
 
+export namespace ComposerMention {
+  /** The relative path identifies the target. The picker displays its two parts. */
+  export function pathParts(mention: ComposerMention) {
+    if ((mention.kind !== "file" && mention.kind !== "folder") || !mention.path)
+      return;
+    const separator = mention.path.lastIndexOf("/");
+    return {
+      path: mention.path,
+      name: mention.path.slice(separator + 1),
+      parent: mention.path.slice(0, Math.max(0, separator)),
+    };
+  }
+
+  export function rank(mentions: readonly ComposerMention[], query: string) {
+    return mentions
+      .flatMap((mention) => {
+        const path = pathParts(mention);
+        const name = (path?.name ?? mention.label).toLowerCase();
+        if (name === query) return [{ mention, rank: 0 }];
+        if (name.startsWith(query)) return [{ mention, rank: 1 }];
+        if (name.includes(query)) return [{ mention, rank: 2 }];
+        const details = path
+          ? [path.path]
+          : [mention.id, mention.kind, mention.description, mention.path];
+        return details.some((value) => value?.toLowerCase().includes(query))
+          ? [{ mention, rank: 3 }]
+          : [];
+      })
+      .sort((left, right) => left.rank - right.rank)
+      .slice(0, MENTION_RESULT_LIMIT)
+      .map(({ mention }) => mention);
+  }
+}
+
+const MENTION_RESULT_LIMIT = 8;
+
 export type ComposerFileAttachment = {
   /** Omitted on legacy/file call sites; directories carry the required
    *  `"directory"` discriminator below. */
@@ -84,6 +120,10 @@ export type ComposerCatalog = {
   commands: ComposerCommand[];
   mentions: ComposerMention[];
   skillMentions?: ComposerMention[];
+  searchMentions?: (
+    query: string,
+    signal: AbortSignal
+  ) => Promise<ComposerMention[]>;
 };
 
 export type ComposerTrigger = {
@@ -91,6 +131,7 @@ export type ComposerTrigger = {
   query: string;
   range: { from: number; to: number };
   items: (ComposerCommand | ComposerMention)[];
+  pending?: boolean;
 };
 
 export type ComposerTextPart = {
@@ -269,12 +310,14 @@ export class ComposerCore {
     from: number;
     revision: number;
   } | null = null;
+  private mentionLookup?: { query: string; items?: ComposerMention[] };
 
   constructor(catalog: Partial<ComposerCatalog> = {}) {
     this.catalog = {
       commands: catalog.commands ?? [],
       mentions: catalog.mentions ?? [],
       skillMentions: catalog.skillMentions,
+      searchMentions: catalog.searchMentions,
     };
     this.snapshot = {
       text: "",
@@ -304,14 +347,20 @@ export class ComposerCore {
       skillMentions: Object.hasOwn(catalog, "skillMentions")
         ? catalog.skillMentions
         : this.catalog.skillMentions,
+      searchMentions: Object.hasOwn(catalog, "searchMentions")
+        ? catalog.searchMentions
+        : this.catalog.searchMentions,
     };
     if (
       next.commands === this.catalog.commands &&
       next.mentions === this.catalog.mentions &&
-      next.skillMentions === this.catalog.skillMentions
+      next.skillMentions === this.catalog.skillMentions &&
+      next.searchMentions === this.catalog.searchMentions
     ) {
       return;
     }
+    if (next.searchMentions !== this.catalog.searchMentions)
+      this.mentionLookup = undefined;
     this.catalog = next;
     const trigger = this.cursor
       ? this.inspectTrigger(this.cursor.textBeforeCursor, this.cursor.position)
@@ -349,9 +398,48 @@ export class ComposerCore {
   inspectCursor(textBeforeCursor: string, cursorPosition: number): void {
     this.cursor = { textBeforeCursor, position: cursorPosition };
     const trigger = this.inspectTrigger(textBeforeCursor, cursorPosition);
+    if (
+      trigger?.kind !== "mention" ||
+      this.mentionLookup?.query !== trigger.query
+    )
+      this.mentionLookup = undefined;
     if (this.triggerEquals(this.snapshot.trigger, trigger)) {
       return;
     }
+    this.snapshot = { ...this.snapshot, trigger, triggerIndex: 0 };
+    this.publish();
+  }
+
+  async resolveMentions(signal: AbortSignal): Promise<void> {
+    const { searchMentions } = this.catalog;
+    const request = this.snapshot.trigger;
+    if (
+      signal.aborted ||
+      !searchMentions ||
+      request?.kind !== "mention" ||
+      !request.pending
+    )
+      return;
+    const lookup = { query: request.query };
+    this.mentionLookup = lookup;
+    let matches: ComposerMention[];
+    try {
+      matches = await searchMentions(lookup.query, signal);
+    } catch {
+      matches = [];
+    }
+    const current = this.snapshot.trigger;
+    if (
+      signal.aborted ||
+      this.mentionLookup !== lookup ||
+      current?.kind !== "mention" ||
+      current.query !== lookup.query
+    )
+      return;
+    const items = matches.slice(0, MENTION_RESULT_LIMIT);
+    this.mentionLookup = { ...lookup, items };
+    const trigger = { ...current, items, pending: false };
+    if (this.triggerEquals(current, trigger)) return;
     this.snapshot = { ...this.snapshot, trigger, triggerIndex: 0 };
     this.publish();
   }
@@ -361,6 +449,7 @@ export class ComposerCore {
   dismissTrigger(): void {
     const trigger = this.snapshot.trigger;
     if (!trigger) return;
+    this.mentionLookup = undefined;
     this.dismissedTrigger = {
       kind: trigger.kind,
       from: trigger.range.from,
@@ -416,6 +505,7 @@ export class ComposerCore {
 
   clear(): void {
     this.cursor = null;
+    this.mentionLookup = undefined;
     this.dismissedTrigger = null;
     this.documentRevision += 1;
     this.snapshot = {
@@ -496,14 +586,14 @@ export class ComposerCore {
         items: skills.filter((mention) => this.matches(query, mention.label)),
       };
     }
-    const match = /(^|\s)([/@])([^\s/@]*)$/.exec(textBeforeCursor);
+    const match = /(?:^|\s)(\/[^\s/@]*|@\S+)$/.exec(textBeforeCursor);
     if (!match) return null;
 
-    const token = `${match[2]}${match[3]}`;
+    const token = match[1];
     const from = cursorPosition - token.length;
-    const query = match[3].toLowerCase();
+    const query = token.slice(1).toLowerCase();
 
-    if (match[2] === "/") {
+    if (token.startsWith("/")) {
       return {
         kind: "command",
         query,
@@ -514,20 +604,17 @@ export class ComposerCore {
       };
     }
 
+    const items =
+      this.mentionLookup?.query === query
+        ? this.mentionLookup.items
+        : undefined;
     return {
       kind: "mention",
       query,
       range: { from, to: cursorPosition },
-      items: this.catalog.mentions.filter((mention) =>
-        this.matches(
-          query,
-          mention.id,
-          mention.label,
-          mention.kind,
-          mention.description,
-          mention.path
-        )
-      ),
+      ...(this.catalog.searchMentions
+        ? { items: items ?? [], pending: items === undefined }
+        : { items: ComposerMention.rank(this.catalog.mentions, query) }),
     };
   }
 
@@ -571,6 +658,7 @@ export class ComposerCore {
     if (!a || !b) return false;
     if (
       a.kind !== b.kind ||
+      a.pending !== b.pending ||
       a.query !== b.query ||
       a.range.from !== b.range.from ||
       a.range.to !== b.range.to ||

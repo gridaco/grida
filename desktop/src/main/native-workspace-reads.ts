@@ -26,7 +26,10 @@ export class NativeWorkspaceReads {
 
   constructor(
     private readonly catalog: Pick<NativeWorkspaceCatalog, "fileGrant">,
-    private readonly workers: Pick<WorkspaceFileWorkers, "open" | "list">
+    private readonly workers: Pick<
+      WorkspaceFileWorkers,
+      "open" | "list" | "searchPaths"
+    >
   ) {}
 
   async read(
@@ -62,6 +65,13 @@ export class NativeWorkspaceReads {
       this.workers.list(grant, directory, signal)
     );
     return workspaceFs.projectDirectory(relative, entries);
+  }
+
+  async searchPaths(workspaceId: string, query: string, owner: AbortSignal) {
+    if (!query.trim()) return [];
+    return await this.withGrant(workspaceId, owner, (grant, signal) =>
+      this.workers.searchPaths(grant, query, signal)
+    );
   }
 
   async readSvgDocument(

@@ -28,6 +28,7 @@ mod waiting;
 pub mod workspace;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub mod workspace_file;
+pub mod workspace_search;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
 pub use supervised_provider::SupervisedProvider;

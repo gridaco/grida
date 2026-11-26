@@ -3,6 +3,7 @@
 use super::*;
 use crate::file_tools::FileAuthority;
 use crate::workspace::{DirectoryGrant, DirectorySpec, ProtectedRoots};
+use crate::workspace_search::{WorkspaceSearchEntry, valid_query};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::io::{BufRead, BufReader, Write};
@@ -31,6 +32,7 @@ struct OpenRequest {
     include_modified: bool,
     #[serde(default)]
     list_directory: bool,
+    search_query: Option<String>,
     write: Option<SaveRequest>,
     publish: Option<PublishRequest>,
 }
@@ -58,6 +60,11 @@ struct Saved {
 #[derive(Serialize)]
 struct Published {
     status: super::write::PublishStatus,
+}
+
+#[derive(Serialize)]
+struct Searched {
+    entries: Vec<WorkspaceSearchEntry>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -129,6 +136,13 @@ pub fn serve_stdio() -> Result<()> {
     if (request.list_directory && request.include_modified)
         || (writes && (request.list_directory || request.include_modified))
         || (request.write.is_some() && request.publish.is_some())
+        || request.search_query.as_ref().is_some_and(|query| {
+            request.list_directory
+                || request.include_modified
+                || writes
+                || !request.path.as_os_str().is_empty()
+                || !valid_query(query)
+        })
     {
         return Err(invalid_frame());
     }
@@ -231,6 +245,10 @@ pub fn serve_stdio() -> Result<()> {
             .and_then(|()| output.write_all(b"\n"))
             .and_then(|()| output.flush())
             .map_err(|_| output_failed());
+    }
+    if let Some(query) = request.search_query {
+        let entries = super::directory::search(&authority, &directory, &query)?;
+        return write_receipt(&mut output, &Searched { entries });
     }
     let opened = OpenedWorkspaceFile::open(
         &snapshot,

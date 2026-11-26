@@ -381,6 +381,7 @@ function QueueRow({
       <NativeQueuedMessagePreview
         inputId={item.inputId}
         preview={item.goalStart?.objective ?? item.preview}
+        snapshotPreview={!item.goalStart}
         label={label}
         attachments={item.attachments}
         displayParts={item.displayParts}

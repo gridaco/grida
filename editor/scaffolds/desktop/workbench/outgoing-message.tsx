@@ -42,7 +42,7 @@ export function OutgoingMessage({
       )}
       {text && (
         <MessageContent className="text-[14px] leading-[23px] whitespace-pre-wrap">
-          {authored.links.size ? (
+          {authored.links.size || authored.hasWorkspaceMentions ? (
             <UserMessageText text={authored.text} skillLinks={authored.links} />
           ) : (
             text

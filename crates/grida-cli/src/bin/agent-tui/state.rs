@@ -102,6 +102,23 @@ impl State {
         changed
     }
 
+    pub fn completion_draft(&self) -> Option<&str> {
+        if self.question_focused {
+            return None;
+        }
+        if let Some(edit) = &self.edit {
+            return Some(&edit.text);
+        }
+        if self
+            .snapshot
+            .as_ref()
+            .is_some_and(|view| view.queue_checkout.is_some())
+        {
+            return None;
+        }
+        Some(&self.ordinary)
+    }
+
     pub fn input(&mut self) -> &mut String {
         match (
             self.question_focused,

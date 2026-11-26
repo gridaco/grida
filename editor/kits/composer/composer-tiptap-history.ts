@@ -1,7 +1,7 @@
 import type { Editor, JSONContent } from "@tiptap/core";
 import { closeHistory, history } from "@tiptap/pm/history";
 import { defaultMarkdownParser, MarkdownParser } from "@tiptap/pm/markdown";
-import type { Node, Schema } from "@tiptap/pm/model";
+import { Fragment, type Node, type Schema } from "@tiptap/pm/model";
 import {
   Plugin,
   PluginKey,
@@ -11,6 +11,7 @@ import {
 } from "@tiptap/pm/state";
 import { Step, StepResult } from "@tiptap/pm/transform";
 import { ComposerHistory } from "./composer-history";
+import { WorkspaceMention } from "./workspace-mention";
 
 const adapters = new WeakMap<Editor, ComposerTiptapHistory>();
 const restoreDraft = "composerRestoreDraft";
@@ -55,11 +56,61 @@ export function parseComposerPrompt(
         node.marks.length > 0;
       return !formatted;
     });
-    return formatted ? doc : undefined;
+    if (!formatted) return undefined;
+    return text.includes('"Workspace ') ? restoreWorkspaceMentions(doc) : doc;
   } catch {
-    // Prompts with unsupported syntax still recall as editable literal text.
-    return undefined;
+    // Preserve literal syntax the composer doesn't support around references.
+    return literalWorkspaceDocument(schema, text);
   }
+}
+
+function literalWorkspaceDocument(
+  schema: Schema,
+  text: string
+): Node | undefined {
+  const mentions = WorkspaceMention.inline(text);
+  if (!mentions.length) return undefined;
+  const paragraphs: Node[][] = [[]];
+  const append = (plain: string) => {
+    const [first, ...rest] = plain.split(/\r?\n/);
+    if (first) paragraphs.at(-1)!.push(schema.text(first));
+    for (const line of rest) paragraphs.push(line ? [schema.text(line)] : []);
+  };
+  let start = 0;
+  for (const { from, to, label, kind, path } of mentions) {
+    append(text.slice(start, from));
+    paragraphs
+      .at(-1)!
+      .push(
+        schema.nodes.composerMention.create({ id: path, label, kind, path })
+      );
+    start = to;
+  }
+  append(text.slice(start));
+  return schema.node(
+    "doc",
+    null,
+    paragraphs.map((content) => schema.node("paragraph", null, content))
+  );
+}
+
+function restoreWorkspaceMentions(node: Node): Node {
+  if (node.isText) {
+    const link = node.marks.find(({ type }) => type.name === "link");
+    const mention =
+      link && WorkspaceMention.parse(link.attrs.href, link.attrs.title);
+    if (mention && node.text === WorkspaceMention.name(mention.path))
+      return node.type.schema.nodes.composerMention.create(
+        { ...mention, id: mention.path, label: node.text },
+        undefined,
+        node.marks.filter((mark) => mark !== link)
+      );
+    return node;
+  }
+  if (node.isLeaf) return node;
+  const children: Node[] = [];
+  node.forEach((child) => children.push(restoreWorkspaceMentions(child)));
+  return node.copy(Fragment.fromArray(children));
 }
 
 /** An undoable change outside the document, grouped with its document edit. */

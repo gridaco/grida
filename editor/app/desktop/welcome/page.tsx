@@ -357,14 +357,19 @@ function WelcomeSurface({
   );
   const defaultWorkspaceRead = useRef<Promise<Workspace | null> | null>(null);
   const destination = target ?? defaultWorkspace;
-  const mentions = useWorkspaceFileMentions(destination?.id);
+  const searchMentions = useWorkspaceFileMentions(destination?.id);
   const skillMenu = useSkillMentions(
     bridge?.nativeChat?.skills,
     destination?.id
   );
   const catalog = useMemo<ComposerCatalog>(
-    () => ({ commands: [], mentions, skillMentions: skillMenu.mentions }),
-    [mentions, skillMenu.mentions]
+    () => ({
+      commands: [],
+      mentions: [],
+      searchMentions,
+      skillMentions: skillMenu.mentions,
+    }),
+    [searchMentions, skillMenu.mentions]
   );
   // Keep the Images picks while browsing other presets.
   const [pickedRefs, setPickedRefs] = useState<

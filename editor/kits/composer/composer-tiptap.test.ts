@@ -1,9 +1,163 @@
 import { describe, expect, it } from "vitest";
 import { generateText, getSchema } from "@tiptap/core";
+import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { ComposerCore } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
+import { WorkspaceMention } from "./workspace-mention";
 
 describe("ComposerTiptap", () => {
+  it("appends a recovered mention to nonempty text without replacing the caret or the typed block", () => {
+    const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
+    const doc = schema.nodeFromJSON({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "New typing" }] },
+      ],
+    });
+    const state = EditorState.create({
+      doc,
+      selection: TextSelection.create(doc, 4),
+    });
+    const recovered = ComposerTiptap.markdownDocument(
+      '[notes.md](<./work/notes.md> "Workspace file")'
+    )!;
+    const append = ComposerTiptap.appendDocument(state, recovered.content!);
+    expect(append?.doc.toJSON().content).toEqual([
+      ...doc.toJSON().content,
+      ...recovered.content!,
+    ]);
+    expect(append?.selection.from).toBe(4);
+  });
+
+  it("uses the filename in the draft, keeps the exact path inline, and restores the mention", () => {
+    const extensions = ComposerTiptap.extensions({ placeholder: "" });
+    const schema = getSchema(extensions);
+    const path = "pet-fx notes/AGENTS.md";
+    const json = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Read " },
+            {
+              type: "composerMention",
+              attrs: { id: path, label: path, kind: "file", path },
+            },
+          ],
+        },
+      ],
+    };
+    const doc = schema.nodeFromJSON(json);
+    const mention = doc.child(0).child(1);
+    expect(mention.type.spec.toDOM?.(mention)).toMatchObject([
+      "span",
+      { title: path },
+      "AGENTS.md",
+    ]);
+    expect(generateText(json, extensions)).toBe("Read AGENTS.md");
+    const text = ComposerTiptap.formattedMarkdown(doc)!;
+    expect(text).toBe(
+      'Read [AGENTS.md](<./pet-fx notes/AGENTS.md> "Workspace file")'
+    );
+    expect(WorkspaceMention.plainText(text)).toBe("Read AGENTS.md");
+    expect(WorkspaceMention.copyText(text)).toBe("Read pet-fx notes/AGENTS.md");
+    expect(ComposerTiptap.markdownDocument(text)).toMatchObject({
+      content: [
+        {
+          content: [
+            { type: "text", text: "Read " },
+            {
+              type: "composerMention",
+              attrs: { id: path, label: "AGENTS.md", kind: "file", path },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("keeps the selected path when the author revises text around the mention", () => {
+    const initial =
+      'Read **[AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")**';
+    const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
+    const revision = schema.nodeFromJSON(
+      ComposerTiptap.markdownDocument(initial)!
+    );
+    expect(revision.child(0).child(1).type.name).toBe("composerMention");
+    const edited = schema.node("doc", null, [
+      schema.node("paragraph", null, [
+        schema.text("Summarize "),
+        revision.child(0).child(1),
+      ]),
+    ]);
+    expect(ComposerTiptap.formattedMarkdown(edited)).toBe(
+      'Summarize **[AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")**'
+    );
+  });
+
+  it("keeps the filename when a queue preview clips the link destination or title", () => {
+    for (const preview of [
+      "Read [AGENTS.md](<./pet-fx/AGE…",
+      'Read [AGENTS.md](<./pet-fx/AGENTS.md> "Workspace fi…',
+    ]) {
+      expect(WorkspaceMention.previewText(preview)).toBe("Read AGENTS.md…");
+    }
+    expect(WorkspaceMention.previewText("Read \\[AGENTS.md](<./pet-fx…")).toBe(
+      "Read \\[AGENTS.md](<./pet-fx…"
+    );
+  });
+
+  it("restores references beside unsupported literal Markdown in a revision", () => {
+    const text =
+      '# Notes\nRead [AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")';
+    const extensions = ComposerTiptap.extensions({ placeholder: "" });
+    const schema = getSchema(extensions);
+    const restored = ComposerTiptap.markdownDocument(text)!;
+    expect(generateText(restored, extensions, { blockSeparator: "\n" })).toBe(
+      "# Notes\nRead AGENTS.md"
+    );
+    expect(
+      ComposerTiptap.formattedMarkdown(schema.nodeFromJSON(restored))
+    ).toBe(
+      '# Notes\n\nRead [AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")'
+    );
+  });
+
+  it("round trips a workspace folder with spaces and Markdown delimiters", () => {
+    const path = "drafts/Résumé [50%] <Q4> #1";
+    const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
+    const doc = schema.nodeFromJSON({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Compare " },
+            {
+              type: "composerMention",
+              attrs: { id: path, kind: "folder", path },
+            },
+          ],
+        },
+      ],
+    });
+    const text = ComposerTiptap.formattedMarkdown(doc)!;
+    expect(WorkspaceMention.plainText(text)).toBe(
+      "Compare Résumé [50%] <Q4> #1"
+    );
+    expect(ComposerTiptap.markdownDocument(text)).toMatchObject({
+      content: [
+        {
+          content: [
+            { type: "text", text: "Compare " },
+            { type: "composerMention", attrs: { kind: "folder", path } },
+          ],
+        },
+      ],
+    });
+  });
+
   it("preserves ordered list starts, nested bullets, code, and inline references in Markdown", () => {
     const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
     const doc = schema.nodeFromJSON({

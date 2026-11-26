@@ -1,5 +1,6 @@
 import { defaultRemarkPlugins } from "streamdown";
 import { SkillMentions } from "@/lib/agent-chat/skill-mentions";
+import { WorkspaceMention } from "@/kits/composer/workspace-mention";
 
 const SKILL_MARKER_ORIGIN = "https://grida-skill.invalid/";
 
@@ -15,7 +16,8 @@ export function projectUserMessageSkills(
   const context = parts ?? [];
   const inline = SkillMentions.inline(text, context);
   const links = new Map<string, { label: string; source?: string }>();
-  if (!inline.length) return { text, context, links };
+  const hasWorkspaceMentions = WorkspaceMention.inline(text).length > 0;
+  if (!inline.length) return { text, context, links, hasWorkspaceMentions };
 
   let start = 0;
   let markdown = "";
@@ -39,6 +41,7 @@ export function projectUserMessageSkills(
     text: markdown + text.slice(start),
     context: context.filter((part) => !positioned.has(skillUri(part) ?? "")),
     links,
+    hasWorkspaceMentions,
   };
 }
 

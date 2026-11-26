@@ -20,9 +20,32 @@ const exampleDirectory: Readonly<Record<string, readonly WorkspaceFsEntry[]>> =
       { name: "README.md", rel_path: "README.md", kind: "file" },
       { name: "handout.md", rel_path: "handout.md", kind: "file" },
       { name: "assets", rel_path: "assets", kind: "directory" },
+      { name: "print", rel_path: "print", kind: "directory" },
+      { name: "web", rel_path: "web", kind: "directory" },
     ],
-    assets: [{ name: "cover.png", rel_path: "assets/cover.png", kind: "file" }],
+    assets: [
+      { name: "cover.png", rel_path: "assets/cover.png", kind: "file" },
+      {
+        name: "cover-sketch.svg",
+        rel_path: "assets/cover-sketch.svg",
+        kind: "file",
+      },
+    ],
+    print: [
+      { name: "handout.md", rel_path: "print/handout.md", kind: "file" },
+      { name: "checklist.md", rel_path: "print/checklist.md", kind: "file" },
+    ],
+    web: [
+      { name: "handout.md", rel_path: "web/handout.md", kind: "file" },
+      { name: "index.html", rel_path: "web/index.html", kind: "file" },
+    ],
   };
+
+export async function readDemoWorkspaceDirectory(directory: string) {
+  return Object.hasOwn(exampleDirectory, directory)
+    ? exampleDirectory[directory]
+    : [];
+}
 
 const sideUnavailable = [
   "catalog",
@@ -78,10 +101,7 @@ export class NativeChatWorkspaceFixture {
     }) as DesktopNativeChat;
   }
 
-  readonly readdir = async (directory: string) =>
-    Object.hasOwn(exampleDirectory, directory)
-      ? exampleDirectory[directory]
-      : [];
+  readonly readdir = readDemoWorkspaceDirectory;
 
   readonly read = () => this.active.fixture;
 

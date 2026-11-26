@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ComposerDraftBinding } from "./composer-draft-binding";
 import type {
   NativeChatAcceptance,
   NativeChatProfileSelection,
@@ -11089,6 +11090,81 @@ describe("a first message chosen before the chat opened", () => {
       expect(submit).toHaveBeenCalledOnce();
       expect(controller.read().error).toBeTruthy();
       expect(controller.read().submitting).toBe(false);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("restores a refused workspace mention into the mounted draft without losing a newer edit", async () => {
+    const { controller, submit } = sending();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    submit.mockReturnValueOnce(pending.promise);
+    const store = durableDrafts();
+    controller.keepDrafts(store, "workspace");
+    const text = '[notes.md](<./notes.md> "Workspace file")';
+    const returned = {
+      type: "paragraph",
+      content: [
+        {
+          type: "composerMention",
+          attrs: {
+            id: "notes.md",
+            label: "notes.md",
+            path: "notes.md",
+            kind: "file",
+          },
+        },
+      ],
+    };
+    const starting = controller.startChat(null, () => ({
+      text,
+      document: { type: "doc", content: [returned] },
+    }));
+    try {
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      const target = controller.composerDraft()!;
+      const binding = new ComposerDraftBinding();
+      let visible: unknown = null;
+      const editor = {
+        ready: true,
+        readDocument: () => visible,
+        clearForHistory: () => {
+          visible = null;
+        },
+        restoreDocument: (doc: unknown) => {
+          if (visible !== null) return false;
+          visible = doc;
+          return true;
+        },
+        appendDocument: (blocks: readonly unknown[]) => {
+          visible = ComposerDraftBinding.append(visible, blocks);
+          return true;
+        },
+      };
+      binding.restore(target, editor);
+      const newer = {
+        type: "paragraph",
+        content: [{ type: "text", text: "Typed while waiting" }],
+      };
+      visible = { type: "doc", content: [newer] };
+      const notified = vi.fn<() => void>();
+      const unsubscribe = controller.subscribe(() => {
+        if (store.returnedFirstMessage(target.key)) notified();
+      });
+      pending.reject(new Error("first send refused"));
+      await expect(starting).resolves.toBeNull();
+      unsubscribe();
+      expect(notified).toHaveBeenCalled();
+      binding.retain(target, visible);
+      expect(store.read(target.key)).toEqual({
+        type: "doc",
+        content: [returned],
+      });
+      expect(binding.restore(target, editor)).toBe("restored");
+      expect(visible).toEqual({ type: "doc", content: [newer, returned] });
+      expect(store.read(target.key)).toEqual(visible);
+      expect(binding.restore(target, editor)).toBe("unchanged");
     } finally {
       controller.disconnect();
     }

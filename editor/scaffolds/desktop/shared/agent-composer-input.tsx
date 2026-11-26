@@ -75,6 +75,7 @@ import {
   type ComposerController,
 } from "@/kits/composer";
 import { AgentComposerSubmission } from "./agent-composer-submission";
+import { WorkspaceFileIcon } from "../workbench/workspace-file-icon";
 
 const ESCAPE_CONFIRM_MS = 2000;
 const MAX_DICTATION_DRAFT_BYTES = 512 * 1024;
@@ -309,9 +310,18 @@ function AgentComposerInner({
     [voice, draftKey, draftStore, submissionScope, editing?.id]
   );
   useLayoutEffect(() => {
-    if (draft && binding.restore(draft, composer) === "restored" && autofocus)
+    if (
+      draft &&
+      binding.restore(
+        draft,
+        composer,
+        editSession.ordinaryEditor(editOwner, composer)
+      ) === "restored" &&
+      autofocus &&
+      !editing
+    )
       composer.focus();
-  }, [binding, composer, draft, autofocus]);
+  }, [binding, composer, draft, autofocus, editSession, editOwner, editing]);
   useEffect(() => {
     if (!draft || !binding.owns(draft)) return;
     const current = readDocument();
@@ -621,7 +631,9 @@ function AgentComposerInner({
         voiceState.active && voiceState.compact && voiceStyles.compact
       )}
     >
-      <ComposerTriggerMenu />
+      <ComposerTriggerMenu
+        renderFileIcon={(path) => <WorkspaceFileIcon relPath={path} />}
+      />
       {(attachments || selectionLabel) && (
         <ComposerAttachmentStrip>
           {attachments}

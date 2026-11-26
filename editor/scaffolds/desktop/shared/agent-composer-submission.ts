@@ -79,7 +79,8 @@ export class AgentComposerSubmission {
         );
       return;
     }
-    const text = lowerPrompt(message, editing);
+    const authored = message.meta.markdown ?? message.meta.text;
+    const text = editing ? authored : authored.trim();
     if (!text.trim() && !allowEmpty && !skills?.length) return;
 
     const document = editor.readDocument();
@@ -338,30 +339,4 @@ export namespace AgentComposerSubmission {
     }): void;
     focus(): boolean;
   }>;
-}
-
-/**
- * Build the prompt text the agent receives: the authored message, then
- * any referenced workspace paths (`@`-mentions / file-refs) as an explicit
- * list so the agent can resolve them.
- */
-function lowerPrompt(
-  message: ComposerMessage,
-  preserveWhitespace = false
-): string {
-  const paths = new Set<string>();
-  for (const part of message.parts) {
-    if (part.type === "mention" && part.target.path)
-      paths.add(part.target.path);
-    else if (part.type === "file-ref") paths.add(part.ref.path);
-  }
-  const text = message.meta.markdown ?? message.meta.text;
-  const sections = [preserveWhitespace ? text : text.trim()];
-  if (paths.size > 0)
-    sections.push(
-      `Referenced workspace files:\n${[...paths]
-        .map((path) => `- ${path}`)
-        .join("\n")}`
-    );
-  return sections.filter((s) => s.length > 0).join("\n\n");
 }

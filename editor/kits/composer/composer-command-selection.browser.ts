@@ -175,4 +175,44 @@ describe("composer command selection", () => {
       },
     });
   });
+
+  it("accepts the highlighted file mention with Tab and preserves its exact path", () => {
+    const { core, editor } = setup();
+    core.setCatalog({
+      mentions: ["print/handout.md", "web/handout.md"].map((path) => ({
+        id: path,
+        label: path,
+        kind: "file",
+        path,
+      })),
+    });
+    const draft = "@handout";
+    editor.commands.setContent(`<p>${draft}</p>`);
+    editor.commands.setTextSelection(draft.length + 1);
+    ComposerTiptap.syncCore(core, editor);
+    core.moveTriggerIndex(1);
+    const submit = vi.fn<() => void>();
+
+    expect(
+      ComposerTiptap.handleKeyDown({
+        editor,
+        core,
+        event: new KeyboardEvent("keydown", { key: "Tab", cancelable: true }),
+        triggerIndex: core.getSnapshot().triggerIndex,
+        moveTriggerIndex: (delta) => core.moveTriggerIndex(delta),
+        submit,
+      })
+    ).toBe(true);
+    expect(submit).not.toHaveBeenCalled();
+    expect(core.createMessage({ submitted_at: 2 })?.parts).toContainEqual({
+      type: "mention",
+      target: {
+        id: "web/handout.md",
+        label: "web/handout.md",
+        kind: "file",
+        path: "web/handout.md",
+        payload: undefined,
+      },
+    });
+  });
 });

@@ -61,6 +61,30 @@ function fixture(
 }
 
 describe("AgentComposerSubmission", () => {
+  it("sends the authored workspace link without a second reference block", async () => {
+    const { request, submission } = fixture();
+    const path = "pet-fx/AGENTS.md";
+    const markdown = 'Read [AGENTS.md](<./pet-fx/AGENTS.md> "Workspace file")';
+    request.editor.submit.mockReturnValue({
+      role: "user",
+      parts: [
+        { type: "text", text: "Read " },
+        {
+          type: "mention",
+          target: { id: path, label: "AGENTS.md", kind: "file", path },
+        },
+      ],
+      meta: {
+        markdown,
+        text: "Read AGENTS.md",
+        attachments: [],
+        submitted_at: 1,
+      },
+    });
+    await submission.submit(request);
+    expect(request.onSubmit.mock.calls[0]?.[0]).toBe(markdown);
+  });
+
   it("submits the inline mention with its exact reference and removes both when deleted", async () => {
     const { request, submission } = fixture();
     const skill = {

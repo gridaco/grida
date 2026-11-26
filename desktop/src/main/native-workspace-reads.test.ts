@@ -45,7 +45,11 @@ it("queues bounded read bursts in order without acquiring authority for cancelle
   );
   const reads = new NativeWorkspaceReads(
     { fileGrant },
-    { list, open: vi.fn<WorkspaceFileWorkers["open"]>() }
+    {
+      list,
+      open: vi.fn<WorkspaceFileWorkers["open"]>(),
+      searchPaths: vi.fn<WorkspaceFileWorkers["searchPaths"]>(),
+    }
   );
   const owner = new AbortController();
   const launch = (relative: string, signal = owner.signal) =>
@@ -91,6 +95,45 @@ it("queues bounded read bursts in order without acquiring authority for cancelle
 
   for (const operation of running.slice(1)) operation.resolve([]);
   await Promise.all(active.slice(1));
+});
+
+it("uses the current workspace grant for search and rejects a result after the grant changes", async () => {
+  const grant = {
+    workspaceId: "registered",
+    root: "/fixture",
+    identity: { device: "1", inode: "2", birthTimeNs: "3" },
+    protected: [],
+  };
+  const fileGrant = vi.fn<NativeWorkspaceCatalog["fileGrant"]>();
+  fileGrant.mockResolvedValueOnce(grant).mockResolvedValueOnce({
+    ...grant,
+    identity: { ...grant.identity, inode: "4" },
+  });
+  const searchPaths = vi
+    .fn<WorkspaceFileWorkers["searchPaths"]>()
+    .mockResolvedValue([{ path: "docs/guide.md", kind: "file" }]);
+  const reads = new NativeWorkspaceReads(
+    { fileGrant },
+    {
+      searchPaths,
+      open: vi.fn<WorkspaceFileWorkers["open"]>(),
+      list: vi.fn<WorkspaceFileWorkers["list"]>(),
+    }
+  );
+  const { signal } = new AbortController();
+  await expect(reads.searchPaths("registered", "", signal)).resolves.toEqual(
+    []
+  );
+  expect(fileGrant).not.toHaveBeenCalled();
+  await expect(
+    reads.searchPaths("registered", "guide", signal)
+  ).rejects.toThrow("workspace_directory_changed");
+  expect(searchPaths).toHaveBeenCalledWith(
+    grant,
+    "guide",
+    expect.any(AbortSignal)
+  );
+  expect(fileGrant.mock.calls).toEqual([["registered"], ["registered"]]);
 });
 
 it.runIf(
@@ -146,6 +189,9 @@ it.runIf(
 
       const authored = Buffer.from("\uFEFFdraft");
       await fs.writeFile(draft, authored);
+      await expect(
+        servicesSidecarClient.searchWorkspacePaths(saved.id, "draft", signal)
+      ).resolves.toEqual([{ path: "draft.txt", kind: "file" }]);
       await fs.utimes(draft, 1_700_000_000.123456, 1_700_000_000.123456);
       const mtime = (await fs.stat(draft)).mtimeMs;
       expect(mtime % 1).not.toBe(0);

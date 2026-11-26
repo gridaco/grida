@@ -1326,7 +1326,7 @@ dependencies = [
 
 [[package]]
 name = "grida-cli"
-version = "0.10.0"
+version = "0.11.0-rc.1"
 dependencies = [
  "agent-client-protocol",
  "agent-kit-core",
@@ -1345,6 +1345,8 @@ dependencies = [
  "hyper",
  "hyper-util",
  "ipnet",
+ "percent-encoding",
+ "pulldown-cmark",
  "ratatui",
  "rcgen",
  "rustix",
@@ -2514,6 +2516,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76979bea66e7875e7509c4ec5300112b316af87fa7a252ca91c448b32dfe3993"
+dependencies = [
+ "bitflags",
+ "memchr",
+ "unicase",
 ]
 
 [[package]]
@@ -3895,6 +3908,12 @@ dependencies = [
  "tempfile",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "unicase"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357cc3acc6a036009fd6c973ed009037c732d60d0b4f6c673e9041497482a28f"
 
 [[package]]
 name = "unicode-general-category"

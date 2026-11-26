@@ -160,15 +160,19 @@ describe("composer menus in a browser", () => {
     ).not.toBeNull();
   });
 
-  it("opens and dismisses a mention without remounting the editor", async () => {
+  it("shows file mentions only while the query has text", async () => {
     const fixture = await setup();
     const { editor } = fixture.current();
     typeTrigger(fixture, "@");
     expect(
       fixture.container.querySelector("[data-composer-trigger-menu]")
+    ).toBeNull();
+    typeTrigger(fixture, "@read");
+    expect(
+      fixture.container.querySelector("[data-composer-trigger-menu]")
         ?.textContent
     ).toContain("README.md");
-    typeTrigger(fixture, "Draft");
+    typeTrigger(fixture, "@");
     expect(
       fixture.container.querySelector("[data-composer-trigger-menu]")
     ).toBeNull();

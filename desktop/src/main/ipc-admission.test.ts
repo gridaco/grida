@@ -84,10 +84,28 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
+          channel !== IPC_CHANNELS.WORKSPACE_SEARCH_PATHS &&
           !workbenchPublication.includes(channel) &&
           !channel.startsWith("grida:welcome:chat-") &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
+    );
+  });
+
+  it("admits workspace path search only from main composer routes", () => {
+    const channel = IPC_CHANNELS.WORKSPACE_SEARCH_PATHS;
+    for (const pathname of [
+      "/desktop/welcome",
+      "/desktop/workspace",
+      "/desktop/file",
+    ])
+      expect(allowedFor("main", pathname)).toContain(channel);
+    expect(allowedFor("main", "/desktop/settings")).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
     );
   });
 

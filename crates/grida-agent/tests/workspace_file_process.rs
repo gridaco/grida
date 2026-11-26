@@ -2,6 +2,7 @@
 
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 
+use grida_agent::workspace_search::WorkspaceSearch;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -85,9 +86,13 @@ async fn opened(
 }
 
 async fn list(root: &Path, path: &str) -> std::process::Output {
-    let mut child = launch(worker());
     let mut request = request(root, path);
     request["listDirectory"] = json!(true);
+    query_workspace(worker(), request).await
+}
+
+async fn query_workspace(command: Command, request: Value) -> std::process::Output {
+    let mut child = launch(command);
     let mut input = child.stdin.take().unwrap();
     send(&mut input, request).await;
     drop(input);
@@ -420,6 +425,89 @@ async fn private_worker_refuses_an_incomplete_directory_listing() {
 }
 
 #[tokio::test]
+async fn private_worker_search_ranks_exact_paths_and_matched_entries() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let root = base.join("workspace");
+    for folder in ["print", "web", "reporting", "node_modules", "資料"] {
+        fs::create_dir_all(root.join(folder)).unwrap();
+    }
+    for path in [
+        "print/Report",
+        "web/Report",
+        "web/report-draft.txt",
+        "web/annual-report.txt",
+        "reporting/notes.txt",
+        "node_modules/report-excluded",
+        "資料/icon@2x.png",
+        ".DS_Store",
+    ] {
+        fs::write(root.join(path), b"data").unwrap();
+    }
+    let outside = base.join("report-outside");
+    fs::create_dir(&outside).unwrap();
+    fs::write(outside.join("Report"), b"outside").unwrap();
+    std::os::unix::fs::symlink(outside, root.join("report-link")).unwrap();
+
+    let index = WorkspaceSearch::scan(&root).unwrap();
+    for (pattern, expected) in [
+        (
+            "report",
+            json!([
+                {"path":"print/Report","kind":"file"},
+                {"path":"web/Report","kind":"file"},
+                {"path":"reporting","kind":"directory"},
+                {"path":"web/report-draft.txt","kind":"file"},
+                {"path":"web/annual-report.txt","kind":"file"},
+                {"path":"reporting/notes.txt","kind":"file"},
+            ]),
+        ),
+        (
+            "icon@2x",
+            json!([{"path":"資料/icon@2x.png","kind":"file"}]),
+        ),
+        (".DS_Store", json!([])),
+        ("", json!([])),
+    ] {
+        let mut search = request(&root, "");
+        search["searchQuery"] = json!(pattern);
+        let result = query_workspace(worker(), search).await;
+        assert!(result.status.success(), "{:?}", result.stderr);
+        let value: Value = serde_json::from_slice(&result.stdout).unwrap();
+        assert_eq!(value, json!({"entries":expected}));
+        assert_eq!(value["entries"], json!(index.search(pattern)));
+    }
+}
+
+#[tokio::test]
+async fn private_worker_search_requires_the_registered_root_and_an_exclusive_operation() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let root = base.join("workspace");
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("report.txt"), b"fixture").unwrap();
+    let mut search = request(&root, "");
+    search["searchQuery"] = json!("report");
+    for (field, value) in [
+        ("path", json!("nested")),
+        ("searchQuery", json!("report\n")),
+        ("searchQuery", json!("x".repeat(4097))),
+        ("listDirectory", json!(true)),
+        ("includeModified", json!(true)),
+        ("write", json!({"length":0})),
+        ("identity", directory_identity(&base)),
+        ("protected", json!([&root])),
+    ] {
+        let mut invalid = search.clone();
+        invalid[field] = value;
+        let result = query_workspace(worker(), invalid).await;
+        assert!(!result.status.success(), "{field}");
+        assert!(result.stdout.is_empty(), "{field}");
+    }
+    assert_eq!(fs::read(root.join("report.txt")).unwrap(), b"fixture");
+}
+
+#[tokio::test]
 async fn private_worker_supplies_fractional_mtime_only_when_requested() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().canonicalize().unwrap();
@@ -605,4 +693,13 @@ async fn private_worker_reads_a_registered_root_under_a_read_only_kernel_scope()
     assert!(refused_write.stdout.is_empty());
     assert_eq!(fs::read(root.join("sample.mp4")).unwrap(), b"test span");
     assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+
+    let mut search = request(&root, "");
+    search["searchQuery"] = json!("sample");
+    let found = query_workspace(sandbox(), search).await;
+    assert!(found.status.success(), "{:?}", found.stderr);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&found.stdout).unwrap(),
+        json!({"entries":[{"path":"sample.mp4","kind":"file"}]})
+    );
 }

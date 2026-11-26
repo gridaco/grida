@@ -30,6 +30,8 @@ draft can be checked after detaching. The fixture lives for the page session.
   turns. **Subagent activity** includes recorded child conversations.
 - **Inline images** shows a workspace image, an unavailable workspace file,
   an allowed remote image, and an **Open image** link for another host.
+- **File mentions** shares the Composer playground's workspace sample. Type
+  `@handout` to distinguish duplicate filenames by their parent paths.
 - **Model and access loading** and **Reconnection** let you decide when the
   local bridge responds. Model, access, plan, and Goal controls use the same
   components as Desktop.

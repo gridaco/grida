@@ -1,6 +1,7 @@
 use super::*;
 use crate::screen::render;
 use agent_client_protocol::v1::schema::{ContentBlock, ContentChunk, SessionUpdate};
+use ratatui::style::Modifier;
 use ratatui::{Terminal, backend::TestBackend};
 use serde_json::{Map, json};
 use transcript::Transcript;
@@ -99,6 +100,247 @@ fn idle(revision: u64) -> Observed {
     let mut observed = seen(revision, json!([]), Value::Null, Value::Null);
     observed.snapshot.current = None;
     observed
+}
+
+fn picker_entries(paths: &[&str]) -> WorkspaceSearch {
+    let workspace = tempfile::tempdir().unwrap();
+    for path in paths {
+        let entry = workspace.path().join(path);
+        if path.ends_with('/') {
+            std::fs::create_dir_all(entry).unwrap();
+        } else {
+            std::fs::create_dir_all(entry.parent().unwrap()).unwrap();
+            std::fs::write(entry, b"").unwrap();
+        }
+    }
+    WorkspaceSearch::scan(workspace.path()).unwrap()
+}
+
+const PICKER_AREA: Rect = Rect::new(0, 0, 80, 25);
+
+#[test]
+fn file_picker_requires_a_query_at_the_end_of_the_draft() {
+    let mut picker = FilePicker::default();
+    for draft in ["", "@", "show @", "user@report", "@report "] {
+        picker.update(Some(draft));
+        assert_eq!(picker.height(), 0, "{draft}");
+        assert!(!picker.needs_paths(), "{draft}");
+    }
+    picker.update(Some("show\n@re"));
+    assert_eq!(picker.height(), 1);
+    assert!(picker.needs_paths());
+    for key in [KeyCode::Enter, KeyCode::Up, KeyCode::Down, KeyCode::Tab] {
+        assert!(picker.key(KeyEvent::from(key), |_, _| unreachable!()));
+    }
+    picker.set_paths(picker_entries(&["docs/notes.md"]));
+    assert_eq!(picker.height(), 0);
+    assert!(!picker.key(KeyEvent::from(KeyCode::Enter), |_, _| unreachable!()));
+}
+
+#[test]
+fn file_picker_ranks_names_before_paths_and_caps_the_list() {
+    let mut picker = FilePicker::default();
+    picker.update(Some("@REPORT"));
+    let entries = picker_entries(&[
+        "reporting/a.txt",
+        "a/annual-report.md",
+        "b/Report.md",
+        "z/report/",
+        "reports/b.txt",
+        "reports/c.txt",
+        "reports/d.txt",
+        "reports/e.txt",
+        "reports/f.txt",
+        "reports/g.txt",
+        "unrelated.txt",
+    ]);
+    picker.set_paths(entries);
+    let names = |picker: &FilePicker| {
+        picker
+            .visible_paths(picker.height())
+            .map(|(entry, _)| entry.path.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        names(&picker),
+        [
+            "z/report",
+            "b/Report.md",
+            "reporting",
+            "reports",
+            "a/annual-report.md",
+            "reporting/a.txt",
+            "reports/b.txt",
+            "reports/c.txt",
+        ],
+    );
+    picker.update(Some("@b/repor"));
+    assert_eq!(names(&picker), ["b/Report.md"]);
+}
+
+#[test]
+fn file_picker_shows_duplicate_names_and_accepts_the_exact_selected_path() {
+    let mut app = App::default();
+    app.state.observe(idle(1));
+    app.state.input().push_str("Inspect @Guide");
+    app.file_picker.update(app.state.completion_draft());
+    app.file_picker.set_paths(picker_entries(&[
+        "workspace/web/chapter/sections/Guide.md",
+        "workspace/print drafts/chapter/sections/Guide.md",
+    ]));
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Up)));
+    assert_eq!(
+        app.file_picker.visible_paths(1).next().unwrap().0.path,
+        "workspace/web/chapter/sections/Guide.md"
+    );
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Down)));
+
+    let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+    terminal
+        .draw(|frame| render(frame, "example", &app))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    let row = buffer
+        .content()
+        .chunks(80)
+        .position(|cells| {
+            cells
+                .iter()
+                .map(|cell| cell.symbol())
+                .collect::<String>()
+                .starts_with("› Guide.md  workspace/print drafts/chapter/sections")
+        })
+        .expect("highlighted filename and parent");
+    let parent = &buffer.content()[row * 80 + "› Guide.md  ".chars().count()];
+    assert!(parent.modifier.contains(Modifier::DIM));
+    let second = buffer.content()[(row + 1) * 80..(row + 2) * 80]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>();
+    assert!(second.starts_with("  Guide.md  workspace/web/chapter/sections"));
+
+    let mut narrow = Terminal::new(TestBackend::new(25, 25)).unwrap();
+    narrow.draw(|frame| render(frame, "example", &app)).unwrap();
+    let visible: String = narrow
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(visible.contains("› Guide.md  …rint drafts…"));
+    assert!(visible.contains("  Guide.md  …rkspace/web…"));
+
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Tab)));
+    assert_eq!(app.file_picker.height(), 0);
+    let send = app.state.enter("example").unwrap();
+    let text = send.params["prompt"][0]["text"].as_str().unwrap();
+    assert_eq!(
+        text,
+        "Inspect \"workspace/print drafts/chapter/sections/Guide.md\" "
+    );
+    let user_chunk = || {
+        SessionUpdate::UserMessageChunk(
+            ContentChunk::new(text.to_owned().into()).message_id("selected-file"),
+        )
+    };
+    let mut transcript = Transcript::default();
+    transcript.note(&notification(
+        user_chunk(),
+        protocol::LIVE,
+        json!({"turnId":"active","activityOrder":0,"offsetBytes":0,"replace":false}),
+    ));
+    assert_eq!(transcript.lines(), [format!("You: {text}")]);
+    transcript.begin("reopen".to_owned());
+    transcript.note(&notification(
+        user_chunk(),
+        protocol::WINDOW,
+        json!({"requestId":"reopen","turnId":"active","activityOrder":0}),
+    ));
+    assert!(!transcript.finish(&json!({
+        "requestId":"reopen","turns":[{"turnId":"active","status":"succeeded"}],
+    })));
+    assert_eq!(transcript.lines(), [format!("You: {text}")]);
+}
+
+#[test]
+fn completion_leaves_enter_available_when_the_picker_cannot_be_drawn() {
+    let mut app = App::default();
+    app.state.observe(idle(1));
+    app.state.input().push_str("Inspect @Guide");
+    app.file_picker.update(app.state.completion_draft());
+    app.file_picker
+        .set_paths(picker_entries(&["docs/Guide.md"]));
+    let short = Rect::new(0, 0, 80, 9);
+    assert_eq!(screen::picker_height(short, &app.file_picker), 0);
+    assert!(!app.complete_path(short, KeyEvent::from(KeyCode::Enter)));
+    assert_eq!(app.state.completion_draft(), Some("Inspect @Guide"));
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Enter)));
+    assert_eq!(app.state.completion_draft(), Some("Inspect docs/Guide.md "));
+}
+
+#[test]
+fn desktop_file_mentions_replay_as_terminal_paths() {
+    let text = "Read [AGENTS.md](<./pet-fx notes/AGENTS.md> \"Workspace file\") and [print](<./print> \"Workspace folder\").";
+    let update = || {
+        SessionUpdate::UserMessageChunk(
+            ContentChunk::new(text.to_owned().into()).message_id("desktop-file"),
+        )
+    };
+    let expected = ["You: Read \"pet-fx notes/AGENTS.md\" and print."];
+    let mut transcript = Transcript::default();
+    transcript.note(&notification(
+        update(),
+        protocol::LIVE,
+        json!({"turnId":"active","activityOrder":0,"offsetBytes":0,"replace":false}),
+    ));
+    assert_eq!(transcript.lines(), expected);
+    transcript.begin("reopen".to_owned());
+    transcript.note(&notification(
+        update(),
+        protocol::WINDOW,
+        json!({"requestId":"reopen","turnId":"active","activityOrder":0}),
+    ));
+    assert!(!transcript.finish(&json!({
+        "requestId":"reopen","turns":[{"turnId":"active","status":"succeeded"}],
+    })));
+    assert_eq!(transcript.lines(), expected);
+    assert_eq!(
+        crate::file_picker::project_paths(&format!("`{text}`")),
+        format!("`{text}`")
+    );
+    assert_eq!(
+        crate::file_picker::project_paths("[Q4](<./drafts/Q4%20%231> \"Workspace file\")"),
+        "\"drafts/Q4 #1\""
+    );
+}
+
+#[test]
+fn file_picker_escape_preserves_the_query_and_enter_inserts_in_queued_edits() {
+    let mut app = App::default();
+    app.state.observe(seen(
+        2,
+        json!([]),
+        json!({"inputId":"waiting","checkoutId":"checked"}),
+        Value::Null,
+    ));
+    *app.state.input() = "Compare @plans".into();
+    app.file_picker.update(app.state.completion_draft());
+    app.file_picker
+        .set_paths(picker_entries(&["docs/Plans@Q4/"]));
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Esc)));
+    assert_eq!(app.state.completion_draft(), Some("Compare @plans"));
+    app.file_picker.update(app.state.completion_draft());
+    assert_eq!(app.file_picker.height(), 0);
+    assert!(!app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Enter)));
+
+    app.state.input().push_str("@q4");
+    app.file_picker.update(app.state.completion_draft());
+    assert!(app.complete_path(PICKER_AREA, KeyEvent::from(KeyCode::Enter)));
+    assert_eq!(app.file_picker.height(), 0);
+    let edit = app.state.enter("example").unwrap();
+    assert_eq!(edit.method, "queue-reinsert");
+    assert_eq!(edit.params["text"], "Compare docs/Plans@Q4 ");
 }
 
 #[test]

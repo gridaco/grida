@@ -1,4 +1,7 @@
-import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
+import type {
+  WorkspaceFsEntry,
+  WorkspacePathMatch,
+} from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
 import type { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { WorkspaceFileMentions } from "./workspace-file-mentions";
@@ -12,7 +15,54 @@ const entry = (
   kind,
 });
 
-it("offers exact relative paths from this workspace", async () => {
+it("uses the ranked native results, preserving full paths and empty results", async () => {
+  const readdir = vi.fn<WorkspaceArtifact.Readdir>();
+  const search =
+    vi.fn<(query: string) => Promise<WorkspacePathMatch[] | null>>();
+  search
+    .mockResolvedValueOnce([
+      { path: "z/cover@2x.png", kind: "file" },
+      { path: "a/cover drafts", kind: "directory" },
+    ])
+    .mockResolvedValueOnce([]);
+  const lookup = WorkspaceFileMentions.source(readdir, search);
+  const { signal } = new AbortController();
+  await expect(lookup("cover", signal)).resolves.toEqual([
+    {
+      id: "z/cover@2x.png",
+      label: "cover@2x.png",
+      path: "z/cover@2x.png",
+      kind: "file",
+    },
+    {
+      id: "a/cover drafts",
+      label: "cover drafts",
+      path: "a/cover drafts",
+      kind: "folder",
+    },
+  ]);
+  await expect(lookup("nothing", signal)).resolves.toEqual([]);
+  expect(readdir).not.toHaveBeenCalled();
+});
+
+it("retains the directory fallback when a shell lacks native search", async () => {
+  const readdir = vi
+    .fn<WorkspaceArtifact.Readdir>()
+    .mockResolvedValue([entry("first.md"), entry("second.md")]);
+  const search = vi.fn<(query: string) => Promise<null>>(async () => null);
+  const lookup = WorkspaceFileMentions.source(readdir, search);
+  const { signal } = new AbortController();
+  await expect(lookup("first", signal)).resolves.toMatchObject([
+    { path: "first.md" },
+  ]);
+  await expect(lookup("second", signal)).resolves.toMatchObject([
+    { path: "second.md" },
+  ]);
+  expect(search).toHaveBeenCalledTimes(1);
+  expect(readdir).toHaveBeenCalledTimes(1);
+});
+
+it("offers exact relative paths for workspace files and folders", async () => {
   const children: Record<string, WorkspaceFsEntry[]> = {
     "": [
       entry("one", "directory"),
@@ -34,9 +84,11 @@ it("offers exact relative paths from this workspace", async () => {
   const { signal } = new AbortController();
 
   const mentions = await WorkspaceFileMentions.list(readdir, signal);
-  expect(mentions.map(({ label, path }) => ({ label, path }))).toEqual([
-    { label: "one/brief.txt", path: "one/brief.txt" },
-    { label: "two/brief.txt", path: "two/brief.txt" },
+  expect(mentions.map(({ kind, path }) => ({ kind, path }))).toEqual([
+    { kind: "folder", path: "one" },
+    { kind: "file", path: "one/brief.txt" },
+    { kind: "folder", path: "two" },
+    { kind: "file", path: "two/brief.txt" },
   ]);
   expect(readdir.mock.calls).toEqual([[""], ["one"], ["two"]]);
 });
@@ -62,8 +114,11 @@ it("bounds discovery even in a wide workspace with no files", async () => {
       : []
   );
 
-  await expect(
-    WorkspaceFileMentions.list(readdir, new AbortController().signal)
-  ).resolves.toEqual([]);
+  const mentions = await WorkspaceFileMentions.list(
+    readdir,
+    new AbortController().signal
+  );
+  expect(mentions).toHaveLength(63);
+  expect(mentions.every(({ kind }) => kind === "folder")).toBe(true);
   expect(readdir).toHaveBeenCalledTimes(64);
 });

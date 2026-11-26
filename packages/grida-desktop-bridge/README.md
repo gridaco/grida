@@ -9,6 +9,11 @@ Desktop source files directly.
 
 ## Contract
 
+The optional `workspaces.search_paths(workspaceId, query)` capability returns
+up to eight ranked file or folder matches from a registered workspace.
+Results contain workspace-relative paths and entry kinds. An empty list
+means no matches. `null` indicates a profile without native search.
+
 - Owns the renderer-visible bridge protocol version.
 - Owns the typed shape of `window.grida`.
 - Owns Desktop-native capability names exposed to the renderer.
