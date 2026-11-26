@@ -21,7 +21,10 @@ export class ComposerDraftBinding {
     if (this.owns(target)) {
       if (!returned || returned === this.returnedFirstMessage)
         return "unchanged";
-      const current = ordinaryEditor.readDocument();
+      const current = ComposerDraftBinding.append(
+        ordinaryEditor.readDocument(),
+        []
+      );
       const pending: ComposerDraftReturnedMessage[] = [];
       for (
         let entry: ComposerDraftReturnedMessage | undefined = returned;
@@ -31,12 +34,13 @@ export class ComposerDraftBinding {
         pending.push(entry);
       const recovered = pending
         .reverse()
-        .reduce<unknown>(
+        .reduce(
           (document, entry) =>
             ComposerDraftBinding.append(document, entry.content),
           current
         );
-      if (current !== recovered && !ordinaryEditor.restoreDocument(recovered))
+      const added = recovered.content.slice(current.content.length);
+      if (added.length && !ordinaryEditor.appendDocument?.(added))
         return "unavailable";
       this.returnedFirstMessage = returned;
       this.savedDocument = JSON.stringify(target.store.read(target.key));
@@ -88,16 +92,25 @@ export class ComposerDraftBinding {
 }
 
 export namespace ComposerDraftBinding {
-  /** Append a returned message once, keeping any newer composer blocks. */
-  export function append(document: unknown, content: readonly unknown[]) {
-    if (
-      document &&
+  type Document = Readonly<{ type: "doc"; content: readonly unknown[] }>;
+
+  function isDocument(document: unknown): document is Document {
+    return (
+      !!document &&
       typeof document === "object" &&
       "type" in document &&
       document.type === "doc" &&
       "content" in document &&
       Array.isArray(document.content)
-    ) {
+    );
+  }
+
+  /** Append a returned message once, keeping any newer composer blocks. */
+  export function append(
+    document: unknown,
+    content: readonly unknown[]
+  ): Document {
+    if (isDocument(document)) {
       const suffix = document.content.slice(-content.length);
       return !content.length ||
         JSON.stringify(suffix) === JSON.stringify(content)
@@ -122,12 +135,13 @@ export namespace ComposerDraftBinding {
 
   export type DocumentEditor = Readonly<{
     readDocument(): unknown | null;
-    restoreDocument(document: unknown): boolean;
+    appendDocument?(blocks: readonly unknown[]): boolean;
   }>;
 
   export type Editor = DocumentEditor &
     Readonly<{
       ready: boolean;
       clearForHistory(): void;
+      restoreDocument(document: unknown): boolean;
     }>;
 }

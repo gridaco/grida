@@ -1,10 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { generateText, getSchema } from "@tiptap/core";
+import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { ComposerCore } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
 import { WorkspaceMention } from "./workspace-mention";
 
 describe("ComposerTiptap", () => {
+  it("appends a recovered mention to nonempty text without replacing the caret or the typed block", () => {
+    const schema = getSchema(ComposerTiptap.extensions({ placeholder: "" }));
+    const doc = schema.nodeFromJSON({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "New typing" }] },
+      ],
+    });
+    const state = EditorState.create({
+      doc,
+      selection: TextSelection.create(doc, 4),
+    });
+    const recovered = ComposerTiptap.markdownDocument(
+      '[notes.md](<./work/notes.md> "Workspace file")'
+    )!;
+    const append = ComposerTiptap.appendDocument(state, recovered.content!);
+    expect(append?.doc.toJSON().content).toEqual([
+      ...doc.toJSON().content,
+      ...recovered.content!,
+    ]);
+    expect(append?.selection.from).toBe(4);
+  });
+
   it("uses the filename in the draft, keeps the exact path inline, and restores the mention", () => {
     const extensions = ComposerTiptap.extensions({ placeholder: "" });
     const schema = getSchema(extensions);

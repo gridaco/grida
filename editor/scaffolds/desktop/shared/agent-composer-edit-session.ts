@@ -1,3 +1,5 @@
+import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
+
 /** Temporarily borrow an editor without replacing or persisting its ordinary draft. */
 export class AgentComposerEditSession {
   private active: {
@@ -73,14 +75,14 @@ export class AgentComposerEditSession {
   /** Reconcile the borrowed draft without replacing the queued edit. */
   ordinaryEditor(
     owner: unknown,
-    editor: AgentComposerEditSession.DocumentEditor
-  ): AgentComposerEditSession.DocumentEditor {
+    editor: ComposerDraftBinding.DocumentEditor
+  ): ComposerDraftBinding.DocumentEditor {
     const active = this.active;
     if (!active || !Object.is(active.owner, owner)) return editor;
     return {
       readDocument: () => active.document,
-      restoreDocument: (document: unknown) => {
-        active.document = document;
+      appendDocument: (content) => {
+        active.document = ComposerDraftBinding.append(active.document, content);
         return true;
       },
     };
@@ -92,15 +94,11 @@ export class AgentComposerEditSession {
 }
 
 export namespace AgentComposerEditSession {
-  export type DocumentEditor = Readonly<{
+  export type Editor = Readonly<{
+    ready: boolean;
     readDocument(): unknown | null;
     restoreDocument(document: unknown): boolean;
+    clear(): void;
+    focus(): boolean;
   }>;
-
-  export type Editor = DocumentEditor &
-    Readonly<{
-      ready: boolean;
-      clear(): void;
-      focus(): boolean;
-    }>;
 }

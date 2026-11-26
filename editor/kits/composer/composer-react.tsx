@@ -76,6 +76,8 @@ export type ComposerController = {
   readDocument: () => unknown | null;
   /** Restore a saved document into an empty editor. False when not applied. */
   restoreDocument: (doc: unknown) => boolean;
+  /** Append saved blocks to the current document. */
+  appendDocument: (blocks: readonly unknown[]) => boolean;
   /** `onHistoryChange` receives true on append or redo, and false on undo. */
   appendText: (
     text: string,
@@ -226,6 +228,13 @@ export function useComposer() {
           return false;
         }
         ComposerTiptap.syncCore(core, editor);
+        return true;
+      },
+      appendDocument(blocks) {
+        if (!editor || editor.isDestroyed) return false;
+        const transaction = ComposerTiptap.appendDocument(editor.state, blocks);
+        if (!transaction) return false;
+        editor.view.dispatch(transaction);
         return true;
       },
       appendText(text, maxBytes, placement, onHistoryChange) {

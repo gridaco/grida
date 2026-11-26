@@ -11133,7 +11133,12 @@ describe("a first message chosen before the chat opened", () => {
           visible = null;
         },
         restoreDocument: (doc: unknown) => {
+          if (visible !== null) return false;
           visible = doc;
+          return true;
+        },
+        appendDocument: (blocks: readonly unknown[]) => {
+          visible = ComposerDraftBinding.append(visible, blocks);
           return true;
         },
       };

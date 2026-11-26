@@ -94,15 +94,18 @@ describe("AgentComposerEditSession", () => {
     session.sync({ id: "queued", text: "Queued edit" }, "chat", editor);
     const edit = state.document;
     const ordinary = session.ordinaryEditor("chat", editor);
-    const recovered = {
-      type: "doc",
-      content: [...original.content, { type: "paragraph" }],
+    const block = {
+      type: "paragraph",
+      content: [{ type: "text", text: "Recovered" }],
     };
     expect(ordinary.readDocument()).toBe(original);
-    expect(ordinary.restoreDocument(recovered)).toBe(true);
+    expect(ordinary.appendDocument?.([block])).toBe(true);
     expect(state.document).toBe(edit);
     expect(session.sync(undefined, "chat", editor)).toBe("changed");
-    expect(state.document).toBe(recovered);
+    expect(state.document).toEqual({
+      type: "doc",
+      content: [...original.content, block],
+    });
   });
 
   it("keeps the new chat's restored draft when an old edit is retired", () => {

@@ -14,13 +14,14 @@ import {
   MarkdownSerializer,
   defaultMarkdownSerializer,
 } from "@tiptap/pm/markdown";
-import type {
-  MarkType,
-  Node as ProseMirrorNode,
-  ResolvedPos,
-  Schema,
+import {
+  Fragment,
+  type MarkType,
+  type Node as ProseMirrorNode,
+  type ResolvedPos,
+  type Schema,
 } from "@tiptap/pm/model";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -354,6 +355,34 @@ export namespace ComposerTiptap {
   export function markdownDocument(text: string): JSONContent | undefined {
     markdownSchema ??= getSchema(extensions({ placeholder: "" }));
     return parseComposerPrompt(markdownSchema, text)?.toJSON();
+  }
+
+  /** Add saved blocks without replacing the document or moving its caret. */
+  export function appendDocument(
+    state: EditorState,
+    blocks: readonly unknown[]
+  ) {
+    if (blocks.length === 0) return;
+    try {
+      const content = Fragment.fromArray(
+        blocks.map((block) => state.schema.nodeFromJSON(block))
+      );
+      const { doc } = state;
+      const empty =
+        doc.childCount === 1 &&
+        doc.firstChild?.type.name === "paragraph" &&
+        !doc.firstChild.content.size;
+      const from = empty ? 0 : doc.childCount;
+      if (!doc.canReplace(from, doc.childCount, content)) return;
+      content.forEach((node) => node.check());
+      return state.tr.replaceWith(
+        empty ? 0 : doc.content.size,
+        doc.content.size,
+        content
+      );
+    } catch {
+      return;
+    }
   }
 
   export function extensions(input: { placeholder: string }) {
