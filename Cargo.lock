@@ -1326,7 +1326,7 @@ dependencies = [
 
 [[package]]
 name = "grida-cli"
-version = "0.10.0"
+version = "0.11.0-rc.1"
 dependencies = [
  "agent-client-protocol",
  "agent-kit-core",

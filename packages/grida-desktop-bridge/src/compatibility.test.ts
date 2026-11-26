@@ -8,6 +8,14 @@ describe("Desktop compatibility handshake", () => {
     expect(DesktopCompatibility.parse(handshake)).toEqual(handshake);
   });
 
+  it("derives the hosted compatibility version from a release candidate", () => {
+    expect(DesktopCompatibility.fromBuildVersion("0.11.0-rc.1")).toEqual({
+      desktopVersion: "0.11.0",
+    });
+    expect(DesktopCompatibility.fromBuildVersion("0.8.1")).toEqual(handshake);
+    expect(DesktopCompatibility.fromBuildVersion("0.11.0-rc.01")).toBeNull();
+  });
+
   it.each([
     ["0.7.99", "0.8.1", true],
     ["0.99.99", "1.0.0", true],

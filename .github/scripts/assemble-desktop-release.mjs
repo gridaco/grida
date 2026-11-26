@@ -16,19 +16,30 @@ const githubReleaseVisibilityRetryDelaysMs = Object.freeze([
 
 export const DesktopRelease = Object.freeze({
   expectedAssetNames(version) {
+    // Match the package makers' version formats after GitHub asset sanitization.
+    const rpmVersion = version.replace("-", "~").replaceAll("-", ".");
+    const debVersion = version.replace(
+      /(\d)[_.+-]?((?:RC|rc|pre|dev|beta|alpha)[_.+-]?\d*)$/,
+      "$1~$2"
+    );
+    const nugetVersion = version
+      .split("+", 1)[0]
+      .replace(/-.+$/, (suffix) => suffix.replaceAll(".", ""));
     return [
-      `Grida-${version}-1.arm64.rpm`,
-      `Grida-${version}-1.x86_64.rpm`,
+      `Grida-${rpmVersion}-1.arm64.rpm`,
+      `Grida-${rpmVersion}-1.x86_64.rpm`,
       `Grida-${version}-arm64.dmg`,
       `Grida-${version}-x64.dmg`,
       `Grida-darwin-arm64-${version}.zip`,
       `Grida-darwin-x64-${version}.zip`,
       `Grida.Setup.${version}.x64.exe`,
       "RELEASES",
-      `co.grida.desktop.x64-${version}-full.nupkg`,
-      `grida_${version}_amd64.deb`,
-      `grida_${version}_arm64.deb`,
-    ].sort();
+      `co.grida.desktop.x64-${nugetVersion}-full.nupkg`,
+      `grida_${debVersion}_amd64.deb`,
+      `grida_${debVersion}_arm64.deb`,
+    ]
+      .map((name) => DesktopRelease.sanitizeAssetName(name))
+      .sort();
   },
 
   sanitizeAssetName(name) {

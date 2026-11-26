@@ -66,6 +66,13 @@ export namespace DesktopCompatibility {
     return a && b ? precedence(a, b) : null;
   }
 
+  /** A prerelease build implements the same compatibility line as its core version. */
+  export function fromBuildVersion(value: string): Handshake | null {
+    const build = version(value);
+    if (!build || build.build !== undefined) return null;
+    return { desktopVersion: build.numbers.join(".") };
+  }
+
   export function parse(value: unknown): Handshake | null {
     if (
       typeof value !== "object" ||

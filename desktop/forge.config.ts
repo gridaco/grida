@@ -29,6 +29,9 @@ dotenv.config();
 const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
+const { version: desktopVersion } = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "package.json"), "utf8")
+) as { version: string };
 // GRIDA-SEC-005 — deep-link scheme, per channel so a dev build and an installed
 // Grida never fight over one OS handler. Insiders targets the localhost editor
 // (like dev) and so registers `grida-dev` to match the editor's dev redirect
@@ -270,9 +273,8 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel((arch) => {
-      const version = process.env.npm_package_version;
       return {
-        setupExe: `${productName}.Setup.${version}.${arch}.exe`,
+        setupExe: `${productName}.Setup.${desktopVersion}.${arch}.exe`,
         name: appBundleId + `.${arch}`,
         title: productName,
         iconUrl: "https://grida.co/favicon.ico",
@@ -293,6 +295,8 @@ const config: ForgeConfig = {
       options: {
         productName: productName,
         name: productName,
+        // RPM uses a tilde to order the release candidate before the final build.
+        version: desktopVersion.replace("-", "~"),
         icon: "./images/icon.png",
         mimeType: [
           // grida:// (prod) / grida-dev:// (insiders) deep linking
