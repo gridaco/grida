@@ -36,7 +36,7 @@ overrides:
   # for current Electron releases. Only the Linux packaging path actually
   # rebuilds (see forge.config.ts rebuildConfig), but the lookup must succeed
   # there. Keep this current when bumping Electron majors.
-  node-abi: "^4.31.0"
+  node-abi: "^4.39.0"
   "@grida/ai-host": "link:../packages/grida-ai-host"
   "@grida/daemon": "link:../packages/grida-daemon"
   "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge"

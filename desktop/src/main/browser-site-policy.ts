@@ -185,8 +185,7 @@ export class BrowserSitePolicy {
         );
       }
     );
-    // Electron 42.2 supplies no initiating frame/WC on this event. Keep
-    // Chromium's restricted-directory boundary rather than guessing its owner.
+    // Keep Chromium's restricted-directory boundary for browser guests.
     browserSession.on(
       "file-system-access-restricted",
       (event, _details, callback) => {

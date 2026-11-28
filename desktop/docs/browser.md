@@ -203,9 +203,8 @@ unconfirmed two seconds after that close request.
 
 File System Access uses Chromium's selected file/folder handles and confirms
 that exact path and read/write scope. Workspace attachment and private native
-paths are never inherited as website grants. Restricted-directory overrides
-remain unavailable: Electron 42.2's restricted-path event lacks an initiating
-frame/WebContents identity.
+paths are never inherited as website grants. Browser guests cannot override
+Chromium's restricted-directory policy.
 
 HTTP authentication uses a native credential form for the actual site origin;
 a proxy challenge identifies its actual host and port. Navigation or owner loss
