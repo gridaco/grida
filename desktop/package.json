@@ -58,7 +58,7 @@
     "ai": "6.0.116",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
-    "electron": "^42.2.0",
+    "electron": "^45.5.0",
     "electron-squirrel-startup": "^1.0.1",
     "parse5": "7.3.0",
     "react": "19.2.5",

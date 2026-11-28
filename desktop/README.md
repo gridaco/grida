@@ -2,6 +2,8 @@
 
 [👉 Download](https://grida.co/downloads)
 
+Desktop requires macOS 13 (Ventura) or later.
+
 The desktop app is the Electron host for the Grida editor. It loads the
 hosted editor under `/desktop/*`, exposes a path-scoped preload bridge,
 and supervises the native Rust chat host over private ACP pipes. A retained

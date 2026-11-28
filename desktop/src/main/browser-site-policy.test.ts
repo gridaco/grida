@@ -153,7 +153,7 @@ function fixture(
               : { deviceId: id },
       } as unknown as Parameters<DeviceHandler>[0]),
     display: (extra: Partial<Parameters<DisplayHandler>[0]> = {}) =>
-      new Promise<Electron.Streams>((resolve) =>
+      new Promise<Electron.Streams | null>((resolve) =>
         display(
           {
             frame: top as unknown as WebFrameMain,
@@ -488,7 +488,13 @@ it("confirms Chromium's exact selected file access without inheriting any worksp
   browser.session.emit(
     "file-system-access-restricted",
     browser.event(),
-    { origin: "https://site.test", path: "/private" },
+    {
+      origin: "https://site.test",
+      path: "/private",
+      isDirectory: true,
+      frame: browser.contents.mainFrame,
+      webContents: browser.contents,
+    } satisfies Electron.FileSystemAccessRestrictedDetails,
     restricted
   );
   expect(restricted).toHaveBeenCalledWith("deny");
